@@ -1,0 +1,43 @@
+{
+  "name": "@mbc-cqrs-severless/core",
+  "version": "1.0.0",
+  "description": "CQRS and event base core",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "files": [
+    "dist",
+    "!dist/tsconfig.tsbuildinfo"
+  ],
+  "scripts": {
+    "build": "rm -rf dist && tsc",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/mbc-net/mbc-cqrs-serverless.git",
+    "directory": "packages/core"
+  },
+  "author": "MBC",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/mbc-net/mbc-cqrs-serverless/issues"
+  },
+  "homepage": "https://github.com/mbc-net/mbc-cqrs-serverless#readme",
+  "publishConfig": {
+    "access": "public"
+  },
+  "dependencies": {
+    "@aws-crypto/sha256-js": "^5.2.0",
+    "@codegenie/serverless-express": "^4.13.0",
+    "@nestjs/common": "^10.3.0",
+    "@nestjs/config": "^3.1.1",
+    "@nestjs/core": "^10.3.0",
+    "@nestjs/mapped-types": "^2.0.4",
+    "@nestjs/platform-express": "^10.3.0",
+    "@nestjs/swagger": "^7.1.17",
+    "class-transformer": "^0.5.1",
+    "class-validator": "^0.14.0",
+    "reflect-metadata": "^0.1.14",
+    "ulid": "^2.3.0"
+  }
+}
