@@ -1,0 +1,16 @@
+{
+  "name": "mbc-cqrs-serverless-example-master",
+  "version": "1.0.0",
+  "description": "Example for using basic command",
+  "main": "index.js",
+  "scripts": {
+    "build": "nest build --watch",
+    "start": "nest start --watch --entryFile repl",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "MBC",
+  "license": "MIT",
+  "dependencies": {
+    "@mbc-cqrs-severless/core": "^0.0.1-alpha.0"
+  }
+}
