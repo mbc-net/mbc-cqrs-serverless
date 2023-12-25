@@ -35,3 +35,6 @@ lerna-debug.log*
 
 # build
 dist/
+
+# nestjs repl
+.nestjs_repl_history
