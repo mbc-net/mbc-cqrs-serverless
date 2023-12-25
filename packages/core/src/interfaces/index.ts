@@ -1,5 +1,5 @@
 export * from './app-module-options.interface'
-export * from './aws/step-function.interface'
+export * from './aws'
 export * from './command.dto'
 export * from './command.entity'
 export * from './command-input-model.interface'

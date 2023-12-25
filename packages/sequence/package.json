@@ -1,0 +1,31 @@
+{
+  "name": "@mbc-cqrs-severless/sequence",
+  "version": "1.0.0",
+  "description": "Generate increment sequence with time-rotation",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "files": [
+    "dist",
+    "!dist/tsconfig.tsbuildinfo"
+  ],
+  "scripts": {
+    "build": "rm -rf dist && tsc",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/mbc-net/mbc-cqrs-serverless.git"
+  },
+  "author": "MBC",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/mbc-net/mbc-cqrs-serverless/issues"
+  },
+  "homepage": "https://github.com/mbc-net/mbc-cqrs-serverless#readme",
+  "publishConfig": {
+    "access": "public"
+  },
+  "dependencies": {
+    "@mbc-cqrs-severless/core": "^0.0.1-alpha.0"
+  }
+}

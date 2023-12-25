@@ -62,6 +62,7 @@
     "typescript": "^5.3.3"
   },
   "workspaces": [
-    "packages/core"
+    "packages/core",
+    "packages/sequence"
   ]
 }
