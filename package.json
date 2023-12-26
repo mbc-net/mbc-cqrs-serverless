@@ -63,6 +63,7 @@
   },
   "workspaces": [
     "packages/core",
-    "packages/sequence"
+    "packages/sequence",
+    "packages/task"
   ]
 }
