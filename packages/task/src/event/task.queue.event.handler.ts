@@ -4,7 +4,7 @@ import { ConfigService } from '@nestjs/config'
 import { ModuleRef } from '@nestjs/core'
 
 import { TaskStatusEnum } from '../enums/status.enum'
-import { MODULE_OPTIONS_TOKEN } from '../task.module-definition'
+import { TASK_QUEUE_EVENT_FACTORY } from '../task.module-definition'
 import { TaskService } from '../task.service'
 import { TaskQueueEvent } from './task.queue.event'
 import { ITaskQueueEventFactory } from './task.queue.event-factory.interface'
@@ -21,7 +21,7 @@ export class TaskQueueEventHandler
     private readonly configService: ConfigService,
     private readonly moduleRef: ModuleRef,
     private readonly taskService: TaskService,
-    @Inject(MODULE_OPTIONS_TOKEN)
+    @Inject(TASK_QUEUE_EVENT_FACTORY)
     private readonly eventFactory: ITaskQueueEventFactory,
   ) {}
 
