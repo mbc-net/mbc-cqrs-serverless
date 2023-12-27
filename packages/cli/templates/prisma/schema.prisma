@@ -1,0 +1,45 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider      = "prisma-client-js"
+  binaryTargets = ["native", "linux-arm64-openssl-1.0.x"]
+  // binaryTargets = ["native", "rhel-openssl-1.0.x"]
+}
+
+datasource db {
+  provider     = "mysql"
+  url          = env("DATABASE_URL")
+  relationMode = "prisma"
+}
+
+model Master {
+  id             String   @id
+  cpk            String // コマンド用PK
+  csk            String // コマンド用SK
+  pk             String // データ用PK, MASTER#unigrab (テナントコード)
+  sk             String // データ用SK, マスタ種別コード#マスタコード
+  masterTypeCode String   @map("master_type_code") // マスタ種別コード, 【共通マスタ】 or 【テナント固有マスタ】
+  masterCode     String   @map("master_code") // マスタコード
+  tenantCode     String   @map("tenant_code") // テナントコード, 【テナントコードマスタ】
+  seq            Int      @default(0) // 並び順, 採番機能を使用する
+  code           String // レコードのコード, マスタ種別コード#マスタコード
+  name           String // レコード名, 名前
+  version        Int // バージョン
+  isDeleted      Boolean  @default(false) @map("is_deleted") // 削除フラグ
+  createdBy      String   @default("") @map("created_by") // 作成者
+  createdIp      String   @default("") @map("created_ip") // 作成IP, IPv6も考慮する
+  createdAt      DateTime @default(now()) @map("created_at") @db.Timestamp(0) // 作成日時
+  updatedBy      String   @default("") @map("updated_by") // 更新者
+  updatedIp      String   @default("") @map("updated_ip") // 更新IP, IPv6も考慮する
+  updatedAt      DateTime @updatedAt @map("updated_at") @db.Timestamp(0) // 更新日時
+
+  atttributesMaster Json? @map("atttributes_master")
+
+  @@unique([cpk, csk])
+  @@unique([pk, sk])
+  @@unique([tenantCode, code])
+  @@unique([tenantCode, masterTypeCode, masterCode])
+  @@index([tenantCode, name])
+  @@map("masters")
+}

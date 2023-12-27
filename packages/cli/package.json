@@ -1,0 +1,33 @@
+{
+  "name": "@mbc-cqrs-severless/cli",
+  "version": "1.0.0",
+  "description": "a CLI to get started with MBC CQRS serverless framework",
+  "bin": {
+    "mbc": "./dist/index.js"
+  },
+  "files": [
+    "dist",
+    "!dist/tsconfig.tsbuildinfo",
+    "templates"
+  ],
+  "scripts": {
+    "build": "rm -rf dist && tsc",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/mbc-net/mbc-cqrs-serverless.git"
+  },
+  "author": "MBC",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/mbc-net/mbc-cqrs-serverless/issues"
+  },
+  "homepage": "https://github.com/mbc-net/mbc-cqrs-serverless#readme",
+  "publishConfig": {
+    "access": "public"
+  },
+  "dependencies": {
+    "commander": "^11.1.0"
+  }
+}

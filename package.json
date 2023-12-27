@@ -5,7 +5,7 @@
   "main": "index.js",
   "scripts": {
     "build": "lerna run build",
-    "publish": "lerna publish --no-private",
+    "release": "lerna publish --no-private",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "repository": {
@@ -64,6 +64,7 @@
   "workspaces": [
     "packages/core",
     "packages/sequence",
-    "packages/task"
+    "packages/task",
+    "packages/cli"
   ]
 }

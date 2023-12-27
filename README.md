@@ -1,5 +1,12 @@
 # MBC CQRS serverless framework
 
+## Installation
+
+```
+$ npm i -g @mbc-cqrs-severless/cli
+$ mbc new YOUR_PROJECT_NAME
+```
+
 ## Usage
 
 - TODO
@@ -25,7 +32,7 @@ $ npm run build
 - Publish packages
 
 ```bash
-$ npm run publish
+$ npm run release
 ```
 
 ## References

@@ -1,0 +1,42 @@
+@endpoint = http://localhost:3000
+@cognitoEndpoint = http://localhost:9229
+@clientId = dnk8y7ii3wled35p3lw0l2cd7
+# account's username 
+@username = admin2
+# account's password
+@password = admin1234
+# account's email
+@email = admin2@example.com
+
+@apiBaseUrl = {{endpoint}}/api
+@eventBaseUrl = {{endpoint}}/event
+
+###
+GET {{endpoint}} HTTP/1.1
+
+###
+# login
+# @name login_cognito
+POST {{cognitoEndpoint}}
+Accept: application/json
+Content-Type: application/x-amz-json-1.1
+X-Amz-Target: AWSCognitoIdentityProviderService.InitiateAuth
+
+{
+  "AuthFlow": "USER_PASSWORD_AUTH",
+  "ClientId": "{{clientId}}",
+  "AuthParameters": {
+    "USERNAME": "{{username}}",
+    "PASSWORD": "{{password}}"
+  },
+  "ClientMetadata": {}
+}
+
+###
+@token = {{login_cognito.response.body.AuthenticationResult.IdToken}}
+###
+
+# Health
+GET {{endpoint}}
+Accept: application/json
+Authorization: {{token}}

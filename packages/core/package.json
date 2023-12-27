@@ -37,6 +37,7 @@
     "@nestjs/swagger": "^7.1.17",
     "class-transformer": "^0.5.1",
     "class-validator": "^0.14.0",
+    "node-fetch": "^2.7.0",
     "reflect-metadata": "^0.1.14",
     "ulid": "^2.3.0"
   }
