@@ -27,7 +27,7 @@
     "migrate": "npm run migrate:rds && npm run migrate:ddb"
   },
   "dependencies": {
-    "@mbc-cqrs-severless/core": "^0.0.6-alpha.0",
+    "@mbc-cqrs-severless/core": "^0.0.5-alpha.0",
     "@prisma/client": "^5.7.1"
   },
   "devDependencies": {
@@ -43,7 +43,7 @@
     "@aws-sdk/signature-v4": "^3.374.0",
     "@aws-sdk/util-create-request": "^3.468.0",
     "@aws-sdk/util-dynamodb": "^3.360.0",
-    "@mbc-cqrs-severless/cli": "^0.0.6-alpha.0",
+    "@mbc-cqrs-severless/cli": "^0.0.5-alpha.0",
     "@nestjs/cli": "^10.2.1",
     "@nestjs/schematics": "^10.0.3",
     "@nestjs/testing": "^10.3.0",
