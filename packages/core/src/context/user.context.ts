@@ -1,7 +1,5 @@
 import { getCurrentInvoke } from '@codegenie/serverless-express'
 
-import { Role } from '../constants'
-
 export interface JwtClaims {
   sub: string
   iss: string
@@ -22,7 +20,7 @@ export interface JwtClaims {
 
 export class UserContext {
   userId: string
-  isSuperAdmin: boolean
+  superRole: string
   role?: string
   tenantCode: string
 
@@ -40,12 +38,12 @@ export const getUserContext = (event?: any): UserContext => {
   const tenantCode = claims['custom:tenantCode'] || event?.headers?.tenant
   const userId = claims.sub
   const role = event?.requestContext?.authorizer?.role
-  const isSuperAdmin = claims['custom:super_role'] === Role.SUPER_ADMIN
+  const superRole = claims['custom:super_role']
 
   return {
     userId,
     role,
-    isSuperAdmin,
+    superRole,
     tenantCode,
   }
 }
