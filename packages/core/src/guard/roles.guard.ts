@@ -8,7 +8,7 @@ import {
 import { Reflector } from '@nestjs/core'
 
 import { Role } from '../constants'
-import { getUserContext, setAuthorizerContext } from '../context'
+import { getUserContext } from '../context'
 import { ROLE_METADATA } from '../decorators'
 
 @Injectable()
@@ -18,6 +18,27 @@ export class RolesGuard implements CanActivate {
   constructor(private reflector: Reflector) {}
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
+    // check tenant
+    const allowedTenant = await this.verifyTenant(context)
+    if (!allowedTenant) {
+      return false
+    }
+
+    // check role permissions
+    const allowedRole = await this.verifyRole(context)
+    return allowedRole
+  }
+
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  protected async verifyTenant(context: ExecutionContext): Promise<boolean> {
+    // Get tenant code from header
+    const userContext = getUserContext()
+
+    // required tenant code
+    return !!userContext.tenantCode
+  }
+
+  protected async verifyRole(context: ExecutionContext): Promise<boolean> {
     const requiredRoles = this.reflector.getAllAndOverride<string[]>(
       ROLE_METADATA,
       [context.getHandler(), context.getClass()],
@@ -45,16 +66,9 @@ export class RolesGuard implements CanActivate {
     this.logger.debug('context: ', ctx)
     const userContext = getUserContext(event)
 
-    // Get tenant code from header
-    const tenantCode = userContext.tenantCode
-
-    if (!tenantCode) {
-      return ''
-    }
-
     const userRole = userContext.superRole || userContext.role
 
-    setAuthorizerContext(event, 'role', userRole)
+    // setAuthorizerContext(event, 'role', userRole)
 
     return userRole
   }
