@@ -6,6 +6,7 @@
   "scripts": {
     "build": "lerna run build",
     "release": "lerna publish --no-private",
+    "deploy": "npm run build && npm run release",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "repository": {
