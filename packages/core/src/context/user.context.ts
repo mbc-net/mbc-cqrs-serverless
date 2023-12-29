@@ -38,7 +38,7 @@ export const getUserContext = (event?: any): UserContext => {
   const tenantCode = claims['custom:tenantCode'] || event?.headers?.tenant
   const userId = claims.sub
   const role = event?.requestContext?.authorizer?.role
-  const superRole = claims['custom:super_role']
+  const superRole = claims['custom:superRole']
 
   return {
     userId,
