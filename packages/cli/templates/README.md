@@ -40,7 +40,7 @@ $ npm run migrate
       # - stream:
       #     type: dynamodb
       #     maximumRetryAttempts: 10
-      #     arn: arn:aws:dynamodb:ddblocal:000000000000:table/local-demo-tasks/stream/2023-09-26T07:51:55.005
+      #     arn: arn:aws:dynamodb:ddblocal:000000000000:table/local-demo-master/stream/2023-09-26T07:51:55.005
       #     filterPatterns:
       #       - eventName: [INSERT]
 
