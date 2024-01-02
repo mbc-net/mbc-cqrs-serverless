@@ -36,13 +36,8 @@ $ npm run offline:docker
 # migrate tables, open in other terminal session
 $ npm run migrate
 
-# copy dynamodb stream arn to `serverless.yml`
-      # - stream:
-      #     type: dynamodb
-      #     maximumRetryAttempts: 10
-      #     arn: arn:aws:dynamodb:ddblocal:000000000000:table/local-demo-master/stream/2023-09-26T07:51:55.005
-      #     filterPatterns:
-      #       - eventName: [INSERT]
+# copy dynamodb stream arn to `.env` file
+      # LOCAL_DDB_MASTER_STREAM=arn:aws:dynamodb:ddblocal:000000000000:table/local-demo-master-command/stream/2024-01-02T03:07:49.349
 
 # serverless, open in other terminal session
 $ npm run offline:sls

@@ -141,7 +141,7 @@ functions:
       - stream:
           type: dynamodb
           maximumRetryAttempts: 10
-          arn: arn:aws:dynamodb:ddblocal:000000000000:table/local-demo-master-command/stream/2023-12-22T03:22:42.870
+          arn: ${env:LOCAL_DDB_MASTER_STREAM}
           filterPatterns:
             - eventName: [INSERT]
 

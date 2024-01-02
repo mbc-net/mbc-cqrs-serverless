@@ -14,7 +14,7 @@
     "start:repl": "nest start --watch --entryFile repl",
     "offline:docker:build": "cd infra-local && docker-compose up --build --remove-orphans",
     "offline:docker": "cd infra-local && mkdir -p docker-data/.cognito && cp -r cognito-local/db docker-data/.cognito && docker-compose up --remove-orphans",
-    "offline:sls": "ln -f .env $PWD/infra-local/.env && cd infra-loca && NODE_ENV=development AWS_ACCESS_KEY_ID=DUMMYIDEXAMPLE AWS_SECRET_ACCESS_KEY=DUMMYEXAMPLEKEY SLS_DEBUG=* serverless offline start --reloadHandler --ignoreJWTSignature",
+    "offline:sls": "ln -f .env $PWD/infra-local/.env && cd infra-local && NODE_ENV=development AWS_ACCESS_KEY_ID=DUMMYIDEXAMPLE AWS_SECRET_ACCESS_KEY=DUMMYEXAMPLEKEY SLS_DEBUG=* serverless offline start --reloadHandler --ignoreJWTSignature",
     "lint": "eslint \"{src,apps,libs,test}/**/*.ts\" --fix",
     "test": "jest",
     "test:watch": "jest --watch",
