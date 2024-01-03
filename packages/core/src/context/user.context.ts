@@ -8,6 +8,7 @@ export interface CustomRole {
 export interface JwtClaims {
   sub: string
   iss: string
+  'cognito:groups': string
   'cognito:username': string
   origin_jti?: string
   aud: string
@@ -25,7 +26,6 @@ export interface JwtClaims {
 
 export class UserContext {
   userId: string
-  userName?: string
   tenantRole: string
   tenantCode: string
 
@@ -41,7 +41,6 @@ export const getUserContext = (event?: any): UserContext => {
   const claims = getAuthorizerClaims(event)
 
   const userId = claims.sub
-  const userName = claims['cognito:username']
   const tenantCode =
     claims['custom:tenant'] || (event?.headers || {})['x-tenant-code']
   // find tenantRole
@@ -60,7 +59,6 @@ export const getUserContext = (event?: any): UserContext => {
 
   return {
     userId,
-    userName,
     tenantRole,
     tenantCode,
   }
@@ -91,6 +89,7 @@ export const getAuthorizerClaims = (event: any): JwtClaims => {
   // {
   //   "sub": "92ca4f68-9ac6-4080-9ae2-2f02a86206a4",
   //   "iss": "http://localhost:9229/local_2G7noHgW",
+  //   "cognito:groups": "admins",
   //   "cognito:username": "admin2",
   //   "origin_jti": "af065044-5ddd-46f9-b0bb-94941ad80a11",
   //   "aud": "dnk8y7ii3wled35p3lw0l2cd7",
