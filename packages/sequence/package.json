@@ -1,6 +1,6 @@
 {
   "name": "@mbc-cqrs-severless/sequence",
-  "version": "0.0.14-alpha.0",
+  "version": "0.0.15-alpha.0",
   "description": "Generate increment sequence with time-rotation",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
@@ -26,6 +26,6 @@
     "access": "public"
   },
   "dependencies": {
-    "@mbc-cqrs-severless/core": "^0.0.14-alpha.0"
+    "@mbc-cqrs-severless/core": "^0.0.15-alpha.0"
   }
 }
