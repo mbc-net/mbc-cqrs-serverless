@@ -1,5 +1,10 @@
 import { getCurrentInvoke } from '@codegenie/serverless-express'
 
+export interface CustomRole {
+  tenant: string // tenant's code
+  role: string // tenant' role
+}
+
 export interface JwtClaims {
   sub: string
   iss: string
@@ -10,8 +15,8 @@ export interface JwtClaims {
   token_use: string
   auth_time: number
   name: string
-  'custom:tenantCode'?: string
-  'custom:superRole'?: 'super_admin' | 'tenant_user'
+  'custom:tenant'?: string // tenant code
+  'custom:roles'?: string
   exp: number
   email: string
   iat: number
@@ -20,8 +25,8 @@ export interface JwtClaims {
 
 export class UserContext {
   userId: string
-  superRole: string
-  role?: string
+  userName?: string
+  tenantRole: string
   tenantCode: string
 
   constructor(partial: Partial<UserContext>) {
@@ -35,15 +40,28 @@ export const getUserContext = (event?: any): UserContext => {
   }
   const claims = getAuthorizerClaims(event)
 
-  const tenantCode = claims['custom:tenantCode'] || event?.headers?.tenant
   const userId = claims.sub
-  const role = event?.requestContext?.authorizer?.role
-  const superRole = claims['custom:superRole']
+  const userName = claims['cognito:username']
+  const tenantCode =
+    claims['custom:tenant'] || (event?.headers || {})['x-tenant-code']
+  // find tenantRole
+  const roles = (
+    JSON.parse(claims['custom:roles'] || '[]') as CustomRole[]
+  ).map((role) => ({ ...role, tenant: (role.tenant || '').toLowerCase() }))
+  let tenantRole = ''
+  for (const { tenant, role } of roles) {
+    if (tenant === '' || tenant === tenantCode) {
+      tenantRole = role
+      if (tenant !== '') {
+        break
+      }
+    }
+  }
 
   return {
     userId,
-    role,
-    superRole,
+    userName,
+    tenantRole,
     tenantCode,
   }
 }
@@ -80,8 +98,8 @@ export const getAuthorizerClaims = (event: any): JwtClaims => {
   //   "token_use": "id",
   //   "auth_time": 1699930911,
   //   "name": "admin2",
-  //   "custom:tenantCode": "1801",
-  //   "custom:super_role": "super_admin",
+  //   "custom:tenant": "1801",
+  //   "custom:roles": "[{\"role\":\"super_admin\"}]",
   //   "exp": 1700017311,
   //   "email": "admin@test.com",
   //   "iat": 1699930911,

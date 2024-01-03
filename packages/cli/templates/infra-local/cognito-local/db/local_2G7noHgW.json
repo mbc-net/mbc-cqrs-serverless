@@ -11,8 +11,8 @@
           "Value": "admin@test.com"
         },
         {
-          "Name": "custom:super_role",
-          "Value": "super_admin"
+          "Name": "custom:roles",
+          "Value": "[{\"role\":\"super_admin\"}]"
         }
       ],
       "Enabled": true,
@@ -284,9 +284,7 @@
       "AllowAdminCreateUserOnly": false,
       "UnusedAccountValidityDays": 7
     },
-    "UsernameAttributes": [
-      "email"
-    ],
+    "UsernameAttributes": ["email"],
     "Arn": "arn:aws:cognito-idp:local:local:userpool/local_2G7noHgW",
     "CreationDate": "2023-11-14T01:22:17.775Z",
     "Id": "local_2G7noHgW",

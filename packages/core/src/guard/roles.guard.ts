@@ -7,7 +7,7 @@ import {
 } from '@nestjs/common'
 import { Reflector } from '@nestjs/core'
 
-import { Role } from '../constants'
+import { ROLE_SYSTEM_ADMIN } from '../constants'
 import { getUserContext } from '../context'
 import { ROLE_METADATA } from '../decorators'
 
@@ -52,7 +52,7 @@ export class RolesGuard implements CanActivate {
     if (!userRole) {
       return false
     }
-    if (userRole === Role.SUPER_ADMIN) {
+    if (userRole === ROLE_SYSTEM_ADMIN) {
       return true
     }
 
@@ -66,10 +66,6 @@ export class RolesGuard implements CanActivate {
     this.logger.debug('context: ', ctx)
     const userContext = getUserContext(event)
 
-    const userRole = userContext.superRole || userContext.role
-
-    // setAuthorizerContext(event, 'role', userRole)
-
-    return userRole
+    return userContext.tenantRole
   }
 }
