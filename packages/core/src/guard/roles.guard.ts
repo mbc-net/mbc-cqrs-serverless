@@ -13,9 +13,9 @@ import { ROLE_METADATA } from '../decorators'
 
 @Injectable()
 export class RolesGuard implements CanActivate {
-  private readonly logger = new Logger(RolesGuard.name)
+  protected readonly logger = new Logger(RolesGuard.name)
 
-  constructor(private reflector: Reflector) {}
+  constructor(protected reflector: Reflector) {}
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
     // check tenant
