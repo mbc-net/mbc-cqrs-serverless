@@ -2,14 +2,16 @@ import { CommandModel } from './command-model.interface'
 import { DetailKey } from './detail-key.interface'
 
 export class CommandEntity implements CommandModel {
+  source?: string
+  isDeleted?: boolean
   status?: string
-  requestId: string
-  createdAt: Date
-  updatedAt: Date
-  createdBy: string
-  updatedBy: string
-  createdIp: string
-  updatedIp: string
+  requestId?: string
+  createdAt?: Date
+  updatedAt?: Date
+  createdBy?: string
+  updatedBy?: string
+  createdIp?: string
+  updatedIp?: string
   pk: string
   sk: string
   id: string

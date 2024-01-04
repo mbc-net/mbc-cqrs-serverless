@@ -101,7 +101,7 @@ export class CommandService implements OnModuleInit {
     )
   }
 
-  async publish(input: CommandInputModel) {
+  async publish(input: CommandInputModel, source?: string) {
     const inputVersion = input.version || 0
     if (inputVersion) {
       // check current version
@@ -124,6 +124,7 @@ export class CommandService implements OnModuleInit {
       ...input,
       sk: addSortKeyVersion(input.sk, version),
       version,
+      source,
       requestId: context?.awsRequestId,
       createdAt: new Date(),
       updatedAt: new Date(),
