@@ -12,7 +12,7 @@ import { ConfigService } from '@nestjs/config'
 import { ulid } from 'ulid'
 
 import { getUserContext } from '../context/user.context'
-import { getBytesInObj } from '../helpers/obj-byte'
+import { objectBytes } from '../helpers/object'
 import {
   DdbUpdateItem,
   DdbUpdateSetPathValue,
@@ -211,7 +211,7 @@ export class DynamoDbService {
     if (data.attributes || data[':attributes']) {
       const attributes = data.attributes || data[':attributes']
       // check size of attributes
-      const bytes = getBytesInObj(data.attributes || data[':attributes'])
+      const bytes = objectBytes(data.attributes || data[':attributes'])
 
       if (bytes > this.config.get<number>('ATTRIBUTE_LIMIT_SIZE')) {
         // save to s3

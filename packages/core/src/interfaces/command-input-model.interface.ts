@@ -12,3 +12,8 @@ export interface CommandInputModel {
   ttl?: number
   attributes?: Record<string, any>
 }
+
+export interface CommandPartialInputModel extends Partial<CommandInputModel> {
+  pk: string
+  sk: string // include version
+}
