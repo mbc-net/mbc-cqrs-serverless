@@ -9,14 +9,16 @@ import {
 } from '@nestjs/common'
 import { ModuleRef } from '@nestjs/core'
 
+import { VERSION_FIRST, VERSION_LATEST } from '../constants'
 import { getUserContext } from '../context/user.context'
 import { DynamoDbService } from '../data-store/dynamodb.service'
 import { DATA_SYNC_HANDLER_METADATA } from '../decorators'
-import { addSortKeyVersion } from '../helpers/key'
+import { addSortKeyVersion, removeSortKeyVersion } from '../helpers/key'
 import {
   CommandInputModel,
   CommandModel,
   CommandModuleOptions,
+  CommandPartialInputModel,
   DetailKey,
   INotification,
 } from '../interfaces'
@@ -24,6 +26,7 @@ import { IDataSyncHandler } from '../interfaces/data-sync-handler.interface'
 import { SnsService } from '../queue/sns.service'
 import { ExplorerService } from '../services'
 import { MODULE_OPTIONS_TOKEN } from './command.module-definition'
+import { DataService } from './data.service'
 import { DataSyncDdsHandler } from './handlers/data-sync-dds.handler'
 
 const TABLE_NAME = Symbol('command')
@@ -45,6 +48,7 @@ export class CommandService implements OnModuleInit {
     private readonly moduleRef: ModuleRef,
     private readonly snsService: SnsService,
     private readonly dataSyncDdsHandler: DataSyncDdsHandler,
+    private readonly dataService: DataService,
   ) {
     this.tableName = this.dynamoDbService.getTableName(
       this.options.tableName,
@@ -101,9 +105,40 @@ export class CommandService implements OnModuleInit {
     )
   }
 
+  // partial data command
+  async publishPartialUpdate(input: CommandPartialInputModel, source?: string) {
+    let item: CommandModel
+    if (input.version > VERSION_FIRST) {
+      item = await this.getItem({
+        pk: input.pk,
+        sk: addSortKeyVersion(input.sk, input.version),
+      })
+    } else {
+      item = await this.getLatestItem({
+        pk: input.pk,
+        sk: removeSortKeyVersion(input.sk),
+      })
+    }
+    if (!item) {
+      throw new BadRequestException(
+        'The input key is not a valid, item not found',
+      )
+    }
+    const fullInput = { ...item, ...input, version: item.version }
+    this.logger.debug('publishPartialUpdate::', fullInput)
+    return await this.publish(fullInput, source)
+  }
+
+  // full data command
   async publish(input: CommandInputModel, source?: string) {
-    const inputVersion = input.version || 0
-    if (inputVersion) {
+    let inputVersion = input.version || VERSION_FIRST
+    if (inputVersion === VERSION_LATEST) {
+      const item = await this.getLatestItem({
+        pk: input.pk,
+        sk: removeSortKeyVersion(input.sk),
+      })
+      inputVersion = item?.version || VERSION_FIRST
+    } else if (inputVersion > VERSION_FIRST) {
       // check current version
       const item = await this.getItem({
         pk: input.pk,
@@ -159,5 +194,33 @@ export class CommandService implements OnModuleInit {
 
   async getItem(key: DetailKey): Promise<CommandModel> {
     return await this.dynamoDbService.getItem(this.tableName, key)
+  }
+
+  async getLatestItem(key: DetailKey): Promise<CommandModel> {
+    const dataItem = await this.dataService.getItem(key)
+    if (!dataItem) {
+      return null
+    }
+
+    let ver = dataItem.version + 5
+    let isUp = true
+    while (true) {
+      const item = await this.getItem({
+        pk: key.pk,
+        sk: addSortKeyVersion(key.sk, ver),
+      })
+      if (item) {
+        if (!isUp) {
+          // look down
+          return item
+        }
+        // continue look up
+        ver += 5
+      } else {
+        // look down
+        ver -= 1
+        isUp = false
+      }
+    }
   }
 }

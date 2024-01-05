@@ -15,5 +15,6 @@ export interface CommandInputModel {
 
 export interface CommandPartialInputModel extends Partial<CommandInputModel> {
   pk: string
-  sk: string // include version
+  sk: string
+  version: number
 }
