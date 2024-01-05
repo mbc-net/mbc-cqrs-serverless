@@ -6,6 +6,7 @@ import { CommandModel, DataModel, DetailKey } from '../interfaces'
 import { CommandService } from './command.service'
 import { DataService } from './data.service'
 import { addSortKeyVersion } from '../helpers/key'
+import { BadRequestException } from '@nestjs/common'
 
 const moduleMocker = new ModuleMocker(global)
 
@@ -130,6 +131,22 @@ describe('CommandService', () => {
       const item = await commandService.publishPartialUpdate(inputItem)
       expect(item).toBeDefined()
       expect(item?.version).toBe(latestItem.version + 1)
+    })
+
+    it('should raise error with the non-existent item', async () => {
+      const key = {
+        pk: 'master',
+        sk: 'max_value_',
+      }
+      const inputItem = {
+        ...key,
+        version: -1,
+        name: '-1',
+      }
+      const call = commandService.publishPartialUpdate(inputItem)
+      expect(call).rejects.toThrow(
+        new BadRequestException('The input key is not a valid, item not found'),
+      )
     })
   })
 })
