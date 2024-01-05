@@ -13,6 +13,7 @@ import { VERSION_FIRST, VERSION_LATEST } from '../constants'
 import { getUserContext } from '../context/user.context'
 import { DynamoDbService } from '../data-store/dynamodb.service'
 import { DATA_SYNC_HANDLER_METADATA } from '../decorators'
+import { mergeDeep } from '../helpers'
 import { addSortKeyVersion, removeSortKeyVersion } from '../helpers/key'
 import {
   CommandInputModel,
@@ -124,7 +125,8 @@ export class CommandService implements OnModuleInit {
         'The input key is not a valid, item not found',
       )
     }
-    const fullInput = { ...item, ...input, version: item.version }
+    const fullInput = mergeDeep({}, item, input, { version: item.version })
+
     this.logger.debug('publishPartialUpdate::', fullInput)
     return await this.publish(fullInput, source)
   }
