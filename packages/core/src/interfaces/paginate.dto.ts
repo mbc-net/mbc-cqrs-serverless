@@ -1,3 +1,4 @@
+import { ApiPropertyOptional } from '@nestjs/swagger'
 import { Transform } from 'class-transformer'
 import { IsInt, Min } from 'class-validator'
 
@@ -6,6 +7,7 @@ export class PaginateDto {
    * Current page number
    * @example 10
    */
+  @ApiPropertyOptional()
   @Transform(({ value }) => Number(value))
   @IsInt()
   @Min(1)
@@ -15,6 +17,7 @@ export class PaginateDto {
    * Items number per page
    * @example 100
    */
+  @ApiPropertyOptional()
   @Transform(({ value }) => Number(value))
   @IsInt()
   @Min(1)
