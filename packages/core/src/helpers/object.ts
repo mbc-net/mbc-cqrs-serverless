@@ -1,5 +1,5 @@
 export function isObject(item: any) {
-  return item && typeof item === 'object' && !Array.isArray(item)
+  return !!item && typeof item === 'object' && !Array.isArray(item)
 }
 
 // deep merge objects without mutating the input parameters

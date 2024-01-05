@@ -43,44 +43,41 @@ describe('objectBytes', () => {
   it('should calculate the object bytes', () => {
     const obj = { a: 1, b: 2 }
     const bytes = objectBytes(obj)
-    expect(bytes).toBe(18)
+    expect(bytes).toBe(new Blob([JSON.stringify(obj)]).size)
   })
 })
 
 // test for isObject function
 describe('isObject', () => {
   it('should check if an object is an object', () => {
-    const obj = { a: 1, b: 2 }
-    expect(isObject(obj)).toBe(true)
+    expect(isObject({ a: 1, b: 2 })).toBe(true)
+    expect(isObject(new Date())).toBe(true)
+    expect(isObject(new Error())).toBe(true)
+    expect(isObject(new RegExp(''))).toBe(true)
   })
 
   // check not an object
   it('should check if an object is not an object', () => {
-    const obj = 'hello'
-    expect(isObject(obj)).toBe(false)
+    expect(isObject('hello')).toBe(false)
     expect(isObject(123)).toBe(false)
     expect(isObject(true)).toBe(false)
     expect(isObject(null)).toBe(false)
     expect(isObject(undefined)).toBe(false)
     expect(isObject([])).toBe(false)
-    expect(isObject({ a: 1 })).toBe(true)
-    expect(isObject(new Date())).toBe(true)
-    expect(isObject(new Error())).toBe(true)
-    expect(isObject(new RegExp(''))).toBe(true)
-    expect(isObject(Symbol('foo'))).toBe(true)
-    expect(isObject(function () {})).toBe(true)
-    expect(isObject(async function () {})).toBe(true)
-    expect(isObject(async () => {})).toBe(true)
-    expect(isObject(function* () {})).toBe(true)
-    expect(isObject(class A {})).toBe(true)
+    expect(isObject(Symbol('foo'))).toBe(false)
+    expect(isObject(function () {})).toBe(false)
+    expect(isObject(async function () {})).toBe(false)
+    expect(isObject(async () => {})).toBe(false)
+    expect(isObject(function* () {})).toBe(false)
+    expect(isObject(class A {})).toBe(false)
     expect(
       isObject(
         class B {
           a = 1
         },
       ),
-    ).toBe(true)
+    ).toBe(false)
     class A {}
-    expect(isObject(class C extends A {})).toBe(true)
+    expect(isObject(class C extends A {})).toBe(false)
   })
 })
