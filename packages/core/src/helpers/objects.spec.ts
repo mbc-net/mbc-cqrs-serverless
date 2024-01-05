@@ -36,6 +36,37 @@ describe('mergeDeep', () => {
     expect(result.b.e).not.toBe(3)
     expect(result.b.f).not.toBe(3)
   })
+
+  it('should return the target object when no sources are provided', () => {
+    const target = { a: 1, b: 2 }
+    const result = mergeDeep(target)
+    expect(result).toEqual(target)
+  })
+
+  it('should deep merge two objects', () => {
+    const target = { a: { x: 1 }, b: { y: 2 } }
+    const source = { a: { y: 3 }, b: { x: 4 } }
+    const expected = { a: { x: 1, y: 3 }, b: { y: 2, x: 4 } }
+    const result = mergeDeep(target, source)
+    expect(result).toEqual(expected)
+  })
+
+  it('should deep merge multiple objects', () => {
+    const target = { a: { x: 1 }, b: { y: 2 } }
+    const source1 = { a: { y: 3 }, b: { x: 4 } }
+    const source2 = { a: { z: 5 }, b: { w: 6 } }
+    const expected = { a: { x: 1, y: 3, z: 5 }, b: { y: 2, x: 4, w: 6 } }
+    const result = mergeDeep(target, source1, source2)
+    expect(result).toEqual(expected)
+  })
+
+  it('should handle primitive values', () => {
+    const target = { a: 1, b: 2 }
+    const source = { a: 3, b: 4 }
+    const expected = { a: 3, b: 4 }
+    const result = mergeDeep(target, source)
+    expect(result).toEqual(expected)
+  })
 })
 
 // test for objectBytes function
@@ -44,6 +75,24 @@ describe('objectBytes', () => {
     const obj = { a: 1, b: 2 }
     const bytes = objectBytes(obj)
     expect(bytes).toBe(new Blob([JSON.stringify(obj)]).size)
+  })
+
+  it('should return the correct byte length for an empty object', () => {
+    const obj = {}
+    const result = objectBytes(obj)
+    expect(result).toBe(2) // empty object "{}" has 2 bytes
+  })
+
+  it('should return the correct byte length for an object with properties', () => {
+    const obj = { name: 'John', age: 30 }
+    const result = objectBytes(obj)
+    expect(result).toBe(24) // object with properties has 24 bytes
+  })
+
+  it('should return the correct byte length for an object with nested objects', () => {
+    const obj = { name: 'John', address: { city: 'New York', country: 'USA' } }
+    const result = objectBytes(obj)
+    expect(result).toBe(61) // object with nested objects has 61 bytes
   })
 })
 
