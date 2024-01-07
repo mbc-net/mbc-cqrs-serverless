@@ -1,6 +1,6 @@
 {
   "name": "@mbc-cqrs-severless/cli",
-  "version": "0.0.16-alpha.0",
+  "version": "0.0.19-alpha.0",
   "description": "a CLI to get started with MBC CQRS serverless framework",
   "bin": {
     "mbc": "./dist/index.js"
