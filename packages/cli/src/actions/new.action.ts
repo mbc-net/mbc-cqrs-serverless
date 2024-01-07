@@ -20,8 +20,8 @@ export default async function newAction(
   mkdirSync(destDir, { recursive: true })
   cpSync(path.join(__dirname, '../../templates'), destDir, { recursive: true })
 
-  // mv ._gitignore .gitignore
-  const gitignore = path.join(destDir, '._gitignore')
+  // mv gitignore .gitignore
+  const gitignore = path.join(destDir, 'gitignore')
   copyFileSync(gitignore, path.join(destDir, '.gitignore'))
   unlinkSync(gitignore)
   // cp .env.local .env
