@@ -1,4 +1,4 @@
-import { applyDecorators, UseGuards } from '@nestjs/common'
+import { applyDecorators, CanActivate, UseGuards } from '@nestjs/common'
 import {
   ApiBearerAuth,
   ApiHeader,
@@ -9,9 +9,20 @@ import { RolesGuard } from '../guard'
 import { Roles } from './roles.decorator'
 
 export function Auth(...roles: string[]) {
+  return AuthGuard({ roles })
+}
+
+export function AuthGuard({
+  guard = RolesGuard,
+  roles,
+}: {
+  // eslint-disable-next-line @typescript-eslint/ban-types
+  guard?: CanActivate | Function
+  roles: string[]
+}) {
   return applyDecorators(
     Roles(...roles),
-    UseGuards(RolesGuard),
+    UseGuards(guard),
     ApiBearerAuth(),
     ApiHeader({
       name: 'x-tenant-code',
