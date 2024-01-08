@@ -2,7 +2,6 @@ import { faker } from '@faker-js/faker'
 import { copyFileSync, readFileSync, unlinkSync } from 'fs'
 import path from 'path'
 
-import packageJson from '../../package.json'
 import { exportsForTesting } from './new.action'
 
 const { useLatestPackageVersion } = exportsForTesting
@@ -10,6 +9,9 @@ const { useLatestPackageVersion } = exportsForTesting
 // create testcase for useLatestPackageVersion function in new.action.ts file
 describe('useLatestPackageVersion', () => {
   const fname = path.join(__dirname, 'package.json')
+  const packageJson = JSON.parse(
+    readFileSync(path.join(__dirname, '../../package.json')).toString(),
+  )
 
   beforeEach(() => {
     copyFileSync(path.join(__dirname, '../../templates/package.json'), fname)

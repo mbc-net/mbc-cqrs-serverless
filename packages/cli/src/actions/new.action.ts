@@ -10,8 +10,6 @@ import {
 } from 'fs'
 import path from 'path'
 
-import packageJson from '../../package.json'
-
 /* eslint-disable no-console */
 export default async function newAction(
   name: string = '',
@@ -50,6 +48,9 @@ export default async function newAction(
 }
 
 function useLatestPackageVersion(destDir: string, name?: string) {
+  const packageJson = JSON.parse(
+    readFileSync(path.join(__dirname, '../../package.json')).toString(),
+  )
   const fname = path.join(destDir, 'package.json')
   const tplPackageJson = JSON.parse(readFileSync(fname).toString())
 
