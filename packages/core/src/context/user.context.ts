@@ -8,7 +8,7 @@ export interface CustomRole {
 export interface JwtClaims {
   sub: string
   iss: string
-  'cognito:groups': string
+  'cognito:groups'?: string[]
   'cognito:username': string
   origin_jti?: string
   aud: string
