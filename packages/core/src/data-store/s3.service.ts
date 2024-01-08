@@ -16,6 +16,7 @@ export class S3Service {
     this[CLIENT_INSTANCE] = new S3Client({
       endpoint: config.get<string>('S3_ENDPOINT'),
       region: config.get<string>('S3_REGION'),
+      forcePathStyle: true,
     })
   }
 
