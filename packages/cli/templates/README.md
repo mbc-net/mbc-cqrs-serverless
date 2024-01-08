@@ -33,6 +33,9 @@ $ npm run build
 # docker, open in other terminal session
 $ npm run offline:docker
 
+# create resources such as S3 buckets
+$ sh infra-local/resources.sh
+
 # migrate tables, open in other terminal session
 $ npm run migrate
 
