@@ -1,7 +1,16 @@
 import { execSync } from 'child_process'
 import { Command } from 'commander'
-import { copyFileSync, cpSync, mkdirSync, unlinkSync } from 'fs'
+import {
+  copyFileSync,
+  cpSync,
+  mkdirSync,
+  readFileSync,
+  unlinkSync,
+  writeFileSync,
+} from 'fs'
 import path from 'path'
+
+import packageJson from '../../package.json'
 
 /* eslint-disable no-console */
 export default async function newAction(
@@ -20,6 +29,9 @@ export default async function newAction(
   mkdirSync(destDir, { recursive: true })
   cpSync(path.join(__dirname, '../../templates'), destDir, { recursive: true })
 
+  // upgrade package
+  useLatestPackageVersion(destDir, name)
+
   // mv gitignore .gitignore
   const gitignore = path.join(destDir, 'gitignore')
   copyFileSync(gitignore, path.join(destDir, '.gitignore'))
@@ -35,4 +47,27 @@ export default async function newAction(
   console.log('Installing packages in', destDir)
   logs = execSync('npm i', { cwd: destDir })
   console.log(logs.toString())
+}
+
+function useLatestPackageVersion(destDir: string, name?: string) {
+  const fname = path.join(destDir, 'package.json')
+  const tplPackageJson = JSON.parse(readFileSync(fname).toString())
+
+  if (name) {
+    tplPackageJson.name = name
+  }
+
+  tplPackageJson.dependencies['@mbc-cqrs-severless/core'] =
+    packageJson.devDependencies['@mbc-cqrs-severless/core']
+  tplPackageJson.devDependencies['@mbc-cqrs-severless/cli'] =
+    packageJson.version
+
+  writeFileSync(fname, JSON.stringify(tplPackageJson, null, 2))
+}
+
+export let exportsForTesting = {
+  useLatestPackageVersion,
+}
+if (process.env.NODE_ENV !== 'test') {
+  exportsForTesting = undefined
 }

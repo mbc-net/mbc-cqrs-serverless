@@ -7,9 +7,9 @@
     "build": "lerna run build",
     "release": "lerna publish --no-private",
     "deploy": "npm run build && npm run release",
-    "test": "jest",
-    "test:watch": "jest --watch",
-    "test:cov": "jest --coverage"
+    "test": "NODE_ENV=test jest",
+    "test:watch": "NODE_ENV=test jest --watch",
+    "test:cov": "NODE_ENV=test jest --coverage"
   },
   "repository": {
     "type": "git",

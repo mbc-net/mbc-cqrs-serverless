@@ -29,5 +29,9 @@
   },
   "dependencies": {
     "commander": "^11.1.0"
+  },
+  "devDependencies": {
+    "@faker-js/faker": "^8.3.1",
+    "@mbc-cqrs-severless/core": "^0.0.19-alpha.0"
   }
 }
