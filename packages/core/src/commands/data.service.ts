@@ -57,6 +57,8 @@ export class DataService {
       attributes: cmd.attributes,
       cpk: cmd.pk,
       csk: cmd.sk,
+      isDeleted: cmd.isDeleted,
+      ttl: cmd.ttl,
       requestId: cmd.requestId,
       createdAt: data?.createdAt || cmd.createdAt,
       updatedAt: cmd.updatedAt,
