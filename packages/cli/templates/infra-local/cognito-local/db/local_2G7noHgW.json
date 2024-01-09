@@ -12,7 +12,7 @@
         },
         {
           "Name": "custom:roles",
-          "Value": "[{\"role\":\"super_admin\"}]"
+          "Value": "[{\"role\":\"system_admin\"}]"
         }
       ],
       "Enabled": true,

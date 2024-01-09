@@ -89,7 +89,7 @@ export const getAuthorizerClaims = (event: any): JwtClaims => {
   // {
   //   "sub": "92ca4f68-9ac6-4080-9ae2-2f02a86206a4",
   //   "iss": "http://localhost:9229/local_2G7noHgW",
-  //   "cognito:groups": "admins",
+  //   "cognito:groups": ["admins"],
   //   "cognito:username": "admin2",
   //   "origin_jti": "af065044-5ddd-46f9-b0bb-94941ad80a11",
   //   "aud": "dnk8y7ii3wled35p3lw0l2cd7",
@@ -98,7 +98,7 @@ export const getAuthorizerClaims = (event: any): JwtClaims => {
   //   "auth_time": 1699930911,
   //   "name": "admin2",
   //   "custom:tenant": "1801",
-  //   "custom:roles": "[{\"role\":\"super_admin\"}]",
+  //   "custom:roles": "[{\"role\":\"system_admin\"}]",
   //   "exp": 1700017311,
   //   "email": "admin@test.com",
   //   "iat": 1699930911,
