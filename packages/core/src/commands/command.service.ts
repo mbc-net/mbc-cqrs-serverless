@@ -8,12 +8,13 @@ import {
   Type,
 } from '@nestjs/common'
 import { ModuleRef } from '@nestjs/core'
+import { isDeepStrictEqual } from 'util'
 
 import { VERSION_FIRST, VERSION_LATEST } from '../constants'
 import { getUserContext } from '../context/user.context'
 import { DynamoDbService } from '../data-store/dynamodb.service'
 import { DATA_SYNC_HANDLER_METADATA } from '../decorators'
-import { mergeDeep } from '../helpers'
+import { mergeDeep, pickKeys } from '../helpers'
 import { addSortKeyVersion, removeSortKeyVersion } from '../helpers/key'
 import {
   CommandInputModel,
@@ -134,15 +135,16 @@ export class CommandService implements OnModuleInit {
   // full data command
   async publish(input: CommandInputModel, source?: string) {
     let inputVersion = input.version || VERSION_FIRST
+    let item: CommandModel
     if (inputVersion === VERSION_LATEST) {
-      const item = await this.getLatestItem({
+      item = await this.getLatestItem({
         pk: input.pk,
         sk: removeSortKeyVersion(input.sk),
       })
       inputVersion = item?.version || VERSION_FIRST
     } else if (inputVersion > VERSION_FIRST) {
       // check current version
-      const item = await this.getItem({
+      item = await this.getItem({
         pk: input.pk,
         sk: addSortKeyVersion(input.sk, inputVersion),
       })
@@ -151,6 +153,10 @@ export class CommandService implements OnModuleInit {
           'Invalid input version. The input version must be equal to the latest version',
         )
       }
+    }
+    if (item && this.isCommandDirty(item, input)) {
+      // do not update if command is not dirty
+      return null
     }
 
     const { event, context } = getCurrentInvoke()
@@ -225,5 +231,24 @@ export class CommandService implements OnModuleInit {
         isUp = false
       }
     }
+  }
+
+  isCommandDirty(item: CommandModel, input: CommandInputModel) {
+    const comparedKeys: (keyof CommandInputModel)[] = [
+      'id',
+      'code',
+      'name',
+      'tenantCode',
+      'type',
+      'isDeleted',
+      'seq',
+      'ttl',
+      'attributes',
+    ]
+
+    return isDeepStrictEqual(
+      pickKeys(item, comparedKeys),
+      pickKeys(input, comparedKeys),
+    )
   }
 }

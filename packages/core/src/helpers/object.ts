@@ -25,3 +25,23 @@ export function mergeDeep(target: any, ...sources: any[]) {
 export function objectBytes(obj: any) {
   return Buffer.byteLength(JSON.stringify(obj))
 }
+
+export function pickKeys(obj: any, keys: string[]) {
+  const result: any = {}
+  for (const key of keys) {
+    if (key in obj) {
+      result[key] = obj[key]
+    }
+  }
+  return result
+}
+
+export function omitKeys(obj: any, keys: string[]) {
+  const result: any = {}
+  for (const key in obj) {
+    if (!keys.includes(key)) {
+      result[key] = obj[key]
+    }
+  }
+  return result
+}
