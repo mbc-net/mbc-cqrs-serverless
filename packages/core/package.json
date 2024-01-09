@@ -1,6 +1,6 @@
 {
   "name": "@mbc-cqrs-severless/core",
-  "version": "0.0.27-alpha.0",
+  "version": "0.0.28-alpha.0",
   "description": "CQRS and event base core",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
