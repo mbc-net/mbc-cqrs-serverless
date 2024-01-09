@@ -10,7 +10,7 @@ import { BadRequestException } from '@nestjs/common'
 
 const moduleMocker = new ModuleMocker(global)
 
-function buildItem(key: DetailKey, version = 0) {
+function buildItem(key: DetailKey, version = 0, attributes = {}) {
   return {
     ...key,
     id: key.pk + '#' + key.sk,
@@ -19,6 +19,7 @@ function buildItem(key: DetailKey, version = 0) {
     version,
     tenantCode: '',
     type: '',
+    attributes,
   }
 }
 
@@ -147,6 +148,43 @@ describe('CommandService', () => {
       expect(call).rejects.toThrow(
         new BadRequestException('The input key is not a valid, item not found'),
       )
+    })
+  })
+
+  describe('isNotCommandDirty', () => {
+    class MasterAttributes {
+      constructor(public name: string) {
+        this.name = name
+      }
+    }
+
+    it('should return true if command is not dirty', () => {
+      const item = buildItem({ pk: 'master', sk: 'max_value@5' }, 5)
+      expect(commandService.isNotCommandDirty(item, item)).toBe(true)
+    })
+
+    it('should return false if command is dirty', () => {
+      const item = buildItem({ pk: 'master', sk: 'max_value@5' }, 5)
+      expect(
+        commandService.isNotCommandDirty(item, { ...item, name: 'test' }),
+      ).toBe(false)
+    })
+
+    it('should return true if input atributes is class instance', () => {
+      const item = buildItem({ pk: 'master', sk: 'max_value@5' }, 5, {
+        name: 'test',
+      })
+      const input = { ...item, attributes: new MasterAttributes('test') }
+      expect(commandService.isNotCommandDirty(item, input)).toBe(true)
+    })
+
+    it('should return false if input atributes is class instance and not dirty', () => {
+      const item = buildItem({ pk: 'master', sk: 'max_value@5' }, 5, {
+        name: 'test',
+      })
+
+      const input = { ...item, attributes: new MasterAttributes('abcdd') }
+      expect(commandService.isNotCommandDirty(item, input)).toBe(false)
     })
   })
 })

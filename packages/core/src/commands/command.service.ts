@@ -154,7 +154,7 @@ export class CommandService implements OnModuleInit {
         )
       }
     }
-    if (item && this.isCommandDirty(item, input)) {
+    if (item && this.isNotCommandDirty(item, input)) {
       // do not update if command is not dirty
       return null
     }
@@ -233,7 +233,7 @@ export class CommandService implements OnModuleInit {
     }
   }
 
-  isCommandDirty(item: CommandModel, input: CommandInputModel) {
+  isNotCommandDirty(item: CommandModel, input: CommandInputModel) {
     const comparedKeys: (keyof CommandInputModel)[] = [
       'id',
       'code',
@@ -247,8 +247,8 @@ export class CommandService implements OnModuleInit {
     ]
 
     return isDeepStrictEqual(
-      pickKeys(item, comparedKeys),
-      pickKeys(input, comparedKeys),
+      structuredClone(pickKeys(item, comparedKeys)),
+      structuredClone(pickKeys(input, comparedKeys)),
     )
   }
 }
