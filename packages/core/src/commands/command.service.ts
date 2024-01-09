@@ -199,14 +199,15 @@ export class CommandService implements OnModuleInit {
   }
 
   async getLatestItem(key: DetailKey): Promise<CommandModel> {
+    const lookUpStep = 5
     const dataItem = await this.dataService.getItem(key)
-    if (!dataItem) {
-      return null
-    }
-
-    let ver = dataItem.version + 5
+    let ver = (dataItem?.version || 0) + lookUpStep
     let isUp = true
     while (true) {
+      if (ver <= VERSION_FIRST) {
+        return null
+      }
+
       const item = await this.getItem({
         pk: key.pk,
         sk: addSortKeyVersion(key.sk, ver),
@@ -217,7 +218,7 @@ export class CommandService implements OnModuleInit {
           return item
         }
         // continue look up
-        ver += 5
+        ver += lookUpStep
       } else {
         // look down
         ver -= 1
