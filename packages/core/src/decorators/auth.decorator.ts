@@ -5,6 +5,7 @@ import {
   ApiUnauthorizedResponse,
 } from '@nestjs/swagger'
 
+import { HEADER_TENANT_CODE } from '../constants'
 import { RolesGuard } from '../guard'
 import { Roles } from './roles.decorator'
 
@@ -24,15 +25,18 @@ export function AuthGuard({
     Roles(...roles),
     UseGuards(guard),
     ApiBearerAuth(),
-    ApiHeader({
-      name: 'x-tenant-code',
-      description: 'current working tenant code',
-      required: true,
-      allowEmptyValue: false,
-      example: 'common',
-    }),
     ApiUnauthorizedResponse({
       description: 'Request unauthorized',
     }),
   )
+}
+
+export function HeaderTenant() {
+  return ApiHeader({
+    name: HEADER_TENANT_CODE,
+    description: 'current working tenant code',
+    required: true,
+    allowEmptyValue: false,
+    example: 'common',
+  })
 }
