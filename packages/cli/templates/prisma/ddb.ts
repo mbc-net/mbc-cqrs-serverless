@@ -1,9 +1,13 @@
 import {
   CreateTableCommand,
   CreateTableCommandInput,
+  DescribeContinuousBackupsCommand,
   DescribeTableCommand,
+  DescribeTimeToLiveCommand,
   DynamoDBClient,
   ResourceNotFoundException,
+  UpdateContinuousBackupsCommand,
+  UpdateTimeToLiveCommand,
 } from '@aws-sdk/client-dynamodb'
 import dotenv from 'dotenv'
 import { readFileSync, readdirSync } from 'fs'
@@ -88,6 +92,8 @@ async function createTable(config: CreateTableCommandInput) {
         tableDesc.Table.LatestStreamArn,
       )
 
+      await updateTable(config.TableName)
+
       return tableDesc.Table.TableArn
     }
   } catch (error) {
@@ -109,4 +115,50 @@ async function createTable(config: CreateTableCommandInput) {
     cnt++
   }
   return table.TableDescription?.TableArn
+}
+
+async function updateTable(TableName: string) {
+  try {
+    // Time to live
+    const ttlDesc = await client.send(
+      new DescribeTimeToLiveCommand({ TableName }),
+    )
+    if (ttlDesc.TimeToLiveDescription?.TimeToLiveStatus === 'DISABLED') {
+      console.log('enable time to live for table:', TableName)
+
+      await client.send(
+        new UpdateTimeToLiveCommand({
+          TableName,
+          TimeToLiveSpecification: {
+            Enabled: true,
+            AttributeName: 'ttl',
+          },
+        }),
+      )
+    }
+
+    // Point-in-time recovery for production
+    if (process.env.NODE_ENV === 'prod') {
+      const pitDesc = await client.send(
+        new DescribeContinuousBackupsCommand({ TableName }),
+      )
+      if (
+        pitDesc.ContinuousBackupsDescription?.ContinuousBackupsStatus ===
+        'DISABLED'
+      ) {
+        console.log('enable point-in-time recovery for table:', TableName)
+
+        await client.send(
+          new UpdateContinuousBackupsCommand({
+            TableName,
+            PointInTimeRecoverySpecification: {
+              PointInTimeRecoveryEnabled: true,
+            },
+          }),
+        )
+      }
+    }
+  } catch (error) {
+    console.error(error)
+  }
 }
