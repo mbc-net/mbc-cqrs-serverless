@@ -1,5 +1,7 @@
 import { getCurrentInvoke } from '@codegenie/serverless-express'
 
+import { HEADER_TENANT_CODE } from '../constants'
+
 export interface CustomRole {
   tenant: string // tenant's code
   role: string // tenant' role
@@ -42,7 +44,7 @@ export const getUserContext = (event?: any): UserContext => {
 
   const userId = claims.sub
   const tenantCode =
-    claims['custom:tenant'] || (event?.headers || {})['x-tenant-code']
+    claims['custom:tenant'] || (event?.headers || {})[HEADER_TENANT_CODE]
   // find tenantRole
   const roles = (
     JSON.parse(claims['custom:roles'] || '[]') as CustomRole[]
