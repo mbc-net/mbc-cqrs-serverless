@@ -13,6 +13,8 @@ services:
       - DYNAMODB_ENDPOINT=http://host.docker.internal:8000
       - STEP_FUNCTIONS_ENDPOINT=http://host.docker.internal:8083
       - ECS_ENDPOINT=VALUE
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
 
   rds:
     image: mysql:8
