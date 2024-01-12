@@ -1,6 +1,5 @@
 import { Logger } from '@nestjs/common'
 import { ConfigService } from '@nestjs/config'
-import { ulid } from 'ulid'
 
 import { EventHandler } from '../decorators'
 import { IEventHandler } from '../interfaces'
@@ -23,11 +22,11 @@ export class DataSyncNewCommandEventHandler
 
   async execute(event: DataSyncNewCommandEvent): Promise<any> {
     this.logger.debug('executing::', event)
-    const ddbRecordId = (event.dynamodb?.NewImage?.id?.S || 'no-id').replaceAll(
-      '#',
-      '-',
-    )
-    const sfnExecName = `${event.tableName}-${ddbRecordId}-${ulid()}`
+    const ddbKeys = event.dynamodb?.Keys
+    const ddbRecordId = `${ddbKeys.pk?.S || 'pk'}-${ddbKeys.sk?.S || 'sk'}`
+      .replaceAll('#', '-')
+      .replace('@', '-')
+    const sfnExecName = `${event.tableName}-${ddbRecordId}-${Date.now()}`
     return await this.sfnService.startExecution(this.sfnArn, event, sfnExecName)
   }
 }
