@@ -19,10 +19,11 @@ export class StepFunctionService {
     return this[CLIENT_INSTANCE]
   }
 
-  startExecution(arn: string, input: any) {
+  startExecution(arn: string, input: any, name?: string) {
     return this.client.send(
       new StartExecutionCommand({
         stateMachineArn: arn,
+        name,
         input: JSON.stringify(input),
       }),
     )
