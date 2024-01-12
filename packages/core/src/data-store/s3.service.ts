@@ -10,7 +10,8 @@ const CLIENT_INSTANCE = Symbol()
 
 @Injectable()
 export class S3Service {
-  private [CLIENT_INSTANCE]: S3Client
+  private readonly [CLIENT_INSTANCE]: S3Client
+  public readonly privateBucket: string
 
   constructor(private readonly config: ConfigService) {
     this[CLIENT_INSTANCE] = new S3Client({
@@ -18,26 +19,32 @@ export class S3Service {
       region: config.get<string>('S3_REGION'),
       forcePathStyle: true,
     })
+    this.privateBucket = config.get<string>('S3_BUCKET_NAME')
   }
 
   get client(): S3Client {
     return this[CLIENT_INSTANCE]
   }
 
-  putItem(key: string, item: any): Promise<any> {
-    return this.client.send(
+  async putItem(key: string, item: any) {
+    const ret = {
+      Bucket: this.privateBucket,
+      Key: key,
+    }
+    await this.client.send(
       new PutObjectCommand({
-        Bucket: this.config.get<string>('S3_BUCKET_NAME'),
-        Key: key,
+        ...ret,
         Body: JSON.stringify(item),
       }),
     )
+
+    return ret
   }
 
   async getItem(key: string) {
     const result = await this.client.send(
       new GetObjectCommand({
-        Bucket: this.config.get<string>('S3_BUCKET_NAME'),
+        Bucket: this.privateBucket,
         Key: key,
       }),
     )

@@ -217,10 +217,9 @@ export class DynamoDbService {
         // save to s3
         const { pk, sk } = data
         const key = `${pk}/${sk}/${ulid()}`
-        await this.s3Service.putItem(key, attributes)
+        const s3Key = await this.s3Service.putItem(key, attributes)
         // assign s3 url to attributes
-        const bucketName = this.config.get<string>('S3_BUCKET_NAME')
-        data.attributes = `s3://${bucketName}/${key}`
+        data.attributes = `s3://${s3Key.Bucket}/${s3Key.Key}`
       }
     }
 
