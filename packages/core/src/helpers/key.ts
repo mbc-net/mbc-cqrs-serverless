@@ -11,3 +11,28 @@ export function removeSortKeyVersion(sk: string) {
   }
   return sk.substring(0, lastDivIdx)
 }
+
+const S3_PREFIX = 's3://'
+const S3_PREFIX_LEN = S3_PREFIX.length
+
+export function isS3AttributeKey(attributes: any) {
+  if (typeof attributes === 'string' && attributes.startsWith(S3_PREFIX)) {
+    return true
+  }
+  return false
+}
+
+export function toS3AttributeKey(bucket: string, key: string) {
+  return `${S3_PREFIX}${bucket}/${key}`
+}
+
+export function parseS3AttributeKey(s3Uri: string) {
+  const sepIdx = s3Uri.indexOf('/', S3_PREFIX_LEN)
+  const bucket = s3Uri.substring(S3_PREFIX_LEN, sepIdx)
+  const key = s3Uri.substring(1 + sepIdx)
+
+  return {
+    bucket,
+    key,
+  }
+}

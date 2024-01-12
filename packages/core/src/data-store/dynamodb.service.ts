@@ -12,6 +12,11 @@ import { ConfigService } from '@nestjs/config'
 import { ulid } from 'ulid'
 
 import { getUserContext } from '../context/user.context'
+import {
+  isS3AttributeKey,
+  parseS3AttributeKey,
+  toS3AttributeKey,
+} from '../helpers'
 import { objectBytes } from '../helpers/object'
 import {
   DdbUpdateItem,
@@ -173,16 +178,9 @@ export class DynamoDbService {
     }
     const obj = unmarshall(item)
 
-    if ('attributes' in obj) {
-      if (
-        typeof obj.attributes === 'string' &&
-        obj.attributes.startsWith('s3://')
-      ) {
-        const s3UrI = obj.attributes
-        const key = s3UrI.substring(1 + s3UrI.indexOf('/', 's3://'.length))
-        const s3Obj = await this.s3Service.getItem(key)
-        obj.attributes = s3Obj
-      }
+    if (isS3AttributeKey(obj.attributes)) {
+      const { key } = parseS3AttributeKey(obj.attributes)
+      obj.attributes = await this.s3Service.getItem(key)
     }
 
     if (obj.createdAt) {
@@ -219,7 +217,7 @@ export class DynamoDbService {
         const key = `${pk}/${sk}/${ulid()}`
         const s3Key = await this.s3Service.putItem(key, attributes)
         // assign s3 url to attributes
-        data.attributes = `s3://${s3Key.Bucket}/${s3Key.Key}`
+        data.attributes = toS3AttributeKey(s3Key.Bucket, s3Key.Key)
       }
     }
 

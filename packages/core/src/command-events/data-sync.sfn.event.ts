@@ -2,6 +2,8 @@ import { AttributeValue } from '@aws-sdk/client-dynamodb'
 import { unmarshall } from '@aws-sdk/util-dynamodb'
 
 import { COMMAND_TABLE_SUFFIX, DATA_TABLE_SUFFIX } from '../constants'
+import { S3Service } from '../data-store'
+import { isS3AttributeKey, parseS3AttributeKey } from '../helpers'
 import {
   CommandModel,
   DetailKey,
@@ -80,5 +82,17 @@ export class DataSyncCommandSfnEvent implements IEvent {
       pk: this.commandRecord.pk,
       sk: this.commandRecord.sk,
     }
+  }
+
+  async getFullCommandRecord(
+    s3Service: S3Service,
+  ): Promise<CommandModel | null> {
+    if (isS3AttributeKey(this.commandRecord?.attributes)) {
+      const { key } = parseS3AttributeKey(
+        this.commandRecord?.attributes as unknown as string,
+      )
+      this.commandRecord.attributes = await s3Service.getItem(key)
+    }
+    return this.commandRecord
   }
 }
