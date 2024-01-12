@@ -179,7 +179,7 @@ export class DynamoDbService {
         obj.attributes.startsWith('s3://')
       ) {
         const s3UrI = obj.attributes
-        const key = s3UrI.replace('s3://', '')
+        const key = s3UrI.substring(1 + s3UrI.indexOf('/', 's3://'.length))
         const s3Obj = await this.s3Service.getItem(key)
         obj.attributes = s3Obj
       }
