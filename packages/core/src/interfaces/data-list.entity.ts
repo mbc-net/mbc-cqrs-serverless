@@ -1,13 +1,15 @@
-import { ApiProperty } from '@nestjs/swagger'
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger'
 
 import { DataEntity } from './data.entity'
 
 export class DataListEntity {
-  @ApiProperty()
+  @ApiPropertyOptional()
   total?: number
-  @ApiProperty()
+  @ApiPropertyOptional()
   lastSk?: string
-  @ApiProperty()
+  @ApiProperty({
+    type: [DataEntity],
+  })
   items: DataEntity[]
 
   constructor(data: Partial<DataListEntity>) {

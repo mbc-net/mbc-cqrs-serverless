@@ -1,28 +1,28 @@
-import { ApiProperty } from '@nestjs/swagger'
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger'
 
 import { CommandModel } from './command-model.interface'
 import { DetailKey } from './detail-key.interface'
 
 export class CommandEntity implements CommandModel {
-  @ApiProperty()
+  @ApiPropertyOptional()
   source?: string
-  @ApiProperty()
+  @ApiPropertyOptional()
   isDeleted?: boolean
-  @ApiProperty()
+  @ApiPropertyOptional()
   status?: string
-  @ApiProperty()
+  @ApiPropertyOptional()
   requestId?: string
-  @ApiProperty()
+  @ApiPropertyOptional()
   createdAt?: Date
-  @ApiProperty()
+  @ApiPropertyOptional()
   updatedAt?: Date
-  @ApiProperty()
+  @ApiPropertyOptional()
   createdBy?: string
-  @ApiProperty()
+  @ApiPropertyOptional()
   updatedBy?: string
-  @ApiProperty()
+  @ApiPropertyOptional()
   createdIp?: string
-  @ApiProperty()
+  @ApiPropertyOptional()
   updatedIp?: string
   @ApiProperty()
   pk: string
@@ -40,11 +40,11 @@ export class CommandEntity implements CommandModel {
   tenantCode: string
   @ApiProperty()
   type: string
-  @ApiProperty()
+  @ApiPropertyOptional()
   seq?: number
-  @ApiProperty()
+  @ApiPropertyOptional()
   ttl?: number
-  @ApiProperty()
+  @ApiPropertyOptional({ type: 'object' })
   attributes?: any
 
   get key(): DetailKey {
