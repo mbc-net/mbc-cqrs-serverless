@@ -5,6 +5,7 @@ import {
   StepFunctionStateInput,
 } from '../command-events/data-sync.sfn.event'
 import { DataSyncCommandSfnName } from '../command-events/sfn-name.enum'
+import { S3Service } from '../data-store'
 import { removeSortKeyVersion } from '../helpers/key'
 import { CommandModuleOptions } from '../interfaces'
 import { MODULE_OPTIONS_TOKEN } from './command.module-definition'
@@ -23,6 +24,7 @@ export class CommandEventHandler {
     private readonly commandService: CommandService,
     private readonly dataService: DataService,
     private readonly historyService: HistoryService,
+    private readonly s3Service: S3Service,
   ) {
     this.logger = new Logger(
       `${CommandEventHandler.name}:${this.options.tableName}`,
@@ -163,8 +165,12 @@ export class CommandEventHandler {
       throw new Error('SyncDataHandler not found!')
     }
     const handler = this.commandService.getDataSyncHandler(handlerName)
+    if (!handler) {
+      throw new Error('SyncDataHandler empty!')
+    }
+    const commandModel = await event.getFullCommandRecord(this.s3Service)
 
-    return handler.up(event.commandRecord)
+    return handler.up(commandModel)
   }
 
   protected async checkNextToken(
