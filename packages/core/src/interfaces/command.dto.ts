@@ -51,6 +51,5 @@ export class CommandDto implements CommandInputModel {
   @IsBoolean()
   isDeleted?: boolean
 
-  @ApiPropertyOptional({ type: 'object' })
   attributes?: Record<string, any>
 }

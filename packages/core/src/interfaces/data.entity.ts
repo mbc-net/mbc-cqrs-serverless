@@ -44,7 +44,7 @@ export class DataEntity implements DataModel {
   seq?: number
   @ApiPropertyOptional()
   ttl?: number
-  @ApiPropertyOptional({ type: 'object' })
+
   attributes?: Record<string, any>
 
   constructor(data: Partial<DataEntity>) {

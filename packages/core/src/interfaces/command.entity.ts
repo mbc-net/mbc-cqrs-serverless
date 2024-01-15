@@ -44,7 +44,7 @@ export class CommandEntity implements CommandModel {
   seq?: number
   @ApiPropertyOptional()
   ttl?: number
-  @ApiPropertyOptional({ type: 'object' })
+
   attributes?: any
 
   get key(): DetailKey {
