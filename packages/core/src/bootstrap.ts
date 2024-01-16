@@ -8,6 +8,7 @@ import { HttpAdapterHost, NestFactory, Reflector } from '@nestjs/core'
 import { Callback, Context, Handler } from 'aws-lambda'
 
 import { AppModule } from './app.module'
+import { HEADER_TENANT_CODE } from './constants'
 import { Environment } from './env.validation'
 import { DynamoDBExceptionFilter } from './filters'
 import { AppModuleOptions } from './interfaces'
@@ -54,6 +55,11 @@ async function bootstrap(opts: AppModuleOptions) {
         'Api-Key',
       )
       .addSecurityRequirements('Api-Key')
+      .addGlobalParameters({
+        in: 'header',
+        required: false,
+        name: HEADER_TENANT_CODE,
+      })
       .build()
     const document = SwaggerModule.createDocument(app, swgConfig, {
       deepScanRoutes: true,
