@@ -23,7 +23,7 @@ export class StepFunctionService {
     return this.client.send(
       new StartExecutionCommand({
         stateMachineArn: arn,
-        name,
+        name: name && name.length < 80 ? name : undefined,
         input: JSON.stringify(input),
       }),
     )
