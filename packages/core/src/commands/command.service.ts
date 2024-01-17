@@ -24,6 +24,7 @@ import {
   DetailKey,
   INotification,
 } from '../interfaces'
+import { ICommandOptions } from '../interfaces/command.options.interface'
 import { IDataSyncHandler } from '../interfaces/data-sync-handler.interface'
 import { SnsService } from '../queue/sns.service'
 import { ExplorerService } from '../services'
@@ -108,7 +109,10 @@ export class CommandService implements OnModuleInit {
   }
 
   // partial data command
-  async publishPartialUpdate(input: CommandPartialInputModel, source?: string) {
+  async publishPartialUpdate(
+    input: CommandPartialInputModel,
+    opts?: ICommandOptions,
+  ) {
     let item: CommandModel
     if (input.version > VERSION_FIRST) {
       item = await this.getItem({
@@ -129,11 +133,11 @@ export class CommandService implements OnModuleInit {
     const fullInput = mergeDeep({}, item, input, { version: item.version })
 
     this.logger.debug('publishPartialUpdate::', fullInput)
-    return await this.publish(fullInput, source)
+    return await this.publish(fullInput, opts)
   }
 
   // full data command
-  async publish(input: CommandInputModel, source?: string) {
+  async publish(input: CommandInputModel, opts?: ICommandOptions) {
     let inputVersion = input.version || VERSION_FIRST
     let item: CommandModel
     if (inputVersion === VERSION_LATEST) {
@@ -167,8 +171,8 @@ export class CommandService implements OnModuleInit {
       ...input,
       sk: addSortKeyVersion(input.sk, version),
       version,
-      source,
-      requestId: context?.awsRequestId,
+      source: opts?.source,
+      requestId: opts?.requestId || context?.awsRequestId,
       createdAt: new Date(),
       updatedAt: new Date(),
       createdBy: userContext.userId,
