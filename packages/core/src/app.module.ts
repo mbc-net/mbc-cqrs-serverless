@@ -7,7 +7,7 @@ import { ConfigurableModuleClass, OPTIONS_TYPE } from './app.module-definition'
 import { AppService } from './app.service'
 import { DataSyncModule } from './command-events/data-sync.module'
 import { DataStoreModule } from './data-store/data-store.module'
-import { validate } from './env.validation'
+import { getValidateConfig } from './env.validation'
 import { EventModule } from './events'
 import { NotificationModule } from './notifications/notification.module'
 import { QueueModule } from './queue/queue.module'
@@ -16,16 +16,6 @@ import { StepFunctionModule } from './step-func/step-function.module'
 
 @Module({
   imports: [
-    ConfigModule.forRoot({
-      isGlobal: true,
-      cache: true,
-      expandVariables: true,
-      validationOptions: {
-        allowUnknow: false,
-        abortEarly: true,
-      },
-      validate,
-    }),
     NotificationModule,
     DataStoreModule,
     DataSyncModule,
@@ -54,6 +44,18 @@ export class AppModule extends ConfigurableModuleClass {
 
     const module = super.forRoot(options)
     const imports = [...(module.imports ?? [])]
+    imports.push(
+      ConfigModule.forRoot({
+        isGlobal: true,
+        cache: true,
+        expandVariables: true,
+        validationOptions: {
+          allowUnknow: false,
+          abortEarly: true,
+        },
+        validate: getValidateConfig(options.envCls),
+      }),
+    )
     imports.push(options.rootModule)
     if (enableEventSourceModule) {
       imports.push(EventModule)

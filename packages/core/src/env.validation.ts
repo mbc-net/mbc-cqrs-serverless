@@ -1,4 +1,4 @@
-import { plainToInstance } from 'class-transformer'
+import { ClassConstructor, plainToInstance } from 'class-transformer'
 import {
   IsBoolean,
   IsEnum,
@@ -15,7 +15,7 @@ export enum Environment {
   Staging = 'stg',
 }
 
-class EnvironmentVariables {
+export class EnvironmentVariables {
   @IsEnum(Environment)
   NODE_ENV: Environment
   @IsString()
@@ -74,16 +74,24 @@ class EnvironmentVariables {
   SES_FROM_EMAIL: string
 }
 
-export function validate(config: Record<string, unknown>) {
-  const validatedConfig = plainToInstance(EnvironmentVariables, config, {
-    enableImplicitConversion: true,
-  })
-  const errors = validateSync(validatedConfig, {
-    skipMissingProperties: false,
-  })
+export function getValidateConfig<T extends EnvironmentVariables>(
+  cls?: ClassConstructor<T>,
+) {
+  return function validate(config: Record<string, unknown>) {
+    const validatedConfig = plainToInstance(
+      cls || EnvironmentVariables,
+      config,
+      {
+        enableImplicitConversion: true,
+      },
+    )
+    const errors = validateSync(validatedConfig, {
+      skipMissingProperties: false,
+    })
 
-  if (errors.length > 0) {
-    throw new Error(errors.toString())
+    if (errors.length > 0) {
+      throw new Error(errors.toString())
+    }
+    return validatedConfig
   }
-  return validatedConfig
 }
