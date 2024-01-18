@@ -16,16 +16,6 @@ import { StepFunctionModule } from './step-func/step-function.module'
 
 @Module({
   imports: [
-    ConfigModule.forRoot({
-      isGlobal: true,
-      cache: true,
-      expandVariables: true,
-      validationOptions: {
-        allowUnknow: false,
-        abortEarly: true,
-      },
-      validate,
-    }),
     NotificationModule,
     DataStoreModule,
     DataSyncModule,
@@ -59,6 +49,18 @@ export class AppModule extends ConfigurableModuleClass {
       imports.push(EventModule)
     }
     imports.push(RouterModule.register(routers))
+    imports.push(
+      ConfigModule.forRoot({
+        isGlobal: true,
+        cache: true,
+        expandVariables: true,
+        validationOptions: {
+          allowUnknow: false,
+          abortEarly: true,
+        },
+        validate: validate(options.validateClass),
+      }),
+    )
 
     return {
       ...module,

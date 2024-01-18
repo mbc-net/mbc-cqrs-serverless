@@ -15,7 +15,7 @@ export enum Environment {
   Staging = 'stg',
 }
 
-class EnvironmentVariables {
+export class EnvironmentVariables {
   @IsEnum(Environment)
   NODE_ENV: Environment
   @IsString()
@@ -74,16 +74,18 @@ class EnvironmentVariables {
   SES_FROM_EMAIL: string
 }
 
-export function validate(config: Record<string, unknown>) {
-  const validatedConfig = plainToInstance(EnvironmentVariables, config, {
-    enableImplicitConversion: true,
-  })
-  const errors = validateSync(validatedConfig, {
-    skipMissingProperties: false,
-  })
+export function validate<T extends typeof EnvironmentVariables>(clazz: T) {
+  return function (config: Record<string, unknown>) {
+    const validatedConfig = plainToInstance(clazz, config, {
+      enableImplicitConversion: true,
+    })
+    const errors = validateSync(validatedConfig, {
+      skipMissingProperties: false,
+    })
 
-  if (errors.length > 0) {
-    throw new Error(errors.toString())
+    if (errors.length > 0) {
+      throw new Error(errors.toString())
+    }
+    return validatedConfig
   }
-  return validatedConfig
 }
