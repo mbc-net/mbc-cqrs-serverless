@@ -17,6 +17,9 @@ custom:
   serverless-offline:
     corsAllowOrigin: '*'
     corsAllowHeaders: '*'
+    host: 0.0.0.0
+    reloadHandler: true
+    ignoreJWTSignature: true
   serverless-offline-ses-v2:
     port: 8005
   serverless-offline-sns:
@@ -91,7 +94,6 @@ provider:
   runtime: nodejs18.x
   profile: serverless
   httpApi:
-    cors: true
     authorizers:
       localAuthorizer:
         type: jwt
