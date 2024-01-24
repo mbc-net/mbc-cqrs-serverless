@@ -7,6 +7,7 @@ export const TASK_QUEUE_EVENT_FACTORY = 'TaskQueueEventFactoryInjectToken'
 
 export interface TaskModuleOptions {
   taskQueueEventFactory: Type<ITaskQueueEventFactory>
+  enableController?: boolean
 }
 
 export const { ConfigurableModuleClass, MODULE_OPTIONS_TOKEN, OPTIONS_TYPE } =

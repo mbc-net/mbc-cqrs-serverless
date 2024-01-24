@@ -11,7 +11,6 @@ import {
 import { TaskService } from './task.service'
 
 @Module({
-  controllers: [TaskController],
   providers: [TaskService, TaskEventHandler, TaskQueueEventHandler],
   exports: [TaskService],
 })
@@ -19,10 +18,20 @@ export class TaskModule extends ConfigurableModuleClass {
   static register(options: typeof OPTIONS_TYPE): DynamicModule {
     const module = super.register(options)
 
+    if (!module.providers) {
+      module.providers = []
+    }
     module.providers.push({
       provide: TASK_QUEUE_EVENT_FACTORY,
       useClass: options.taskQueueEventFactory,
     })
+
+    if (options.enableController) {
+      if (!module.controllers) {
+        module.controllers = []
+      }
+      module.controllers.push(TaskController)
+    }
 
     return {
       ...module,
