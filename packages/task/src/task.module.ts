@@ -1,3 +1,4 @@
+import { DataStoreModule, QueueModule } from '@mbc-cqrs-severless/core'
 import { DynamicModule, Module } from '@nestjs/common'
 
 import { TaskEventHandler } from './event/task.event.handler'
@@ -11,6 +12,7 @@ import {
 import { TaskService } from './task.service'
 
 @Module({
+  imports: [DataStoreModule, QueueModule],
   providers: [TaskService, TaskEventHandler, TaskQueueEventHandler],
   exports: [TaskService],
 })

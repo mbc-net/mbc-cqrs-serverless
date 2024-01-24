@@ -1,3 +1,4 @@
+import { DataStoreModule } from '@mbc-cqrs-severless/core'
 import { DynamicModule, Module } from '@nestjs/common'
 
 import { SequencesController } from './sequences.controller'
@@ -8,6 +9,7 @@ import {
 import { SequencesService } from './sequences.service'
 
 @Module({
+  imports: [DataStoreModule],
   providers: [SequencesService],
   exports: [SequencesService],
 })
