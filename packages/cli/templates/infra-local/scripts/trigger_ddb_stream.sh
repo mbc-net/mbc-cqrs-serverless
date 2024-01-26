@@ -7,6 +7,8 @@ export AWS_SECRET_ACCESS_KEY=local
 
 endpoint='http://localhost:8000'
 
+source .env
+
 echo "Read table name"
 declare -a tables
 while IFS= read -r line; do
@@ -25,7 +27,7 @@ for table in "${tables[@]}"; do
 		fi
 
 		echo "Check health table ${table}"
-		status=$(aws --endpoint=${endpoint} dynamodb describe-table --table-name local-suisss-recruit-${table}-command --query 'Table.TableStatus')
+		status=$(aws --endpoint=${endpoint} dynamodb describe-table --table-name local-${APP_NAME}-${table}-command --query 'Table.TableStatus')
 		echo "Table status: ${status}"
 		if [[ "${status}" == "\"ACTIVE\"" ]]; then
 			echo "Table ${table} is ACTIVE"
@@ -63,5 +65,5 @@ done
 timestamp=$(date +%s)
 for table in "${tables[@]}"; do
 	echo "Send a command to trigger command stream ${table}"
-	aws --endpoint=${endpoint} dynamodb put-item --table-name local-suisss-recruit-${table}-command --item "{\"pk\": {\"S\": \"test\" }, \"sk\": { \"S\": \"${timestamp}\" }}"
+	aws --endpoint=${endpoint} dynamodb put-item --table-name local-${APP_NAME}-${table}-command --item "{\"pk\": {\"S\": \"test\" }, \"sk\": { \"S\": \"${timestamp}\" }}"
 done
