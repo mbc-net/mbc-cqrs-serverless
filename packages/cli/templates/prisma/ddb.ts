@@ -10,11 +10,12 @@ import {
   UpdateTimeToLiveCommand,
 } from '@aws-sdk/client-dynamodb'
 import dotenv from 'dotenv'
-import { readFileSync, readdirSync } from 'fs'
+import { appendFileSync, readFileSync, readdirSync, writeFileSync } from 'fs'
 import path from 'path'
 
 dotenv.config()
 
+const envFilePath = './.env'
 const tableDir = path.join(__dirname, 'dynamodbs')
 const cqrsModuleFname = 'cqrs.json'
 const cqrsTableDecsFname = 'cqrs_desc.json'
@@ -34,6 +35,8 @@ main().catch((e) => {
 let cnt = 0
 
 async function main() {
+  // clear table stream arn in .env
+  clearTableStreamArnInEnv()
   // create cqrs tables
   await createCqrsTables()
   // create other tables
@@ -76,6 +79,9 @@ async function createCqrsTables() {
 }
 
 async function createTable(config: CreateTableCommandInput) {
+  const originName = config.TableName as string
+  console.log('\ncreating table:', originName)
+
   // add table prefix
   config.TableName = tablePrefix + config.TableName
 
@@ -93,6 +99,10 @@ async function createTable(config: CreateTableCommandInput) {
       )
 
       await updateTable(config.TableName)
+
+      if (tableDesc.Table.LatestStreamArn) {
+        appendTableStreamArnToEnv(originName, tableDesc.Table.LatestStreamArn)
+      }
 
       return tableDesc.Table.TableArn
     }
@@ -113,6 +123,13 @@ async function createTable(config: CreateTableCommandInput) {
       '`',
     )
     cnt++
+
+    if (table.TableDescription?.LatestStreamArn) {
+      appendTableStreamArnToEnv(
+        originName,
+        table.TableDescription?.LatestStreamArn,
+      )
+    }
   }
   return table.TableDescription?.TableArn
 }
@@ -161,4 +178,34 @@ async function updateTable(TableName: string) {
   } catch (error) {
     console.error(error)
   }
+}
+
+function appendTableStreamArnToEnv(name: string, streamArn: string) {
+  if (process.env.NODE_ENV !== 'local') {
+    return
+  }
+
+  try {
+    appendFileSync(
+      envFilePath,
+      `\nLOCAL_DDB_${name
+        .replace('-command', '')
+        .toUpperCase()}_STREAM=${streamArn}`,
+    )
+  } catch (error) {
+    console.error('Write to .env error!', error)
+  }
+}
+
+function clearTableStreamArnInEnv() {
+  if (process.env.NODE_ENV !== 'local') {
+    return
+  }
+
+  console.log('Clear table stream arn in .env')
+  const lines = readFileSync(envFilePath, 'utf-8').split('\n')
+  const newLines = lines.filter(
+    (line) => !line.match(/^LOCAL_DDB_.*_STREAM.*$/),
+  )
+  writeFileSync(envFilePath, newLines.join('\n'))
 }
