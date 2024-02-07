@@ -64,7 +64,7 @@ export class DynamoDbService {
       item.tenantCode = tenantCode
     }
 
-    const data = await this.objToDdbItem(item)
+    const data = await this.objToDdbItem(tableName, item)
 
     await this.client.send(
       new PutItemCommand({
@@ -108,6 +108,7 @@ export class DynamoDbService {
         UpdateExpression: updateExpression,
         ExpressionAttributeNames: expressionAttributeNames,
         ExpressionAttributeValues: await this.objToDdbItem(
+          tableName,
           expressionAttributeValues,
         ),
         ConditionExpression: conditions,
@@ -152,7 +153,7 @@ export class DynamoDbService {
         KeyConditionExpression:
           'pk = :pk' + (sk ? `AND ${sk.skExpession}` : ''),
         ExpressionAttributeNames: sk?.skAttributeNames,
-        ExpressionAttributeValues: await this.objToDdbItem({
+        ExpressionAttributeValues: await this.objToDdbItem(tableName, {
           ...sk?.skAttributeValues,
           ':pk': pk,
         }),
@@ -194,7 +195,7 @@ export class DynamoDbService {
     return obj
   }
 
-  private async objToDdbItem(obj: Record<string, any>) {
+  private async objToDdbItem(tableName: string, obj: Record<string, any>) {
     if (!obj) {
       return obj
     }
@@ -214,7 +215,7 @@ export class DynamoDbService {
       if (bytes > this.config.get<number>('ATTRIBUTE_LIMIT_SIZE')) {
         // save to s3
         const { pk, sk } = data
-        const key = `${pk}/${sk}/${ulid()}`
+        const key = `ddb/${tableName}/${pk}/${sk}/${ulid()}.json`
         const s3Key = await this.s3Service.putItem(key, attributes)
         // assign s3 url to attributes
         data.attributes = toS3AttributeKey(s3Key.Bucket, s3Key.Key)
