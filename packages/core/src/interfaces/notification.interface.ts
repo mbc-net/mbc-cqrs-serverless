@@ -1,5 +1,6 @@
 export interface INotification {
   id: string
+  table: string
   pk: string
   sk: string
   tenantCode: string

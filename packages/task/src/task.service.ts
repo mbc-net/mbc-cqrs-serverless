@@ -79,6 +79,7 @@ export class TaskService {
     await this.snsService.publish<INotification>({
       action: 'task-status',
       ...key,
+      table: this.tableName,
       id: notifyId || `${key.pk}#${key.sk}`,
       tenantCode: key.pk.substring(key.pk.indexOf('#') + 1),
       content: { status, attributes },

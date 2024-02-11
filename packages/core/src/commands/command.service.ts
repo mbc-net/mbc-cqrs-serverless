@@ -198,6 +198,7 @@ export class CommandService implements OnModuleInit {
     await this.snsService.publish<INotification>({
       action: 'command-status',
       ...key,
+      table: this.tableName,
       id: notifyId || `${this.tableName}#${key.pk}#${key.sk}`,
       tenantCode: key.pk.substring(key.pk.indexOf('#') + 1),
       content: { status },

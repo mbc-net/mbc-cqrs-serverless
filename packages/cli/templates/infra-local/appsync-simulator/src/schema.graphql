@@ -1,5 +1,6 @@
 type Message {
   id: String!
+  table: String!
   pk: String!
   sk: String!
   tenantCode: String!
