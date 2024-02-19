@@ -163,7 +163,9 @@ export class DynamoDbService {
     const lastSk = res.LastEvaluatedKey
       ? unmarshall(res.LastEvaluatedKey).sk
       : undefined
-    const items = Promise.all(res.Items?.map((item) => this.ddbItemToObj(item)))
+    const items = await Promise.all(
+      res.Items?.map((item) => this.ddbItemToObj(item)),
+    )
 
     return {
       lastSk,
