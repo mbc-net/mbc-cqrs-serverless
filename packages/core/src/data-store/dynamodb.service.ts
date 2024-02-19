@@ -151,7 +151,7 @@ export class DynamoDbService {
           ? this.toDdbKey({ pk, sk: startFromSk })
           : undefined,
         KeyConditionExpression:
-          'pk = :pk' + (sk ? `AND ${sk.skExpession}` : ''),
+          'pk = :pk' + (sk ? ` and ${sk.skExpession}` : ''),
         ExpressionAttributeNames: sk?.skAttributeNames,
         ExpressionAttributeValues: await this.objToDdbItem(tableName, {
           ...sk?.skAttributeValues,
