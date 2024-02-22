@@ -11,8 +11,10 @@ import { prismaLoggingMiddleware, PrismaModule } from './prisma'
       prismaServiceOptions: {
         middlewares: [prismaLoggingMiddleware()],
         prismaOptions: {
-          log: ['info', 'error', 'warn', 'query'],
-          // log: ['error'],
+          log:
+            process.env.NODE_ENV !== 'local'
+              ? ['error']
+              : ['info', 'error', 'warn', 'query'],
         },
         explicitConnect: false,
       },
