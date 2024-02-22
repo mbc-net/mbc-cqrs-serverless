@@ -6,6 +6,7 @@ import { ClassSerializerInterceptor, ValidationPipe } from '@nestjs/common'
 import { ConfigService } from '@nestjs/config'
 import { HttpAdapterHost, NestFactory, Reflector } from '@nestjs/core'
 import { Callback, Context, Handler } from 'aws-lambda'
+import { firstValueFrom, ReplaySubject } from 'rxjs'
 
 import { AppModule } from './app.module'
 import { HEADER_TENANT_CODE } from './constants'
@@ -14,14 +15,14 @@ import { DynamoDBExceptionFilter } from './filters'
 import { AppModuleOptions } from './interfaces'
 import { AppLogLevel, getLogLevels, RequestLogger } from './services'
 
-let server: Handler
+const serverSubject = new ReplaySubject<Handler>()
 
 async function bootstrap(opts: AppModuleOptions) {
   const logLevel: AppLogLevel =
     (process.env.LOG_LEVEL as AppLogLevel) ?? 'verbose'
   const logger = new RequestLogger('main', {
     logLevels: getLogLevels(logLevel),
-    timestamp: true,
+    timestamp: logLevel === 'verbose' || logLevel === 'debug',
   })
 
   const app = await NestFactory.create(AppModule.forRoot(opts), {
@@ -101,6 +102,8 @@ async function bootstrap(opts: AppModuleOptions) {
       AWS_DYNAMODB: '/event/dynamodb',
       AWS_EVENTBRIDGE: '/event/event-bridge',
       AWS_STEP_FUNCTIONS: '/event/step-functions',
+      AWS_S3: '/event/s3',
+      AWS_KINESIS_DATA_STREAM: '/event/kinesis-data-stream',
     },
     logSettings: {
       level: logLevel,
@@ -109,8 +112,12 @@ async function bootstrap(opts: AppModuleOptions) {
 }
 
 export function createHandler(opts: AppModuleOptions): Handler {
+  // Do not wait for lambdaHandler to be called before bootstraping Nest.
+  bootstrap(opts).then((server) => serverSubject.next(server))
+
   return async (event: any, context: Context, callback: Callback) => {
-    server = server ?? (await bootstrap(opts))
+    // Wait for bootstrap to finish, then start handling requests.
+    const server = await firstValueFrom(serverSubject)
     return server(event, context, callback)
   }
 }
