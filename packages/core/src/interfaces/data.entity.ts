@@ -44,6 +44,8 @@ export class DataEntity implements DataModel {
   seq?: number
   @ApiPropertyOptional()
   ttl?: number
+  @ApiPropertyOptional()
+  isDeleted?: boolean
 
   attributes?: Record<string, any>
 
