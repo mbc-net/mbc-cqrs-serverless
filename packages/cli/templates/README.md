@@ -17,6 +17,13 @@ TechStack:
 - RDS - PostgreSQL
 - Serverless fw && Localstack for local development
 
+## Prepare
+
+- [Nodejs](https://nodejs.org/en/download)
+- [JQ cli](https://jqlang.github.io/jq/download/)
+- [AWS cli](https://docs.aws.amazon.com/cli/latest/userguide/getting-started-install.html)
+- [Docker](https://docs.docker.com/engine/install/)
+
 ## Installation
 
 ```bash
