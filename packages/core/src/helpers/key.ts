@@ -1,4 +1,4 @@
-import { VER_SEPARATOR } from '../constants/key'
+import { KEY_SEPARATOR, VER_SEPARATOR } from '../constants/key'
 
 export function addSortKeyVersion(sk: string, version: number) {
   return `${removeSortKeyVersion(sk)}${VER_SEPARATOR}${version}`
@@ -10,6 +10,10 @@ export function removeSortKeyVersion(sk: string) {
     return sk
   }
   return sk.substring(0, lastDivIdx)
+}
+
+export function generateId(pk: string, sk: string) {
+  return `${pk}${KEY_SEPARATOR}${removeSortKeyVersion(sk)}`
 }
 
 const S3_PREFIX = 's3://'
