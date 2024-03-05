@@ -11,6 +11,7 @@ const query = /* GraphQL */ `
   mutation SEND_MESSAGE($message: AWSJSON!) {
     sendMessage(message: $message) {
       id
+      table
       pk
       sk
       tenantCode
