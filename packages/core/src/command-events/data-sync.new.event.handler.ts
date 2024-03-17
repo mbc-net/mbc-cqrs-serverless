@@ -28,7 +28,12 @@ export class DataSyncNewCommandEventHandler
     const ddbKeys = event.dynamodb?.Keys
     const ddbRecordId = `${ddbKeys.pk?.S || 'pk'}-${ddbKeys.sk?.S || 'sk'}`
       .replaceAll('#', '-')
-      .replace('@', '-')
+      .replace('@', '-v')
+      .replace(
+        /[^0-9A-Za-z_-]+/g,
+        `__${Math.random().toString(36).substring(2, 4)}__`,
+      )
+
     const sfnExecName = `${moduleName}-${ddbRecordId}-${Date.now()}`
     return await this.sfnService.startExecution(this.sfnArn, event, sfnExecName)
   }
