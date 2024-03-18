@@ -79,6 +79,11 @@ async function createCqrsTables() {
 }
 
 async function createTable(config: CreateTableCommandInput) {
+  // random wait
+  await new Promise((r) =>
+    setTimeout(r, 200 + Math.floor(Math.random() * 5000)),
+  )
+
   const originName = config.TableName as string
   console.log('\ncreating table:', originName)
 
@@ -152,28 +157,32 @@ async function updateTable(TableName: string) {
           },
         }),
       )
+
+      // random wait
+      await new Promise((r) => setTimeout(r, Math.floor(Math.random() * 5000)))
     }
 
     // Point-in-time recovery for production
-    if (process.env.NODE_ENV === 'prod') {
-      const pitDesc = await client.send(
-        new DescribeContinuousBackupsCommand({ TableName }),
-      )
-      if (
-        pitDesc.ContinuousBackupsDescription?.ContinuousBackupsStatus ===
-        'DISABLED'
-      ) {
-        console.log('enable point-in-time recovery for table:', TableName)
+    const pitDesc = await client.send(
+      new DescribeContinuousBackupsCommand({ TableName }),
+    )
+    if (
+      pitDesc.ContinuousBackupsDescription?.PointInTimeRecoveryDescription
+        ?.PointInTimeRecoveryStatus === 'DISABLED'
+    ) {
+      console.log('enable point-in-time recovery for table:', TableName)
 
-        await client.send(
-          new UpdateContinuousBackupsCommand({
-            TableName,
-            PointInTimeRecoverySpecification: {
-              PointInTimeRecoveryEnabled: true,
-            },
-          }),
-        )
-      }
+      await client.send(
+        new UpdateContinuousBackupsCommand({
+          TableName,
+          PointInTimeRecoverySpecification: {
+            PointInTimeRecoveryEnabled: true,
+          },
+        }),
+      )
+
+      // random wait
+      await new Promise((r) => setTimeout(r, Math.floor(Math.random() * 5000)))
     }
   } catch (error) {
     console.error(error)
