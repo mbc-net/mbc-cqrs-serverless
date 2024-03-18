@@ -163,26 +163,30 @@ async function updateTable(TableName: string) {
     }
 
     // Point-in-time recovery for production
-    const pitDesc = await client.send(
-      new DescribeContinuousBackupsCommand({ TableName }),
-    )
-    if (
-      pitDesc.ContinuousBackupsDescription?.PointInTimeRecoveryDescription
-        ?.PointInTimeRecoveryStatus === 'DISABLED'
-    ) {
-      console.log('enable point-in-time recovery for table:', TableName)
-
-      await client.send(
-        new UpdateContinuousBackupsCommand({
-          TableName,
-          PointInTimeRecoverySpecification: {
-            PointInTimeRecoveryEnabled: true,
-          },
-        }),
+    if (process.env.NODE_ENV !== 'local') {
+      const pitDesc = await client.send(
+        new DescribeContinuousBackupsCommand({ TableName }),
       )
+      if (
+        pitDesc.ContinuousBackupsDescription?.PointInTimeRecoveryDescription
+          ?.PointInTimeRecoveryStatus === 'DISABLED'
+      ) {
+        console.log('enable point-in-time recovery for table:', TableName)
 
-      // random wait
-      await new Promise((r) => setTimeout(r, Math.floor(Math.random() * 5000)))
+        await client.send(
+          new UpdateContinuousBackupsCommand({
+            TableName,
+            PointInTimeRecoverySpecification: {
+              PointInTimeRecoveryEnabled: true,
+            },
+          }),
+        )
+
+        // random wait
+        await new Promise((r) =>
+          setTimeout(r, Math.floor(Math.random() * 5000)),
+        )
+      }
     }
   } catch (error) {
     console.error(error)
