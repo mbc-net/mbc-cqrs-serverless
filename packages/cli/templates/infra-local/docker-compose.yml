@@ -14,7 +14,7 @@ services:
       - STEP_FUNCTIONS_ENDPOINT=http://host.docker.internal:8083
       - ECS_ENDPOINT=VALUE
     extra_hosts:
-      - "host.docker.internal:host-gateway"
+      - 'host.docker.internal:host-gateway'
 
   rds:
     image: mysql:8
@@ -62,14 +62,13 @@ services:
       - '4566:4566'
       - '4510-4559:4510-4559'
     environment:
-      - DATA_DIR=/tmp/localstack/data
       - SERVICES=s3
       - AWS_DEFAULT_REGION=ap-northeast-1
       - SERVICE_ACCESS_KEY=local
       - SERVICE_SECRET_KEY=local
       - EXTRA_CORS_ALLOWED_ORIGINS=*
     volumes:
-      - ./docker-data/localstack:/tmp/localstack
+      - ./docker-data/localstack:/var/lib/localstack
       - ./docker-data/run/docker.sock:/var/run/docker.sock
 
   appsync:
