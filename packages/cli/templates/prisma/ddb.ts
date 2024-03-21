@@ -80,9 +80,11 @@ async function createCqrsTables() {
 
 async function createTable(config: CreateTableCommandInput) {
   // random wait
-  await new Promise((r) =>
-    setTimeout(r, 200 + Math.floor(Math.random() * 5000)),
-  )
+  if (process.env.NODE_ENV !== 'local') {
+    await new Promise((r) =>
+      setTimeout(r, 200 + Math.floor(Math.random() * 5000)),
+    )
+  }
 
   const originName = config.TableName as string
   console.log('\ncreating table:', originName)
@@ -159,7 +161,11 @@ async function updateTable(TableName: string) {
       )
 
       // random wait
-      await new Promise((r) => setTimeout(r, Math.floor(Math.random() * 5000)))
+      if (process.env.NODE_ENV !== 'local') {
+        await new Promise((r) =>
+          setTimeout(r, Math.floor(Math.random() * 5000)),
+        )
+      }
     }
 
     // Point-in-time recovery for production
@@ -183,9 +189,11 @@ async function updateTable(TableName: string) {
         )
 
         // random wait
-        await new Promise((r) =>
-          setTimeout(r, Math.floor(Math.random() * 5000)),
-        )
+        if (process.env.NODE_ENV !== 'local') {
+          await new Promise((r) =>
+            setTimeout(r, Math.floor(Math.random() * 5000)),
+          )
+        }
       }
     }
   } catch (error) {
