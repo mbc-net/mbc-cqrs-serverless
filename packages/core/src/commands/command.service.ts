@@ -10,7 +10,7 @@ import {
 import { ModuleRef } from '@nestjs/core'
 import { isDeepStrictEqual } from 'util'
 
-import { VERSION_FIRST, VERSION_LATEST } from '../constants'
+import { VER_SEPARATOR, VERSION_FIRST, VERSION_LATEST } from '../constants'
 import { getUserContext } from '../context/user.context'
 import { DynamoDbService } from '../data-store/dynamodb.service'
 import { DATA_SYNC_HANDLER_METADATA } from '../decorators'
@@ -189,6 +189,34 @@ export class CommandService implements OnModuleInit {
     return command
   }
 
+  async duplicate(key: DetailKey) {
+    const item = await this.getItem(key)
+    if (!item) {
+      throw new BadRequestException(
+        'The input key is not a valid, item not found',
+      )
+    }
+    const { event, context } = getCurrentInvoke()
+    const userContext = getUserContext(event)
+
+    item.version += 1
+    item.sk = addSortKeyVersion(item.sk, item.version)
+    item.source = 'duplicated'
+    item.requestId = context?.awsRequestId
+    item.updatedAt = new Date()
+    item.updatedBy = userContext.userId
+    item.updatedIp = event?.requestContext?.http?.sourceIp
+
+    this.logger.debug('duplicate::', item)
+    await this.dynamoDbService.putItem(
+      this.tableName,
+      item,
+      'attribute_not_exists(pk) AND attribute_not_exists(sk)',
+    )
+
+    return item
+  }
+
   async updateStatus(key: DetailKey, status: string, notifyId?: string) {
     await this.dynamoDbService.updateItem(this.tableName, key, {
       set: { status },
@@ -206,6 +234,9 @@ export class CommandService implements OnModuleInit {
   }
 
   async getItem(key: DetailKey): Promise<CommandModel> {
+    if (!key.sk.includes(VER_SEPARATOR)) {
+      return this.getLatestItem(key)
+    }
     return await this.dynamoDbService.getItem(this.tableName, key)
   }
 
