@@ -1,11 +1,7 @@
-import { IDataSyncHandler } from '@mbc-cqrs-severless/core'
-import { ConfigurableModuleBuilder, Type } from '@nestjs/common'
+import { ConfigurableModuleBuilder } from '@nestjs/common'
 export interface SettingModuleOptions {
-  enableController?: boolean
-  tableName: string
-  skipError?: boolean
-  dataSyncHandlers?: Type<IDataSyncHandler>[]
-  disableDefaultHandler?: boolean
+  enableSettingController?: boolean
+  enableDataController?: boolean
 }
 
 export const { ConfigurableModuleClass, MODULE_OPTIONS_TOKEN, OPTIONS_TYPE } =

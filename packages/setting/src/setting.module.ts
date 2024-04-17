@@ -13,8 +13,14 @@ import {
   ConfigurableModuleClass,
   OPTIONS_TYPE,
 } from './setting.module-definition'
-
 @Module({
+  imports: [
+    CommandModule.register({
+      tableName: 'master',
+    }),
+    DataStoreModule,
+    QueueModule,
+  ],
   providers: [SettingService, DataSettingService],
   exports: [SettingService, DataSettingService],
 })
@@ -22,23 +28,18 @@ export class SettingModule extends ConfigurableModuleClass {
   static register(options: typeof OPTIONS_TYPE): DynamicModule {
     const module = super.register(options)
 
-    const { enableController, ...commandOpts } = options
+    const { enableDataController, enableSettingController } = options
 
-    if (!module.imports) {
-      module.imports = []
-    }
-
-    module.imports.push(
-      CommandModule.register(commandOpts),
-      DataStoreModule,
-      QueueModule,
-    )
-
-    if (enableController) {
+    if (enableDataController || enableSettingController) {
       if (!module.controllers) {
         module.controllers = []
       }
-      module.controllers.push(SettingController, DataSettingController)
+      if (enableDataController) {
+        module.controllers.push(DataSettingController)
+      }
+      if (enableSettingController) {
+        module.controllers.push(SettingController)
+      }
     }
 
     return {
