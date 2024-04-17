@@ -2,8 +2,10 @@ import { Type } from 'class-transformer'
 import {
   IsArray,
   IsBoolean,
+  IsNumber,
   IsOptional,
   IsString,
+  Min,
   ValidateNested,
 } from 'class-validator'
 
@@ -32,6 +34,11 @@ export class SettingAttrFields {
   @IsString()
   @IsOptional()
   length?: string
+
+  @IsNumber()
+  @Min(1)
+  @IsOptional()
+  maxRow?: number
 
   @IsString()
   @IsOptional()

@@ -32,9 +32,21 @@ export class SettingController {
 
   @Get('/')
   @Auth()
-  async getDataByPK() {
+  async listData() {
     const userContext = getUserContext()
-    return await this.settingService.getData(userContext.tenantCode)
+    return await this.settingService.list(userContext.tenantCode)
+  }
+
+  @Get('/:pk/:sk')
+  @Auth()
+  async getDetail(@Param() key: DetailDto) {
+    const userContext = getUserContext()
+    const { tenantCode } = parsePk(key.pk)
+
+    if (userContext.tenantCode !== tenantCode) {
+      throw new BadRequestException('Invalid tenant code')
+    }
+    return await this.settingService.get(key)
   }
 
   @Post('/')
@@ -68,5 +80,14 @@ export class SettingController {
     }
 
     return await this.settingService.delete(key)
+  }
+
+  @Post('/check-exist/:code')
+  async checkExistCode(@Param('code') code: string) {
+    const userContext = getUserContext()
+    return this.settingService.checkExistSettingCode(
+      userContext.tenantCode,
+      code,
+    )
   }
 }

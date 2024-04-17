@@ -1,9 +1,4 @@
-import {
-  Auth,
-  DetailDto,
-  getUserContext,
-  ROLE_SYSTEM_ADMIN,
-} from '@mbc-cqrs-severless/core'
+import { DetailDto, getUserContext } from '@mbc-cqrs-severless/core'
 import {
   BadRequestException,
   Body,
@@ -32,9 +27,20 @@ export class DataSettingController {
   constructor(private readonly dataSettingService: DataSettingService) {}
 
   @Get('/')
-  async getDataByPK(@Query() searchDto: DataSettingSearchDto) {
+  async listData(@Query() searchDto: DataSettingSearchDto) {
     const userContext = getUserContext()
-    return await this.dataSettingService.get(userContext.tenantCode, searchDto)
+    return await this.dataSettingService.list(userContext.tenantCode, searchDto)
+  }
+
+  @Get('/:pk/:sk')
+  async getDetail(@Param() key: DetailDto) {
+    const userContext = getUserContext()
+    const { tenantCode } = parsePk(key.pk)
+
+    if (userContext.tenantCode !== tenantCode) {
+      throw new BadRequestException('Invalid tenant code')
+    }
+    return await this.dataSettingService.get(key)
   }
 
   @Post('/')

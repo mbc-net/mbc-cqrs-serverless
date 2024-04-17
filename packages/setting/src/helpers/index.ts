@@ -1,4 +1,4 @@
-import { KEY_SEPARATOR } from '@mbc-cqrs-severless/core'
+import { KEY_SEPARATOR, removeSortKeyVersion } from '@mbc-cqrs-severless/core'
 
 export const MASTER_PK_PREFIX = 'MASTER'
 export const SETTING_SK_PREFIX = 'master_setting'
@@ -22,7 +22,7 @@ export function parseDataSettingSk(sk: string): {
   if (sk.split(KEY_SEPARATOR).length !== 2) {
     throw new Error('Invalid SK')
   }
-  const [settingCode, code] = sk.split(KEY_SEPARATOR)
+  const [settingCode, code] = removeSortKeyVersion(sk).split(KEY_SEPARATOR)
   return { settingCode, code }
 }
 

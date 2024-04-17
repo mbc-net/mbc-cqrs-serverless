@@ -12,7 +12,6 @@ import {
   Injectable,
   Logger,
   NotFoundException,
-  Param,
 } from '@nestjs/common'
 import { basename } from 'path'
 
@@ -20,7 +19,6 @@ import { DataSettingCommandDto } from '../dto/data-setting-command.dto'
 import { CreateDataSettingDto } from '../dto/data-setting-create.dto'
 import { DataSettingSearchDto } from '../dto/data-setting-search.dto'
 import { UpdateDataSettingDto } from '../dto/data-setting-update.dto'
-import { SettingAttrFields } from '../dto/setting-attributes.dto'
 import { DataSettingDataEntity } from '../entities/data-setting-data.entity'
 import { DataSettingDataListEntity } from '../entities/data-setting-data-list.entity'
 import { SettingDataEntity } from '../entities/setting-data.entity'
@@ -30,6 +28,7 @@ import {
   generateSettingSk,
   MASTER_PK_PREFIX,
   parseDataSettingSk,
+  SETTING_SK_PREFIX,
 } from '../helpers'
 
 @Injectable()
@@ -41,18 +40,34 @@ export class DataSettingService {
     private readonly dataService: DataService,
   ) {}
 
-  async get(tenantCode: string, searchDto: DataSettingSearchDto) {
+  async list(tenantCode: string, searchDto: DataSettingSearchDto) {
     const pk = generateSettingPk(tenantCode)
-    const query = {
-      sk: {
+    const query = { sk: undefined, limit: 100 }
+    if (searchDto.settingCode) {
+      query.sk = {
         skExpession: 'begins_with(sk, :settingCode)',
         skAttributeValues: {
           ':settingCode': `${searchDto.settingCode}${KEY_SEPARATOR}`,
         },
-      },
+      }
     }
-    const res = await this.dataService.listItemsByPk(pk, query)
+    const res = (await this.dataService.listItemsByPk(
+      pk,
+      query,
+    )) as DataSettingDataListEntity
+
+    if (res?.items) {
+      res.items = res.items.filter((item) =>
+        item.sk.startsWith(`${SETTING_SK_PREFIX}${KEY_SEPARATOR}`),
+      )
+    }
+
     return new DataSettingDataListEntity(res as DataSettingDataListEntity)
+  }
+
+  async get(key: DetailDto) {
+    const res = await this.dataService.getItem(key)
+    return new DataSettingDataEntity(res as DataSettingDataEntity)
   }
 
   async create(tenantCode: string, createDto: CreateDataSettingDto) {
@@ -61,7 +76,7 @@ export class DataSettingService {
     const sk = generateDataSettingSk(settingCode, code)
     const id = generateId(pk, sk)
 
-    const dataSetting = await this.dataService.getItem({ pk, sk } as DetailDto)
+    const dataSetting = await this.dataService.getItem({ pk, sk })
 
     if (dataSetting && dataSetting.isDeleted == false) {
       throw new BadRequestException('Data setting is exist!')
@@ -72,19 +87,10 @@ export class DataSettingService {
     const setting = (await this.dataService.getItem({
       pk,
       sk: settingSk,
-    } as DetailDto)) as SettingDataEntity
+    })) as SettingDataEntity
 
     if (!setting || setting.isDeleted) {
       throw new NotFoundException('Setting code is not exist!')
-    }
-
-    const isValid = this.isValidAttributes(
-      setting.attributes.fields,
-      createDto.attributes,
-    )
-
-    if (!isValid) {
-      throw new BadRequestException('Data field is not mat with setting')
     }
 
     const createCmd: DataSettingCommandDto = {
@@ -92,12 +98,10 @@ export class DataSettingService {
       pk,
       sk,
       version: dataSetting?.version ?? VERSION_FIRST,
-      code,
-      name: createDto.name,
       type: MASTER_PK_PREFIX,
       tenantCode,
       isDeleted: false,
-      attributes: createDto.attributes,
+      ...createDto,
     }
 
     const item = await this.commandService.publish(createCmd, {
@@ -112,9 +116,7 @@ export class DataSettingService {
   }
 
   async update(key: DetailDto, updateDto: UpdateDataSettingDto) {
-    const data = (await this.dataService.getItem(
-      key as DetailDto,
-    )) as DataSettingDataEntity
+    const data = (await this.dataService.getItem(key)) as DataSettingDataEntity
 
     if (!data) {
       throw new NotFoundException()
@@ -127,19 +129,10 @@ export class DataSettingService {
       const setting = (await this.dataService.getItem({
         pk: key.pk,
         sk: settingSk,
-      } as DetailDto)) as SettingDataEntity
+      })) as SettingDataEntity
 
       if (!setting || setting.isDeleted) {
         throw new NotFoundException('Setting code is not exist!')
-      }
-
-      const isValid = this.isValidAttributes(
-        setting.attributes.fields,
-        updateDto.attributes,
-      )
-
-      if (!isValid) {
-        throw new BadRequestException('Data field is not mat with setting')
       }
     }
 
@@ -167,7 +160,7 @@ export class DataSettingService {
     return new DataSettingDataEntity(item as DataSettingDataEntity)
   }
 
-  async delete(@Param() key: DetailDto) {
+  async delete(key: DetailDto) {
     const data = (await this.dataService.getItem(key)) as DataSettingDataEntity
 
     if (!data) {
@@ -200,24 +193,8 @@ export class DataSettingService {
     const item = (await this.dataService.getItem({
       pk,
       sk,
-    } as DetailDto)) as DataSettingDataEntity
+    })) as DataSettingDataEntity
 
-    return !!item
-  }
-
-  // Check all required physicalName in setting is existed in data setting key
-  private isValidAttributes(
-    fields: SettingAttrFields[],
-    dataAttr: object = {},
-  ) {
-    const settingFieldName = []
-    fields.map((field) => {
-      if (field.isRequired) settingFieldName.push(field.physicalName)
-    })
-
-    const dataFieldName = new Set()
-    Object.keys(dataAttr).map((key) => dataFieldName.add(key))
-
-    return settingFieldName.every((name) => dataFieldName.has(name))
+    return !!item && !item.isDeleted
   }
 }

@@ -37,7 +37,7 @@ export class SettingService {
     private readonly dataService: DataService,
   ) {}
 
-  async getData(tenantCode: string) {
+  async list(tenantCode: string) {
     const pk = generateSettingPk(tenantCode)
     const query = {
       sk: {
@@ -46,9 +46,15 @@ export class SettingService {
           ':settingPrefix': `${SETTING_SK_PREFIX}${KEY_SEPARATOR}`,
         },
       },
+      limit: 100,
     }
     const res = await this.dataService.listItemsByPk(pk, query)
     return new SettingDataListEntity(res as SettingDataListEntity)
+  }
+
+  async get(key: DetailDto) {
+    const res = await this.dataService.getItem(key)
+    return new SettingDataEntity(res as SettingDataEntity)
   }
 
   async create(tenantCode: string, createDto: CreateSettingDto) {
@@ -62,7 +68,7 @@ export class SettingService {
     const pk = generateSettingPk(tenantCode)
     const sk = generateSettingSk(createDto.code)
 
-    const setting = await this.dataService.getItem({ pk, sk } as DetailDto)
+    const setting = await this.dataService.getItem({ pk, sk })
 
     if (setting && setting.isDeleted == false) {
       throw new BadRequestException('Setting code is exist!')
@@ -75,15 +81,10 @@ export class SettingService {
       pk,
       sk,
       version: setting?.version ?? VERSION_FIRST,
-      code: createDto.code,
-      name: createDto.name,
       type: MASTER_PK_PREFIX,
       tenantCode,
       isDeleted: false,
-      attributes: {
-        fields: createDto.attributes.fields,
-        description: createDto.attributes.description,
-      },
+      ...createDto,
     })
 
     const item = await this.commandService.publish(createCmd, {
@@ -162,6 +163,17 @@ export class SettingService {
     })
 
     return new SettingDataEntity(item as SettingDataEntity)
+  }
+
+  async checkExistSettingCode(tenantCode: string, code: string) {
+    const pk = generateSettingPk(tenantCode)
+    const sk = generateSettingSk(code)
+    const item = (await this.dataService.getItem({
+      pk,
+      sk,
+    })) as SettingDataEntity
+
+    return !!item && !item.isDeleted
   }
 
   private isValidFields(fields: SettingAttrFields[]) {
