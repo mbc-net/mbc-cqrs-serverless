@@ -69,7 +69,8 @@
     "packages/core",
     "packages/sequence",
     "packages/task",
-    "packages/cli"
+    "packages/cli",
+    "packages/setting"
   ],
   "jest": {
     "moduleFileExtensions": [
