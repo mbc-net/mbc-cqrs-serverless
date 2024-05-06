@@ -28,7 +28,8 @@
     "access": "public"
   },
   "dependencies": {
-    "commander": "^11.1.0"
+    "commander": "^11.1.0",
+    "rimraf": "^5.0.5"
   },
   "devDependencies": {
     "@faker-js/faker": "^8.3.1",
