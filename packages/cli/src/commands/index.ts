@@ -3,10 +3,12 @@ import { Command } from 'commander'
 
 import { newCommand } from './new.command'
 import { startCommand } from './start.command'
+import { uiCommand } from './ui.command'
 
 export default function loadCommands(program: Command) {
   newCommand(program)
   startCommand(program)
+  uiCommand(program)
 
   // error handling
   program.on('command:*', () => {
