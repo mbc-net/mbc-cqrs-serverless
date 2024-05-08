@@ -57,8 +57,8 @@ export class DataSettingService {
     )) as DataSettingDataListEntity
 
     if (res?.items) {
-      res.items = res.items.filter((item) =>
-        item.sk.startsWith(`${SETTING_SK_PREFIX}${KEY_SEPARATOR}`),
+      res.items = res.items.filter(
+        (item) => !item.sk.startsWith(`${SETTING_SK_PREFIX}${KEY_SEPARATOR}`),
       )
     }
 
