@@ -54,9 +54,6 @@ export class SettingAttrFields {
   @IsOptional()
   dataFormat?: string
 
-  @IsString()
-  uiComponent: string
-
   constructor(attrs: Partial<SettingAttrFields>) {
     Object.assign(this, attrs)
   }
