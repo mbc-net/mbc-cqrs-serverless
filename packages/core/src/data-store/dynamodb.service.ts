@@ -15,6 +15,7 @@ import { getUserContext } from '../context/user.context'
 import {
   isS3AttributeKey,
   parseS3AttributeKey,
+  toISOStringWithTimezone,
   toS3AttributeKey,
 } from '../helpers'
 import { objectBytes } from '../helpers/object'
@@ -233,7 +234,7 @@ export class DynamoDbService {
     for (const key in data) {
       const value = data[key]
       if (value instanceof Date) {
-        data[key] = value.toISOString()
+        data[key] = toISOStringWithTimezone(value)
       }
     }
 
