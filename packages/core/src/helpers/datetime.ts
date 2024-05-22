@@ -1,19 +1,14 @@
-function pad(n: number) {
-  return `${Math.floor(Math.abs(n))}`.padStart(2, '0')
-}
-
-// Get timezone offset in ISO format (+hh:mm or -hh:mm)
-function getTimezoneOffset(date: Date) {
-  const tzOffset = -date.getTimezoneOffset()
-  const diff = tzOffset >= 0 ? '+' : '-'
-  return diff + pad(tzOffset / 60) + ':' + pad(tzOffset % 60)
-}
-
 export function toISOString(date: Date) {
+  if (!date) {
+    return undefined
+  }
   return date.toISOString()
 }
 
 export function toISOStringWithTimezone(date: Date) {
+  if (!date) {
+    return undefined
+  }
   return (
     date.getFullYear() +
     '-' +
@@ -38,4 +33,15 @@ export function isISOString(val: string) {
 export function isISOStringWithTimezone(val: string) {
   const d = new Date(val)
   return !Number.isNaN(d.valueOf()) && toISOStringWithTimezone(d) === val
+}
+
+function pad(n: number) {
+  return `${Math.floor(Math.abs(n))}`.padStart(2, '0')
+}
+
+// Get timezone offset in ISO format (+hh:mm or -hh:mm)
+function getTimezoneOffset(date: Date) {
+  const tzOffset = -date.getTimezoneOffset()
+  const diff = tzOffset >= 0 ? '+' : '-'
+  return diff + pad(tzOffset / 60) + ':' + pad(tzOffset % 60)
 }
