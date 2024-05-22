@@ -4,6 +4,7 @@ import {
   GetItemCommand,
   PutItemCommand,
   QueryCommand,
+  ScanCommand,
   UpdateItemCommand,
 } from '@aws-sdk/client-dynamodb'
 import { marshall, unmarshall } from '@aws-sdk/util-dynamodb'
@@ -174,17 +175,11 @@ export class DynamoDbService {
     }
   }
 
-  async listAllItems(
-    tableName: string,
-    startKey?: DetailKey,
-    limit = 10,
-    order: 'asc' | 'desc' = 'asc',
-  ) {
+  async listAllItems(tableName: string, startKey?: DetailKey, limit = 10) {
     const res = await this.client.send(
-      new QueryCommand({
+      new ScanCommand({
         TableName: tableName,
         Limit: limit,
-        ScanIndexForward: order === 'asc',
         ExclusiveStartKey: startKey ? this.toDdbKey(startKey) : undefined,
       }),
     )
