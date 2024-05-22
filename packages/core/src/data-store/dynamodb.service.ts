@@ -173,6 +173,34 @@ export class DynamoDbService {
     }
   }
 
+  async listAllItems(
+    tableName: string,
+    startKey?: DetailKey,
+    limit = 10,
+    order: 'asc' | 'desc' = 'asc',
+  ) {
+    const res = await this.client.send(
+      new QueryCommand({
+        TableName: tableName,
+        Limit: limit,
+        ScanIndexForward: order === 'asc',
+        ExclusiveStartKey: startKey ? this.toDdbKey(startKey) : undefined,
+      }),
+    )
+
+    const lastKey = res.LastEvaluatedKey
+      ? (unmarshall(res.LastEvaluatedKey) as DetailKey)
+      : undefined
+    const items = await Promise.all(
+      res.Items?.map((item) => this.ddbItemToObj(item)),
+    )
+
+    return {
+      lastKey,
+      items,
+    }
+  }
+
   private async ddbItemToObj(
     item: Record<string, AttributeValue>,
   ): Promise<any> {

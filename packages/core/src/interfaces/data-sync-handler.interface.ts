@@ -1,6 +1,8 @@
 import { CommandModel } from './command-model.interface'
 
 export interface IDataSyncHandler<TExecuteResult = any, TRollbackResult = any> {
+  readonly type?: string
+
   /**
    * Upgrade data by a command.
    * @param cmd The command to upgrade

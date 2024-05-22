@@ -217,6 +217,40 @@ export class CommandService implements OnModuleInit {
     return item
   }
 
+  async reSyncData() {
+    const targetSyncHandlers = this.dataSyncHandlers?.filter(
+      (handler) => handler.type !== 'dynamodb',
+    )
+
+    if (!targetSyncHandlers?.length) {
+      this.logger.debug('no data sync handlers')
+      return
+    }
+
+    const dataTableName = this.dataService.tableName
+    let startKey: DetailKey = undefined
+    while (true) {
+      const res = await this.dynamoDbService.listAllItems(
+        dataTableName,
+        startKey,
+      )
+
+      if (res?.items?.length) {
+        for (const item of res.items) {
+          item.sk = addSortKeyVersion(item.sk, item.version)
+          for (const handler of targetSyncHandlers) {
+            await handler.up(item)
+          }
+        }
+      }
+
+      startKey = res?.lastKey
+      if (!startKey) {
+        break
+      }
+    }
+  }
+
   async updateStatus(key: DetailKey, status: string, notifyId?: string) {
     await this.dynamoDbService.updateItem(this.tableName, key, {
       set: { status },

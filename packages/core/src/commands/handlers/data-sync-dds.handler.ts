@@ -7,6 +7,8 @@ import { DataService } from '../data.service'
 export class DataSyncDdsHandler implements IDataSyncHandler {
   private readonly logger = new Logger(DataSyncDdsHandler.name)
 
+  readonly type = 'dynamodb'
+
   constructor(private readonly dataService: DataService) {}
 
   async up(cmd: CommandModel): Promise<any> {
