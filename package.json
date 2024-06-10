@@ -70,7 +70,8 @@
     "packages/sequence",
     "packages/task",
     "packages/cli",
-    "packages/setting"
+    "packages/setting",
+    "packages/datetime"
   ],
   "jest": {
     "moduleFileExtensions": [
