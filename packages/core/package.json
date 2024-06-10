@@ -29,6 +29,7 @@
   "dependencies": {
     "@aws-crypto/sha256-js": "^5.2.0",
     "@codegenie/serverless-express": "^4.13.0",
+    "@mbc-cqrs-severless/datetime": "^1.0.0",
     "@nestjs/common": "^10.3.0",
     "@nestjs/config": "^3.1.1",
     "@nestjs/core": "^10.3.0",

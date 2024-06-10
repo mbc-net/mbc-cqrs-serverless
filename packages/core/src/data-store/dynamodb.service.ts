@@ -8,6 +8,7 @@ import {
   UpdateItemCommand,
 } from '@aws-sdk/client-dynamodb'
 import { marshall, unmarshall } from '@aws-sdk/util-dynamodb'
+import { toISOStringWithTimezone } from '@mbc-cqrs-severless/datetime'
 import { Injectable, Logger } from '@nestjs/common'
 import { ConfigService } from '@nestjs/config'
 import { ulid } from 'ulid'
@@ -16,7 +17,6 @@ import { getUserContext } from '../context/user.context'
 import {
   isS3AttributeKey,
   parseS3AttributeKey,
-  toISOStringWithTimezone,
   toS3AttributeKey,
 } from '../helpers'
 import { objectBytes } from '../helpers/object'
