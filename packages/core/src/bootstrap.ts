@@ -12,6 +12,7 @@ import { AppModule } from './app.module'
 import { HEADER_TENANT_CODE } from './constants'
 import { Environment } from './env.validation'
 import { DynamoDBExceptionFilter } from './filters'
+import { IS_LAMBDA_RUNNING } from './helpers'
 import { AppModuleOptions } from './interfaces'
 import { AppLogLevel, getLogLevels, RequestLogger } from './services'
 
@@ -90,9 +91,15 @@ async function bootstrap(opts: AppModuleOptions) {
     // console.log(mermaidEdges.join('\n'))
   }
 
+  if (!IS_LAMBDA_RUNNING) {
+    await app.listen(configService.get<number>('APP_PORT') || 3000)
+    return null
+  }
+
   await app.init()
 
   const expressApp = app.getHttpAdapter().getInstance()
+
   return serverlessExpress({
     app: expressApp,
     // resolutionMode: 'CALLBACK',

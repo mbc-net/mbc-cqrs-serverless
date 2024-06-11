@@ -2,6 +2,7 @@ import { ClassConstructor, plainToInstance } from 'class-transformer'
 import {
   IsBoolean,
   IsEnum,
+  IsNumber,
   IsOptional,
   IsPositive,
   IsString,
@@ -20,6 +21,10 @@ export class EnvironmentVariables {
   NODE_ENV: Environment
   @IsString()
   APP_NAME: string
+
+  @IsNumber()
+  @IsOptional()
+  APP_PORT: number
 
   @IsBoolean()
   EVENT_SOURCE_DISABLED: boolean
