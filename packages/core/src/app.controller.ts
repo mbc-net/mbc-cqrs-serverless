@@ -1,8 +1,8 @@
-import { getCurrentInvoke } from '@codegenie/serverless-express'
 import { Controller, Get, Logger } from '@nestjs/common'
 import { ApiTags } from '@nestjs/swagger'
 
 import { AppService } from './app.service'
+import { CONTEXT } from './decorators'
 
 @Controller()
 @ApiTags('main')
@@ -12,10 +12,8 @@ export class AppController {
   constructor(private readonly appService: AppService) {}
 
   @Get('/')
-  getHello(): string {
-    const { event, context } = getCurrentInvoke()
-    this.logger.log(event, context)
-
+  getHello(@CONTEXT() ctx: any): string {
+    this.logger.debug('ctx::', JSON.stringify(ctx, null, 2))
     return this.appService.getHello()
   }
 }
