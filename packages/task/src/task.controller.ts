@@ -1,4 +1,4 @@
-import { DetailDto } from '@mbc-cqrs-severless/core'
+import { DetailDto, IInvoke, INVOKE_CONTEXT } from '@mbc-cqrs-severless/core'
 import {
   Body,
   Controller,
@@ -20,8 +20,11 @@ export class TaskController {
   constructor(private readonly tasksService: TaskService) {}
 
   @Post('/')
-  async createTask(@Body() dto: CreateTaskDto) {
-    return await this.tasksService.createTask(dto)
+  async createTask(
+    @INVOKE_CONTEXT() invokeContext: IInvoke,
+    @Body() dto: CreateTaskDto,
+  ) {
+    return await this.tasksService.createTask(dto, { invokeContext })
   }
 
   @Get('/:pk/:sk')

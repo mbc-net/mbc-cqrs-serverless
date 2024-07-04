@@ -4,6 +4,7 @@ import {
   DetailDto,
   generateId,
   getCommandSource,
+  IInvoke,
   KEY_SEPARATOR,
   VERSION_FIRST,
 } from '@mbc-cqrs-severless/core'
@@ -70,7 +71,11 @@ export class DataSettingService {
     return new DataSettingDataEntity(res as DataSettingDataEntity)
   }
 
-  async create(tenantCode: string, createDto: CreateDataSettingDto) {
+  async create(
+    tenantCode: string,
+    createDto: CreateDataSettingDto,
+    opts: { invokeContext: IInvoke },
+  ) {
     const { settingCode, code } = createDto
     const pk = generateSettingPk(tenantCode)
     const sk = generateDataSettingSk(settingCode, code)
@@ -110,12 +115,17 @@ export class DataSettingService {
         this.constructor.name,
         'createDataSetting',
       ),
+      invokeContext: opts.invokeContext,
     })
 
     return new DataSettingDataEntity(item as DataSettingDataEntity)
   }
 
-  async update(key: DetailDto, updateDto: UpdateDataSettingDto) {
+  async update(
+    key: DetailDto,
+    updateDto: UpdateDataSettingDto,
+    opts: { invokeContext: IInvoke },
+  ) {
     const data = (await this.dataService.getItem(key)) as DataSettingDataEntity
 
     if (!data) {
@@ -155,12 +165,13 @@ export class DataSettingService {
         this.constructor.name,
         'updateDataSetting',
       ),
+      invokeContext: opts.invokeContext,
     })
 
     return new DataSettingDataEntity(item as DataSettingDataEntity)
   }
 
-  async delete(key: DetailDto) {
+  async delete(key: DetailDto, opts: { invokeContext: IInvoke }) {
     const data = (await this.dataService.getItem(key)) as DataSettingDataEntity
 
     if (!data) {
@@ -182,6 +193,7 @@ export class DataSettingService {
         this.constructor.name,
         'deleteDataSetting',
       ),
+      invokeContext: opts.invokeContext,
     })
 
     return new DataSettingDataEntity(item as DataSettingDataEntity)

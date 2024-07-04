@@ -4,6 +4,7 @@ import {
   DetailDto,
   generateId,
   getCommandSource,
+  IInvoke,
   KEY_SEPARATOR,
   VERSION_FIRST,
 } from '@mbc-cqrs-severless/core'
@@ -57,7 +58,11 @@ export class SettingService {
     return new SettingDataEntity(res as SettingDataEntity)
   }
 
-  async create(tenantCode: string, createDto: CreateSettingDto) {
+  async create(
+    tenantCode: string,
+    createDto: CreateSettingDto,
+    opts: { invokeContext: IInvoke },
+  ) {
     const validField = this.isValidFields(createDto.attributes.fields)
     if (!validField) {
       throw new BadRequestException(
@@ -93,11 +98,16 @@ export class SettingService {
         this.constructor.name,
         'createSetting',
       ),
+      invokeContext: opts.invokeContext,
     })
     return new SettingDataEntity(item as SettingDataEntity)
   }
 
-  async update(key: DetailDto, updateDto: UpdateSettingDto) {
+  async update(
+    key: DetailDto,
+    updateDto: UpdateSettingDto,
+    opts: { invokeContext: IInvoke },
+  ) {
     const data = (await this.dataService.getItem(key)) as SettingDataEntity
 
     if (!data) {
@@ -134,11 +144,12 @@ export class SettingService {
         this.constructor.name,
         'updateSetting',
       ),
+      invokeContext: opts.invokeContext,
     })
     return new SettingDataEntity(item as SettingDataEntity)
   }
 
-  async delete(key: DetailDto) {
+  async delete(key: DetailDto, opts: { invokeContext: IInvoke }) {
     const data = (await this.dataService.getItem(key)) as SettingDataEntity
 
     if (!data) {
@@ -160,6 +171,7 @@ export class SettingService {
         this.constructor.name,
         'deleteSetting',
       ),
+      invokeContext: opts.invokeContext,
     })
 
     return new SettingDataEntity(item as SettingDataEntity)

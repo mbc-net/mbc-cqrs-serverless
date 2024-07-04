@@ -1,8 +1,8 @@
-import { getCurrentInvoke } from '@codegenie/serverless-express'
 import {
   DetailKey,
   DynamoDbService,
   getUserContext,
+  IInvoke,
   INotification,
   KEY_SEPARATOR,
   SnsService,
@@ -27,9 +27,14 @@ export class TaskService {
     this.tableName = dynamoDbService.getTableName('tasks')
   }
 
-  async createTask(dto: CreateTaskDto): Promise<TaskEntity> {
-    const { event, context } = getCurrentInvoke()
-    const userContext = getUserContext(event)
+  async createTask(
+    dto: CreateTaskDto,
+    opts: {
+      invokeContext: IInvoke
+    },
+  ): Promise<TaskEntity> {
+    const sourceIp = opts.invokeContext?.event?.requestContext?.http?.sourceIp
+    const userContext = getUserContext(opts.invokeContext)
 
     const taskCode = ulid()
     const pk = `TASK${KEY_SEPARATOR}${dto.tenantCode}`
@@ -46,13 +51,13 @@ export class TaskService {
       tenantCode: dto.tenantCode,
       status: TaskStatusEnum.CREATED,
       input: dto.input,
-      requestId: context?.awsRequestId,
+      requestId: opts.invokeContext?.context?.awsRequestId,
       createdAt: new Date(),
       updatedAt: new Date(),
       createdBy: userContext.userId,
       updatedBy: userContext.userId,
-      createdIp: event?.requestContext?.http?.sourceIp,
-      updatedIp: event?.requestContext?.http?.sourceIp,
+      createdIp: sourceIp,
+      updatedIp: sourceIp,
     }
 
     await this.dynamoDbService.putItem(this.tableName, item)

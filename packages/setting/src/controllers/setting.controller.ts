@@ -2,6 +2,8 @@ import {
   Auth,
   DetailDto,
   getUserContext,
+  IInvoke,
+  INVOKE_CONTEXT,
   ROLE_SYSTEM_ADMIN,
 } from '@mbc-cqrs-severless/core'
 import {
@@ -32,15 +34,15 @@ export class SettingController {
 
   @Get('/')
   @Auth()
-  async listData() {
-    const userContext = getUserContext()
+  async listData(@INVOKE_CONTEXT() ctx: IInvoke) {
+    const userContext = getUserContext(ctx)
     return await this.settingService.list(userContext.tenantCode)
   }
 
   @Get('/:pk/:sk')
   @Auth()
-  async getDetail(@Param() key: DetailDto) {
-    const userContext = getUserContext()
+  async getDetail(@INVOKE_CONTEXT() ctx: IInvoke, @Param() key: DetailDto) {
+    const userContext = getUserContext(ctx)
     const { tenantCode } = parsePk(key.pk)
 
     if (userContext.tenantCode !== tenantCode) {
@@ -50,41 +52,53 @@ export class SettingController {
   }
 
   @Post('/')
-  async createSetting(@Body() createDto: CreateSettingDto) {
-    const userContext = getUserContext()
-    return await this.settingService.create(userContext.tenantCode, createDto)
+  async createSetting(
+    @INVOKE_CONTEXT() invokeContext: IInvoke,
+    @Body() createDto: CreateSettingDto,
+  ) {
+    const userContext = getUserContext(invokeContext)
+    return await this.settingService.create(userContext.tenantCode, createDto, {
+      invokeContext,
+    })
   }
 
   @Put('/:pk/:sk')
   async updateSetting(
+    @INVOKE_CONTEXT() invokeContext: IInvoke,
     @Param() key: DetailDto,
     @Body() updateDto: UpdateSettingDto,
   ) {
-    const userContext = getUserContext()
+    const userContext = getUserContext(invokeContext)
     const { tenantCode } = parsePk(key.pk)
 
     if (userContext.tenantCode !== tenantCode) {
       throw new BadRequestException('Invalid tenant code')
     }
 
-    return await this.settingService.update(key, updateDto)
+    return await this.settingService.update(key, updateDto, { invokeContext })
   }
 
   @Delete('/:pk/:sk')
-  async deleteSetting(@Param() key: DetailDto) {
-    const userContext = getUserContext()
+  async deleteSetting(
+    @INVOKE_CONTEXT() invokeContext: IInvoke,
+    @Param() key: DetailDto,
+  ) {
+    const userContext = getUserContext(invokeContext)
     const { tenantCode } = parsePk(key.pk)
 
     if (userContext.tenantCode !== tenantCode) {
       throw new BadRequestException('Invalid tenant code')
     }
 
-    return await this.settingService.delete(key)
+    return await this.settingService.delete(key, { invokeContext })
   }
 
   @Post('/check-exist/:code')
-  async checkExistCode(@Param('code') code: string) {
-    const userContext = getUserContext()
+  async checkExistCode(
+    @INVOKE_CONTEXT() ctx: IInvoke,
+    @Param('code') code: string,
+  ) {
+    const userContext = getUserContext(ctx)
     return this.settingService.checkExistSettingCode(
       userContext.tenantCode,
       code,

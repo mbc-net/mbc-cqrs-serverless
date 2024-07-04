@@ -12,7 +12,6 @@ import { Injectable, Logger } from '@nestjs/common'
 import { ConfigService } from '@nestjs/config'
 import { ulid } from 'ulid'
 
-import { getUserContext } from '../context/user.context'
 import {
   isS3AttributeKey,
   parseS3AttributeKey,
@@ -60,12 +59,6 @@ export class DynamoDbService {
     item: Record<string, any>,
     conditions?: string,
   ) {
-    if (!item.tenantCode) {
-      // Assign tenantCode for item before put
-      const { tenantCode } = getUserContext()
-      item.tenantCode = tenantCode
-    }
-
     const data = await this.objToDdbItem(tableName, item)
 
     await this.client.send(

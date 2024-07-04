@@ -1,4 +1,3 @@
-import { getCurrentInvoke } from '@codegenie/serverless-express'
 import {
   CanActivate,
   ExecutionContext,
@@ -32,7 +31,7 @@ export class RolesGuard implements CanActivate {
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   protected async verifyTenant(context: ExecutionContext): Promise<boolean> {
     // Get tenant code from header
-    const userContext = getUserContext()
+    const userContext = getUserContext(context)
 
     // required tenant code
     return !!userContext.tenantCode
@@ -61,10 +60,7 @@ export class RolesGuard implements CanActivate {
 
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   protected async getUserRole(context: ExecutionContext): Promise<string> {
-    const { event, context: ctx } = getCurrentInvoke()
-    this.logger.debug('event:', event)
-    this.logger.debug('context: ', ctx)
-    const userContext = getUserContext(event)
+    const userContext = getUserContext(context)
 
     return userContext.tenantRole
   }

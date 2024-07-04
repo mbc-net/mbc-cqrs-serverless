@@ -1,9 +1,9 @@
-import { getCurrentInvoke } from '@codegenie/serverless-express'
 import {
   DataEntity,
   DetailKey,
   DynamoDbService,
   getUserContext,
+  IInvoke,
   KEY_SEPARATOR,
 } from '@mbc-cqrs-severless/core'
 import { Injectable, Logger } from '@nestjs/common'
@@ -35,13 +35,18 @@ export class SequencesService {
    * - type: typeCode
    * - seq: sequence value ( atomic counter )
    */
-  async genNewSequence(dto: GenSequenceDto): Promise<DataEntity> {
+  async genNewSequence(
+    dto: GenSequenceDto,
+    opts: {
+      invokeContext: IInvoke
+    },
+  ): Promise<DataEntity> {
     const rotateVal = this.getRotateValue(dto.rotateBy, dto.date)
     const pk = `SEQ${KEY_SEPARATOR}${dto.tenantCode}`
     const sk = `${dto.typeCode}${KEY_SEPARATOR}${rotateVal}`
 
-    const { event, context } = getCurrentInvoke()
-    const userContext = getUserContext(event)
+    const sourceIp = opts.invokeContext?.event?.requestContext?.http?.sourceIp
+    const userContext = getUserContext(opts.invokeContext)
     const now = new Date()
     const item = await this.dynamoDbService.updateItem(
       this.tableName,
@@ -53,13 +58,13 @@ export class SequencesService {
           tenantCode: dto.tenantCode,
           type: dto.typeCode,
           seq: { ifNotExists: 0, incrementBy: 1 },
-          requestId: context?.awsRequestId,
+          requestId: opts.invokeContext?.context?.awsRequestId,
           createdAt: { ifNotExists: now },
           createdBy: { ifNotExists: userContext.userId },
-          createdIp: { ifNotExists: event?.requestContext?.http?.sourceIp },
+          createdIp: { ifNotExists: sourceIp },
           updatedAt: now,
           updatedBy: userContext.userId,
-          updatedIp: event?.requestContext?.http?.sourceIp,
+          updatedIp: sourceIp,
         },
       },
     )

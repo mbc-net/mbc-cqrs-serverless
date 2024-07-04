@@ -1,4 +1,3 @@
-import { getCurrentInvoke } from '@codegenie/serverless-express'
 import {
   BadRequestException,
   Inject,
@@ -11,7 +10,7 @@ import { ModuleRef } from '@nestjs/core'
 import { isDeepStrictEqual } from 'util'
 
 import { VER_SEPARATOR, VERSION_FIRST, VERSION_LATEST } from '../constants'
-import { getUserContext } from '../context/user.context'
+import { getUserContext } from '../context/user'
 import { DynamoDbService } from '../data-store/dynamodb.service'
 import { DATA_SYNC_HANDLER_METADATA } from '../decorators'
 import { mergeDeep, pickKeys } from '../helpers'
@@ -137,7 +136,7 @@ export class CommandService implements OnModuleInit {
   }
 
   // full data command
-  async publish(input: CommandInputModel, opts?: ICommandOptions) {
+  async publish(input: CommandInputModel, opts: ICommandOptions) {
     let inputVersion = input.version || VERSION_FIRST
     let item: CommandModel
     if (inputVersion === VERSION_LATEST) {
@@ -163,8 +162,10 @@ export class CommandService implements OnModuleInit {
       return null
     }
 
-    const { event, context } = getCurrentInvoke()
-    const userContext = getUserContext(event)
+    const userContext = getUserContext(opts.invokeContext)
+    const requestId =
+      opts?.requestId || opts.invokeContext?.context?.awsRequestId
+    const sourceIp = opts.invokeContext?.event?.requestContext?.http?.sourceIp
     const version = inputVersion + 1
 
     const command: CommandModel = {
@@ -172,13 +173,13 @@ export class CommandService implements OnModuleInit {
       sk: addSortKeyVersion(input.sk, version),
       version,
       source: opts?.source,
-      requestId: opts?.requestId || context?.awsRequestId,
+      requestId,
       createdAt: new Date(),
       updatedAt: new Date(),
       createdBy: userContext.userId,
       updatedBy: userContext.userId,
-      createdIp: event?.requestContext?.http?.sourceIp,
-      updatedIp: event?.requestContext?.http?.sourceIp,
+      createdIp: sourceIp,
+      updatedIp: sourceIp,
     }
     this.logger.debug('publish::', command)
     await this.dynamoDbService.putItem(
@@ -189,23 +190,23 @@ export class CommandService implements OnModuleInit {
     return command
   }
 
-  async duplicate(key: DetailKey) {
+  async duplicate(key: DetailKey, opts: ICommandOptions) {
     const item = await this.getItem(key)
     if (!item) {
       throw new BadRequestException(
         'The input key is not a valid, item not found',
       )
     }
-    const { event, context } = getCurrentInvoke()
-    const userContext = getUserContext(event)
+    const userContext = getUserContext(opts.invokeContext)
 
     item.version += 1
     item.sk = addSortKeyVersion(item.sk, item.version)
     item.source = 'duplicated'
-    item.requestId = context?.awsRequestId
+    item.requestId =
+      opts?.requestId || opts.invokeContext?.context?.awsRequestId
     item.updatedAt = new Date()
     item.updatedBy = userContext.userId
-    item.updatedIp = event?.requestContext?.http?.sourceIp
+    item.updatedIp = opts.invokeContext?.event?.requestContext?.http?.sourceIp
 
     this.logger.debug('duplicate::', item)
     await this.dynamoDbService.putItem(

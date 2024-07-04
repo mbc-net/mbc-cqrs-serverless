@@ -2,7 +2,8 @@ import { Controller, Get, Logger } from '@nestjs/common'
 import { ApiTags } from '@nestjs/swagger'
 
 import { AppService } from './app.service'
-import { CONTEXT } from './decorators'
+import { IInvoke } from './context'
+import { INVOKE_CONTEXT } from './decorators'
 
 @Controller()
 @ApiTags('main')
@@ -12,7 +13,7 @@ export class AppController {
   constructor(private readonly appService: AppService) {}
 
   @Get('/')
-  getHello(@CONTEXT() ctx: any): string {
+  getHello(@INVOKE_CONTEXT() ctx: IInvoke): string {
     this.logger.debug('ctx::', JSON.stringify(ctx, null, 2))
     return this.appService.getHello()
   }

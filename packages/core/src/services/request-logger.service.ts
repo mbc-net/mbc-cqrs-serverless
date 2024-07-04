@@ -1,9 +1,10 @@
 /* eslint-disable no-console */
-import { getCurrentInvoke } from '@codegenie/serverless-express'
 import { ConsoleLogger, LogLevel } from '@nestjs/common'
 
-import { getUserContext } from '../context/user.context'
+import { extractInvokeContext } from '../context'
+import { getUserContext } from '../context/user'
 import { Environment } from '../env.validation'
+import { IS_LAMBDA_RUNNING } from '../helpers'
 
 export type AppLogLevel =
   | 'verbose' // The most fine-grained information used to trace the path of your code's execution
@@ -14,7 +15,8 @@ export type AppLogLevel =
   | 'fatal' // Messages about serious errors that cause the application to stop functioning
 
 export class RequestLogger extends ConsoleLogger {
-  private readonly isLocal: boolean = process.env.NODE_ENV === Environment.Local
+  private readonly isLocal: boolean =
+    process.env.NODE_ENV === Environment.Local || !IS_LAMBDA_RUNNING
 
   protected printStackTrace(stack: string) {
     if (this.isLocal) {
@@ -57,10 +59,10 @@ export class RequestLogger extends ConsoleLogger {
   }
 
   protected getLambdaContextMessage(contextMessage?: string) {
-    const { event, context } = getCurrentInvoke()
-    const userContext = getUserContext(event)
-    const requestId = context?.awsRequestId || undefined
-    const ip = event?.requestContext?.http?.sourceIp || undefined
+    const ctx = extractInvokeContext()
+    const userContext = getUserContext(ctx)
+    const requestId = ctx?.context?.awsRequestId || undefined
+    const ip = ctx?.event?.requestContext?.http?.sourceIp || undefined
     const tenantCode = userContext.tenantCode || undefined
     const userId = userContext.userId || undefined
 

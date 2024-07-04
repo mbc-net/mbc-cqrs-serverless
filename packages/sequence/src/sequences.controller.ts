@@ -1,4 +1,4 @@
-import { DetailDto } from '@mbc-cqrs-severless/core'
+import { DetailDto, IInvoke, INVOKE_CONTEXT } from '@mbc-cqrs-severless/core'
 import { Body, Controller, Get, Param, Post } from '@nestjs/common'
 import { ApiTags } from '@nestjs/swagger'
 
@@ -15,7 +15,10 @@ export class SequencesController {
   }
 
   @Post('/')
-  async genSequence(@Body() dto: GenSequenceDto) {
-    return await this.sequenceService.genNewSequence(dto)
+  async genSequence(
+    @INVOKE_CONTEXT() invokeContext: IInvoke,
+    @Body() dto: GenSequenceDto,
+  ) {
+    return await this.sequenceService.genNewSequence(dto, { invokeContext })
   }
 }

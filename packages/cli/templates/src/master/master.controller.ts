@@ -2,6 +2,8 @@ import {
   CommandService,
   DataService,
   DetailDto,
+  IInvoke,
+  INVOKE_CONTEXT,
   SearchDto,
 } from '@mbc-cqrs-severless/core'
 import {
@@ -35,11 +37,12 @@ export class MasterController {
 
   @Post('/')
   async publishCommand(
+    @INVOKE_CONTEXT() invokeContext: IInvoke,
     @Body() masterDto: MasterCommandDto,
   ): Promise<MasterDataEntity> {
     this.logger.debug('cmd:', masterDto)
     this.logger.debug('commandService:' + this.commandService.tableName)
-    const item = await this.commandService.publish(masterDto)
+    const item = await this.commandService.publish(masterDto, { invokeContext })
     return new MasterDataEntity(item as MasterDataEntity)
   }
 
