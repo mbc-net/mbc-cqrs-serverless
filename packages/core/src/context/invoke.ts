@@ -110,7 +110,7 @@ export function extractInvokeContext(ctx?: ExecutionContext): IInvoke {
           method: request.method,
           path: request.path,
           protocol: request.protocol,
-          sourceIp: request.ip,
+          sourceIp: request.get('x-source-ip') || request.ip,
           userAgent: request.get('user-agent'),
         },
         requestId: request.get('x-request-id'),
@@ -119,7 +119,9 @@ export function extractInvokeContext(ctx?: ExecutionContext): IInvoke {
     },
     context: {
       awsRequestId:
-        request.get('x-amzn-trace-id') || request.get('x-request-id'),
+        request.get('x-amz-cf-id') ||
+        request.get('x-amzn-trace-id') ||
+        request.get('x-request-id'),
     },
   }
 }
