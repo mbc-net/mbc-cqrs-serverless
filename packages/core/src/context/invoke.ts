@@ -126,8 +126,10 @@ export function extractInvokeContext(ctx?: ExecutionContext): IInvoke {
   }
 }
 
-export const getAuthorizerClaims = (ctx: IInvoke): JwtClaims => {
-  return ctx?.event?.requestContext?.authorizer?.jwt?.claims
+export function getAuthorizerClaims(ctx: IInvoke): JwtClaims {
+  return (
+    ctx?.event?.requestContext?.authorizer?.jwt?.claims || ({} as JwtClaims)
+  )
   // {
   //   "sub": "92ca4f68-9ac6-4080-9ae2-2f02a86206a4",
   //   "iss": "http://localhost:9229/local_2G7noHgW",
