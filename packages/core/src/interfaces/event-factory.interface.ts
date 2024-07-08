@@ -1,6 +1,7 @@
 import {
   DynamoDBStreamEvent,
   EventBridgeEvent,
+  S3Event,
   SNSEvent,
   SQSEvent,
 } from 'aws-lambda'
@@ -18,4 +19,6 @@ export interface IEventFactory<TEvent extends IEvent = any> {
   transformEventBridge(event: EventBridgeEvent<any, any>): Promise<TEvent[]>
 
   transformStepFunction(event: StepFunctionsEvent<any>): Promise<TEvent[]>
+
+  transformS3(event: S3Event): Promise<TEvent[]>
 }

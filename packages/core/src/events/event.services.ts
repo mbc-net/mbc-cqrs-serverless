@@ -2,6 +2,7 @@ import { Injectable, Logger } from '@nestjs/common'
 import {
   DynamoDBStreamEvent,
   EventBridgeEvent,
+  S3Event,
   SNSEvent,
   SQSEvent,
 } from 'aws-lambda'
@@ -62,6 +63,12 @@ export class EventService {
   async handleStepFunctionsEvent(raw: StepFunctionsEvent<any>) {
     this.logger.debug('handleStepFunctionsEvent::', raw)
     const events = await this.eventFactory.transformStepFunction(raw)
+    return this.execute(events)
+  }
+
+  async handleS3Event(raw: S3Event) {
+    this.logger.debug('handleStepFunctionsEvent::', raw)
+    const events = await this.eventFactory.transformS3(raw)
     return this.execute(events)
   }
 

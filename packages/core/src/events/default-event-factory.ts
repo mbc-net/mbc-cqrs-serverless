@@ -1,6 +1,7 @@
 import {
   DynamoDBStreamEvent,
   EventBridgeEvent,
+  S3Event,
   SNSEvent,
   SQSEvent,
 } from 'aws-lambda'
@@ -23,9 +24,11 @@ export class DefaultEventFactory implements IEventFactory {
     return events
   }
 
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   async transformSns(event: SNSEvent): Promise<IEvent[]> {
-    throw new Error('Method not implemented.')
+    return event.Records.map((record) => ({
+      ...record,
+      source: record.EventSource,
+    }))
   }
 
   async transformDynamodbStream(event: DynamoDBStreamEvent): Promise<IEvent[]> {
@@ -45,10 +48,9 @@ export class DefaultEventFactory implements IEventFactory {
   }
 
   async transformEventBridge(
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     event: EventBridgeEvent<any, any>,
   ): Promise<IEvent[]> {
-    throw new Error('Method not implemented.')
+    return [event]
   }
 
   async transformStepFunction(
@@ -56,5 +58,12 @@ export class DefaultEventFactory implements IEventFactory {
   ): Promise<IEvent[]> {
     const commandStepFunction = new DataSyncCommandSfnEvent(event)
     return [commandStepFunction]
+  }
+
+  async transformS3(event: S3Event): Promise<IEvent[]> {
+    return event.Records.map((record) => ({
+      ...record,
+      source: record.eventSource,
+    }))
   }
 }

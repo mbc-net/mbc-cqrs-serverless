@@ -3,6 +3,7 @@ import { ApiExcludeController } from '@nestjs/swagger'
 import {
   DynamoDBStreamEvent,
   EventBridgeEvent,
+  S3Event,
   SNSEvent,
   SQSEvent,
 } from 'aws-lambda'
@@ -64,6 +65,16 @@ export class EventController {
   async handleStepFunctionsEvent(@Body() event: StepFunctionsEvent<any>) {
     try {
       return await this.eventService.handleStepFunctionsEvent(event)
+    } catch (error) {
+      this.logger.error(error)
+      throw new EventSourceException(error as Error)
+    }
+  }
+
+  @Post('s3')
+  async handleS3Event(@Body() event: S3Event) {
+    try {
+      return await this.eventService.handleS3Event(event)
     } catch (error) {
       this.logger.error(error)
       throw new EventSourceException(error as Error)
