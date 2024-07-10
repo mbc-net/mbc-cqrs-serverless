@@ -47,6 +47,7 @@ export class SequencesService {
 
     const sourceIp = opts.invokeContext?.event?.requestContext?.http?.sourceIp
     const userContext = getUserContext(opts.invokeContext)
+    const userId = userContext.userId || 'system'
     const now = new Date()
     const item = await this.dynamoDbService.updateItem(
       this.tableName,
@@ -60,10 +61,10 @@ export class SequencesService {
           seq: { ifNotExists: 0, incrementBy: 1 },
           requestId: opts.invokeContext?.context?.awsRequestId,
           createdAt: { ifNotExists: now },
-          createdBy: { ifNotExists: userContext.userId },
+          createdBy: { ifNotExists: userId },
           createdIp: { ifNotExists: sourceIp },
           updatedAt: now,
-          updatedBy: userContext.userId,
+          updatedBy: userId,
           updatedIp: sourceIp,
         },
       },
