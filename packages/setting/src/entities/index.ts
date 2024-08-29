@@ -1,6 +1,0 @@
-export * from './data-setting-command.entity'
-export * from './data-setting-data.entity'
-export * from './data-setting-data-list.entity'
-export * from './setting-command.entity'
-export * from './setting-data.entity'
-export * from './setting-data-list.entity'
