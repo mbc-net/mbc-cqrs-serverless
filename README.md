@@ -6,6 +6,10 @@ Unleash the power of scalable, resilient serverless applications with CQRS on AW
 
 This package provides core functionalities for implementing the Command Query Responsibility Segregation (CQRS) pattern within AWS serverless architectures, powered by the incredible NestJS framework. It simplifies the development of highly scalable and decoupled systems that can handle complex business logic and high-volume data processing.
 
+## Documentation
+
+Visit https://mbc-net.github.io/mbc-cqrs-serverless-doc/ to view the full documentation.
+
 ## Features
 
 - **CQRS framework for AWS serverless**:
