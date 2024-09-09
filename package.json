@@ -24,7 +24,7 @@
   "bugs": {
     "url": "https://github.com/mbc-net/mbc-cqrs-serverless/issues"
   },
-  "homepage": "https://github.com/mbc-net/mbc-cqrs-serverless#readme",
+  "homepage": "https://mbc-net.github.io/mbc-cqrs-serverless-doc/",
   "devDependencies": {
     "@aws-sdk/client-dynamodb": "^3.478.0",
     "@aws-sdk/client-s3": "^3.478.0",
