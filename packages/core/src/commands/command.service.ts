@@ -110,7 +110,7 @@ export class CommandService implements OnModuleInit {
   // partial data command
   async publishPartialUpdate(
     input: CommandPartialInputModel,
-    opts?: ICommandOptions,
+    opts: ICommandOptions,
   ) {
     let item: CommandModel
     if (input.version > VERSION_FIRST) {
