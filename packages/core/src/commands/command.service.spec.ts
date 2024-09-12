@@ -7,6 +7,7 @@ import { CommandService } from './command.service'
 import { DataService } from './data.service'
 import { addSortKeyVersion } from '../helpers/key'
 import { BadRequestException } from '@nestjs/common'
+import { ICommandOptions } from '../interfaces/command.options.interface'
 
 const moduleMocker = new ModuleMocker(global)
 
@@ -129,7 +130,9 @@ describe('CommandService', () => {
         name: '-1',
       }
       const latestItem = await commandService.getLatestItem(key)
-      const item = await commandService.publishPartialUpdate(inputItem)
+      const item = await commandService.publishPartialUpdate(inputItem, {
+        invokeContext: {},
+      })
       expect(item).toBeDefined()
       expect(item?.version).toBe(latestItem.version + 1)
     })
@@ -144,7 +147,9 @@ describe('CommandService', () => {
         version: -1,
         name: '-1',
       }
-      const call = commandService.publishPartialUpdate(inputItem)
+      const call = commandService.publishPartialUpdate(inputItem, {
+        invokeContext: {},
+      })
       expect(call).rejects.toThrow(
         new BadRequestException('The input key is not a valid, item not found'),
       )
