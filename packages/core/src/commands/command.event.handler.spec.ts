@@ -1,0 +1,184 @@
+import { createMock } from '@golevelup/ts-jest'
+import { Test } from '@nestjs/testing'
+import { DynamoDbService, S3Service } from '../data-store'
+
+import {
+  DynamoDBClient,
+  GetItemCommand,
+  UpdateItemCommand,
+} from '@aws-sdk/client-dynamodb'
+import { PublishCommand, SNSClient } from '@aws-sdk/client-sns'
+import { ConfigService } from '@nestjs/config'
+import { mockClient } from 'aws-sdk-client-mock'
+import 'aws-sdk-client-mock-jest'
+import { DataSyncCommandSfnEvent } from '../command-events/data-sync.sfn.event'
+import { CommandEventHandler } from '../commands/command.event.handler'
+import { MODULE_OPTIONS_TOKEN } from '../commands/command.module-definition'
+import { DataService } from '../commands/data.service'
+import { CommandModel, IDataSyncHandler } from '../interfaces'
+import { SnsService } from '../queue/sns.service'
+import { ExplorerService } from '../services'
+import { CommandService } from './command.service'
+import { DataSyncDdsHandler } from './handlers/data-sync-dds.handler'
+import { HistoryService } from './history.service'
+
+export class MockedHandler implements IDataSyncHandler {
+  async up(cmd: CommandModel): Promise<any> {}
+  async down(cmd: CommandModel): Promise<any> {}
+}
+
+const sfnCheckVersionEvent = new DataSyncCommandSfnEvent({
+  input: {},
+  context: {
+    Execution: {
+      Id: 'arn:aws:states:ap-northeast-1:101010101010:execution:command:table_name-tenantCode-test-1726027976-v1-1726214572086',
+      Input: {
+        eventSourceARN:
+          'arn:aws:dynamodb:ap-northeast-1:undefined:env-app_name-table_name-command',
+        awsRegion: 'ddblocal',
+        eventID: '6e4009b4-5dab-4ee2-8570-4713062683cb',
+        eventName: 'INSERT',
+        eventVersion: '1.1',
+        eventSource: 'aws:dynamodb',
+        dynamodb: {
+          ApproximateCreationDateTime: '2024-09-13T08:02:00.000Z',
+          Keys: { sk: { S: '1726027976@1' }, pk: { S: 'tenantCode#test' } },
+          NewImage: {
+            code: { S: '1726027976' },
+            updatedBy: { S: '92ca4f68-9ac6-4080-9ae2-2f02a86206a4' },
+            createdIp: { S: '127.0.0.1' },
+            tenantCode: { S: 'tenantCode' },
+            source: { S: '[master]:MasterController.publishCommand' },
+            type: { S: 'MASTER' },
+            version: { N: '1' },
+            createdAt: { S: '2024-09-13T15:02:51+07:00' },
+            updatedIp: { S: '127.0.0.1' },
+            createdBy: { S: '92ca4f68-9ac6-4080-9ae2-2f02a86206a4' },
+            requestId: { S: '45e4edc6-e4ce-4b3a-baf9-3ef4fed82a1c' },
+            sk: { S: '1726027976@1' },
+            name: { S: '1726027976' },
+            attributes: { M: { master: { M: {} } } },
+            pk: { S: 'tenantCode#test' },
+            id: { S: 'tenantCode#test#1726027976' },
+            updatedAt: { S: '2024-09-13T15:02:51+07:00' },
+          },
+          SequenceNumber: '000000000000000000089',
+          SizeBytes: 465,
+          StreamViewType: 'NEW_IMAGE',
+        },
+        source:
+          'arn:aws:dynamodb:ap-northeast-1:undefined:env-app_name-table_name-command',
+      },
+      Name: 'table_name-tenantCode-test-1726027976-v1-1726214572086',
+      RoleArn: 'arn:aws:iam::101010101010:role/DummyRole',
+      StartTime: '2024-09-13T08:02:52.094Z',
+    },
+    State: {
+      EnteredTime: '2024-09-13T08:02:52.095Z',
+      Name: 'check_version',
+      RetryCount: 0,
+    },
+    StateMachine: {
+      Id: 'arn:aws:states:ap-northeast-1:101010101010:stateMachine:command',
+      Name: 'command',
+    },
+  },
+})
+
+const keys = {
+  NODE_ENV: 'env',
+  APP_NAME: 'app_name',
+}
+
+describe('DataSyncCommandSfnEventHandler', () => {
+  let commandEventHandler: CommandEventHandler
+  let commandService: CommandService
+  const dynamoDBMock = mockClient(DynamoDBClient)
+  const snsMock = mockClient(SNSClient)
+
+  beforeEach(async () => {
+    const moduleRef = await Test.createTestingModule({
+      providers: [
+        CommandEventHandler,
+        CommandService,
+        DataService,
+        HistoryService,
+        S3Service,
+        DynamoDbService,
+        SnsService,
+        MockedHandler,
+        {
+          provide: MODULE_OPTIONS_TOKEN,
+          useValue: {
+            tableName: 'table_name',
+            dataSyncHandlers: [MockedHandler],
+          },
+        },
+        {
+          provide: ExplorerService,
+          useValue: createMock<ExplorerService>({
+            exploreDataSyncHandlers: () => ({
+              dataSyncHandlers: [MockedHandler],
+            }),
+          }),
+        },
+        {
+          provide: DataSyncDdsHandler,
+          useClass: MockedHandler,
+        },
+        {
+          provide: ConfigService,
+          useValue: createMock<ConfigService>({
+            get: jest.fn((key) => {
+              return keys[key] ?? 'default'
+            }),
+          }),
+        },
+      ],
+    }).compile()
+    commandEventHandler =
+      moduleRef.get<CommandEventHandler>(CommandEventHandler)
+  })
+
+  afterEach(() => {
+    jest.clearAllMocks()
+    dynamoDBMock.reset()
+  })
+
+  it('fasfa', async () => {
+    // Arrange
+    dynamoDBMock.on(UpdateItemCommand).resolves({} as any)
+    snsMock.on(PublishCommand).resolves({} as any)
+    dynamoDBMock.on(GetItemCommand).resolves({ Item: {} })
+
+    // Action
+    await commandEventHandler.execute(sfnCheckVersionEvent)
+
+    // Assert
+    expect(dynamoDBMock).toHaveReceivedCommandTimes(UpdateItemCommand, 2)
+    expect(dynamoDBMock).toHaveReceivedCommandTimes(GetItemCommand, 1)
+    expect(snsMock).toHaveReceivedCommandTimes(PublishCommand, 2)
+
+    expect(snsMock).toHaveReceivedCommandWith(PublishCommand, {
+      Message: expect.stringContaining('check_version'),
+    })
+    expect(dynamoDBMock).toHaveReceivedNthCommandWith(1, UpdateItemCommand, {
+      TableName: 'env-app_name-table_name-command',
+      Key: { pk: { S: 'tenantCode#test' }, sk: { S: '1726027976@1' } },
+      ExpressionAttributeValues: expect.objectContaining({
+        ':status': { S: 'check_version:STARTED' },
+      }),
+    })
+    expect(dynamoDBMock).toHaveReceivedNthCommandWith(2, GetItemCommand, {
+      TableName: 'env-app_name-table_name-data',
+      Key: { pk: { S: 'tenantCode#test' }, sk: { S: '1726027976' } },
+    })
+    expect(dynamoDBMock).toHaveReceivedNthCommandWith(3, UpdateItemCommand, {
+      TableName: 'env-app_name-table_name-command',
+      Key: { pk: { S: 'tenantCode#test' }, sk: { S: '1726027976@1' } },
+      ExpressionAttributeValues: expect.objectContaining({
+        ':status': { S: 'check_version:FINISHED' },
+      }),
+    })
+  })
+})
