@@ -109,12 +109,7 @@ const sfnTransformDataEvent = createEvent(
 
 const sfnSyncDataEvent = createEvent(DataSyncCommandSfnName.SYNC_DATA, {
   prevStateName: 'transform_data',
-  result: 'DataSyncDdsHandler',
-})
-
-const sfn2SyncDataEvent = createEvent(DataSyncCommandSfnName.SYNC_DATA, {
-  prevStateName: 'transform_data',
-  result: 'MasterDataSyncRdsHandler',
+  result: 'MockedHandler',
 })
 
 const sfnFinishDataEvent = createEvent(DataSyncCommandSfnName.FINISH)
@@ -172,6 +167,9 @@ describe('DataSyncCommandSfnEventHandler', () => {
       }).compile()
       commandEventHandler =
         moduleRef.get<CommandEventHandler>(CommandEventHandler)
+
+      const commandService = moduleRef.get<CommandService>(CommandService)
+      commandService.onModuleInit()
     })
 
     afterEach(() => {
@@ -323,6 +321,59 @@ describe('DataSyncCommandSfnEventHandler', () => {
       expect(dynamoDBMock).toHaveReceivedNthCommandWith(4, PutItemCommand, {
         TableName: 'env-app_name-table_name-history',
         Item: { sk: { S: '1726027976@1' }, version: { N: '1' } },
+      })
+    })
+
+    it('should return the array of handlers when executing the correct transform data event', async () => {
+      // Arrange
+      dynamoDBMock.on(UpdateItemCommand).resolves({} as any)
+      snsMock.on(PublishCommand).resolves({} as any)
+      dynamoDBMock.on(GetItemCommand).resolves({ Item: {} })
+
+      // Action
+      const result = await commandEventHandler.execute(sfnTransformDataEvent)
+
+      console.log('result,', result)
+
+      // Assert
+      expect(result).toEqual(
+        expect.arrayContaining([
+          { prevStateName: 'transform_data', result: 'MockedHandler' },
+        ]),
+      )
+    })
+
+    it('should call the AWS service with the correct parameters when executing the correct transform data event', async () => {
+      // Arrange
+      dynamoDBMock.on(UpdateItemCommand).resolves({} as any)
+      snsMock.on(PublishCommand).resolves({} as any)
+      dynamoDBMock.on(GetItemCommand).resolves({ Item: {} })
+
+      // Action
+      await commandEventHandler.execute(sfnTransformDataEvent)
+
+      // Assert
+      expect(dynamoDBMock).toHaveReceivedCommandTimes(UpdateItemCommand, 2)
+      expect(snsMock).toHaveReceivedCommandTimes(PublishCommand, 2)
+
+      expect(snsMock).toHaveReceivedCommandWith(PublishCommand, {
+        Message: expect.stringContaining('transform_data'),
+      })
+
+      expect(dynamoDBMock).toHaveReceivedNthCommandWith(1, UpdateItemCommand, {
+        TableName: 'env-app_name-table_name-command',
+        Key: { pk: { S: 'tenantCode#test' }, sk: { S: '1726027976@1' } },
+        ExpressionAttributeValues: expect.objectContaining({
+          ':status': { S: 'transform_data:STARTED' },
+        }),
+      })
+
+      expect(dynamoDBMock).toHaveReceivedNthCommandWith(2, UpdateItemCommand, {
+        TableName: 'env-app_name-table_name-command',
+        Key: { pk: { S: 'tenantCode#test' }, sk: { S: '1726027976@1' } },
+        ExpressionAttributeValues: expect.objectContaining({
+          ':status': { S: 'transform_data:FINISHED' },
+        }),
       })
     })
   })
