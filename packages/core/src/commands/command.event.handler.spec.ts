@@ -313,16 +313,16 @@ describe('DataSyncCommandSfnEventHandler', () => {
         TableName: 'env-app_name-table_name-data',
         Key: { pk: { S: 'tenantCode#test' }, sk: { S: '1726027976' } },
       })
-      expect(dynamoDBMock).toHaveReceivedNthCommandWith(3, UpdateItemCommand, {
+      expect(dynamoDBMock).toHaveReceivedNthCommandWith(3, PutItemCommand, {
+        TableName: 'env-app_name-table_name-history',
+        Item: { sk: { S: '1726027976@1' }, version: { N: '1' } },
+      })
+      expect(dynamoDBMock).toHaveReceivedNthCommandWith(4, UpdateItemCommand, {
         TableName: 'env-app_name-table_name-command',
         Key: { pk: { S: 'tenantCode#test' }, sk: { S: '1726027976@1' } },
         ExpressionAttributeValues: expect.objectContaining({
           ':status': { S: 'history_copy:FINISHED' },
         }),
-      })
-      expect(dynamoDBMock).toHaveReceivedNthCommandWith(4, PutItemCommand, {
-        TableName: 'env-app_name-table_name-history',
-        Item: { sk: { S: '1726027976@1' }, version: { N: '1' } },
       })
     })
 
@@ -455,6 +455,40 @@ describe('DataSyncCommandSfnEventHandler', () => {
         Key: { pk: { S: 'tenantCode#test' }, sk: { S: '1726027976@1' } },
         ExpressionAttributeValues: expect.objectContaining({
           ':status': { S: 'sync_data:FINISHED' },
+        }),
+      })
+    })
+
+    it('should call the AWS service with the correct parameters when executing the finish data event', async () => {
+      // Arrange
+      dynamoDBMock.on(UpdateItemCommand).resolves({} as any)
+      snsMock.on(PublishCommand).resolves({} as any)
+      dynamoDBMock.on(GetItemCommand).resolves({ Item: {} })
+
+      // Action
+      await commandEventHandler.execute(sfnFinishDataEvent)
+
+      // Assert
+      expect(dynamoDBMock).toHaveReceivedCommandTimes(UpdateItemCommand, 2)
+      expect(snsMock).toHaveReceivedCommandTimes(PublishCommand, 2)
+
+      expect(snsMock).toHaveReceivedCommandWith(PublishCommand, {
+        Message: expect.stringContaining('finish'),
+      })
+
+      expect(dynamoDBMock).toHaveReceivedNthCommandWith(1, UpdateItemCommand, {
+        TableName: 'env-app_name-table_name-command',
+        Key: { pk: { S: 'tenantCode#test' }, sk: { S: '1726027976@1' } },
+        ExpressionAttributeValues: expect.objectContaining({
+          ':status': { S: 'finish:STARTED' },
+        }),
+      })
+
+      expect(dynamoDBMock).toHaveReceivedNthCommandWith(2, UpdateItemCommand, {
+        TableName: 'env-app_name-table_name-command',
+        Key: { pk: { S: 'tenantCode#test' }, sk: { S: '1726027976@1' } },
+        ExpressionAttributeValues: expect.objectContaining({
+          ':status': { S: 'finish:FINISHED' },
         }),
       })
     })
