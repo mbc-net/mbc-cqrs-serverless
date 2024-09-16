@@ -28,7 +28,9 @@ import { HistoryService } from './history.service'
 import { DataSyncCommandSfnName } from '../command-events/sfn-name.enum'
 
 export class MockedHandler implements IDataSyncHandler {
-  async up(cmd: CommandModel): Promise<any> {}
+  async up(cmd: CommandModel): Promise<any> {
+    return 'MockedHandler has been called'
+  }
   async down(cmd: CommandModel): Promise<any> {}
 }
 
@@ -373,6 +375,86 @@ describe('DataSyncCommandSfnEventHandler', () => {
         Key: { pk: { S: 'tenantCode#test' }, sk: { S: '1726027976@1' } },
         ExpressionAttributeValues: expect.objectContaining({
           ':status': { S: 'transform_data:FINISHED' },
+        }),
+      })
+    })
+
+    it('should throw not found handler error when executing the sync data event', async () => {
+      // Arrange
+      dynamoDBMock.on(UpdateItemCommand).resolves({} as any)
+      snsMock.on(PublishCommand).resolves({} as any)
+      dynamoDBMock.on(GetItemCommand).resolves({ Item: {} })
+
+      // Action & Assert
+      await expect(
+        commandEventHandler.execute(
+          createEvent(DataSyncCommandSfnName.SYNC_DATA, {
+            prevStateName: 'transform_data',
+          }),
+        ),
+      ).rejects.toThrow('SyncDataHandler not found!')
+    })
+
+    it('should throw empty handler error when executing the sync data event', async () => {
+      // Arrange
+      dynamoDBMock.on(UpdateItemCommand).resolves({} as any)
+      snsMock.on(PublishCommand).resolves({} as any)
+      dynamoDBMock.on(GetItemCommand).resolves({ Item: {} })
+
+      // Action & Assert
+      await expect(
+        commandEventHandler.execute(
+          createEvent(DataSyncCommandSfnName.SYNC_DATA, {
+            prevStateName: 'transform_data',
+            result: 'HandlerNotExist',
+          }),
+        ),
+      ).rejects.toThrow('SyncDataHandler empty!')
+    })
+
+    it('should call handler up when executing the correct sync data event', async () => {
+      // Arrange
+      dynamoDBMock.on(UpdateItemCommand).resolves({} as any)
+      snsMock.on(PublishCommand).resolves({} as any)
+      dynamoDBMock.on(GetItemCommand).resolves({ Item: {} })
+
+      // Action
+      const result = await commandEventHandler.execute(sfnSyncDataEvent)
+
+      // Assert
+      expect(result).toEqual('MockedHandler has been called')
+    })
+
+    it('should call the AWS service with the correct parameters when executing the correct sync data event', async () => {
+      // Arrange
+      dynamoDBMock.on(UpdateItemCommand).resolves({} as any)
+      snsMock.on(PublishCommand).resolves({} as any)
+      dynamoDBMock.on(GetItemCommand).resolves({ Item: {} })
+
+      // Action
+      await commandEventHandler.execute(sfnSyncDataEvent)
+
+      // Assert
+      expect(dynamoDBMock).toHaveReceivedCommandTimes(UpdateItemCommand, 2)
+      expect(snsMock).toHaveReceivedCommandTimes(PublishCommand, 2)
+
+      expect(snsMock).toHaveReceivedCommandWith(PublishCommand, {
+        Message: expect.stringContaining('sync_data'),
+      })
+
+      expect(dynamoDBMock).toHaveReceivedNthCommandWith(1, UpdateItemCommand, {
+        TableName: 'env-app_name-table_name-command',
+        Key: { pk: { S: 'tenantCode#test' }, sk: { S: '1726027976@1' } },
+        ExpressionAttributeValues: expect.objectContaining({
+          ':status': { S: 'sync_data:STARTED' },
+        }),
+      })
+
+      expect(dynamoDBMock).toHaveReceivedNthCommandWith(2, UpdateItemCommand, {
+        TableName: 'env-app_name-table_name-command',
+        Key: { pk: { S: 'tenantCode#test' }, sk: { S: '1726027976@1' } },
+        ExpressionAttributeValues: expect.objectContaining({
+          ':status': { S: 'sync_data:FINISHED' },
         }),
       })
     })
