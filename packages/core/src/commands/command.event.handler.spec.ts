@@ -5,6 +5,7 @@ import { DynamoDbService, S3Service } from '../data-store'
 import {
   DynamoDBClient,
   GetItemCommand,
+  PutItemCommand,
   UpdateItemCommand,
 } from '@aws-sdk/client-dynamodb'
 import { PublishCommand, SNSClient } from '@aws-sdk/client-sns'
@@ -264,6 +265,64 @@ describe('DataSyncCommandSfnEventHandler', () => {
         ExpressionAttributeValues: expect.objectContaining({
           ':status': { S: 'check_version:FINISHED' },
         }),
+      })
+    })
+
+    it('should return result = ok when executing the correct history copy event', async () => {
+      // Arrange
+      dynamoDBMock.on(UpdateItemCommand).resolves({} as any)
+      snsMock.on(PublishCommand).resolves({} as any)
+      dynamoDBMock
+        .on(GetItemCommand)
+        .resolves({ Item: { sk: { S: '1726027976' }, version: { N: '1' } } })
+
+      // Action
+      const result = await commandEventHandler.execute(sfnHistoryCopyEvent)
+
+      // Assert
+      expect(result).toEqual({ result: 'ok' })
+    })
+
+    it('should call the AWS service with the correct parameters when executing the correct history copy event', async () => {
+      // Arrange
+      dynamoDBMock.on(UpdateItemCommand).resolves({} as any)
+      snsMock.on(PublishCommand).resolves({} as any)
+      dynamoDBMock
+        .on(GetItemCommand)
+        .resolves({ Item: { sk: { S: '1726027976' }, version: { N: '1' } } })
+
+      // Action
+      await commandEventHandler.execute(sfnHistoryCopyEvent)
+
+      // Assert
+      expect(dynamoDBMock).toHaveReceivedCommandTimes(UpdateItemCommand, 2)
+      expect(dynamoDBMock).toHaveReceivedCommandTimes(GetItemCommand, 1)
+      expect(snsMock).toHaveReceivedCommandTimes(PublishCommand, 2)
+
+      expect(snsMock).toHaveReceivedCommandWith(PublishCommand, {
+        Message: expect.stringContaining('history_copy'),
+      })
+      expect(dynamoDBMock).toHaveReceivedNthCommandWith(1, UpdateItemCommand, {
+        TableName: 'env-app_name-table_name-command',
+        Key: { pk: { S: 'tenantCode#test' }, sk: { S: '1726027976@1' } },
+        ExpressionAttributeValues: expect.objectContaining({
+          ':status': { S: 'history_copy:STARTED' },
+        }),
+      })
+      expect(dynamoDBMock).toHaveReceivedNthCommandWith(2, GetItemCommand, {
+        TableName: 'env-app_name-table_name-data',
+        Key: { pk: { S: 'tenantCode#test' }, sk: { S: '1726027976' } },
+      })
+      expect(dynamoDBMock).toHaveReceivedNthCommandWith(3, UpdateItemCommand, {
+        TableName: 'env-app_name-table_name-command',
+        Key: { pk: { S: 'tenantCode#test' }, sk: { S: '1726027976@1' } },
+        ExpressionAttributeValues: expect.objectContaining({
+          ':status': { S: 'history_copy:FINISHED' },
+        }),
+      })
+      expect(dynamoDBMock).toHaveReceivedNthCommandWith(4, PutItemCommand, {
+        TableName: 'env-app_name-table_name-history',
+        Item: { sk: { S: '1726027976@1' }, version: { N: '1' } },
       })
     })
   })
