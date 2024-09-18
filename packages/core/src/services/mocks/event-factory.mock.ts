@@ -1,5 +1,6 @@
-import { EventFactory } from '@mbc-cqrs-severless/core'
 import { Logger } from '@nestjs/common'
+
+import { EventFactory } from '../../decorators'
 
 @EventFactory()
 export class MockEventFactory {
