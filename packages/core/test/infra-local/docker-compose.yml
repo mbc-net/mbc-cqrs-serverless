@@ -1,0 +1,91 @@
+version: '2'
+services:
+  stepfunctions-local:
+    image: amazon/aws-stepfunctions-local
+    ports:
+      - 8083:8083
+    environment:
+      - AWS_ACCOUNT_ID=101010101010
+      - AWS_DEFAULT_REGION=ap-northeast-1
+      - LAMBDA_ENDPOINT=http://host.docker.internal:3002
+      - SQS_ENDPOINT=http://host.docker.internal:9324
+      - SNS_ENDPOINT=http://host.docker.internal:4002
+      - DYNAMODB_ENDPOINT=http://host.docker.internal:8000
+      - STEP_FUNCTIONS_ENDPOINT=http://host.docker.internal:8083
+      - ECS_ENDPOINT=VALUE
+    extra_hosts:
+      - 'host.docker.internal:host-gateway'
+
+  rds:
+    image: mysql:8
+    environment:
+      MYSQL_ROOT_PASSWORD: RootCqrs
+      MYSQL_DATABASE: cqrs
+    volumes:
+      - ./docker-data/mysql:/var/lib/mysql
+    ports:
+      - 3306:3306
+
+  dynamodb-local:
+    image: amazon/dynamodb-local
+    ports:
+      - 8000:8000
+    volumes:
+      - ./docker-data/dynamodb-local:/home/dynamodblocal/data
+    working_dir: /home/dynamodblocal
+    command: '-jar DynamoDBLocal.jar -sharedDb -dbPath ./data'
+
+  dynamodb-admin:
+    image: aaronshaf/dynamodb-admin
+    environment:
+      - DYNAMO_ENDPOINT=dynamodb-local:8000
+      - AWS_REGION=ap-northeast-1
+      - AWS_ACCESS_KEY_ID=local
+      - AWS_SECRET_ACCESS_KEY=local
+    ports:
+      - 8001:8001
+    depends_on:
+      - dynamodb-local
+
+  queue:
+    image: softwaremill/elasticmq-native:latest
+    ports:
+      - 9324:9324 # sqs
+      - 9325:9325 # ui
+    volumes:
+      - ./elasticmq.conf:/opt/elasticmq.conf
+      - ./docker-data/elasticmq:/data
+
+  localstack:
+    image: localstack/localstack
+    ports:
+      - '4566:4566'
+      - '4510-4559:4510-4559'
+    environment:
+      - SERVICES=s3
+      - AWS_DEFAULT_REGION=ap-northeast-1
+      - SERVICE_ACCESS_KEY=local
+      - SERVICE_SECRET_KEY=local
+      - EXTRA_CORS_ALLOWED_ORIGINS=*
+    volumes:
+      - ./docker-data/localstack:/var/lib/localstack
+      - ./docker-data/run/docker.sock:/var/run/docker.sock
+
+  appsync:
+    build:
+      context: ./appsync-simulator
+      dockerfile: Dockerfile
+    ports:
+      - 4001:4001
+    environment:
+      - PORT=4001
+      - API_KEY=da2-fakeApiId123456
+
+  cognito-local:
+    build:
+      context: ./cognito-local
+      dockerfile: Dockerfile
+    ports:
+      - 9229:9229
+    volumes:
+      - ./docker-data/.cognito:/app/.cognito

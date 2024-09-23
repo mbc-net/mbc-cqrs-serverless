@@ -38,3 +38,12 @@ dist/
 
 # nestjs repl
 .nestjs_repl_history
+
+# docker volumn
+docker-data
+
+# cognito local
+.cognito
+
+# environment variable
+.env

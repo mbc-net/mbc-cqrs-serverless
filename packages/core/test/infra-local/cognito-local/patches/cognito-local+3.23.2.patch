@@ -1,0 +1,57 @@
+diff --git a/node_modules/cognito-local/lib/errors.d.ts b/node_modules/cognito-local/lib/errors.d.ts
+index 73c8ba1..4de35b5 100644
+--- a/node_modules/cognito-local/lib/errors.d.ts
++++ b/node_modules/cognito-local/lib/errors.d.ts
+@@ -46,3 +46,6 @@ export declare class InvalidLambdaResponseError extends CognitoError {
+ export declare class InvalidParameterError extends CognitoError {
+     constructor(message?: string);
+ }
++export declare class UserDisableException extends CognitoError {
++    constructor();
++}
+diff --git a/node_modules/cognito-local/lib/errors.js b/node_modules/cognito-local/lib/errors.js
+index ff327dc..a4da36a 100644
+--- a/node_modules/cognito-local/lib/errors.js
++++ b/node_modules/cognito-local/lib/errors.js
+@@ -18,6 +18,7 @@ __export(exports, {
+   ResourceNotFoundError: () => ResourceNotFoundError,
+   UnexpectedLambdaExceptionError: () => UnexpectedLambdaExceptionError,
+   UnsupportedError: () => UnsupportedError,
++  UserDisableException: () => UserDisableException,
+   UserLambdaValidationError: () => UserLambdaValidationError,
+   UserNotConfirmedException: () => UserNotConfirmedException,
+   UserNotFoundError: () => UserNotFoundError,
+@@ -101,6 +102,11 @@ class InvalidParameterError extends CognitoError {
+     super("InvalidParameterException", message);
+   }
+ }
++class UserDisableException extends CognitoError {
++  constructor() {
++    super("UserDisableException", "User is disable.");
++  }
++}
+ // Annotate the CommonJS export names for ESM import in node:
+ 0 && (module.exports = {
+   CodeMismatchError,
+@@ -115,6 +121,7 @@ class InvalidParameterError extends CognitoError {
+   ResourceNotFoundError,
+   UnexpectedLambdaExceptionError,
+   UnsupportedError,
++  UserDisableException,
+   UserLambdaValidationError,
+   UserNotConfirmedException,
+   UserNotFoundError,
+diff --git a/node_modules/cognito-local/lib/targets/initiateAuth.js b/node_modules/cognito-local/lib/targets/initiateAuth.js
+index ee7c3d6..23632d7 100644
+--- a/node_modules/cognito-local/lib/targets/initiateAuth.js
++++ b/node_modules/cognito-local/lib/targets/initiateAuth.js
+@@ -125,6 +125,9 @@ const userPasswordAuthFlow = async (ctx, req, userPool, userPoolClient, services
+   if (user.UserStatus === "UNCONFIRMED") {
+     throw new import_errors.UserNotConfirmedException();
+   }
++  if (!user.Enabled) {
++    throw new import_errors.UserDisableException();
++  }
+   if (userPool.options.MfaConfiguration === "OPTIONAL" && (user.MFAOptions ?? []).length > 0 || userPool.options.MfaConfiguration === "ON") {
+     return verifyMfaChallenge(ctx, user, req, userPool, services);
+   }

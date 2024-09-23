@@ -1,0 +1,85 @@
+{
+  "openapi": "3.0.0",
+  "paths": {
+    "/": {
+      "get": {
+        "operationId": "AppController_getHello",
+        "parameters": [
+          {
+            "in": "header",
+            "required": false,
+            "name": "x-tenant-code",
+            "schema": {}
+          }
+        ],
+        "responses": { "200": { "description": "" } },
+        "tags": ["main"]
+      }
+    },
+    "/api/testing": {
+      "post": {
+        "operationId": "TestController_publishCommand",
+        "parameters": [
+          {
+            "in": "header",
+            "required": false,
+            "name": "x-tenant-code",
+            "schema": {}
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/CommandDto" }
+            }
+          }
+        },
+        "responses": { "201": { "description": "" } },
+        "tags": ["testing"]
+      }
+    }
+  },
+  "info": {
+    "title": "serverless",
+    "description": "The serverless API",
+    "version": "1.0.0",
+    "contact": {}
+  },
+  "tags": [],
+  "servers": [{ "url": "http://localhost:3000/", "description": "local" }],
+  "components": {
+    "securitySchemes": {
+      "Api-Key": { "type": "apiKey", "in": "header", "name": "Authorization" }
+    },
+    "schemas": {
+      "CommandDto": {
+        "type": "object",
+        "properties": {
+          "pk": { "type": "string" },
+          "sk": { "type": "string" },
+          "id": { "type": "string" },
+          "code": { "type": "string" },
+          "name": { "type": "string" },
+          "version": { "type": "number" },
+          "tenantCode": { "type": "string" },
+          "type": { "type": "string" },
+          "seq": { "type": "number" },
+          "ttl": { "type": "number" },
+          "isDeleted": { "type": "boolean" }
+        },
+        "required": [
+          "pk",
+          "sk",
+          "id",
+          "code",
+          "name",
+          "version",
+          "tenantCode",
+          "type"
+        ]
+      }
+    }
+  },
+  "security": [{ "Api-Key": [] }]
+}
