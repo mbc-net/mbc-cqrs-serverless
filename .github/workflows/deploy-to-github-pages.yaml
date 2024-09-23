@@ -71,8 +71,8 @@ jobs:
       - name: Log path
         run: pwd
 
-      # - name: Run e2e Tests
-      #   run: npx lerna run test:e2e --scope=@mbc-cqrs-severless/core
+      - name: Run e2e Tests
+        run: npx lerna run test:e2e --scope=@mbc-cqrs-severless/core
       - name: Write temp
         run: 'echo "Hello" > ./packages/core/test/scripts/a.out.txt'
 
