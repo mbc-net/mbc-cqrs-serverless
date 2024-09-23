@@ -27,7 +27,6 @@ const client = new DynamoDBClient({
   region: process.env.DYNAMODB_REGION,
 })
 
-console.log('process.env', process.env)
 console.log('tablePrefix', tablePrefix)
 
 main().catch((e) => {

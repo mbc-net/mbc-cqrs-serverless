@@ -47,3 +47,7 @@ docker-data
 
 # environment variable
 .env
+
+#
+
+*.out.txt
