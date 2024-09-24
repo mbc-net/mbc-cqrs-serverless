@@ -39,7 +39,9 @@ const readLastLines = (filePath, numLines) => {
 const checkStartedInLastThreeLine = () => {
   const lastLines = readLastLines(filePath, 4)
   console.log('lastLines', lastLines)
-  const allEndWithStarted = lastLines.every((line) => line.endsWith('Started'))
+  const allEndWithStarted = lastLines.every(
+    (line) => line.endsWith('Started') || line.endsWith('Running'),
+  )
   return allEndWithStarted
 }
 
