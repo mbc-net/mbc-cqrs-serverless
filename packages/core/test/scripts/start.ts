@@ -73,6 +73,22 @@ const slsStarted = async () => {
   )
 }
 
+const slsStable = async () => {
+  await retry(
+    async () => {
+      const fileContent = readFileSync(
+        path.join(__dirname, 'sls_pid.out.txt'),
+        'utf-8',
+      )
+      const result = fileContent.length > 0
+      console.log('slsStable', result)
+      if (result) return
+      throw new Error('sls is not stable!')
+    },
+    { retries: 10, retryIntervalMs: 5 * 1000 },
+  )
+}
+
 const runCommand = function (cmd: string, args: string[]) {
   console.log(`Running command: ${cmd} ${args.join(' ')}`)
 
@@ -96,7 +112,7 @@ module.exports = async function async() {
     await slsStarted()
 
     // wait sls stable
-    await sleep(10000)
+    await slsStable()
   } catch (e) {
     console.error(e)
     process.exit(1)
