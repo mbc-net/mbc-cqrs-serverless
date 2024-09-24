@@ -54,3 +54,7 @@ docker-data
 
 # test report
 report
+
+# dynamo local
+.dynamodb
+dynamodb-local-metadata.json

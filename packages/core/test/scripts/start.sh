@@ -4,6 +4,10 @@ cp ../../.env.example ../../.env
 
 rm *.out.txt
 
+echo "Run dynamodb local" >> start.out.txt 2>&1
+
+bash ./run_dynamodb_local.sh > dynamodb_local.out.txt 2>&1 &
+
 # Step 1: Run the Docker container
 npm run offline:docker -- -d > docker.out.txt 2>&1
 
@@ -21,7 +25,7 @@ while true; do
 	fi
 
     # Get the last 5 lines from the log file
-    last_lines=$(tail -n 4 "$LOG_FILE")
+    last_lines=$(tail -n 3 "$LOG_FILE")
 
     echo "${last_lines}" >> start.out.txt 2>&1
 
@@ -33,13 +37,8 @@ while true; do
     fi
 
     # Print the result
-    echo "All last 4 lines end with 'Started|Running': $result" >> start.out.txt 2>&1
+    echo "All last 3 lines end with 'Started|Running': $result" >> start.out.txt 2>&1
 done
-
-# Permission 
-chmod -R 777 ../infra-local >> start.out.txt 2>&1
-chmod -R 777 ../infra-local/docker-data/ >> start.out.txt 2>&1
-chmod -R 777 ../infra-local/docker-data/dynamodb-local >> start.out.txt 2>&1
 
 sleep 15
 

@@ -26,14 +26,14 @@ services:
   #   ports:
   #     - 3306:3306
 
-  dynamodb-local:
-    image: amazon/dynamodb-local
-    ports:
-      - 8000:8000
-    volumes:
-      - ./docker-data/dynamodb-local:/home/dynamodblocal/data
-    working_dir: /home/dynamodblocal
-    command: '-jar DynamoDBLocal.jar -sharedDb -dbPath ./data'
+  # dynamodb-local:
+  #   image: amazon/dynamodb-local
+  #   ports:
+  #     - 8000:8000
+  #   volumes:
+  #     - ./docker-data/dynamodb-local:/home/dynamodblocal/data
+  #   working_dir: /home/dynamodblocal
+  #   command: '-jar DynamoDBLocal.jar -sharedDb -dbPath ./data'
 
   # dynamodb-admin:
   #   image: aaronshaf/dynamodb-admin
