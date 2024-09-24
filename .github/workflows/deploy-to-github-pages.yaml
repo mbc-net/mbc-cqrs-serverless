@@ -49,13 +49,11 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Log path
-        run: pwd
+      - name: Build test
+        run: npx lerna run build:test --scope=@mbc-cqrs-severless/core
 
       - name: Run e2e Tests
         run: npx lerna run test:e2e --scope=@mbc-cqrs-severless/core
-      - name: Write temp
-        run: 'echo "Hello" > ./packages/core/test/scripts/a.out.txt'
 
       - uses: actions/upload-artifact@v4
         name: 'upload artfact'

@@ -94,6 +94,9 @@ module.exports = async function async() {
     await dockerStarted()
 
     await slsStarted()
+
+    // wait sls stable
+    await sleep(10000)
   } catch (e) {
     console.error(e)
     process.exit(1)

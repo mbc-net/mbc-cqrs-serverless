@@ -10,6 +10,7 @@
   ],
   "scripts": {
     "build": "rm -rf dist && tsc",
+    "build:test": "rm -rf test/dist && tsc -p test/tsconfig.build.json",
     "test": "echo \"Error: no test specified\" && exit 1",
     "test:e2e": "NODE_ENV=local jest --config ./test/jest-e2e.json --runInBand",
     "offline:docker": "cd test/infra-local && mkdir -p docker-data/.cognito && cp -r cognito-local/db docker-data/.cognito && docker compose up --remove-orphans",
