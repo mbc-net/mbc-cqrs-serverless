@@ -7,7 +7,25 @@ import * as path from 'path'
 const cwd = path.resolve(__dirname, '.')
 const filePath = path.join(__dirname, 'docker.out.txt')
 
-function readLastLines(filePath, numLines) {
+const sleep = (ms = 0) => new Promise((resolve) => setTimeout(resolve, ms))
+
+const retry = async <T>(
+  fn: () => Promise<T> | T,
+  { retries, retryIntervalMs }: { retries: number; retryIntervalMs: number },
+): Promise<T> => {
+  try {
+    await sleep(retryIntervalMs)
+    return await fn()
+  } catch (error) {
+    if (retries <= 0) {
+      throw error
+    }
+    await sleep(retryIntervalMs)
+    return retry(fn, { retries: retries - 1, retryIntervalMs })
+  }
+}
+
+const readLastLines = (filePath, numLines) => {
   try {
     const data = readFileSync(filePath, 'utf8')
     const lines = data.trim().split('\n')
@@ -18,11 +36,38 @@ function readLastLines(filePath, numLines) {
   }
 }
 
-function checkLogs() {
-  const lastLines = readLastLines(filePath, 3)
+const checkStartedInLastThreeLine = () => {
+  const lastLines = readLastLines(filePath, 4)
   console.log('lastLines', lastLines)
   const allEndWithStarted = lastLines.every((line) => line.endsWith('Started'))
   return allEndWithStarted
+}
+
+const dockerStarted = async () => {
+  await retry(
+    async () => {
+      const result = checkStartedInLastThreeLine()
+      if (result) return
+      throw new Error()
+    },
+    { retries: 120, retryIntervalMs: 5 * 1000 },
+  )
+}
+
+const slsStarted = async () => {
+  await retry(
+    async () => {
+      const fileContent = readFileSync(
+        path.join(__dirname, 'sls.out.txt'),
+        'utf-8',
+      )
+      const result = fileContent.includes('Server ready: http://0.0.0.0:3000')
+      console.log('slsStarted', result)
+      if (result) return
+      throw new Error()
+    },
+    { retries: 10, retryIntervalMs: 5 * 1000 },
+  )
 }
 
 const runCommand = function (cmd: string, args: string[]) {
@@ -35,21 +80,17 @@ const runCommand = function (cmd: string, args: string[]) {
   })
 
   process.unref() // Allow the parent process to exit independently
-}
 
-const sleep = (delay) => new Promise((resolve) => setTimeout(resolve, delay))
+  console.log(`Started process with PID: ${process.pid}`)
+}
 
 module.exports = async function async() {
   try {
     runCommand('bash', ['start.sh']) // Adjust command and args if needed
 
-    let result = false
+    await dockerStarted()
 
-    while (!result) {
-      await sleep(3000)
-      result = checkLogs()
-    }
-    await sleep(15000)
+    await slsStarted()
   } catch (e) {
     console.error(e)
     process.exit(1)

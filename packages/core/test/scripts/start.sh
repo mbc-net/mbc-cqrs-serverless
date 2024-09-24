@@ -2,6 +2,8 @@
 
 cp ../../.env.example ../../.env
 
+rm *.out.txt
+
 # Step 1: Run the Docker container
 npm run offline:docker -- -d > docker.out.txt 2>&1
 
@@ -18,23 +20,19 @@ while true; do
 	fi
 
     # Get the last 5 lines from the log file
-    last_lines=$(tail -n 3 "$LOG_FILE")
+    last_lines=$(tail -n 4 "$LOG_FILE")
 
     echo "${last_lines}"
 
     # Check if all last 5 lines end with "Started"
     if echo "$last_lines" | grep -q -E 'Started$'; then
-        # If all lines end with "Started", set variable to true
-        result=true
         break
     else
-        # Otherwise, set variable to false
-        result=false
         sleep 5
     fi
 
     # Print the result
-    echo "All last 5 lines end with 'Started': $result"
+    echo "All last 4 lines end with 'Started': $result"
 done
 
 sleep 15
