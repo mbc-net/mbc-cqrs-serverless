@@ -17,6 +17,7 @@ const retry = async <T>(
     await sleep(retryIntervalMs)
     return await fn()
   } catch (error) {
+    console.log(`Retry: ${retries}::: ${error}`)
     if (retries <= 0) {
       throw error
     }
@@ -50,7 +51,7 @@ const dockerStarted = async () => {
     async () => {
       const result = checkStartedInLastThreeLine()
       if (result) return
-      throw new Error()
+      throw new Error('docker is not started!')
     },
     { retries: 120, retryIntervalMs: 5 * 1000 },
   )
@@ -66,7 +67,7 @@ const slsStarted = async () => {
       const result = fileContent.includes('Server ready: http://0.0.0.0:3000')
       console.log('slsStarted', result)
       if (result) return
-      throw new Error()
+      throw new Error('sls is not started!')
     },
     { retries: 10, retryIntervalMs: 5 * 1000 },
   )
