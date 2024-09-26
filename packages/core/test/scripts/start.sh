@@ -72,7 +72,7 @@ npm run migrate > migrate.out.txt 2>&1
 
 echo "Run serverless offline" >> start.out.txt 2>&1
 
-npm run offline:sls > sls.out.txt 2>&1 & disown
+nohup ./run_sls.sh > sls.out.txt 2>&1 &
 
 # Check serverless is running
 start=$(date +%s)

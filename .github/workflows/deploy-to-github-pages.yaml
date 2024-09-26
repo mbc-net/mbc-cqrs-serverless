@@ -53,7 +53,7 @@ jobs:
         run: npx lerna run build:test --scope=@mbc-cqrs-severless/core
 
       - name: Run e2e Tests
-        run: npx lerna run test:e2e --scope=@mbc-cqrs-severless/core
+        run: RUNNER_TRACKING_ID="" && npx lerna run test:e2e --scope=@mbc-cqrs-severless/core
 
       - uses: actions/upload-artifact@v4
         name: 'upload artfact'
