@@ -7,7 +7,6 @@
     "^.+\\.(t|j)s$": "ts-jest"
   },
   "globalSetup": "<rootDir>/../scripts/start.ts",
-  "globalTeardown": "<rootDir>/../scripts/stop.ts",
   "reporters": [
     "default",
     [
