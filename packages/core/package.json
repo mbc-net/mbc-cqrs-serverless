@@ -13,7 +13,6 @@
     "build:test": "rm -rf test/dist && tsc -p test/tsconfig.build.json",
     "test": "echo \"Error: no test specified\" && exit 1",
     "test:e2e": "NODE_ENV=local jest --config ./test/jest-e2e.json --runInBand",
-    "posttest:e2e": "cd test/scripts && /bin/bash ./stop.sh",
     "offline:docker": "cd test/infra-local && mkdir -p docker-data/.cognito && cp -r cognito-local/db docker-data/.cognito && docker compose up --remove-orphans",
     "offline:docker:stop": "cd test/infra-local && docker compose down --remove-orphans",
     "offline:sls": "/bin/bash ./test/infra-local/scripts/trigger_ddb_stream.sh & ln -f .env $PWD/test/infra-local/.env && cd ./test/infra-local && NODE_ENV=development AWS_ACCESS_KEY_ID=DUMMYIDEXAMPLE AWS_SECRET_ACCESS_KEY=DUMMYEXAMPLEKEY SLS_DEBUG=* serverless offline start",
