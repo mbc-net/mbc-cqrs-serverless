@@ -24,19 +24,16 @@ while true; do
 		exit 1
 	fi
 
-    # Get the last 5 lines from the log file
     last_lines=$(tail -n 3 "$LOG_FILE")
 
     echo "${last_lines}" >> start.out.txt 2>&1
 
-    # Check if all last 5 lines end with "Started"
     if echo "$last_lines" | grep -q -E 'Started$|Running$'; then
         break
     else
         sleep 5
     fi
 
-    # Print the result
     echo "All last 3 lines end with 'Started|Running': $result" >> start.out.txt 2>&1
 done
 
@@ -72,7 +69,7 @@ npm run migrate > migrate.out.txt 2>&1
 
 echo "Run serverless offline" >> start.out.txt 2>&1
 
-nohup ./run_sls.sh > sls.out.txt 2>&1 &
+npm run offline:sls > sls.out.txt 2>&1 &
 
 # Check serverless is running
 start=$(date +%s)
