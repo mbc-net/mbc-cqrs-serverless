@@ -1,0 +1,17 @@
+{
+  "Clients": {
+    "dnk8y7ii3wled35p3lw0l2cd7": {
+      "AccessTokenValidity": 30,
+      "ClientId": "dnk8y7ii3wled35p3lw0l2cd7",
+      "ClientName": "local_cognito_fw",
+      "CreationDate": "2023-11-14T01:22:54.529Z",
+      "LastModifiedDate": "2023-11-14T01:22:54.529Z",
+      "TokenValidityUnits": {
+        "AccessToken": "hours",
+        "IdToken": "minutes",
+        "RefreshToken": "days"
+      },
+      "UserPoolId": "local_2G7noHgW"
+    }
+  }
+}

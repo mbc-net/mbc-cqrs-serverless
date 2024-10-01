@@ -1,0 +1,28 @@
+type Message {
+  id: String!
+  table: String!
+  pk: String!
+  sk: String!
+  tenantCode: String!
+  action: String!
+  content: AWSJSON!
+}
+
+type Query {
+  getMessage(id: String!): Message
+}
+
+type Mutation {
+  sendMessage(message: AWSJSON!): Message!
+}
+
+type Subscription {
+  onMessage(tenantCode: String!, action: String, id: String): Message
+    @aws_subscribe(mutations: ["sendMessage"])
+}
+
+schema {
+  query: Query
+  mutation: Mutation
+  subscription: Subscription
+}

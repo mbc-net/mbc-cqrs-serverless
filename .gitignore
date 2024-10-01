@@ -38,3 +38,23 @@ dist/
 
 # nestjs repl
 .nestjs_repl_history
+
+# docker volumn
+docker-data
+
+# cognito local
+.cognito
+
+# environment variable
+.env
+
+#
+
+*.out.txt
+
+# test report
+report
+
+# dynamo local
+.dynamodb
+dynamodb-local-metadata.json

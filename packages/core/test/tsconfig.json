@@ -1,8 +1,7 @@
 {
   "compilerOptions": {
-    "strict": true,
     "module": "commonjs",
-    "declaration": true,
+    "declaration": false,
     "removeComments": true,
     "emitDecoratorMetadata": true,
     "experimentalDecorators": true,
@@ -16,15 +15,14 @@
     "strictNullChecks": false,
     "noImplicitAny": false,
     "strictBindCallApply": false,
-    "forceConsistentCasingInFileNames": true,
+    "forceConsistentCasingInFileNames": false,
     "noFallthroughCasesInSwitch": false,
     "esModuleInterop": true,
     "noLib": false,
     "noUnusedLocals": false,
     "paths": {
-      "@mbc-cqrs-severless/*": ["./packages/*/"]
+      "@core/*": ["../src"]
     }
   },
-  "include": ["./packages/**/*", "./examples/**/*"],
-  "exclude": ["node_modules", "test", "**/dist", "**/*.spec.ts", "**/*.test.ts"]
+  "include": ["src/*", "src/**/*"]
 }

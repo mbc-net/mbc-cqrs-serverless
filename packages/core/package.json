@@ -10,7 +10,15 @@
   ],
   "scripts": {
     "build": "rm -rf dist && tsc",
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "build:test": "rm -rf test/dist && tsc -p test/tsconfig.build.json",
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "test:e2e": "NODE_ENV=local jest --config ./test/jest-e2e.json --runInBand",
+    "posttest:e2e": "kill -9 $(lsof -ti :8000)",
+    "offline:docker": "cd test/infra-local && mkdir -p docker-data/.cognito && cp -r cognito-local/db docker-data/.cognito && docker compose up --remove-orphans",
+    "offline:docker:stop": "cd test/infra-local && docker compose down --remove-orphans",
+    "offline:sls": "/bin/bash ./test/infra-local/scripts/trigger_ddb_stream.sh & ln -f .env $PWD/test/infra-local/.env && cd ./test/infra-local && NODE_ENV=development AWS_ACCESS_KEY_ID=DUMMYIDEXAMPLE AWS_SECRET_ACCESS_KEY=DUMMYEXAMPLEKEY serverless offline start",
+    "migrate:ddb": "ts-node test/prisma/ddb.ts",
+    "migrate": "npm run migrate:ddb"
   },
   "repository": {
     "type": "git",
@@ -41,5 +49,26 @@
     "node-fetch": "^2.7.0",
     "reflect-metadata": "^0.1.14",
     "ulid": "^2.3.0"
+  },
+  "devDependencies": {
+    "serverless": "^3.38.0",
+    "serverless-dynamodb": "^0.2.47",
+    "serverless-localstack": "^1.1.2",
+    "serverless-offline": "^13.3.2",
+    "serverless-offline-aws-eventbridge": "^2.1.0",
+    "serverless-offline-dynamodb-streams": "^7.0.0",
+    "serverless-offline-lambda": "^1.0.6",
+    "serverless-offline-local-authorizers-plugin": "^1.2.0",
+    "serverless-offline-scheduler": "^0.5.0",
+    "serverless-offline-ses-v2": "^1.0.4",
+    "serverless-offline-sns": "^0.77.2",
+    "serverless-offline-sqs": "^8.0.0",
+    "serverless-offline-ssm": "^6.2.0",
+    "serverless-offline-watcher": "^1.1.0",
+    "serverless-plugin-offline-dynamodb-stream": "^1.0.20",
+    "serverless-s3-local": "^0.8.1",
+    "serverless-step-functions": "^3.18.0",
+    "serverless-step-functions-local": "^0.5.1",
+    "supertest": "^7.0.0"
   }
 }

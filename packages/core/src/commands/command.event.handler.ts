@@ -41,7 +41,7 @@ export class CommandEventHandler {
       event.commandRecord.requestId,
     )
     try {
-      const ret = this.handleStepState(event)
+      const ret = await this.handleStepState(event)
       await this.commandService.updateStatus(
         event.commandKey,
         getCommandStatus(event.stepStateName, CommandStatus.STATUS_FINISHED),

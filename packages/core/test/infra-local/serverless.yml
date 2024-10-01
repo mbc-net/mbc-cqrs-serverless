@@ -1,0 +1,306 @@
+service: serverless-example
+useDotenv: true
+
+plugins:
+  - serverless-offline-sns
+  - serverless-offline-sqs
+  - serverless-offline-lambda
+  - serverless-step-functions
+  - serverless-step-functions-local
+  - serverless-dynamodb
+  - serverless-offline-dynamodb-streams
+  - serverless-offline-aws-eventbridge
+  - serverless-offline-ses-v2
+  - serverless-offline
+
+custom:
+  serverless-offline:
+    corsAllowOrigin: '*'
+    corsAllowHeaders: '*'
+    host: 0.0.0.0
+    reloadHandler: true
+    ignoreJWTSignature: true
+  serverless-offline-ses-v2:
+    port: 8005
+  serverless-offline-sns:
+    port: 4002 # a free port for the sns server to run on
+    debug: true
+    subscriptions:
+      - topic:
+          topicName: CqrsSnsTopic
+          rawMessageDelivery: 'true'
+          filterPolicy: { 'action': ['task-execute'] }
+        queue: http://localhost:9324/101010101010/task-action-queue
+      - topic:
+          topicName: CqrsSnsTopic
+          rawMessageDelivery: 'true'
+          filterPolicy:
+            {
+              'action':
+                ['notification-action', 'command-status', 'task-status'],
+            }
+        queue: http://localhost:9324/101010101010/notification-queue
+    # host: 0.0.0.0 # Optional, defaults to 127.0.0.1 if not provided to serverless-offline
+    # sns-endpoint: http://127.0.0.1:4567 # Optional. Only if you want to use a custom SNS provider endpoint
+    # sns-subscribe-endpoint: http://127.0.0.1:3000 # Optional. Only if you want to use a custom subscribe endpoint from SNS to send messages back to
+    accountId: 101010101010 # Optional
+  serverless-offline-sqs:
+    autoCreate: false # create queue if not exists
+    accountId: 101010101010
+    debug: true
+    apiVersion: '2012-11-05'
+    endpoint: http://localhost:9324
+    region: ap-northeast-1
+    accessKeyId: root
+    secretAccessKey: root
+    skipCacheInvalidation: false
+  stepFunctionsLocal:
+    accountId: 101010101010
+    region: ap-northeast-1
+    # lambdaEndpoint: http://0.0.0.0:3002
+    externalInstance: true
+  serverless-dynamodb:
+    stages:
+      # set for create tables on dev enviroment
+      - dev
+    start:
+      docker: true
+      inMemory: true
+      port: 8000
+      noStart: true
+      seed: true
+      migrate: false # create tables on start
+      onStart: false
+      convertEmptyValues: true
+  serverless-offline-dynamodb-streams:
+    endpoint: http://localhost:8000
+  serverless-offline-aws-eventbridge:
+    port: 4010 # port to run the eventBridge mock server on
+    mockEventBridgeServer: true # Set to false if EventBridge is already mocked by another stack
+    hostname: 127.0.0.1 # IP or hostname of existing EventBridge if mocked by another stack
+    pubSubPort: 4011 # Port to run the MQ server (or just listen if using an EventBridge Mock server from another stack)
+    debug: false # flag to show debug messages
+    account: '' # account id that gets passed to the event
+    maximumRetryAttempts: 10 # maximumRetryAttempts to retry lambda
+    retryDelayMs: 500 # retry delay
+    throwRetryExhausted: false # default true
+    payloadSizeLimit: '10mb' # Controls the maximum payload size being passed to https://www.npmjs.com/package/bytes (Note: this payload size might not be the same size as your AWS Eventbridge receive)
+    # localStackConfig:
+    #   localStackEndpoint: http://localhost:4566
+
+provider:
+  name: aws
+  region: ap-northeast-1
+  runtime: nodejs18.x
+  profile: serverless
+  httpApi:
+    authorizers:
+      localAuthorizer:
+        type: jwt
+        identitySource: $request.header.Authorization
+        issuerUrl: http://localhost:9229/local_2G7noHgW
+        audience:
+          - dnk8y7ii3wled35p3lw0l2cd7
+      keycloakAuthorizer:
+        type: jwt
+        identitySource: $request.header.Authorization
+        issuerUrl: http://localhost:8180/realms/master
+        # issuerUrl: http://localhost:8180/auth/realms/master # old version
+        audience:
+          - cqrs-demo
+
+functions:
+  main:
+    handler: ../dist/test/src/main.handler
+    events:
+      - httpApi: # public api
+          method: GET
+          path: /
+      - httpApi:
+          method: ANY
+          path: '/swagger-ui/{proxy+}'
+      - httpApi: # protected api
+          method: ANY
+          path: '/{proxy+}'
+          # authorizer:
+          # name: localAuthorizer
+          # authorizer:
+          #   name: keycloakAuthorizer
+      # - eventBridge:
+      #     eventBus: marketing
+      #     # run every 5 minutes
+      #     schedule: "cron(0/5 * * * ? *)"
+      - sqs:
+          arn:
+            Fn::GetAtt:
+              - TaskActionQueue
+              - Arn
+      - sqs:
+          arn:
+            Fn::GetAtt:
+              - NotificationQueue
+              - Arn
+      - stream:
+          type: dynamodb
+          maximumRetryAttempts: 10
+          arn: ${env:LOCAL_DDB_TESTING-TABLE_STREAM}
+          filterPatterns:
+            - eventName: [INSERT]
+
+stepFunctions:
+  # https://goessner.net/articles/JsonPath/index.html
+  # https://docs.aws.amazon.com/step-functions/latest/dg/concepts-input-output-filtering.html
+  stateMachines:
+    command:
+      name: command
+      definition:
+        Comment: 'An example of the Amazon States Language using wait states'
+        StartAt: check_version
+        States:
+          fail:
+            Type: Fail
+            CausePath: $.cause
+            ErrorPath: $.error
+          success:
+            Type: Succeed
+          check_version:
+            Type: Task
+            Resource: arn:aws:states:::lambda:invoke
+            Parameters:
+              FunctionName: arn:aws:lambda:ap-northeast-1:101010101010:function:serverless-example-dev-main
+              Payload:
+                input.$: $
+                context.$: $$
+            Retry:
+              - ErrorEquals:
+                  - Lambda.ServiceException
+                  - Lambda.AWSLambdaException
+                  - Lambda.SdkClientException
+                IntervalSeconds: 2
+                MaxAttempts: 5
+                BackoffRate: 2
+            OutputPath: $.Payload[0][0]
+            Next: check_version_result
+          check_version_result:
+            Type: Choice
+            Choices:
+              - Variable: $.result
+                NumericEquals: 0
+                Next: history_copy
+              - Variable: $.result
+                NumericEquals: 1
+                Next: wait_prev_command
+              - Variable: $.result
+                NumericEquals: -1
+                Next: fail
+            Default: wait_prev_command
+          wait_prev_command:
+            Type: Task
+            Resource: arn:aws:states:::lambda:invoke.waitForTaskToken
+            Parameters:
+              FunctionName: arn:aws:lambda:ap-northeast-1:101010101010:function:serverless-example-dev-main
+              Payload:
+                input.$: $
+                context.$: $$
+                taskToken.$: $$.Task.Token
+            Retry:
+              - ErrorEquals:
+                  - Lambda.ServiceException
+                  - Lambda.AWSLambdaException
+                  - Lambda.SdkClientException
+                IntervalSeconds: 2
+                MaxAttempts: 5
+                BackoffRate: 2
+            OutputPath: $.Payload[0][0]
+            Next: history_copy
+          history_copy:
+            Type: Task
+            Resource: arn:aws:states:::lambda:invoke
+            Parameters:
+              FunctionName: arn:aws:lambda:ap-northeast-1:101010101010:function:serverless-example-dev-main
+              Payload:
+                input.$: $
+                context.$: $$
+            Retry:
+              - ErrorEquals:
+                  - Lambda.ServiceException
+                  - Lambda.AWSLambdaException
+                  - Lambda.SdkClientException
+                IntervalSeconds: 2
+                MaxAttempts: 5
+                BackoffRate: 2
+            OutputPath: $.Payload[0][0]
+            Next: transform_data
+          transform_data:
+            Type: Task
+            Resource: arn:aws:states:::lambda:invoke
+            Parameters:
+              FunctionName: arn:aws:lambda:ap-northeast-1:101010101010:function:serverless-example-dev-main
+              Payload:
+                input.$: $
+                context.$: $$
+            Retry:
+              - ErrorEquals:
+                  - Lambda.ServiceException
+                  - Lambda.AWSLambdaException
+                  - Lambda.SdkClientException
+                IntervalSeconds: 2
+                MaxAttempts: 5
+                BackoffRate: 2
+            OutputPath: $.Payload[0][0]
+            Next: sync_data_all
+          sync_data_all:
+            Type: Map
+            MaxConcurrency: 0
+            ItemsPath: $
+            Iterator:
+              StartAt: sync_data
+              States:
+                sync_data:
+                  Type: Task
+                  Resource: arn:aws:states:::lambda:invoke
+                  Parameters:
+                    FunctionName: arn:aws:lambda:ap-northeast-1:101010101010:function:serverless-example-dev-main
+                    Payload:
+                      input.$: $
+                      context.$: $$
+                  Retry:
+                    - ErrorEquals:
+                        - Lambda.ServiceException
+                        - Lambda.AWSLambdaException
+                        - Lambda.SdkClientException
+                      IntervalSeconds: 2
+                      MaxAttempts: 5
+                      BackoffRate: 2
+                  OutputPath: $.Payload[0][0]
+                  End: true
+            Next: finish
+          finish:
+            Type: Task
+            Resource: arn:aws:states:::lambda:invoke
+            Parameters:
+              FunctionName: arn:aws:lambda:ap-northeast-1:101010101010:function:serverless-example-dev-main
+              Payload:
+                input.$: $
+                context.$: $$
+            Retry:
+              - ErrorEquals:
+                  - Lambda.ServiceException
+                  - Lambda.AWSLambdaException
+                  - Lambda.SdkClientException
+                IntervalSeconds: 2
+                MaxAttempts: 5
+                BackoffRate: 2
+            OutputPath: $.Payload[0][0]
+            Next: success
+
+resources:
+  Resources:
+    TaskActionQueue:
+      Type: AWS::SQS::Queue
+      Properties:
+        QueueName: task-action-queue
+    NotificationQueue:
+      Type: AWS::SQS::Queue
+      Properties:
+        QueueName: notification-queue

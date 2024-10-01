@@ -1,0 +1,18 @@
+{
+  "moduleFileExtensions": ["js", "json", "ts"],
+  "rootDir": "./e2e",
+  "testEnvironment": "node",
+  "testRegex": ".e2e-spec.ts$",
+  "transform": {
+    "^.+\\.(t|j)s$": "ts-jest"
+  },
+  "globalSetup": "<rootDir>/../scripts/start.ts",
+  "globalTeardown": "<rootDir>/../scripts/stop.ts",
+  "reporters": [
+    "default",
+    [
+      "jest-junit",
+      { "outputDirectory": "../../report", "outputName": "e2e-core.xml" }
+    ]
+  ]
+}
