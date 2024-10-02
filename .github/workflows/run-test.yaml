@@ -1,0 +1,86 @@
+name: Run test
+
+on:
+  pull_request:
+    types: [opened, synchronize]
+    branches:
+      - develop
+      - main
+
+permissions:
+  contents: write
+  actions: read
+  checks: write
+
+jobs:
+  unit_tests:
+    name: Unit Test
+    permissions: write-all
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 18
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run Unit Tests
+        run: npm run test
+
+      - name: Debug
+        run: ls -la
+
+      - name: Debug report
+        run: ls -la report
+
+      - name: Unit Test Report
+        uses: dorny/test-reporter@v1
+        if: success() || failure() # run this step even if previous step failed
+        with:
+          name: Unit Tests Reporter # Name of the check run which will be created
+          path: report/unit.xml # Path to test results
+          reporter: jest-junit # Format of test results
+          fail-on-error: 'true' #  Set action as failed if test report contains any failed test
+
+  e2e_tests:
+    name: E2e Test For Core package
+    needs: unit_tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 18
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build test
+        run: npx lerna run build:test --scope=@mbc-cqrs-severless/core
+
+      - name: Run e2e Tests
+        run: npx lerna run test:e2e --scope=@mbc-cqrs-severless/core
+
+      - uses: actions/upload-artifact@v4
+        name: 'upload artfact'
+        if: success() || failure()
+        with:
+          name: my-artifacts
+          path: ./packages/core/test/scripts/*.out.txt
+
+      - name: E2E Test Report
+        uses: dorny/test-reporter@v1
+        if: success() || failure() # run this step even if previous step failed
+        with:
+          name: E2E Core Tests Reporter # Name of the check run which will be created
+          path: report/e2e-core.xml # Path to test results
+          reporter: jest-junit # Format of test results
+          fail-on-error: 'true' #  Set action as failed if test report contains any failed test
