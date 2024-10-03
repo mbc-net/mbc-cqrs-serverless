@@ -84,7 +84,6 @@ jobs:
     name: Publish
     needs: e2e_tests
     runs-on: ubuntu-latest
-
     steps:
       - uses: actions/checkout@v4
         with:
@@ -100,6 +99,7 @@ jobs:
         run: |
           git config user.name "${{ github.actor }}"
           git config user.email "${{ github.actor}}@users.noreply.github.com"
+          git remote set-url origin https://x-access-token:${{ secrets.GH_TOKEN }}@github.com/${{ github.repository }}.git
 
           if [[ "${{ github.base_ref }}" == "development" ]]; then
             npx lerna version prepatch --force-publish --no-changelog --yes
