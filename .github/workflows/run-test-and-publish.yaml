@@ -1,11 +1,9 @@
-name: Run test and publish
+name: Run test and publish alpha version
 
 on:
-  pull_request:
-    types: [closed]
+  push:
     branches:
       - develop
-      - main
 
 permissions:
   contents: write
@@ -14,7 +12,6 @@ permissions:
 
 jobs:
   unit_tests:
-    if: github.event.pull_request.merged == true # Condition
     name: Unit Test
     runs-on: ubuntu-latest
     steps:
@@ -32,14 +29,14 @@ jobs:
       - name: Run Unit Tests
         run: npm run test
 
-      # - name: Unit Test Report
-      #   uses: dorny/test-reporter@v1
-      #   if: success() || failure() # run this step even if previous step failed
-      #   with:
-      #     name: Unit Tests Reporter # Name of the check run which will be created
-      #     path: report/unit.xml # Path to test results
-      #     reporter: jest-junit # Format of test results
-      #     fail-on-error: 'true' #  Set action as failed if test report contains any failed test
+      - name: Unit Test Report
+        uses: dorny/test-reporter@v1
+        if: success() || failure()
+        with:
+          name: Unit Tests Reporter
+          path: report/unit.xml
+          reporter: jest-junit
+          fail-on-error: 'true'
 
   e2e_tests:
     name: E2e Test For Core package
@@ -70,21 +67,19 @@ jobs:
           name: my-artifacts
           path: ./packages/core/test/scripts/*.out.txt
 
-      # - name: E2E Test Report
-      #   uses: dorny/test-reporter@v1
-      #   if: success() || failure() # run this step even if previous step failed
-      #   with:
-      #     name: E2E Core Tests Reporter # Name of the check run which will be created
-      #     path: report/e2e-core.xml # Path to test results
-      #     reporter: jest-junit # Format of test results
-      #     fail-on-error: 'true' #  Set action as failed if test report contains any failed test
+      - name: E2E Test Report
+        uses: dorny/test-reporter@v1
+        if: success() || failure()
+        with:
+          name: E2E Core Tests Reporter
+          path: report/e2e-core.xml
+          reporter: jest-junit
+          fail-on-error: 'true'
 
   publish:
-    if: github.event.pull_request.merged == true # Condition
     name: Publish
     needs: e2e_tests
     runs-on: ubuntu-latest
-
     steps:
       - uses: actions/checkout@v4
         with:
@@ -96,15 +91,11 @@ jobs:
       - name: Authenticate with npm
         run: echo "//registry.npmjs.org/:_authToken=${{ secrets.NPM_TOKEN }}" > ~/.npmrc
 
-      - name: 'Version and publish'
+      - name: 'Version and publish alpha version'
         run: |
           git config user.name "${{ github.actor }}"
           git config user.email "${{ github.actor}}@users.noreply.github.com"
 
-          if [[ "${{ github.base_ref }}" == "development" ]]; then
-            npx lerna version prepatch --force-publish --no-changelog --yes
-          else
-            npx lerna version prepatch --conventional-graduate --no-changelog --yes
-          fi
+          npx lerna version prepatch --force-publish --no-changelog --yes
 
           npx lerna publish from-git --yes
