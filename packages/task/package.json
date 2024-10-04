@@ -1,6 +1,6 @@
 {
   "name": "@mbc-cqrs-severless/task",
-  "version": "0.0.61-alpha.0",
+  "version": "0.0.63-alpha.0",
   "description": "long-running task",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
@@ -26,6 +26,6 @@
     "access": "public"
   },
   "dependencies": {
-    "@mbc-cqrs-severless/core": "^0.0.61-alpha.0"
+    "@mbc-cqrs-severless/core": "^0.0.63-alpha.0"
   }
 }
