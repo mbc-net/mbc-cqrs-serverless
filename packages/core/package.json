@@ -25,7 +25,7 @@
     "url": "git+https://github.com/mbc-net/mbc-cqrs-serverless.git",
     "directory": "packages/core"
   },
-  "author": "MBC",
+  "author": "Murakami Business Consulting, Inc.",
   "license": "MIT",
   "bugs": {
     "url": "https://github.com/mbc-net/mbc-cqrs-serverless/issues"
