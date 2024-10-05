@@ -1,6 +1,6 @@
 {
   "name": "@mbc-cqrs-serverless/core",
-  "version": "0.1.3-beta.0",
+  "version": "0.1.4-beta.0",
   "description": "CQRS and event base core",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
