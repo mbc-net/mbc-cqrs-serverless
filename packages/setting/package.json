@@ -1,6 +1,6 @@
 {
-  "name": "@mbc-cqrs-severless/setting",
-  "version": "0.1.1-beta.0",
+  "name": "@mbc-cqrs-serverless/setting",
+  "version": "0.1.2-beta.0",
   "description": "Setting master data",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
@@ -26,6 +26,6 @@
     "access": "public"
   },
   "dependencies": {
-    "@mbc-cqrs-severless/core": "^0.1.1-beta.0"
+    "@mbc-cqrs-serverless/core": "^0.1.2-beta.0"
   }
 }
