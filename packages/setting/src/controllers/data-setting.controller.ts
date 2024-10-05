@@ -3,7 +3,7 @@ import {
   getUserContext,
   IInvoke,
   INVOKE_CONTEXT,
-} from '@mbc-cqrs-sererless/core'
+} from '@mbc-cqrs-serverless/core'
 import {
   BadRequestException,
   Body,

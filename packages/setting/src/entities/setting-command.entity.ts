@@ -1,4 +1,4 @@
-import { CommandEntity } from '@mbc-cqrs-sererless/core'
+import { CommandEntity } from '@mbc-cqrs-serverless/core'
 
 import { SettingAttributes } from '../dto/setting-attributes.dto'
 

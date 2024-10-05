@@ -1,5 +1,5 @@
-import { CommandModule } from '@mbc-cqrs-sererless/core'
-import { SequencesModule } from '@mbc-cqrs-sererless/sequence'
+import { CommandModule } from '@mbc-cqrs-serverless/core'
+import { SequencesModule } from '@mbc-cqrs-serverless/sequence'
 import { Module } from '@nestjs/common'
 
 import { MasterDataSyncRdsHandler } from './handler/master-rds.handler'

@@ -1,4 +1,4 @@
-import { DataEntity } from '@mbc-cqrs-sererless/core'
+import { DataEntity } from '@mbc-cqrs-serverless/core'
 
 import { SettingAttributes } from '../dto/setting-attributes.dto'
 

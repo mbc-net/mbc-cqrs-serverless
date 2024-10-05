@@ -1,4 +1,4 @@
-import { CommandEntity } from '@mbc-cqrs-sererless/core'
+import { CommandEntity } from '@mbc-cqrs-serverless/core'
 
 export class DataSettingCommandEntity extends CommandEntity {
   attributes?: object

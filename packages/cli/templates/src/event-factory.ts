@@ -1,4 +1,4 @@
-import { DefaultEventFactory, EventFactory } from '@mbc-cqrs-sererless/core'
+import { DefaultEventFactory, EventFactory } from '@mbc-cqrs-serverless/core'
 import { Logger } from '@nestjs/common'
 
 @EventFactory()

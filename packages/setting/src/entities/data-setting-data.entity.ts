@@ -1,4 +1,4 @@
-import { DataEntity } from '@mbc-cqrs-sererless/core'
+import { DataEntity } from '@mbc-cqrs-serverless/core'
 
 export class DataSettingDataEntity extends DataEntity {
   attributes?: object

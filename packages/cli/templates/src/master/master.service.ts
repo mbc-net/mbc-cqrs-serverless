@@ -1,4 +1,4 @@
-import { SearchDto } from '@mbc-cqrs-sererless/core'
+import { SearchDto } from '@mbc-cqrs-serverless/core'
 import { Injectable, Logger } from '@nestjs/common'
 import { Prisma } from '@prisma/client'
 import { getOrderBys } from 'src/helpers'

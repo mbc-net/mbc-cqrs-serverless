@@ -5,7 +5,7 @@ import {
   IInvoke,
   INVOKE_CONTEXT,
   SearchDto,
-} from '@mbc-cqrs-sererless/core'
+} from '@mbc-cqrs-serverless/core'
 import {
   Body,
   Controller,

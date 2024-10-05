@@ -1,4 +1,4 @@
-import { EventBus, EventHandler, IEventHandler } from '@mbc-cqrs-sererless/core'
+import { EventBus, EventHandler, IEventHandler } from '@mbc-cqrs-serverless/core'
 import { Inject, Logger, OnModuleInit } from '@nestjs/common'
 import { ConfigService } from '@nestjs/config'
 import { ModuleRef } from '@nestjs/core'

@@ -6,7 +6,7 @@ import {
   INotification,
   KEY_SEPARATOR,
   SnsService,
-} from '@mbc-cqrs-sererless/core'
+} from '@mbc-cqrs-serverless/core'
 import { Injectable, Logger } from '@nestjs/common'
 import { ulid } from 'ulid'
 

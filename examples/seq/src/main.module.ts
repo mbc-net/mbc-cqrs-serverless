@@ -1,4 +1,4 @@
-import { SequencesModule } from '@mbc-cqrs-sererless/sequence'
+import { SequencesModule } from '@mbc-cqrs-serverless/sequence'
 import { Module } from '@nestjs/common'
 
 import { MasterModule } from './master/master.module'

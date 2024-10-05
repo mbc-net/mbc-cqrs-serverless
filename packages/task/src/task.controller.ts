@@ -1,4 +1,4 @@
-import { DetailDto, IInvoke, INVOKE_CONTEXT } from '@mbc-cqrs-sererless/core'
+import { DetailDto, IInvoke, INVOKE_CONTEXT } from '@mbc-cqrs-serverless/core'
 import {
   Body,
   Controller,

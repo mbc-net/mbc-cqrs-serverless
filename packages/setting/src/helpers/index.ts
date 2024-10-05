@@ -1,4 +1,4 @@
-import { KEY_SEPARATOR, removeSortKeyVersion } from '@mbc-cqrs-sererless/core'
+import { KEY_SEPARATOR, removeSortKeyVersion } from '@mbc-cqrs-serverless/core'
 
 export const MASTER_PK_PREFIX = 'MASTER'
 export const SETTING_SK_PREFIX = 'master_setting'

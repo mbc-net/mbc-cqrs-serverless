@@ -58,9 +58,9 @@ function useLatestPackageVersion(destDir: string, name?: string) {
     tplPackageJson.name = name
   }
 
-  tplPackageJson.dependencies['@mbc-cqrs-sererless/core'] =
-    packageJson.devDependencies['@mbc-cqrs-sererless/core']
-  tplPackageJson.devDependencies['@mbc-cqrs-sererless/cli'] =
+  tplPackageJson.dependencies['@mbc-cqrs-serverless/core'] =
+    packageJson.devDependencies['@mbc-cqrs-serverless/core']
+  tplPackageJson.devDependencies['@mbc-cqrs-serverless/cli'] =
     packageJson.version
 
   writeFileSync(fname, JSON.stringify(tplPackageJson, null, 2))
