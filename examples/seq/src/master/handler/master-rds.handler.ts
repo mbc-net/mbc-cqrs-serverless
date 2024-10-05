@@ -1,4 +1,4 @@
-import { CommandModel, IDataSyncHandler } from '@mbc-cqrs-severless/core'
+import { CommandModel, IDataSyncHandler } from '@mbc-cqrs-sererless/core'
 import { Injectable, Logger } from '@nestjs/common'
 
 @Injectable()

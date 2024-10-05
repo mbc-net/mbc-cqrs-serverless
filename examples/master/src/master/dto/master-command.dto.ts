@@ -1,4 +1,4 @@
-import { CommandDto } from '@mbc-cqrs-severless/core'
+import { CommandDto } from '@mbc-cqrs-serverless/core'
 import { Type } from 'class-transformer'
 import { IsOptional, ValidateNested } from 'class-validator'
 

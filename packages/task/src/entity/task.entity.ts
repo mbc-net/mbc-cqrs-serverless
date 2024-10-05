@@ -1,4 +1,4 @@
-import { CommandEntity } from '@mbc-cqrs-severless/core'
+import { CommandEntity } from '@mbc-cqrs-serverless/core'
 
 import { TaskStatusEnum } from '../enums/status.enum'
 

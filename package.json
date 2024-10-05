@@ -1,5 +1,5 @@
 {
-  "name": "mbc-cqrs-severless",
+  "name": "mbc-cqrs-serverless",
   "version": "1.0.0",
   "description": "CQRS by AWS serverless",
   "main": "index.js",

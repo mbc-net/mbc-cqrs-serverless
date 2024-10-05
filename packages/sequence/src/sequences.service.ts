@@ -5,7 +5,7 @@ import {
   getUserContext,
   IInvoke,
   KEY_SEPARATOR,
-} from '@mbc-cqrs-severless/core'
+} from '@mbc-cqrs-serverless/core'
 import { Injectable, Logger } from '@nestjs/common'
 
 import { GenSequenceDto } from './dto/gen-sequence.dto'

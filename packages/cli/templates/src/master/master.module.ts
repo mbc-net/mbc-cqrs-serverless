@@ -1,4 +1,4 @@
-import { CommandModule } from '@mbc-cqrs-severless/core'
+import { CommandModule } from '@mbc-cqrs-sererless/core'
 import { Module } from '@nestjs/common'
 
 import { MasterDataSyncRdsHandler } from './handler/master-rds.handler'

@@ -1,4 +1,4 @@
-import { DataStoreModule } from '@mbc-cqrs-severless/core'
+import { DataStoreModule } from '@mbc-cqrs-serverless/core'
 import { DynamicModule, Module } from '@nestjs/common'
 
 import { SequencesController } from './sequences.controller'

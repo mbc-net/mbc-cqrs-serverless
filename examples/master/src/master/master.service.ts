@@ -1,4 +1,4 @@
-import { SearchDto } from '@mbc-cqrs-severless/core'
+import { SearchDto } from '@mbc-cqrs-serverless/core'
 import { Injectable, Logger } from '@nestjs/common'
 
 import { MasterDataListEntity } from './entity/master-data-list.entity'

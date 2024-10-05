@@ -2,7 +2,7 @@ import {
   CommandModel,
   IDataSyncHandler,
   removeSortKeyVersion,
-} from '@mbc-cqrs-severless/core'
+} from '@mbc-cqrs-sererless/core'
 import { Injectable, Logger } from '@nestjs/common'
 import { PrismaService } from 'src/prisma'
 

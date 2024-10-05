@@ -1,4 +1,4 @@
-import { IEvent } from '@mbc-cqrs-severless/core'
+import { IEvent } from '@mbc-cqrs-sererless/core'
 import {
   SQSMessageAttributes,
   SQSRecord,

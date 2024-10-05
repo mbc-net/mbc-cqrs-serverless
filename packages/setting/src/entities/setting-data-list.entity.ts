@@ -1,4 +1,4 @@
-import { DataListEntity } from '@mbc-cqrs-severless/core'
+import { DataListEntity } from '@mbc-cqrs-sererless/core'
 import { ApiProperty } from '@nestjs/swagger'
 
 import { SettingDataEntity } from './setting-data.entity'

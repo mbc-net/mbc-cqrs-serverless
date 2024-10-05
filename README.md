@@ -42,7 +42,7 @@ Visit https://mbc-net.github.io/mbc-cqrs-serverless-doc/ to view the full docume
 ## Installation
 
 ```bash
-$ npm i -g @mbc-cqrs-severless/cli
+$ npm i -g @mbc-cqrs-serverless/cli
 ```
 
 ## Usage
@@ -70,7 +70,7 @@ $ mbc new YOUR_PROJECT_NAME
 - Add new packages by
 
 ```bash
-$ npm init --scope mbc-cqrs-severless -w ./packages/{PACKAGE_NAME}
+$ npm init --scope mbc-cqrs-serverless -w ./packages/{PACKAGE_NAME}
 ```
 
 - Build packages

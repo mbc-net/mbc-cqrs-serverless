@@ -1,4 +1,4 @@
-import { createHandler } from '@mbc-cqrs-severless/core'
+import { createHandler } from '@mbc-cqrs-sererless/core'
 
 import { MainModule } from './main.module'
 

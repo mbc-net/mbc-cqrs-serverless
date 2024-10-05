@@ -2,7 +2,7 @@ import {
   CommandModule,
   DataStoreModule,
   QueueModule,
-} from '@mbc-cqrs-severless/core'
+} from '@mbc-cqrs-sererless/core'
 import { DynamicModule, Module } from '@nestjs/common'
 
 import { DataSettingController } from './controllers/data-setting.controller'

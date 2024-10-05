@@ -11,6 +11,6 @@
   "author": "MBC",
   "license": "MIT",
   "dependencies": {
-    "@mbc-cqrs-severless/core": "^0.0.1-alpha.0"
+    "@mbc-cqrs-sererless/core": "^0.0.1-alpha.0"
   }
 }

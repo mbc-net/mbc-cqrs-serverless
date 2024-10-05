@@ -22,7 +22,7 @@
     "noLib": false,
     "noUnusedLocals": false,
     "paths": {
-      "@mbc-cqrs-severless/*": ["./packages/*/"]
+      "@mbc-cqrs-serverless/*": ["./packages/*/"]
     }
   },
   "include": ["./packages/**/*", "./examples/**/*"],

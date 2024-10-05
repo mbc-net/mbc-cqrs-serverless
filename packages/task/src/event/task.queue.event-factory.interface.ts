@@ -1,4 +1,4 @@
-import { DefaultEventFactory, IEvent } from '@mbc-cqrs-severless/core'
+import { DefaultEventFactory, IEvent } from '@mbc-cqrs-sererless/core'
 import { SQSEvent } from 'aws-lambda'
 
 import { TaskQueueEvent } from './task.queue.event'

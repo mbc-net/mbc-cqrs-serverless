@@ -1,5 +1,5 @@
 /* eslint-disable no-console */
-import { AppModule } from '@mbc-cqrs-severless/core'
+import { AppModule } from '@mbc-cqrs-sererless/core'
 import { repl } from '@nestjs/core'
 
 import { MainModule } from './main.module'
