@@ -96,6 +96,8 @@ jobs:
           git config user.name "${{ github.actor }}"
           git config user.email "${{ github.actor}}@users.noreply.github.com"
 
+          npx lerna run build
+
           npx lerna version prepatch --force-publish --no-changelog --yes
 
           npx lerna publish from-git --yes
