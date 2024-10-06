@@ -47,7 +47,7 @@
     "class-validator": "^0.14.0",
     "jwt-decode": "^4.0.0",
     "node-fetch": "^2.7.0",
-    "reflect-metadata": "^0.1.14",
+    "reflect-metadata": "^0.2.2",
     "ulid": "^2.3.0"
   },
   "devDependencies": {
