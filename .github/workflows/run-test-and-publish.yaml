@@ -88,6 +88,12 @@ jobs:
         with:
           node-version: 18
           cache: npm
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build packages
+        run: npx lerna run build
+
       - name: Authenticate with npm
         run: echo "//registry.npmjs.org/:_authToken=${{ secrets.NPM_TOKEN }}" > ~/.npmrc
 
@@ -95,8 +101,6 @@ jobs:
         run: |
           git config user.name "${{ github.actor }}"
           git config user.email "${{ github.actor}}@users.noreply.github.com"
-
-          npx lerna run build
 
           npx lerna version prepatch --force-publish --no-changelog --yes
 
