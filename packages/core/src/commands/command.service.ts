@@ -60,7 +60,7 @@ export class CommandService implements OnModuleInit {
   }
 
   onModuleInit() {
-    if (!this.options.disableDefaulHandler) {
+    if (!this.options.disableDefaultHandler) {
       this[DATA_SYNC_HANDLER] = [this.dataSyncDdsHandler]
     }
     if (this.options.dataSyncHandlers?.length) {
