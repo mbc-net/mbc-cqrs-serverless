@@ -1,6 +1,5 @@
 import { EventBus, EventHandler, IEventHandler } from '@mbc-cqrs-serverless/core'
 import { Inject, Logger, OnModuleInit } from '@nestjs/common'
-import { ConfigService } from '@nestjs/config'
 import { ModuleRef } from '@nestjs/core'
 
 import { TaskStatusEnum } from '../enums/status.enum'
@@ -18,7 +17,6 @@ export class TaskQueueEventHandler
   private eventBus: EventBus
 
   constructor(
-    private readonly configService: ConfigService,
     private readonly moduleRef: ModuleRef,
     private readonly taskService: TaskService,
     @Inject(TASK_QUEUE_EVENT_FACTORY)
@@ -26,7 +24,8 @@ export class TaskQueueEventHandler
   ) {}
 
   onModuleInit() {
-    if (!this.configService.get<boolean>('EVENT_SOURCE_DISABLED')) {
+    const enableEventSourceModule = process.env.EVENT_SOURCE_DISABLED !== 'true'
+    if (enableEventSourceModule) {
       this.eventBus = this.moduleRef.get(EventBus, { strict: false })
     }
   }
@@ -53,6 +52,7 @@ export class TaskQueueEventHandler
       await this.taskService.updateStatus(taskKey, TaskStatusEnum.FAILED, {
         error,
       })
+      throw error
     }
   }
 }
