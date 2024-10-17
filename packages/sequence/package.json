@@ -1,6 +1,6 @@
 {
   "name": "@mbc-cqrs-serverless/sequence",
-  "version": "0.1.14-beta.0",
+  "version": "0.1.15-beta.0",
   "description": "Generate increment sequence with time-rotation",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
@@ -26,6 +26,6 @@
     "access": "public"
   },
   "dependencies": {
-    "@mbc-cqrs-serverless/core": "^0.1.14-beta.0"
+    "@mbc-cqrs-serverless/core": "^0.1.15-beta.0"
   }
 }

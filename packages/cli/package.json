@@ -1,6 +1,6 @@
 {
   "name": "@mbc-cqrs-serverless/cli",
-  "version": "0.1.14-beta.0",
+  "version": "0.1.15-beta.0",
   "description": "a CLI to get started with MBC CQRS serverless framework",
   "bin": {
     "mbc": "./dist/index.js"
@@ -33,6 +33,6 @@
   },
   "devDependencies": {
     "@faker-js/faker": "^8.3.1",
-    "@mbc-cqrs-serverless/core": "^0.1.14-beta.0"
+    "@mbc-cqrs-serverless/core": "^0.1.15-beta.0"
   }
 }
