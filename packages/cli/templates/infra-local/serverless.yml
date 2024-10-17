@@ -93,6 +93,7 @@ provider:
   region: ap-northeast-1
   runtime: nodejs18.x
   profile: serverless
+  timeout: 100
   httpApi:
     authorizers:
       localAuthorizer:
