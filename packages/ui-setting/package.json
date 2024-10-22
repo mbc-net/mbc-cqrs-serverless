@@ -1,5 +1,5 @@
 {
-  "name": "@mbc-cqrs-serverless/setting",
+  "name": "@mbc-cqrs-serverless/ui-setting",
   "version": "0.1.15-beta.0",
   "description": "Setting master data",
   "main": "./dist/index.js",
