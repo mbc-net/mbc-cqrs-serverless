@@ -16,9 +16,19 @@
     "url": "https://github.com/mbc-net/mbc-cqrs-serverless.git"
   },
   "keywords": [
-    "MBC",
-    "CQRS",
-    "Serverless"
+    "mbc",
+    "cqrs",
+    "serverless",
+    "framework",
+    "event-driven",
+    "backend",
+    "aws",
+    "lambda",
+    "ecs",
+    "fargate",
+    "step-functions",
+    "sqs",
+    "typpescript"
   ],
   "author": "Murakami Business Consulting, Inc.",
   "license": "MIT",

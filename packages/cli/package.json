@@ -3,9 +3,19 @@
   "version": "0.1.18-beta.0",
   "description": "a CLI to get started with MBC CQRS serverless framework",
   "keywords": [
-    "MBC",
-    "CQRS",
-    "Serverless"
+    "mbc",
+    "cqrs",
+    "serverless",
+    "framework",
+    "event-driven",
+    "backend",
+    "aws",
+    "lambda",
+    "ecs",
+    "fargate",
+    "step-functions",
+    "sqs",
+    "typpescript"
   ],
   "bin": {
     "mbc": "./dist/index.js"
