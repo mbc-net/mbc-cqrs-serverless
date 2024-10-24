@@ -49,13 +49,13 @@ $ npm i -g @mbc-cqrs-serverless/cli
 
 - Create a new application
 
-```
+```bash
 $ mbc new YOUR_PROJECT_NAME
 ```
 
 ## Examples
 
-- [Check here](./examples/)
+- [Check here](https://github.com/mbc-net/mbc-cqrs-serveless-samples)
 
 ## Architecture
 
@@ -63,7 +63,7 @@ $ mbc new YOUR_PROJECT_NAME
 
 ## How to guide
 
-- TODO
+- Japanese: https://www.mbc-net.com/tag/mbc-cqrs-serverless/
 
 ## Contributing
 
@@ -91,3 +91,7 @@ $ npm run release
 - NPM workspace: https://docs.npmjs.com/cli/v7/using-npm/workspaces
 - Nestjs: https://docs.nestjs.com/
 - Serverless framework: https://www.serverless.com/framework/docs
+
+## License
+Copyright &copy; 2024, Murakami Business Consulting, Inc. https://www.mbc-net.com/
+This project and sub projects are under the MIT License.
