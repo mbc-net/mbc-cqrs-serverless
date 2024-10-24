@@ -16,6 +16,7 @@
     "url": "https://github.com/mbc-net/mbc-cqrs-serverless.git"
   },
   "keywords": [
+    "MBC",
     "CQRS",
     "Serverless"
   ],

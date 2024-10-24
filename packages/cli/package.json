@@ -2,6 +2,11 @@
   "name": "@mbc-cqrs-serverless/cli",
   "version": "0.1.17-beta.0",
   "description": "a CLI to get started with MBC CQRS serverless framework",
+  "keywords": [
+    "MBC",
+    "CQRS",
+    "Serverless"
+  ],
   "bin": {
     "mbc": "./dist/index.js"
   },

@@ -2,6 +2,11 @@
   "name": "@mbc-cqrs-serverless/sequence",
   "version": "0.1.17-beta.0",
   "description": "Generate increment sequence with time-rotation",
+  "keywords": [
+    "MBC",
+    "CQRS",
+    "Serverless"
+  ],
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "files": [

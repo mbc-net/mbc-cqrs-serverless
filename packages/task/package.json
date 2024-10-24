@@ -2,6 +2,11 @@
   "name": "@mbc-cqrs-serverless/task",
   "version": "0.1.17-beta.0",
   "description": "long-running task",
+  "keywords": [
+    "MBC",
+    "CQRS",
+    "Serverless"
+  ],
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "files": [

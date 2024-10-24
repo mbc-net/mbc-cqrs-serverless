@@ -93,5 +93,5 @@ $ npm run release
 - Serverless framework: https://www.serverless.com/framework/docs
 
 ## License
-Copyright &copy; 2024, Murakami Business Consulting, Inc. https://www.mbc-net.com/
+Copyright &copy; 2024, Murakami Business Consulting, Inc. https://www.mbc-net.com/  
 This project and sub projects are under the MIT License.
