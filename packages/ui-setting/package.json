@@ -1,6 +1,6 @@
 {
   "name": "@mbc-cqrs-serverless/ui-setting",
-  "version": "0.1.18-beta.0",
+  "version": "0.1.19-beta.0",
   "description": "Setting master data",
   "keywords": [
     "mbc",
@@ -16,7 +16,6 @@
     "step-functions",
     "sqs",
     "typpescript"
-
   ],
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
@@ -42,6 +41,6 @@
     "access": "public"
   },
   "dependencies": {
-    "@mbc-cqrs-serverless/core": "^0.1.18-beta.0"
+    "@mbc-cqrs-serverless/core": "^0.1.19-beta.0"
   }
 }
