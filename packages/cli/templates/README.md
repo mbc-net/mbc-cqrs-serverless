@@ -1,6 +1,7 @@
+![MBC CQRS serverless framework](https://mbc-net.github.io/mbc-cqrs-serverless-doc/img/mbc-cqrs-serverless.png)
 ## Description
 
-CQRS framework based on [Nest](https://github.com/nestjs/nest).
+MBC CQRS serverless framework based on [Nest](https://github.com/nestjs/nest).
 
 TechStack:
 
@@ -163,3 +164,7 @@ $ npm run start:repl
 ```
 
 - Ref: https://docs.nestjs.com/recipes/repl
+
+## Documentation
+Visit https://mbc-net.github.io/mbc-cqrs-serverless-doc/ to view the full documentation.
+

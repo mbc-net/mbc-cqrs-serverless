@@ -1,3 +1,4 @@
+![MBC CQRS serverless framework](https://mbc-net.github.io/mbc-cqrs-serverless-doc/img/mbc-cqrs-serverless.png)
 # MBC CQRS serverless framework Sequence package
 
 ## Documentation
