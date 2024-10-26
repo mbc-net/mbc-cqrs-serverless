@@ -1,3 +1,5 @@
+![MBC CQRS serverless framework](images/mbc-cqrs-serverless.png)
+
 # MBC CQRS serverless framework
 
 Unleash the power of scalable, resilient serverless applications with CQRS on AWS, the magic of NestJS and the convenience of local development workflows! ✨
