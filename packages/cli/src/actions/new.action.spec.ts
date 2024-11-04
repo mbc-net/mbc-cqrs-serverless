@@ -1,62 +1,111 @@
-import { faker } from '@faker-js/faker'
-import { copyFileSync, readFileSync, unlinkSync } from 'fs'
+import { execSync } from 'child_process'
+import { Command } from 'commander'
+import { copyFileSync, cpSync, mkdirSync } from 'fs'
 import path from 'path'
 
-import { exportsForTesting } from './new.action'
+import newAction, { exportsForTesting } from './new.action'
 
-const { usePackageVersion } = exportsForTesting
+jest.mock('child_process', () => ({
+  execSync: jest.fn(),
+}))
 
-// create testcase for usePackageVersion function in new.action.ts file
-describe('usePackageVersion', () => {
-  const fname = path.join(__dirname, 'package.json')
-  const packageVersion = '1.0.0'
-  const packageJson = JSON.parse(
-    readFileSync(path.join(__dirname, '../../package.json')).toString(),
-  )
+jest.mock('fs', () => ({
+  copyFileSync: jest.fn(),
+  cpSync: jest.fn(),
+  mkdirSync: jest.fn(),
+  unlinkSync: jest.fn(),
+  writeFileSync: jest.fn(),
+  readFileSync: jest.fn(() =>
+    JSON.stringify({ dependencies: {}, devDependencies: {} }),
+  ),
+}))
+
+describe('newAction', () => {
+  const mockExecSync = execSync as jest.MockedFunction<typeof execSync>
+  const mockCommand = new Command().name('new') // Mock command with name 'new'
 
   beforeEach(() => {
-    copyFileSync(path.join(__dirname, '../../templates/package.json'), fname)
+    jest.clearAllMocks()
   })
 
-  afterEach(() => {
-    unlinkSync(fname)
-  })
+  it('should generate a project with the latest version when version is not specified', async () => {
+    const projectName = 'test-project'
+    const latestVersion = '1.2.3'
+    mockExecSync
+      .mockReturnValueOnce(Buffer.from(latestVersion))
+      .mockReturnValue(Buffer.from(''))
 
-  it('it should update deps', () => {
-    usePackageVersion(__dirname, packageVersion)
-    const tplPackageJson = JSON.parse(readFileSync(fname).toString())
+    await newAction(`${projectName}`, {}, mockCommand)
 
-    expect(tplPackageJson.dependencies['@mbc-cqrs-serverless/core']).toBe(
-      packageVersion,
+    expect(execSync).toHaveBeenCalledWith(
+      'npm view @mbc-cqrs-serverless/core dist-tags.latest',
     )
-    expect(packageJson.version).toBe(
-      tplPackageJson.devDependencies['@mbc-cqrs-serverless/cli'],
+    expect(mkdirSync).toHaveBeenCalledWith(
+      path.join(process.cwd(), projectName),
+      { recursive: true },
     )
+    expect(cpSync).toHaveBeenCalledWith(
+      path.join(__dirname, '../../templates'),
+      path.join(process.cwd(), projectName),
+      { recursive: true },
+    )
+    expect(copyFileSync).toHaveBeenCalledTimes(2) // For .gitignore and .env.local
+    expect(mockExecSync).toHaveBeenCalledWith('git init', {
+      cwd: path.join(process.cwd(), projectName),
+    })
+    expect(mockExecSync).toHaveBeenCalledWith('npm i', {
+      cwd: path.join(process.cwd(), projectName),
+    })
   })
 
-  it('it should not update name', () => {
-    const { name } = JSON.parse(readFileSync(fname).toString())
+  it('should use a specific version if specified', async () => {
+    const projectName = 'test-project'
+    const version = '1.0.0'
+    const mockVersions = ['1.0.0', '1.1.0', '1.2.0']
+    mockExecSync
+      .mockReturnValueOnce(Buffer.from(JSON.stringify(mockVersions)))
+      .mockReturnValue(Buffer.from(''))
 
-    usePackageVersion(__dirname, packageVersion)
-    const tplPackageJson = JSON.parse(readFileSync(fname).toString())
+    await newAction(`${projectName}@${version}`, {}, mockCommand)
 
-    expect(name).toBe(tplPackageJson.name)
+    expect(execSync).toHaveBeenCalledWith(
+      'npm view @mbc-cqrs-serverless/core versions --json',
+    )
+    expect(mkdirSync).toHaveBeenCalledWith(
+      path.join(process.cwd(), projectName),
+      { recursive: true },
+    )
+    expect(cpSync).toHaveBeenCalledWith(
+      path.join(__dirname, '../../templates'),
+      path.join(process.cwd(), projectName),
+      { recursive: true },
+    )
+    expect(copyFileSync).toHaveBeenCalledTimes(2) // For .gitignore and .env.local
+    expect(mockExecSync).toHaveBeenCalledWith('git init', {
+      cwd: path.join(process.cwd(), projectName),
+    })
+    expect(mockExecSync).toHaveBeenCalledWith('npm i', {
+      cwd: path.join(process.cwd(), projectName),
+    })
   })
 
-  it('it should not update name with empty name', () => {
-    const { name } = JSON.parse(readFileSync(fname).toString())
+  it('should throw an error for an invalid version', async () => {
+    const projectName = 'test-project'
+    const invalidVersion = '2.0.0'
+    const mockVersions = ['1.0.0', '1.1.0', '1.2.0']
+    mockExecSync.mockReturnValueOnce(Buffer.from(JSON.stringify(mockVersions)))
 
-    usePackageVersion(__dirname, packageVersion, '')
-    const tplPackageJson = JSON.parse(readFileSync(fname).toString())
+    const consoleSpy = jest.spyOn(console, 'log').mockImplementation()
 
-    expect(name).toBe(tplPackageJson.name)
-  })
+    await newAction(`${projectName}@${invalidVersion}`, {}, mockCommand)
 
-  it('it should update name', () => {
-    const name = faker.word.sample()
-    usePackageVersion(__dirname, packageVersion, name)
-    const tplPackageJson = JSON.parse(readFileSync(fname).toString())
-
-    expect(name).toBe(tplPackageJson.name)
+    expect(execSync).toHaveBeenCalledWith(
+      'npm view @mbc-cqrs-serverless/core versions --json',
+    )
+    expect(consoleSpy).toHaveBeenCalledWith(
+      'The specified package version does not exist. Please chose a valid version!\n',
+      mockVersions,
+    )
+    consoleSpy.mockRestore()
   })
 })

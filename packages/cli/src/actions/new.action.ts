@@ -109,6 +109,7 @@ function getPackageVersion(packageName: string, isLatest = false): string[] {
 
 export let exportsForTesting = {
   usePackageVersion,
+  getPackageVersion,
 }
 if (process.env.NODE_ENV !== 'test') {
   exportsForTesting = undefined
