@@ -16,19 +16,43 @@ export default async function newAction(
   options: object,
   command: Command,
 ) {
+  const [projectName, version = 'latest'] = name.split('@')
+
   console.log(
-    `Executing command '${command.name()}' for application '${name}' with options '${JSON.stringify(
+    `Executing command '${command.name()}' for application '${projectName}' with options '${JSON.stringify(
       options,
     )}'`,
   )
 
-  const destDir = path.join(process.cwd(), name)
+  let packageVersion
+
+  if (version === 'latest') {
+    packageVersion = `^${
+      getPackageVersion('@mbc-cqrs-serverless/core', true)[0]
+    }` //  use the latest patch and minor versions
+  } else {
+    const versions = getPackageVersion('@mbc-cqrs-serverless/core')
+    const regex = new RegExp(`^${version}(?![0-9]).*$`) // start with version and not directly follow by a digit
+    const matchVersions = versions.filter((v) => regex.test(v))
+    if (versions.includes(version)) {
+      packageVersion = version // specific version
+    } else if (matchVersions.length !== 0) {
+      packageVersion = `^${matchVersions.at(-1)}` // use the patch and minor versions
+    } else {
+      console.log(
+        'The specified package version does not exist. Please chose a valid version!\n',
+        versions,
+      )
+      return
+    }
+  }
+
+  const destDir = path.join(process.cwd(), projectName)
   console.log('Generating MBC cqrs serverless application in', destDir)
   mkdirSync(destDir, { recursive: true })
   cpSync(path.join(__dirname, '../../templates'), destDir, { recursive: true })
 
-  // upgrade package
-  useLatestPackageVersion(destDir, name)
+  usePackageVersion(destDir, packageVersion, projectName)
 
   // mv gitignore .gitignore
   const gitignore = path.join(destDir, 'gitignore')
@@ -47,27 +71,45 @@ export default async function newAction(
   console.log(logs.toString())
 }
 
-function useLatestPackageVersion(destDir: string, name?: string) {
+function usePackageVersion(
+  destDir: string,
+  packageVersion: string,
+  projectName?: string,
+) {
   const packageJson = JSON.parse(
     readFileSync(path.join(__dirname, '../../package.json')).toString(),
   )
   const fname = path.join(destDir, 'package.json')
   const tplPackageJson = JSON.parse(readFileSync(fname).toString())
 
-  if (name) {
-    tplPackageJson.name = name
+  if (projectName) {
+    tplPackageJson.name = projectName
   }
 
-  tplPackageJson.dependencies['@mbc-cqrs-serverless/core'] =
-    packageJson.devDependencies['@mbc-cqrs-serverless/core']
+  tplPackageJson.dependencies['@mbc-cqrs-serverless/core'] = packageVersion
   tplPackageJson.devDependencies['@mbc-cqrs-serverless/cli'] =
     packageJson.version
 
   writeFileSync(fname, JSON.stringify(tplPackageJson, null, 2))
 }
 
+function getPackageVersion(packageName: string, isLatest = false): string[] {
+  if (isLatest) {
+    const latestVersion = execSync(`npm view ${packageName} dist-tags.latest`)
+      .toString()
+      .trim()
+    return [latestVersion]
+  }
+
+  const versions = JSON.parse(
+    execSync(`npm view ${packageName} versions --json`).toString(),
+  ) as string[]
+  return versions
+}
+
 export let exportsForTesting = {
-  useLatestPackageVersion,
+  usePackageVersion,
+  getPackageVersion,
 }
 if (process.env.NODE_ENV !== 'test') {
   exportsForTesting = undefined
