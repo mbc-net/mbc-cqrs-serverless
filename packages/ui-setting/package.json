@@ -1,6 +1,6 @@
 {
   "name": "@mbc-cqrs-serverless/ui-setting",
-  "version": "0.1.21-beta.0",
+  "version": "0.1.22-beta.0",
   "description": "Setting master data",
   "keywords": [
     "mbc",
@@ -41,6 +41,6 @@
     "access": "public"
   },
   "dependencies": {
-    "@mbc-cqrs-serverless/core": "^0.1.21-beta.0"
+    "@mbc-cqrs-serverless/core": "^0.1.22-beta.0"
   }
 }
