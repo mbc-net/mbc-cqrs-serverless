@@ -1,4 +1,5 @@
-![MBC CQRS serverless framework](https://mbc-net.github.io/mbc-cqrs-serverless-doc/img/mbc-cqrs-serverless.png)
+![MBC CQRS serverless framework](https://mbc-cqrs-serverless.mbc-net.com/img/mbc-cqrs-serverless.png)
+
 # MBC CQRS serverless framework CLI package
 
 ## Description
@@ -10,7 +11,7 @@ The MBC CLI is a command-line interface tool that helps you to initialize your m
 To install `mbc`, run:
 
 ```bash
-npm install -g @mbc-cqrs-serverless/cli 
+npm install -g @mbc-cqrs-serverless/cli
 ```
 
 ## Usage
@@ -28,11 +29,11 @@ There are 3 usages for the new command:
   - If the provided version is a prefix, the CLI uses the latest version matching that prefix.
   - If no matching version is found, the CLI logs an error and provides a list of available versions for the user.
 
-
 ## Documentation
 
-Visit https://mbc-net.github.io/mbc-cqrs-serverless-doc/ to view the full documentation.
+Visit https://mbc-cqrs-serverless.mbc-net.com/ to view the full documentation.
 
 ## License
+
 Copyright &copy; 2024, Murakami Business Consulting, Inc. https://www.mbc-net.com/  
 This project and sub projects are under the MIT License.

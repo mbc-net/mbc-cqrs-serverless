@@ -38,7 +38,7 @@
   "bugs": {
     "url": "https://github.com/mbc-net/mbc-cqrs-serverless/issues"
   },
-  "homepage": "https://mbc-net.github.io/mbc-cqrs-serverless-doc/",
+  "homepage": "https://mbc-cqrs-serverless.mbc-net.com/",
   "publishConfig": {
     "access": "public"
   },
