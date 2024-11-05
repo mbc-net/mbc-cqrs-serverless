@@ -1,4 +1,4 @@
-![MBC CQRS serverless framework](https://mbc-net.github.io/mbc-cqrs-serverless-doc/img/mbc-cqrs-serverless.png)
+![MBC CQRS serverless framework](https://mbc-cqrs-serverless.mbc-net.com/img/mbc-cqrs-serverless.png)
 
 # MBC CQRS serverless framework
 
@@ -10,7 +10,7 @@ This package provides core functionalities for implementing the Command Query Re
 
 ## Documentation
 
-Visit https://mbc-net.github.io/mbc-cqrs-serverless-doc/ to view the full documentation.
+Visit https://mbc-cqrs-serverless.mbc-net.com/ to view the full documentation.
 
 ## Features
 
@@ -95,5 +95,6 @@ $ npm run release
 - Serverless framework: https://www.serverless.com/framework/docs
 
 ## License
+
 Copyright &copy; 2024, Murakami Business Consulting, Inc. https://www.mbc-net.com/  
 This project and sub projects are under the MIT License.
