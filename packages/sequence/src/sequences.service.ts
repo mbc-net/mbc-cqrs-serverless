@@ -142,7 +142,7 @@ export class SequencesService implements ISequenceService {
             { pk: rotateSequenceData.pk, sk: rotateSequenceData.sk },
             {
               set: {
-                code: params.code2,
+                code: sk,
                 name: rotateBy || 'none',
                 tenantCode: dto.tenantCode,
                 type: params.code1,
@@ -229,7 +229,7 @@ export class SequencesService implements ISequenceService {
     })
   }
 
-  private getRotateValue(rotateBy?: RotateByEnum, forDate?: Date) {
+  getRotateValue(rotateBy?: RotateByEnum, forDate?: Date) {
     const date = forDate || new Date()
 
     switch (rotateBy) {
@@ -259,8 +259,8 @@ export class SequencesService implements ISequenceService {
     }
   }
 
-  private isIncrementNo(
-    rotateBy: RotateByEnum,
+  isIncrementNo(
+    rotateBy: RotateByEnum | undefined,
     nowFiscalYear: number,
     fiscalYear: number,
     issuedAt: Date,
@@ -305,7 +305,7 @@ export class SequencesService implements ISequenceService {
     return false
   }
 
-  private getFiscalYear(now: Date) {
+  getFiscalYear(now: Date) {
     /**
      * This function calculates the fiscal year for MELTEC.
      * Fiscal year is from April to March.
@@ -322,7 +322,7 @@ export class SequencesService implements ISequenceService {
     return year - 1953
   }
 
-  private createFormatDict(
+  createFormatDict(
     sequenceParams: SequenceParamsDto,
     fiscalYear: number,
     fixNo: number,
