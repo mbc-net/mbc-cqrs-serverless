@@ -58,6 +58,10 @@ export default async function newAction(
   const gitignore = path.join(destDir, 'gitignore')
   copyFileSync(gitignore, path.join(destDir, '.gitignore'))
   unlinkSync(gitignore)
+  // mv infra/gitignore infra/.gitignore
+  const infraGitignore = path.join(destDir, 'infra/gitignore')
+  copyFileSync(infraGitignore, path.join(destDir, 'infra/.gitignore'))
+  unlinkSync(infraGitignore)
   // cp .env.local .env
   copyFileSync(path.join(destDir, '.env.local'), path.join(destDir, '.env'))
 

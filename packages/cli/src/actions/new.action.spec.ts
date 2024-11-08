@@ -49,7 +49,7 @@ describe('newAction', () => {
       path.join(process.cwd(), projectName),
       { recursive: true },
     )
-    expect(copyFileSync).toHaveBeenCalledTimes(2) // For .gitignore and .env.local
+    expect(copyFileSync).toHaveBeenCalledTimes(3) // For .gitignore, infra/.gitignore and .env.local
     expect(mockExecSync).toHaveBeenCalledWith('git init', {
       cwd: path.join(process.cwd(), projectName),
     })
@@ -80,7 +80,7 @@ describe('newAction', () => {
       path.join(process.cwd(), projectName),
       { recursive: true },
     )
-    expect(copyFileSync).toHaveBeenCalledTimes(2) // For .gitignore and .env.local
+    expect(copyFileSync).toHaveBeenCalledTimes(3) // For .gitignore, infra/.gitignore and .env.local
     expect(mockExecSync).toHaveBeenCalledWith('git init', {
       cwd: path.join(process.cwd(), projectName),
     })
