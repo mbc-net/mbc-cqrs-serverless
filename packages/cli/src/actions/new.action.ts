@@ -5,6 +5,7 @@ import {
   cpSync,
   mkdirSync,
   readFileSync,
+  rmSync,
   unlinkSync,
   writeFileSync,
 } from 'fs'
@@ -50,7 +51,7 @@ export default async function newAction(
   const destDir = path.join(process.cwd(), projectName)
   console.log('Generating MBC cqrs serverless application in', destDir)
   mkdirSync(destDir, { recursive: true })
-  cpSync(path.join(__dirname, '../../templates'), destDir, { recursive: true })
+  useTemplate(destDir)
 
   usePackageVersion(destDir, packageVersion, projectName)
 
@@ -73,6 +74,33 @@ export default async function newAction(
   console.log('Installing packages in', destDir)
   logs = execSync('npm i', { cwd: destDir })
   console.log(logs.toString())
+}
+
+function useTemplate(destDir: string) {
+  if (isLatestCli()) {
+    cpSync(path.join(__dirname, '../../templates'), destDir, {
+      recursive: true,
+    })
+  } else {
+    execSync('npm i @mbc-cqrs-serverless/cli', { cwd: destDir })
+    cpSync(
+      path.join(destDir, 'node_modules/@mbc-cqrs-serverless/cli/templates'),
+      destDir,
+      { recursive: true },
+    )
+    rmSync(path.join(destDir, 'node_modules'), {
+      recursive: true,
+    })
+  }
+}
+
+function isLatestCli() {
+  const latestVersion = getPackageVersion('@mbc-cqrs-serverless/cli', true)[0]
+  const packageJson = JSON.parse(
+    readFileSync(path.join(__dirname, '../../package.json')).toString(),
+  )
+  const curVersion = packageJson.version
+  return latestVersion === curVersion
 }
 
 function usePackageVersion(
@@ -114,6 +142,7 @@ function getPackageVersion(packageName: string, isLatest = false): string[] {
 export let exportsForTesting = {
   usePackageVersion,
   getPackageVersion,
+  isLatestCli,
 }
 if (process.env.NODE_ENV !== 'test') {
   exportsForTesting = undefined
