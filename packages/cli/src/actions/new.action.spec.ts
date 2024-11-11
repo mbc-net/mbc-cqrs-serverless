@@ -16,7 +16,7 @@ jest.mock('fs', () => ({
   unlinkSync: jest.fn(),
   writeFileSync: jest.fn(),
   readFileSync: jest.fn(() =>
-    JSON.stringify({ dependencies: {}, devDependencies: {} }),
+    JSON.stringify({ version: '1.2.3', dependencies: {}, devDependencies: {} }),
   ),
 }))
 
@@ -32,7 +32,8 @@ describe('newAction', () => {
     const projectName = 'test-project'
     const latestVersion = '1.2.3'
     mockExecSync
-      .mockReturnValueOnce(Buffer.from(latestVersion))
+      .mockReturnValueOnce(Buffer.from(latestVersion)) // latest core
+      .mockReturnValueOnce(Buffer.from(latestVersion)) // latest cli
       .mockReturnValue(Buffer.from(''))
 
     await newAction(`${projectName}`, {}, mockCommand)
@@ -63,7 +64,8 @@ describe('newAction', () => {
     const version = '1.0.0'
     const mockVersions = ['1.0.0', '1.1.0', '1.2.0']
     mockExecSync
-      .mockReturnValueOnce(Buffer.from(JSON.stringify(mockVersions)))
+      .mockReturnValueOnce(Buffer.from(JSON.stringify(mockVersions))) // list version core
+      .mockReturnValueOnce(Buffer.from('1.2.3')) // latest cli
       .mockReturnValue(Buffer.from(''))
 
     await newAction(`${projectName}@${version}`, {}, mockCommand)
