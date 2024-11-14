@@ -44,7 +44,14 @@ export class SequencesService implements ISequenceService {
       invokeContext: IInvoke
     },
   ): Promise<DataEntity> {
-    const { date, rotateBy, format = '%%no%%', tenantCode, params } = dto
+    const {
+      date,
+      rotateBy,
+      format = '%%no%%',
+      tenantCode,
+      params,
+      registerDate,
+    } = dto
     const pk = `SEQ${KEY_SEPARATOR}${tenantCode}`
     let sk = [
       params.code1,

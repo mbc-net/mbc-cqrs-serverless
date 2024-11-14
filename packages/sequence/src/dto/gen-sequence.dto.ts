@@ -48,4 +48,8 @@ export class GenSequenceDto {
   @IsString()
   @IsOptional()
   format?: string
+
+  @IsString()
+  @IsOptional()
+  registerDate?: Date
 }
