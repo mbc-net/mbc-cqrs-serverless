@@ -305,7 +305,7 @@ export class SequencesService implements ISequenceService {
     return false
   }
 
-  getFiscalYear(now: Date) {
+  getFiscalYear(now: Date, registerDate?: Date) {
     /**
      * This function calculates the fiscal year for MELTEC.
      * Fiscal year is from April to March.
@@ -316,6 +316,9 @@ export class SequencesService implements ISequenceService {
     // If the month is January, February, or March, subtract 1 from the year
     if (now.getMonth() + 1 <= 3) {
       year -= 1
+    }
+    if (registerDate) {
+      return year - registerDate.getFullYear()
     }
 
     // Subtract 1953 because 2021 corresponds to the 68th fiscal year
