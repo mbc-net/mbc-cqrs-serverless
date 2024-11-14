@@ -311,16 +311,36 @@ export class SequencesService implements ISequenceService {
      * Fiscal year is from April to March.
      * Example: November 2021 → 68th fiscal year.
      */
+
+    // If registerDate is provided, calculate the fiscal year period (期)
+    if (registerDate) {
+      const registerYear = registerDate.getFullYear() // Registration year
+      const registerMonth = registerDate.getMonth() + 1 // Registration month (1 - 12)
+
+      let year = now.getFullYear() // Current year
+      let fiscalYearPeriod
+
+      // If the current month is January, February, or March, the fiscal year belongs to the previous year
+      if (now.getMonth() + 1 <= 3) {
+        year -= 1
+      }
+
+      // Calculate the fiscal year period (期) from the company's registration date
+      fiscalYearPeriod = year - registerYear + 1
+
+      // If the registration month is after March, the fiscal year starts from the following year
+      if (registerMonth > 3) {
+        fiscalYearPeriod++
+      }
+
+      return fiscalYearPeriod
+    }
     let year = now.getFullYear()
 
     // If the month is January, February, or March, subtract 1 from the year
     if (now.getMonth() + 1 <= 3) {
       year -= 1
     }
-    if (registerDate) {
-      return year - registerDate.getFullYear()
-    }
-
     // Subtract 1953 because 2021 corresponds to the 68th fiscal year
     return year - 1953
   }
