@@ -22,9 +22,9 @@ export function buildApp(env: Env, isLocal = false) {
     }
   }
 
-  const runCommand = function (cmd: string) {
+  const runCommand = function (cmd: string, cwdExec: string = cwd) {
     console.log(cmd)
-    const ret = execSync(cmd, { cwd })
+    const ret = execSync(cmd, { cwd: cwdExec })
     console.log(ret.toString())
   }
 
@@ -48,11 +48,9 @@ export function buildApp(env: Env, isLocal = false) {
   const prunePath = `${layerPath}/prune`
   runCommand(`mkdir -p ${prunePath}`)
   runCommand(`npm --prefix ./${prunePath} i node-prune modclean`)
-  runCommand(`npm --prefix ./${prunePath} exec node-prune`)
   runCommand(
     `npm --prefix ./${prunePath} exec modclean -- -n default:safe,default:caution -r`,
   )
-  runCommand(`rm -rf ${prunePath}`)
   runCommand(
     'mv node_modules/.prisma/client/libquery_engine-linux-arm64-* prisma',
   )
@@ -68,6 +66,11 @@ export function buildApp(env: Env, isLocal = false) {
   const nodejsLayerPath = `${layerPath}/nodejs`
   runCommand(`mkdir -p ${nodejsLayerPath}`)
   runCommand(`mv node_modules ${nodejsLayerPath}`)
+
+  // min size layer
+  console.log('============= min size layer =============')
+  runCommand(`npm --prefix ../prune exec node-prune`, `${layerFullPath}/nodejs`)
+  runCommand(`rm -rf ${prunePath}`)
 
   console.log('============= build app finished =============')
 
