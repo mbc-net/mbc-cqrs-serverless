@@ -47,13 +47,13 @@ export class PipelineStack extends Stack {
 
     const testStep = new CodeBuildStep(`${prefix}Test`, {
       projectName: `${prefix}Test`,
-      installCommands: ['npm ci'],
-      commands: ['npm run test'],
+      installCommands: ['npm ci', 'npm --prefix ./infra ci'],
+      commands: ['npm run test', 'npm --prefix ./infra run test'],
       primaryOutputDirectory: 'report',
       partialBuildSpec: BuildSpec.fromObject({
         reports: {
           [unitTestReports.reportGroupArn]: {
-            files: ['unit.xml'],
+            files: ['*.xml'],
             'base-directory': 'report',
             'discard-paths': true,
           },
