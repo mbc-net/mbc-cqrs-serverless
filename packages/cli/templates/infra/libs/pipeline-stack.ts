@@ -47,7 +47,11 @@ export class PipelineStack extends Stack {
 
     const testStep = new CodeBuildStep(`${prefix}Test`, {
       projectName: `${prefix}Test`,
-      installCommands: ['npm ci', 'npm --prefix ./infra ci'],
+      installCommands: [
+        'npm i -g pnpm',
+        'npm ci',
+        'pnpm --dir ./infra install --frozen-lockfile',
+      ],
       commands: ['npm run test', 'npm --prefix ./infra run test'],
       primaryOutputDirectory: 'report',
       partialBuildSpec: BuildSpec.fromObject({
@@ -71,8 +75,9 @@ export class PipelineStack extends Stack {
           testOut: testStep,
         },
         commands: [
+          'npm i -g pnpm',
           'cd infra',
-          'npm ci',
+          'pnpm install --frozen-lockfile',
           'npm run build',
           'npx cdk synth ' + id + ' -e',
         ],
