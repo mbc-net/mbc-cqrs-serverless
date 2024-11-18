@@ -3,6 +3,7 @@ import { SequencesService } from './sequences.service';
 import { DynamoDbService } from '@mbc-cqrs-serverless/core';
 import { Logger } from '@nestjs/common';
 import { RotateByEnum } from './enums/rotate-by.enum';
+import { FiscalYearOptions } from './interfaces/fiscal-year.interface';
 
 describe('SequencesService', () => {
   let service: SequencesService;
@@ -73,34 +74,101 @@ describe('SequencesService', () => {
     });
   });
 
-  it('should return 68 for a date in November 2021', () => {
-    const testDate = new Date('2021-11-15'); // November 2021
-    expect(service.getFiscalYear(testDate)).toBe(68);
+  // Case 1: Default start month (April) and reference year 1953
+  it('should calculate the fiscal year using default start month (April) and reference year 1953', () => {
+    const options: FiscalYearOptions = { now: new Date('2024-03-15') }; // Before the fiscal year starts (April 1)
+    const result = service.getFiscalYear(options);
+    expect(result).toBe(71); // 2023 fiscal year, since 2024-2023 = 1, starting from 1953
   });
 
-  it('should return 68 for a date in March 2022 (end of fiscal year 68)', () => {
-    const testDate = new Date('2022-03-31'); // March 2022
-    expect(service.getFiscalYear(testDate)).toBe(68);
+  // Case 2: Custom start month (e.g., July)
+  it('should calculate the fiscal year using a custom start month (July)', () => {
+    const options: FiscalYearOptions = { now: new Date('2024-03-15'), startMonth: 7 };
+    const result = service.getFiscalYear(options);
+    expect(result).toBe(71); // The fiscal year 2023 ends on June 30, 2024
   });
 
-  it('should return 69 for a date in April 2022 (start of fiscal year 69)', () => {
-    const testDate = new Date('2022-04-01'); // April 2022
-    expect(service.getFiscalYear(testDate)).toBe(69);
+  // Case 3: Custom register time (e.g., starting from 2020)
+  it('should calculate the fiscal year using a custom register time (2020)', () => {
+    const options: FiscalYearOptions = {
+      now: new Date('2024-03-15'),
+      registerTime: new Date('2020-05-01'),
+    };
+    const result = service.getFiscalYear(options);
+    expect(result).toBe(4);
   });
 
-  it('should return 69 for a date in December 2022', () => {
-    const testDate = new Date('2022-12-01'); // December 2022
-    expect(service.getFiscalYear(testDate)).toBe(69);
+  // Case 4: Custom register time and custom start month (e.g., July)
+  it('should calculate the fiscal year using a custom register time and start month (July)', () => {
+    const options: FiscalYearOptions = {
+      now: new Date('2024-03-15'),
+      registerTime: new Date('2020-05-01'),
+      startMonth: 7,
+    };
+    const result = service.getFiscalYear(options);
+    expect(result).toBe(4); 
   });
 
-  it('should return 69 for a date in February 2023 (within fiscal year 69)', () => {
-    const testDate = new Date('2023-02-15'); // February 2023
-    expect(service.getFiscalYear(testDate)).toBe(69);
+  // Case 5: `now` exactly matches the start of the fiscal year (April 1)
+  it('should handle the case where now is exactly the start of the fiscal year', () => {
+    const options: FiscalYearOptions = { now: new Date('2024-04-01') }; // First day of fiscal year
+    const result = service.getFiscalYear(options);
+    expect(result).toBe(72); // 2024 fiscal year (72nd fiscal year since 1953)
   });
 
-  it('should return 70 for a date in April 2023 (start of fiscal year 70)', () => {
-    const testDate = new Date('2023-04-01'); // April 2023
-    expect(service.getFiscalYear(testDate)).toBe(70);
+  // Case 6: `now` is just before the start of the fiscal year (March 31)
+  it('should handle the case where now is just before the fiscal year starts', () => {
+    const options: FiscalYearOptions = { now: new Date('2024-03-31') }; // Day before fiscal year starts
+    const result = service.getFiscalYear(options);
+    expect(result).toBe(71); // Fiscal year 2023 (71st fiscal year since 1953)
+  });
+
+  // Case 7: `now` is in the next fiscal year, but before the start month
+  it('should calculate the fiscal year when now is after the fiscal year start, but before the start month', () => {
+    const options: FiscalYearOptions = {
+      now: new Date('2024-06-01'), // After fiscal year start (April) but before custom start month (July)
+      startMonth: 7,
+      registerTime: new Date('2019-01-01'),
+    };
+    const result = service.getFiscalYear(options);
+    expect(result).toBe(6); // Fiscal year 2024, counting from 2019 + 1 = 6
+  });
+
+  // Case 8: Handle future registerTime (later than now)
+  it('should return a negative fiscal year when registerTime is in the future', () => {
+    const options: FiscalYearOptions = {
+      now: new Date('2024-11-18'),
+      registerTime: new Date('2025-05-01'), // Future register date
+    };
+    const result = service.getFiscalYear(options);
+    expect(result).toBe(0); // 2024 fiscal year is negative compared to future registerTime
+  });
+
+  // Case 9: `now` and `registerTime` in the same fiscal year
+  it('should return fiscal year 1 when now and registerTime fall within the same fiscal year', () => {
+    const options: FiscalYearOptions = {
+      now: new Date('2024-10-01'),
+      registerTime: new Date('2024-05-01'),
+    };
+    const result = service.getFiscalYear(options);
+    expect(result).toBe(1); // Same fiscal year (2024) as registerTime
+  });
+
+  // Case 10: No startMonth or registerTime, using defaults (1953)
+  it('should return the fiscal year using defaults (starting from 1953)', () => {
+    const options: FiscalYearOptions = { now: new Date('2024-11-18') }; // No startMonth or registerTime
+    const result = service.getFiscalYear(options);
+    expect(result).toBe(72); // 2023 fiscal year, starting from 1953
+  });
+
+  // Case 11: Very early registerTime and no startMonth
+  it('should return a high fiscal year number when registerTime is very early (e.g., 1900)', () => {
+    const options: FiscalYearOptions = {
+      now: new Date('2024-11-18'),
+      registerTime: new Date('1900-01-01'), // Register date far in the past
+    };
+    const result = service.getFiscalYear(options);
+    expect(result).toBe(125);
   });
 
   it('should return fiscal year when rotateBy is FISCAL_YEARLY', () => {

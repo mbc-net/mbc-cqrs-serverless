@@ -11,6 +11,7 @@ import { Injectable, Logger } from '@nestjs/common'
 
 import { GenSequenceDto, SequenceParamsDto } from './dto/gen-sequence.dto'
 import { RotateByEnum } from './enums/rotate-by.enum'
+import { FiscalYearOptions } from './interfaces/fiscal-year.interface'
 import { ISequenceService } from './interfaces/sequence-service.interface'
 
 @Injectable()
@@ -36,6 +37,15 @@ export class SequencesService implements ISequenceService {
    * - tenant_code: tenantCode
    * - type: typeCode
    * - seq: sequence value ( atomic counter )
+   *  - requestId: requestId
+   * - createdAt: createdAt
+   * - createdBy: createdBy
+   * - createdIp: createdIp
+   * - attributes: {
+   *    formatted_no: formattedNo ( )
+   *    fiscal_year: fiscalYear
+   *    issued_at: issuedAt
+   * }
    */
 
   async genNewSequence(
@@ -63,7 +73,10 @@ export class SequencesService implements ISequenceService {
 
     const now = new Date()
     const issuedAt = toISOStringWithTimezone(date || now)
-    const nowFiscalYear = this.getFiscalYear(date || now, registerDate)
+    const nowFiscalYear = this.getFiscalYear({
+      now: date || now,
+      registerTime: registerDate,
+    })
     const sourceIp = opts.invokeContext?.event?.requestContext?.http?.sourceIp
     const userContext = getUserContext(opts.invokeContext)
     const userId = userContext.userId || 'system'
@@ -223,40 +236,34 @@ export class SequencesService implements ISequenceService {
     return false
   }
 
-  getFiscalYear(now: Date, registerDate?: Date) {
+  getFiscalYear(options: FiscalYearOptions): number {
     /**
-     * This function calculates the fiscal year for MELTEC.
-     * Fiscal year is from April to March.
-     * Example: November 2021 → 68th fiscal year.
+     * Calculates the fiscal year based on the provided `now` and `registerTime`.
+     *
+     * - If `registerTime` is provided, the fiscal year will be calculated starting from
+     *   the month of the registration date (`registerTime`).
+     * - If `registerTime` is not provided, the fiscal year will start from the `startMonth` (default is April).
+     *
+     * The fiscal year calculation considers the following:
+     * - The default start month is April (month 4).
+     * - The reference year for the fiscal year calculation is 1953.
      */
 
-    // If registerDate is provided, calculate the fiscal year period (期)
-    if (registerDate) {
-      const registerYear = registerDate.getFullYear() // Registration year
-      const registerMonth = registerDate.getMonth() + 1 // Registration month (1 - 12)
+    const { now, startMonth = 4, registerTime } = options
 
-      const nowYear = now.getFullYear() // Current year
-      const nowMonth = now.getMonth() + 1 // Current month (1 - 12)
+    const effectiveStartMonth = registerTime
+      ? registerTime.getMonth() + 1
+      : startMonth ?? 4
+    const referenceYear = registerTime ? registerTime.getFullYear() : 1953 // Reference year
 
-      let fiscalYearPeriod
+    // Determine the current fiscal year
+    const fiscalYear =
+      now.getMonth() + 1 < effectiveStartMonth
+        ? now.getFullYear() - 1
+        : now.getFullYear()
 
-      // If current month is before the registration month, fiscal year will be in the previous year
-      if (nowMonth < registerMonth) {
-        fiscalYearPeriod = nowYear - registerYear
-      } else {
-        fiscalYearPeriod = nowYear - registerYear + 1
-      }
-
-      return fiscalYearPeriod
-    }
-    let year = now.getFullYear()
-
-    // If the month is January, February, or March, subtract 1 from the year
-    if (now.getMonth() + 1 <= 3) {
-      year -= 1
-    }
-    // Subtract 1953 because 2021 corresponds to the 68th fiscal year
-    return year - 1953
+    // Return the fiscal year number starting from `referenceYear`
+    return fiscalYear - referenceYear + 1
   }
 
   createFormatDict(
