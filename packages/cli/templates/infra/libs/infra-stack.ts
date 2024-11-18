@@ -72,9 +72,9 @@ export class InfraStack extends cdk.Stack {
         mfa: cdk.aws_cognito.Mfa.OFF,
         accountRecovery: cdk.aws_cognito.AccountRecovery.NONE,
         customAttributes: {
-          cci_code: new cdk.aws_cognito.StringAttribute({
+          tenant_code: new cdk.aws_cognito.StringAttribute({
             mutable: true,
-            maxLen: 20,
+            maxLen: 50,
           }),
           company_code: new cdk.aws_cognito.StringAttribute({
             mutable: true,
@@ -84,10 +84,7 @@ export class InfraStack extends cdk.Stack {
             mutable: true,
             maxLen: 2024,
           }),
-          user_type: new cdk.aws_cognito.StringAttribute({
-            mutable: true,
-            maxLen: 20,
-          }),
+          roles: new cdk.aws_cognito.StringAttribute({ mutable: true }),
         },
         email: cdk.aws_cognito.UserPoolEmail.withCognito(),
         deletionProtection: true,
