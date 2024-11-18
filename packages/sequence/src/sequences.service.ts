@@ -40,9 +40,7 @@ export class SequencesService implements ISequenceService {
 
   async genNewSequence(
     dto: GenSequenceDto,
-    opts: {
-      invokeContext: IInvoke
-    },
+    opts: { invokeContext: IInvoke },
   ): Promise<DataEntity> {
     const {
       date,
@@ -64,176 +62,89 @@ export class SequencesService implements ISequenceService {
       .join(KEY_SEPARATOR)
 
     const now = new Date()
-    let rotateSequenceData = null
     const issuedAt = toISOStringWithTimezone(date || now)
-    const nowFiscalYear = this.getFiscalYear(date || now)
-    let failCount = 0
-    let fixNo = 0
-    let formattedNo = ''
-
+    const nowFiscalYear = this.getFiscalYear(date || now, registerDate)
     const sourceIp = opts.invokeContext?.event?.requestContext?.http?.sourceIp
     const userContext = getUserContext(opts.invokeContext)
     const userId = userContext.userId || 'system'
-    for (let i = 0; i < 5; i++) {
-      try {
-        const sequenceData = await this.dynamoDbService.getItem(
-          this.tableName,
-          { pk, sk },
-        )
-        if (date && failCount === 0) {
-          // Handle rotating sequence data if date is provided
-          const rotateSortKeyVal = this.getRotateValue(rotateBy, date)
-          rotateSequenceData = await this.dynamoDbService.getItem(
-            this.tableName,
-            {
-              pk,
-              sk: `${sk}${KEY_SEPARATOR}${rotateSortKeyVal}`,
-            },
-          )
 
-          fixNo = rotateSequenceData ? rotateSequenceData.seq + 1 : 1
-        } else if (!date && sequenceData) {
-          // Handle non-date logic for sequence increment
-          fixNo = this.isIncrementNo(
-            rotateBy,
-            nowFiscalYear,
-            sequenceData.attributes.fiscal_year,
-            new Date(sequenceData.issuedAt),
-          )
-            ? sequenceData.seq + 1
-            : 1
-        }
+    // Helper function for building the update data
+    const buildUpdateData = (seq: number, formattedNo: string, sk: string) => ({
+      set: {
+        code: sk,
+        name: rotateBy || 'none',
+        tenantCode,
+        type: params.code1,
+        seq,
+        requestId: opts.invokeContext?.context?.awsRequestId,
+        createdAt: { ifNotExists: now },
+        createdBy: { ifNotExists: userId },
+        createdIp: { ifNotExists: sourceIp },
+        attributes: {
+          formatted_no: formattedNo,
+          fiscal_year: nowFiscalYear,
+          issued_at: issuedAt,
+        },
+        updatedAt: now,
+        updatedBy: userId,
+        updatedIp: sourceIp,
+      },
+    })
 
-        const formatDate = date || now
-
-        const formatDict = this.createFormatDict(
-          params,
-          nowFiscalYear,
-          fixNo,
-          formatDate,
-        )
-
-        formattedNo = this.createFormattedNo(format, formatDict)
-
-        const updateData = {
-          set: {
-            code: sk,
-            name: rotateBy || 'none',
-            tenantCode,
-            type: params.code1,
-            seq: fixNo,
-            requestId: opts.invokeContext?.context?.awsRequestId,
-            createdAt: { ifNotExists: now },
-            createdBy: { ifNotExists: userId },
-            createdIp: { ifNotExists: sourceIp },
-            attributes: {
-              formatted_no: formattedNo,
-              fiscal_year: nowFiscalYear,
-              issued_at: issuedAt,
-            },
-            updatedAt: now,
-            updatedBy: userId,
-            updatedIp: sourceIp,
-          },
-        }
-        if (!date) {
-          await this.dynamoDbService.updateItem(
-            this.tableName,
-            { pk, sk },
-            updateData,
-          )
-        }
-        if (rotateSequenceData) {
-          return await this.dynamoDbService.updateItem(
-            this.tableName,
-            { pk: rotateSequenceData.pk, sk: rotateSequenceData.sk },
-            {
-              set: {
-                code: sk,
-                name: rotateBy || 'none',
-                tenantCode: dto.tenantCode,
-                type: params.code1,
-                seq: fixNo,
-                requestId: opts.invokeContext?.context?.awsRequestId,
-                createdAt: { ifNotExists: now },
-                createdBy: { ifNotExists: userId },
-                createdIp: { ifNotExists: sourceIp },
-                attributes: {
-                  formatted_no: formattedNo,
-                  fiscal_year: nowFiscalYear,
-                  issued_at: issuedAt,
-                },
-                updatedAt: now,
-                updatedBy: userId,
-                updatedIp: sourceIp,
-              },
-            },
-          )
-        } else if (date) {
-          const rotateSortKeyVal = this.getRotateValue(rotateBy, date)
-          sk = `${sk}${KEY_SEPARATOR}${rotateSortKeyVal}`
-          await this.dynamoDbService.updateItem(
-            this.tableName,
-            { pk, sk },
-            {
-              set: {
-                code: sk,
-                name: rotateBy || 'none',
-                tenantCode: dto.tenantCode,
-                type: params.code1,
-                seq: fixNo,
-                requestId: opts.invokeContext?.context?.awsRequestId,
-                createdAt: { ifNotExists: now },
-                createdBy: { ifNotExists: userId },
-                createdIp: { ifNotExists: sourceIp },
-                attributes: {
-                  formatted_no: formattedNo,
-                  fiscal_year: nowFiscalYear,
-                  issued_at: issuedAt,
-                },
-                updatedAt: now,
-                updatedBy: userId,
-                updatedIp: sourceIp,
-              },
-            },
-          )
-          break
-        } else {
-          await this.dynamoDbService.updateItem(
-            this.tableName,
-            { pk, sk },
-            {
-              set: {
-                code: sk,
-                name: rotateBy || 'none',
-                tenantCode: dto.tenantCode,
-                type: params.code1,
-                seq: fixNo,
-                requestId: opts.invokeContext?.context?.awsRequestId,
-                createdAt: { ifNotExists: now },
-                createdBy: { ifNotExists: userId },
-                createdIp: { ifNotExists: sourceIp },
-                attributes: {
-                  formatted_no: formattedNo,
-                  fiscal_year: nowFiscalYear,
-                  issued_at: issuedAt,
-                },
-                updatedAt: now,
-                updatedBy: userId,
-                updatedIp: sourceIp,
-              },
-            },
-          )
-          break
-        }
-      } catch (error) {
-        failCount++
-      }
-    }
-    return await this.dynamoDbService.getItem(this.tableName, {
+    const sequenceData = await this.dynamoDbService.getItem(this.tableName, {
       pk,
       sk,
     })
+    let fixNo = 0
+    let rotateSequenceData = null
+
+    // Handle rotating sequence data if date is provided
+    if (date) {
+      const rotateSortKeyVal = this.getRotateValue(rotateBy, date)
+      rotateSequenceData = await this.dynamoDbService.getItem(this.tableName, {
+        pk,
+        sk: `${sk}${KEY_SEPARATOR}${rotateSortKeyVal}`,
+      })
+      fixNo = rotateSequenceData ? rotateSequenceData.seq + 1 : 1
+    } else if (!date && sequenceData) {
+      fixNo = this.isIncrementNo(
+        rotateBy,
+        nowFiscalYear,
+        sequenceData.attributes.fiscal_year,
+        new Date(sequenceData.issuedAt),
+      )
+        ? sequenceData.seq + 1
+        : 1
+    }
+
+    const formatDict = this.createFormatDict(
+      params,
+      nowFiscalYear,
+      fixNo,
+      date || now,
+    )
+    const formattedNo = this.createFormattedNo(format, formatDict)
+
+    // Common update operation
+    if (rotateSequenceData) {
+      return await this.dynamoDbService.updateItem(
+        this.tableName,
+        { pk: rotateSequenceData.pk, sk: rotateSequenceData.sk },
+        buildUpdateData(fixNo, formattedNo, sk),
+      )
+    }
+
+    // Non-rotate logic
+    if (date) {
+      const rotateSortKeyVal = this.getRotateValue(rotateBy, date)
+      sk = `${sk}${KEY_SEPARATOR}${rotateSortKeyVal}`
+    }
+
+    return await this.dynamoDbService.updateItem(
+      this.tableName,
+      { pk, sk },
+      buildUpdateData(fixNo, formattedNo, sk),
+    )
   }
 
   getRotateValue(rotateBy?: RotateByEnum, forDate?: Date) {
@@ -324,20 +235,16 @@ export class SequencesService implements ISequenceService {
       const registerYear = registerDate.getFullYear() // Registration year
       const registerMonth = registerDate.getMonth() + 1 // Registration month (1 - 12)
 
-      let year = now.getFullYear() // Current year
+      const nowYear = now.getFullYear() // Current year
+      const nowMonth = now.getMonth() + 1 // Current month (1 - 12)
+
       let fiscalYearPeriod
 
-      // If the current month is January, February, or March, the fiscal year belongs to the previous year
-      if (now.getMonth() + 1 <= 3) {
-        year -= 1
-      }
-
-      // Calculate the fiscal year period (期) from the company's registration date
-      fiscalYearPeriod = year - registerYear + 1
-
-      // If the registration month is after March, the fiscal year starts from the following year
-      if (registerMonth > 3) {
-        fiscalYearPeriod++
+      // If current month is before the registration month, fiscal year will be in the previous year
+      if (nowMonth < registerMonth) {
+        fiscalYearPeriod = nowYear - registerYear
+      } else {
+        fiscalYearPeriod = nowYear - registerYear + 1
       }
 
       return fiscalYearPeriod
