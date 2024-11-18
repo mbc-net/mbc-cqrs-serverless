@@ -119,15 +119,19 @@ export class SequencesService implements ISequenceService {
         sk: `${sk}${KEY_SEPARATOR}${rotateSortKeyVal}`,
       })
       fixNo = rotateSequenceData ? rotateSequenceData.seq + 1 : 1
-    } else if (!date && sequenceData) {
-      fixNo = this.isIncrementNo(
-        rotateBy,
-        nowFiscalYear,
-        sequenceData.attributes.fiscal_year,
-        new Date(sequenceData.issuedAt),
-      )
-        ? sequenceData.seq + 1
-        : 1
+    } else if (!date) {
+      if (sequenceData) {
+        fixNo = this.isIncrementNo(
+          rotateBy,
+          nowFiscalYear,
+          sequenceData.attributes.fiscal_year,
+          new Date(sequenceData.issuedAt),
+        )
+          ? sequenceData.seq + 1
+          : 1
+      } else {
+        fixNo = 1
+      }
     }
 
     const formatDict = this.createFormatDict(
