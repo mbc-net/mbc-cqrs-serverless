@@ -59,6 +59,7 @@ export class SequencesService implements ISequenceService {
       tenantCode,
       params,
       registerDate,
+      startMonth,
     } = dto
     const pk = `SEQ${KEY_SEPARATOR}${tenantCode}`
     let sk = [
@@ -76,6 +77,7 @@ export class SequencesService implements ISequenceService {
     const nowFiscalYear = this.getFiscalYear({
       now: date || now,
       registerTime: registerDate,
+      startMonth,
     })
     const sourceIp = opts.invokeContext?.event?.requestContext?.http?.sourceIp
     const userContext = getUserContext(opts.invokeContext)
