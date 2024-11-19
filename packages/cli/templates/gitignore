@@ -44,3 +44,5 @@ docker-data
 .nestjs_repl_history
 
 .env
+
+report
