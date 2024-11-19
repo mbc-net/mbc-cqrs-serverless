@@ -1,7 +1,39 @@
 import { ApiProperty } from '@nestjs/swagger'
-import { IsEnum, IsOptional, IsString } from 'class-validator'
+import {
+  IsEnum,
+  IsNumber,
+  IsObject,
+  IsOptional,
+  IsString,
+} from 'class-validator'
 
 import { RotateByEnum } from '../enums/rotate-by.enum'
+
+export class SequenceParamsDto {
+  //code1#code2#code3#code4#code5
+
+  @IsString()
+  code1: string
+
+  @IsString()
+  code2: string
+
+  @IsOptional()
+  @IsString()
+  code3?: string
+
+  @IsOptional()
+  @IsString()
+  code4?: string
+
+  @IsOptional()
+  @IsString()
+  code5?: string
+
+  constructor(partial: Partial<SequenceParamsDto>) {
+    Object.assign(this, partial)
+  }
+}
 
 export class GenSequenceDto {
   @IsString()
@@ -16,6 +48,30 @@ export class GenSequenceDto {
   @IsString()
   tenantCode: string
 
+  @IsObject()
+  params: SequenceParamsDto
+
+  /**
+   * Format of no
+   */
+
   @IsString()
-  typeCode: string
+  @IsOptional()
+  format?: string
+
+  /**
+   * Start month of fiscal year (default: 4)
+   */
+
+  @IsNumber()
+  @IsOptional()
+  startMonth?: number
+
+  /**
+   * Company registration date
+   */
+
+  @IsString()
+  @IsOptional()
+  registerDate?: Date
 }
