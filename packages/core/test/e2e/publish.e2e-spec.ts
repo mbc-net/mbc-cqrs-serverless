@@ -7,15 +7,15 @@ import { syncDataFinished } from './utils'
 const API_PATH = '/api/testing'
 
 describe('Publish', () => {
-  it('should be stored correct data in DDB', async () => {
+  it('should be stored correct data in the command DDB table', async () => {
     // Arrange
     const payload = {
       pk: 'TEST',
-      sk: 'publish',
-      id: 'TEST#publish',
-      name: 'testing',
+      sk: 'publish#command',
+      id: 'TEST#publish#command',
+      name: 'testing#command',
       version: 0,
-      code: 'publish',
+      code: 'publish#command',
       type: 'TEST',
     }
 
@@ -25,14 +25,91 @@ describe('Publish', () => {
     // Assert
     expect(res.statusCode).toEqual(201)
 
-    await syncDataFinished('testing-table', { pk: 'TEST', sk: 'publish@1' })
+    await syncDataFinished('testing-table', {
+      pk: payload.pk,
+      sk: `${payload.sk}@1`,
+    })
+
+    const data = await getItem(
+      getTableName('testing-table', TableType.COMMAND),
+      {
+        pk: payload.pk,
+        sk: `${payload.sk}@1`,
+      },
+    )
+
+    console.log('data', data)
+
+    expect(data).toMatchObject({
+      ...payload,
+      version: 1,
+      sk: `${payload.sk}@1`,
+    })
+  }, 40000)
+
+  it('should be stored correct data in the data DDB table', async () => {
+    // Arrange
+    const payload = {
+      pk: 'TEST',
+      sk: 'publish#data',
+      id: 'TEST#publish#data',
+      name: 'testing#data',
+      version: 0,
+      code: 'publish#data',
+      type: 'TEST',
+    }
+
+    // Action
+    const res = await request(config.apiBaseUrl).post(API_PATH).send(payload)
+
+    // Assert
+    expect(res.statusCode).toEqual(201)
+
+    await syncDataFinished('testing-table', {
+      pk: payload.pk,
+      sk: `${payload.sk}@1`,
+    })
 
     const data = await getItem(getTableName('testing-table', TableType.DATA), {
-      pk: 'TEST',
-      sk: 'publish',
+      pk: payload.pk,
+      sk: payload.sk,
     })
 
     expect(data).toMatchObject({ ...payload, version: 1 })
+  }, 40000)
+
+  it('should be stored correct data in the history DDB table', async () => {
+    // Arrange
+    const payload = {
+      pk: 'TEST',
+      sk: 'publish#history',
+      id: 'TEST#publish#history',
+      name: 'testing#history',
+      version: 0,
+      code: 'publish#history',
+      type: 'TEST',
+    }
+
+    // Action
+    const res = await request(config.apiBaseUrl).post(API_PATH).send(payload)
+
+    await syncDataFinished('testing-table', {
+      pk: payload.pk,
+      sk: `${payload.sk}@1`,
+    })
+
+    // Assert
+    expect(res.statusCode).toEqual(201)
+
+    const data = await getItem(
+      getTableName('testing-table', TableType.HISTORY),
+      {
+        pk: payload.pk,
+        sk: `${payload.sk}@1`,
+      },
+    )
+
+    expect(data).toBeUndefined()
   }, 40000)
 
   it('should return invalid input version', async () => {
@@ -71,7 +148,10 @@ describe('Publish', () => {
 
     await request(config.apiBaseUrl).post(API_PATH).send(payload)
 
-    await syncDataFinished('testing-table', { pk: 'TEST', sk: 'publish_2@1' })
+    await syncDataFinished('testing-table', {
+      pk: payload.pk,
+      sk: `${payload.sk}@1`,
+    })
 
     const res = await request(config.apiBaseUrl).post(API_PATH).send(payload)
 
