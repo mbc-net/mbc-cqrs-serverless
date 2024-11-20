@@ -57,6 +57,7 @@ export class PipelineStack extends Stack {
         'npm run test', // source test
         'npm --prefix ./infra run test', // infra snapshot test
         'npm --prefix ./infra run cdk synth', // generate infra diagram
+        'npm ci && cp .env.local .env && npm run generate:swagger', // generate api doc
       ],
       primaryOutputDirectory: 'report',
       partialBuildSpec: BuildSpec.fromObject({
