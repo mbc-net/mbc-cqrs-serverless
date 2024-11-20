@@ -36,7 +36,8 @@
     "migrate:dev": "prisma migrate dev",
     "migrate:rds": "prisma migrate deploy",
     "migrate:ddb": "ts-node prisma/ddb.ts",
-    "migrate": "npm run migrate:rds && npm run migrate:ddb"
+    "migrate": "npm run migrate:rds && npm run migrate:ddb",
+    "generate:swagger": "nest start --entryFile generate-swagger"
   },
   "dependencies": {
     "@mbc-cqrs-serverless/core": "",
