@@ -48,11 +48,16 @@ export class PipelineStack extends Stack {
     const testStep = new CodeBuildStep(`${prefix}Test`, {
       projectName: `${prefix}Test`,
       installCommands: [
+        'apt install graphviz -y',
         'npm i -g pnpm',
         'npm ci',
         'pnpm --dir ./infra install --frozen-lockfile',
       ],
-      commands: ['npm run test', 'npm --prefix ./infra run test'],
+      commands: [
+        'npm run test', // source test
+        'npm --prefix ./infra run test', // infra snapshot test
+        'npm --prefix ./infra run cdk synth', // generate infra diagram
+      ],
       primaryOutputDirectory: 'report',
       partialBuildSpec: BuildSpec.fromObject({
         reports: {
