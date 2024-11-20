@@ -1,3 +1,3 @@
 module.exports = {
-  outdir: 'graph',
+  outdir: '../report/infra',
 }
