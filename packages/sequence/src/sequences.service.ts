@@ -2,36 +2,101 @@ import {
   DataEntity,
   DetailKey,
   DynamoDbService,
+  generateId,
   getUserContext,
   IInvoke,
   KEY_SEPARATOR,
+  masterPk,
+  seqPk,
   toISOStringWithTimezone,
 } from '@mbc-cqrs-serverless/core'
 import { Injectable, Logger } from '@nestjs/common'
 
-import { GenSequenceDto, SequenceParamsDto } from './dto/gen-sequence.dto'
+import {
+  GenerateFormattedSequenceDto,
+  GenSequenceDto,
+  SequenceParamsDto,
+} from './dto/gen-sequence.dto'
+import { SequenceEntity } from './entities/sequence.entity'
 import { RotateByEnum } from './enums/rotate-by.enum'
 import { FiscalYearOptions } from './interfaces/fiscal-year.interface'
 import { ISequenceService } from './interfaces/sequence-service.interface'
+import { SequenceMasterDataProvider } from './sequence-master-factory'
 
 @Injectable()
 export class SequencesService implements ISequenceService {
   private readonly logger = new Logger(SequencesService.name)
   private readonly tableName: string
 
-  constructor(private readonly dynamoDbService: DynamoDbService) {
+  constructor(
+    private readonly dynamoDbService: DynamoDbService,
+    private readonly masterDataProvider: SequenceMasterDataProvider,
+  ) {
     this.tableName = dynamoDbService.getTableName('sequences')
     this.logger.debug('tableName: ' + this.tableName)
   }
 
+  /**
+   * @deprecated This method is deprecated at V0.2.
+   */
   async getCurrentSequence(key: DetailKey): Promise<DataEntity> {
     return await this.dynamoDbService.getItem(this.tableName, key)
   }
 
   /**
+   * @deprecated This method is deprecated at V0.2.
    * Seq data structure
    * - pk: SEQ#tenantCode
    * - sk: typeCode#rotateValue ( e.x: `user#20230401` )
+   * - code: typeCode#rotateValue
+   * - name: rotateBy ( e.x: `daily` )
+   * - tenant_code: tenantCode
+   * - type: typeCode
+   * - seq: sequence value ( atomic counter )
+   */
+  async genNewSequence(
+    dto: GenSequenceDto,
+    options: {
+      invokeContext: IInvoke
+    },
+  ): Promise<DataEntity> {
+    const rotateVal = this.getRotateValue(dto.rotateBy, dto.date)
+    const pk = `SEQ${KEY_SEPARATOR}${dto.tenantCode}`
+    const sk = `${dto.typeCode}${KEY_SEPARATOR}${rotateVal}`
+
+    const sourceIp =
+      options.invokeContext?.event?.requestContext?.http?.sourceIp
+    const userContext = getUserContext(options.invokeContext)
+    const userId = userContext.userId || 'system'
+    const now = new Date()
+    const item = await this.dynamoDbService.updateItem(
+      this.tableName,
+      { pk, sk },
+      {
+        set: {
+          code: sk,
+          name: dto.rotateBy || 'none',
+          tenantCode: dto.tenantCode,
+          type: dto.typeCode,
+          seq: { ifNotExists: 0, incrementBy: 1 },
+          requestId: options.invokeContext?.context?.awsRequestId,
+          createdAt: { ifNotExists: now },
+          createdBy: { ifNotExists: userId },
+          createdIp: { ifNotExists: sourceIp },
+          updatedAt: now,
+          updatedBy: userId,
+          updatedIp: sourceIp,
+        },
+      },
+    )
+
+    return item
+  }
+
+  /**
+   * Seq data structure
+   * - pk: SEQ#tenantCode
+   * - sk: typeCode#code1#code2#code3#code4#code5rotateValue ( e.x: `user#20230401` )
    * - code: typeCode#rotateValue
    * - name: rotateBy ( e.x: `daily` )
    * - tenant_code: tenantCode
@@ -42,32 +107,37 @@ export class SequencesService implements ISequenceService {
    * - createdBy: createdBy
    * - createdIp: createdIp
    * - attributes: {
-   *    formatted_no: formattedNo ( )
+   *    formatted_no: formattedNo ( e.x: `2023-04-01-0001` )
    *    fiscal_year: fiscalYear
    *    issued_at: issuedAt
    * }
    */
 
-  async genNewSequence(
-    dto: GenSequenceDto,
-    opts: { invokeContext: IInvoke },
-  ): Promise<DataEntity> {
-    const {
-      date,
-      rotateBy,
-      format = '%%no%%',
-      tenantCode,
-      params,
-      registerDate,
-      startMonth,
-    } = dto
-    const pk = `SEQ${KEY_SEPARATOR}${tenantCode}`
+  async generateSequenceItem(
+    dto: GenerateFormattedSequenceDto,
+    options: { invokeContext: IInvoke },
+  ): Promise<SequenceEntity> {
+    const { date, rotateBy, tenantCode, params } = dto
+
+    const generalMasterPk = masterPk(tenantCode)
+    const generalMasterSk = `SEQ${KEY_SEPARATOR}${params?.code1}`
+    this.logger.log('general master pk: ', generalMasterPk)
+    this.logger.log('general master sk: ', generalMasterSk)
+    const masterData = await this.masterDataProvider.getData({
+      pk: generalMasterPk,
+      sk: generalMasterSk,
+    })
+    // Get master data for the tenant
+    const { format, typeCode, registerDate, startMonth } = masterData
+    const pk = seqPk(tenantCode)
+    // Construct the sort key for the sequence
     let sk = [
-      params.code1,
-      params.code2,
-      params.code3,
-      params.code4,
-      params.code5,
+      typeCode,
+      params?.code1,
+      params?.code2,
+      params?.code3,
+      params?.code4,
+      params?.code5,
     ]
       .filter(Boolean)
       .join(KEY_SEPARATOR)
@@ -79,91 +149,48 @@ export class SequencesService implements ISequenceService {
       registerTime: registerDate,
       startMonth,
     })
-    const sourceIp = opts.invokeContext?.event?.requestContext?.http?.sourceIp
-    const userContext = getUserContext(opts.invokeContext)
+    const sourceIp =
+      options.invokeContext?.event?.requestContext?.http?.sourceIp
+    const userContext = getUserContext(options.invokeContext)
     const userId = userContext.userId || 'system'
 
-    // Helper function for building the update data
-    const buildUpdateData = (seq: number, formattedNo: string, sk: string) => ({
-      set: {
-        code: sk,
-        name: rotateBy || 'none',
-        tenantCode,
-        type: params.code1,
-        seq,
-        requestId: opts.invokeContext?.context?.awsRequestId,
-        createdAt: { ifNotExists: now },
-        createdBy: { ifNotExists: userId },
-        createdIp: { ifNotExists: sourceIp },
-        attributes: {
-          formatted_no: formattedNo,
-          fiscal_year: nowFiscalYear,
-          issued_at: issuedAt,
-        },
-        updatedAt: now,
-        updatedBy: userId,
-        updatedIp: sourceIp,
-      },
-    })
+    const rotateVal = this.getRotateValue(rotateBy, date)
+    sk = `${sk}${KEY_SEPARATOR}${rotateVal}`
 
-    const sequenceData = await this.dynamoDbService.getItem(this.tableName, {
-      pk,
-      sk,
-    })
-    let fixNo = 0
-    let rotateSequenceData = null
-
-    // Handle rotating sequence data if date is provided
-    if (date) {
-      const rotateSortKeyVal = this.getRotateValue(rotateBy, date)
-      rotateSequenceData = await this.dynamoDbService.getItem(this.tableName, {
-        pk,
-        sk: `${sk}${KEY_SEPARATOR}${rotateSortKeyVal}`,
-      })
-      fixNo = rotateSequenceData ? rotateSequenceData.seq + 1 : 1
-    } else if (!date) {
-      if (sequenceData) {
-        fixNo = this.isIncrementNo(
-          rotateBy,
-          nowFiscalYear,
-          sequenceData.attributes.fiscal_year,
-          new Date(sequenceData.issuedAt),
-        )
-          ? sequenceData.seq + 1
-          : 1
-      } else {
-        fixNo = 1
-      }
-    }
-
-    const formatDict = this.createFormatDict(
-      params,
-      nowFiscalYear,
-      fixNo,
-      date || now,
-    )
-    const formattedNo = this.createFormattedNo(format, formatDict)
-
-    // Common update operation
-    if (rotateSequenceData) {
-      return await this.dynamoDbService.updateItem(
-        this.tableName,
-        { pk: rotateSequenceData.pk, sk: rotateSequenceData.sk },
-        buildUpdateData(fixNo, formattedNo, sk),
-      )
-    }
-
-    // Non-rotate logic
-    if (date) {
-      const rotateSortKeyVal = this.getRotateValue(rotateBy, date)
-      sk = `${sk}${KEY_SEPARATOR}${rotateSortKeyVal}`
-    }
-
-    return await this.dynamoDbService.updateItem(
+    const item = await this.dynamoDbService.updateItem(
       this.tableName,
       { pk, sk },
-      buildUpdateData(fixNo, formattedNo, sk),
+      {
+        set: {
+          code: sk,
+          name: dto.rotateBy || 'none',
+          tenantCode: dto.tenantCode,
+          type: typeCode,
+          seq: { ifNotExists: 0, incrementBy: 1 },
+          requestId: options.invokeContext?.context?.awsRequestId,
+          createdAt: { ifNotExists: now },
+          createdBy: { ifNotExists: userId },
+          createdIp: { ifNotExists: sourceIp },
+          updatedAt: now,
+          updatedBy: userId,
+          updatedIp: sourceIp,
+        },
+      },
     )
+
+    const formatDict = this.createFormatDict(
+      nowFiscalYear,
+      item.seq,
+      date || now,
+      { ...params },
+    )
+    const formattedNo = this.createFormattedNo(format, formatDict)
+    return new SequenceEntity({
+      id: generateId(item.pk, item.sk),
+      no: item.seq,
+      formattedNo: formattedNo,
+      issuedAt: new Date(issuedAt),
+    })
   }
 
   getRotateValue(rotateBy?: RotateByEnum, forDate?: Date) {
@@ -273,10 +300,10 @@ export class SequencesService implements ISequenceService {
   }
 
   createFormatDict(
-    sequenceParams: SequenceParamsDto,
     fiscalYear: number,
     fixNo: number,
     now: Date,
+    sequenceParams?: SequenceParamsDto,
   ) {
     return {
       ...sequenceParams,
