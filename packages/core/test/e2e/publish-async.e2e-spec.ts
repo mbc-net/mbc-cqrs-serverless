@@ -25,13 +25,13 @@ describe('Publish', () => {
     // Assert
     expect(res.statusCode).toEqual(201)
 
-    await syncDataFinished('testing-table', {
+    await syncDataFinished('testing_table', {
       pk: payload.pk,
       sk: `${payload.sk}@1`,
     })
 
     const data = await getItem(
-      getTableName('testing-table', TableType.COMMAND),
+      getTableName('testing_table', TableType.COMMAND),
       {
         pk: payload.pk,
         sk: `${payload.sk}@1`,
@@ -65,12 +65,12 @@ describe('Publish', () => {
     // Assert
     expect(res.statusCode).toEqual(201)
 
-    await syncDataFinished('testing-table', {
+    await syncDataFinished('testing_table', {
       pk: payload.pk,
       sk: `${payload.sk}@1`,
     })
 
-    const data = await getItem(getTableName('testing-table', TableType.DATA), {
+    const data = await getItem(getTableName('testing_table', TableType.DATA), {
       pk: payload.pk,
       sk: payload.sk,
     })
@@ -93,7 +93,7 @@ describe('Publish', () => {
     // Action
     const res = await request(config.apiBaseUrl).post(API_PATH).send(payload)
 
-    await syncDataFinished('testing-table', {
+    await syncDataFinished('testing_table', {
       pk: payload.pk,
       sk: `${payload.sk}@1`,
     })
@@ -102,7 +102,7 @@ describe('Publish', () => {
     expect(res.statusCode).toEqual(201)
 
     const data = await getItem(
-      getTableName('testing-table', TableType.HISTORY),
+      getTableName('testing_table', TableType.HISTORY),
       {
         pk: payload.pk,
         sk: `${payload.sk}@1`,
@@ -148,7 +148,7 @@ describe('Publish', () => {
 
     await request(config.apiBaseUrl).post(API_PATH).send(payload)
 
-    await syncDataFinished('testing-table', {
+    await syncDataFinished('testing_table', {
       pk: payload.pk,
       sk: `${payload.sk}@1`,
     })
