@@ -7,7 +7,7 @@ import { TestController } from './test.controller'
 @Module({
   imports: [
     CommandModule.register({
-      tableName: 'testing-table',
+      tableName: 'testing_table',
       dataSyncHandlers: [TestSyncHandler],
     }),
   ],
