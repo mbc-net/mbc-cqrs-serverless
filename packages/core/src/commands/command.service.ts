@@ -21,6 +21,7 @@ import {
   CommandModuleOptions,
   CommandPartialInputModel,
   DetailKey,
+  ICommandService,
   INotification,
 } from '../interfaces'
 import { ICommandOptions } from '../interfaces/command.options.interface'
@@ -37,7 +38,7 @@ const DATA_SYNC_HANDLER = Symbol(DATA_SYNC_HANDLER_METADATA)
 export type DataSyncHandlerType = Type<IDataSyncHandler>
 
 @Injectable()
-export class CommandService implements OnModuleInit {
+export class CommandService implements OnModuleInit, ICommandService {
   private logger: Logger
   private [TABLE_NAME]: string
   private [DATA_SYNC_HANDLER]: IDataSyncHandler[] = []
@@ -107,10 +108,60 @@ export class CommandService implements OnModuleInit {
     )
   }
 
-  // partial data command
+  async publishPartialUpdateSync(
+    input: CommandPartialInputModel,
+    options: ICommandOptions,
+  ): Promise<CommandModel> {
+    const item: CommandModel = await this.dataService.getItem({
+      pk: input.pk,
+      sk: input.sk,
+    })
+
+    if (!item || item.version !== input.version) {
+      throw new BadRequestException(
+        'The input is not a valid, item not found or version not match',
+      )
+    }
+    const fullInput = mergeDeep({}, item, input, { version: item.version })
+
+    this.logger.debug('publishPartialUpdateSync::', fullInput)
+    return await this.publishSync(fullInput, options)
+  }
+
+  async publishPartialUpdateAsync(
+    input: CommandPartialInputModel,
+    options: ICommandOptions,
+  ): Promise<CommandModel> {
+    let item: CommandModel
+    if (input.version > VERSION_FIRST) {
+      item = await this.getItem({
+        pk: input.pk,
+        sk: addSortKeyVersion(input.sk, input.version),
+      })
+    } else {
+      item = await this.getLatestItem({
+        pk: input.pk,
+        sk: removeSortKeyVersion(input.sk),
+      })
+    }
+    if (!item) {
+      throw new BadRequestException(
+        'The input key is not a valid, item not found',
+      )
+    }
+    const fullInput = mergeDeep({}, item, input, { version: item.version })
+
+    this.logger.debug('publishPartialUpdate::', fullInput)
+    return await this.publishAsync(fullInput, options)
+  }
+
+  /**
+   * @deprecated Use {@link publishPartialUpdateAsync} instead.
+   * This function is outdated and will be removed in the next major release.
+   */
   async publishPartialUpdate(
     input: CommandPartialInputModel,
-    opts: ICommandOptions,
+    options: ICommandOptions,
   ) {
     let item: CommandModel
     if (input.version > VERSION_FIRST) {
@@ -132,11 +183,61 @@ export class CommandService implements OnModuleInit {
     const fullInput = mergeDeep({}, item, input, { version: item.version })
 
     this.logger.debug('publishPartialUpdate::', fullInput)
-    return await this.publish(fullInput, opts)
+    return await this.publish(fullInput, options)
   }
 
-  // full data command
-  async publish(input: CommandInputModel, opts: ICommandOptions) {
+  async publishSync(
+    input: CommandInputModel,
+    options: ICommandOptions,
+  ): Promise<CommandModel> {
+    const item = await this.dataService.getItem({ pk: input.pk, sk: input.sk })
+
+    let inputVersion = input.version ?? VERSION_FIRST
+
+    if (inputVersion === VERSION_LATEST) {
+      inputVersion = item?.version ?? VERSION_FIRST
+    } else if ((item?.version ?? 0) !== inputVersion) {
+      throw new BadRequestException(
+        'Invalid input version. The input version must be equal to the latest version',
+      )
+    }
+
+    const userContext = getUserContext(options.invokeContext)
+    const requestId =
+      options?.requestId || options.invokeContext?.context?.awsRequestId
+    const sourceIp =
+      options.invokeContext?.event?.requestContext?.http?.sourceIp
+    const version = (item?.version ?? inputVersion) + 1
+
+    const command: CommandModel = {
+      ...input,
+      version,
+      source: options?.source,
+      requestId,
+      createdAt: new Date(),
+      updatedAt: item?.updatedAt ?? new Date(),
+      createdBy: userContext.userId,
+      updatedBy: item?.updatedBy ?? userContext.userId,
+      createdIp: sourceIp,
+      updatedIp: item?.updatedIp ?? sourceIp,
+    }
+    this.logger.debug('publishSync::', command)
+
+    await this.dataService.publish(command)
+
+    const targetSyncHandlers = this.dataSyncHandlers?.filter(
+      (handler) => handler.type !== 'dynamodb',
+    )
+
+    await Promise.all(targetSyncHandlers.map((handler) => handler.up(command)))
+
+    return command
+  }
+
+  async publishAsync(
+    input: CommandInputModel,
+    options: ICommandOptions,
+  ): Promise<CommandModel | null> {
     let inputVersion = input.version || VERSION_FIRST
     let item: CommandModel
     if (inputVersion === VERSION_LATEST) {
@@ -162,17 +263,18 @@ export class CommandService implements OnModuleInit {
       return null
     }
 
-    const userContext = getUserContext(opts.invokeContext)
+    const userContext = getUserContext(options.invokeContext)
     const requestId =
-      opts?.requestId || opts.invokeContext?.context?.awsRequestId
-    const sourceIp = opts.invokeContext?.event?.requestContext?.http?.sourceIp
+      options?.requestId || options.invokeContext?.context?.awsRequestId
+    const sourceIp =
+      options.invokeContext?.event?.requestContext?.http?.sourceIp
     const version = inputVersion + 1
 
     const command: CommandModel = {
       ...input,
       sk: addSortKeyVersion(input.sk, version),
       version,
-      source: opts?.source,
+      source: options?.source,
       requestId,
       createdAt: new Date(),
       updatedAt: new Date(),
@@ -190,23 +292,32 @@ export class CommandService implements OnModuleInit {
     return command
   }
 
-  async duplicate(key: DetailKey, opts: ICommandOptions) {
+  /**
+   * @deprecated Use {@link publishAsync} instead.
+   * This function is outdated and will be removed in the next major release.
+   */
+  async publish(input: CommandInputModel, options: ICommandOptions) {
+    return await this.publishAsync(input, options)
+  }
+
+  async duplicate(key: DetailKey, options: ICommandOptions) {
     const item = await this.getItem(key)
     if (!item) {
       throw new BadRequestException(
         'The input key is not a valid, item not found',
       )
     }
-    const userContext = getUserContext(opts.invokeContext)
+    const userContext = getUserContext(options.invokeContext)
 
     item.version += 1
     item.sk = addSortKeyVersion(item.sk, item.version)
     item.source = 'duplicated'
     item.requestId =
-      opts?.requestId || opts.invokeContext?.context?.awsRequestId
+      options?.requestId || options.invokeContext?.context?.awsRequestId
     item.updatedAt = new Date()
     item.updatedBy = userContext.userId
-    item.updatedIp = opts.invokeContext?.event?.requestContext?.http?.sourceIp
+    item.updatedIp =
+      options.invokeContext?.event?.requestContext?.http?.sourceIp
 
     this.logger.debug('duplicate::', item)
     await this.dynamoDbService.putItem(

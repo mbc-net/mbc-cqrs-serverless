@@ -22,7 +22,20 @@ export class TestController {
   ) {
     this.logger.debug('cmd:', commandDto)
     this.logger.debug('commandService:' + this.commandService.tableName)
-    const item = await this.commandService.publish(commandDto, {
+    const item = await this.commandService.publishAsync(commandDto, {
+      invokeContext,
+    })
+    return item
+  }
+
+  @Post('/sync')
+  async publishCommandSync(
+    @INVOKE_CONTEXT() invokeContext: IInvoke,
+    @Body() commandDto: CommandDto,
+  ) {
+    this.logger.debug('cmd:', commandDto)
+    this.logger.debug('commandService:' + this.commandService.tableName)
+    const item = await this.commandService.publishSync(commandDto, {
       invokeContext,
     })
     return item
