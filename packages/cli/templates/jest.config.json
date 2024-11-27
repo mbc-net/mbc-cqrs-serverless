@@ -1,0 +1,19 @@
+{
+  "moduleFileExtensions": ["js", "json", "ts"],
+  "rootDir": ".",
+  "testEnvironment": "node",
+  "testRegex": "\\.spec\\.ts$",
+  "transform": {
+    "^.+\\.(t|j)s$": "ts-jest"
+  },
+  "moduleNameMapper": {
+    "^test/(.*)$": "<rootDir>/test/$1",
+    "^src/(.*)$": "<rootDir>/src/$1"
+  },
+  "modulePathIgnorePatterns": ["infra"],
+  "passWithNoTests": true,
+  "reporters": [
+    "default",
+    ["jest-junit", { "outputDirectory": "report", "outputName": "unit.xml" }]
+  ]
+}

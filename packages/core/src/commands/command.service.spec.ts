@@ -7,7 +7,6 @@ import { CommandService } from './command.service'
 import { DataService } from './data.service'
 import { addSortKeyVersion } from '../helpers/key'
 import { BadRequestException } from '@nestjs/common'
-import { ICommandOptions } from '../interfaces/command.options.interface'
 
 const moduleMocker = new ModuleMocker(global)
 
@@ -24,30 +23,30 @@ function buildItem(key: DetailKey, version = 0, attributes = {}) {
   }
 }
 
-const dataSet: {
-  command: CommandModel[]
-  data: DataModel[]
-} = {
-  command: [
-    buildItem({ pk: 'master', sk: 'max_value@1' }, 1),
-    buildItem({ pk: 'master', sk: 'max_value@2' }, 2),
-    buildItem({ pk: 'master', sk: 'max_value@3' }, 3),
-    buildItem({ pk: 'master', sk: 'max_value@4' }, 3),
-    buildItem({ pk: 'master', sk: 'max_value@5' }, 5),
-    buildItem({ pk: 'master', sk: 'max_value@6' }, 6),
-    buildItem({ pk: 'master', sk: 'max_value@7' }, 7),
-    buildItem({ pk: 'master', sk: 'max_value@8' }, 8),
-    buildItem({ pk: 'master', sk: 'max_value@9' }, 9),
-    buildItem({ pk: 'master', sk: 'max_value@10' }, 10),
-    buildItem({ pk: 'master', sk: 'max_value@11' }, 11),
-  ],
-  data: [buildItem({ pk: 'master', sk: 'max_value' }, 5)],
-}
-
 describe('CommandService', () => {
   let commandService: CommandService
 
   beforeEach(async () => {
+    const dataSet: {
+      command: CommandModel[]
+      data: DataModel[]
+    } = {
+      command: [
+        buildItem({ pk: 'master', sk: 'max_value@1' }, 1),
+        buildItem({ pk: 'master', sk: 'max_value@2' }, 2),
+        buildItem({ pk: 'master', sk: 'max_value@3' }, 3),
+        buildItem({ pk: 'master', sk: 'max_value@4' }, 3),
+        buildItem({ pk: 'master', sk: 'max_value@5' }, 5),
+        buildItem({ pk: 'master', sk: 'max_value@6' }, 6),
+        buildItem({ pk: 'master', sk: 'max_value@7' }, 7),
+        buildItem({ pk: 'master', sk: 'max_value@8' }, 8),
+        buildItem({ pk: 'master', sk: 'max_value@9' }, 9),
+        buildItem({ pk: 'master', sk: 'max_value@10' }, 10),
+        buildItem({ pk: 'master', sk: 'max_value@11' }, 11),
+      ],
+      data: [buildItem({ pk: 'master', sk: 'max_value' }, 5)],
+    }
+
     const moduleRef = await Test.createTestingModule({
       providers: [CommandService, DataService],
     })
@@ -118,7 +117,7 @@ describe('CommandService', () => {
     })
   })
 
-  describe('publishPartialUpdate', () => {
+  describe('publishPartialUpdateAsync', () => {
     it('should update with the latest item', async () => {
       const key = {
         pk: 'master',
@@ -130,7 +129,7 @@ describe('CommandService', () => {
         name: '-1',
       }
       const latestItem = await commandService.getLatestItem(key)
-      const item = await commandService.publishPartialUpdate(inputItem, {
+      const item = await commandService.publishPartialUpdateAsync(inputItem, {
         invokeContext: {},
       })
       expect(item).toBeDefined()
@@ -147,7 +146,7 @@ describe('CommandService', () => {
         version: -1,
         name: '-1',
       }
-      const call = commandService.publishPartialUpdate(inputItem, {
+      const call = commandService.publishPartialUpdateAsync(inputItem, {
         invokeContext: {},
       })
       expect(call).rejects.toThrow(
@@ -175,7 +174,7 @@ describe('CommandService', () => {
       ).toBe(false)
     })
 
-    it('should return true if input atributes is class instance', () => {
+    it('should return true if input attributes is class instance', () => {
       const item = buildItem({ pk: 'master', sk: 'max_value@5' }, 5, {
         name: 'test',
       })
@@ -183,13 +182,103 @@ describe('CommandService', () => {
       expect(commandService.isNotCommandDirty(item, input)).toBe(true)
     })
 
-    it('should return false if input atributes is class instance and not dirty', () => {
+    it('should return false if input attributes is class instance and not dirty', () => {
       const item = buildItem({ pk: 'master', sk: 'max_value@5' }, 5, {
         name: 'test',
       })
 
       const input = { ...item, attributes: new MasterAttributes('abcdd') }
       expect(commandService.isNotCommandDirty(item, input)).toBe(false)
+    })
+  })
+
+  describe('publishPartialUpdateSync', () => {
+    it('should update with the latest version item', async () => {
+      const key = {
+        pk: 'master',
+        sk: 'max_value',
+      }
+      const inputItem = {
+        ...key,
+        version: 5,
+        name: '-1',
+      }
+      const item = await commandService.publishPartialUpdateSync(inputItem, {
+        invokeContext: {},
+      })
+      expect(item).toBeDefined()
+      expect(item).toMatchObject({
+        ...inputItem,
+        version: 6,
+      })
+    })
+
+    it('should raise error with invalid version', async () => {
+      const key = {
+        pk: 'master',
+        sk: 'max_value',
+      }
+      const inputItem = {
+        ...key,
+        version: 4,
+        name: '4',
+      }
+      const res = commandService.publishPartialUpdateSync(inputItem, {
+        invokeContext: {},
+      })
+      expect(res).rejects.toThrow(
+        new BadRequestException(
+          'The input is not a valid, item not found or version not match',
+        ),
+      )
+    })
+
+    it('should raise error with item not found', async () => {
+      const key = {
+        pk: 'master',
+        sk: 'max_value_',
+      }
+      const inputItem = {
+        ...key,
+        version: 4,
+        name: '4',
+      }
+      const res = commandService.publishPartialUpdateSync(inputItem, {
+        invokeContext: {},
+      })
+      expect(res).rejects.toThrow(
+        new BadRequestException(
+          'The input is not a valid, item not found or version not match',
+        ),
+      )
+    })
+  })
+
+  describe('publishSync', () => {
+    it('should update with the latest version item', async () => {
+      const inputItem = buildItem({ pk: 'master', sk: 'max_value' }, -1)
+
+      const item = await commandService.publishSync(inputItem, {
+        invokeContext: {},
+      })
+      console.log('$@#$@', item)
+      expect(item).toBeDefined()
+      expect(item).toMatchObject({
+        ...inputItem,
+        version: 6,
+      })
+    })
+
+    it('should raise error with invalid input version', async () => {
+      const inputItem = buildItem({ pk: 'master', sk: 'max_value' }, 4)
+      const res = commandService.publishSync(inputItem, {
+        invokeContext: {},
+      })
+      expect(res).rejects.toThrow(
+        new BadRequestException(
+          'Invalid input version. The input version must be equal to the latest version',
+        ),
+      )
     })
   })
 })

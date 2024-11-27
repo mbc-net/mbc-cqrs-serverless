@@ -11,6 +11,18 @@
           "Value": "admin@test.com"
         },
         {
+          "Name": "custom:tenant_code",
+          "Value": "mbc"
+        },
+        {
+          "Name": "custom:company_code",
+          "Value": "00000"
+        },
+        {
+          "Name": "custom:member_id",
+          "Value": "MEMBER#mbc#00000#99999"
+        },
+        {
           "Name": "custom:roles",
           "Value": "[{\"role\":\"system_admin\"}]"
         }
@@ -249,14 +261,47 @@
         }
       },
       {
+        "Name": "custom:tenant_code",
+        "AttributeDataType": "String",
+        "DeveloperOnlyAttribute": false,
+        "Mutable": true,
+        "Required": false,
+        "StringAttributeConstraints": {
+          "MinLength": "0",
+          "MaxLength": "50"
+        }
+      },
+      {
+        "Name": "custom:company_code",
+        "AttributeDataType": "String",
+        "DeveloperOnlyAttribute": false,
+        "Mutable": true,
+        "Required": false,
+        "StringAttributeConstraints": {
+          "MinLength": "0",
+          "MaxLength": "50"
+        }
+      },
+      {
+        "Name": "custom:member_id",
+        "AttributeDataType": "String",
+        "DeveloperOnlyAttribute": false,
+        "Mutable": true,
+        "Required": false,
+        "StringAttributeConstraints": {
+          "MinLength": "0",
+          "MaxLength": "2048"
+        }
+      },
+      {
         "Name": "custom:roles",
         "AttributeDataType": "String",
         "DeveloperOnlyAttribute": false,
         "Mutable": true,
         "Required": false,
         "StringAttributeConstraints": {
-          "MinLength": "1",
-          "MaxLength": "10"
+          "MinLength": "0",
+          "MaxLength": "2048"
         }
       }
     ],

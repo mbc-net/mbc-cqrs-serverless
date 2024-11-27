@@ -38,6 +38,29 @@
         "responses": { "201": { "description": "" } },
         "tags": ["testing"]
       }
+    },
+    "/api/testing/sync": {
+      "post": {
+        "operationId": "TestController_publishCommandSync",
+        "parameters": [
+          {
+            "in": "header",
+            "required": false,
+            "name": "x-tenant-code",
+            "schema": {}
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/CommandDto" }
+            }
+          }
+        },
+        "responses": { "201": { "description": "" } },
+        "tags": ["testing"]
+      }
     }
   },
   "info": {

@@ -1,6 +1,6 @@
 {
   "name": "@mbc-cqrs-serverless/core",
-  "version": "0.1.21-beta.0",
+  "version": "0.1.35-beta.0",
   "description": "CQRS and event base core",
   "keywords": [
     "mbc",
@@ -45,7 +45,7 @@
   "bugs": {
     "url": "https://github.com/mbc-net/mbc-cqrs-serverless/issues"
   },
-  "homepage": "https://mbc-net.github.io/mbc-cqrs-serverless-doc/",
+  "homepage": "https://mbc-cqrs-serverless.mbc-net.com/",
   "publishConfig": {
     "access": "public"
   },
