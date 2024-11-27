@@ -1,3 +1,4 @@
+import { DEFAULT_TENANT_CODE } from '../constants'
 import { KEY_SEPARATOR, VER_SEPARATOR } from '../constants/key'
 
 export function addSortKeyVersion(sk: string, version: number) {
@@ -40,3 +41,9 @@ export function parseS3AttributeKey(s3Uri: string) {
     key,
   }
 }
+
+export const masterPk = (tenantCode?: string) =>
+  `MASTER${KEY_SEPARATOR}${tenantCode || DEFAULT_TENANT_CODE}`
+
+export const seqPk = (tenantCode?: string) =>
+  `SEQ${KEY_SEPARATOR}${tenantCode || DEFAULT_TENANT_CODE}`
