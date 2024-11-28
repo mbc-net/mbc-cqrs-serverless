@@ -120,7 +120,7 @@ export class SequencesService implements ISequenceService {
     const { date, rotateBy, tenantCode, params, typeCode } = dto
 
     const generalMasterPk = masterPk(tenantCode)
-    const generalMasterSk = `SEQ${KEY_SEPARATOR}${params?.code1}`
+    const generalMasterSk = `SEQ${KEY_SEPARATOR}${typeCode}`
     this.logger.log('general master pk: ', generalMasterPk)
     this.logger.log('general master sk: ', generalMasterSk)
     const masterData = await this.masterDataProvider.getData({
