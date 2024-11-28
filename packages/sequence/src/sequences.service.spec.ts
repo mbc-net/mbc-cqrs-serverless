@@ -330,6 +330,7 @@ describe('SequencesService', () => {
       const result = await service.generateSequenceItem(
         {
           tenantCode: tenantCode,
+          typeCode: 'sequence',
           params: {
             code1: 'TODO',
           },
@@ -372,6 +373,7 @@ describe('SequencesService', () => {
       const result = await service.generateSequenceItem(
         {
           tenantCode: tenantCode,
+          typeCode: 'sequence',
           date: new Date("2024-11-27T13:44:16+07:00"),  
           params: {
             code1: 'TODO',
@@ -414,6 +416,7 @@ describe('SequencesService', () => {
       const result = await service.generateSequenceItem(
         {
           tenantCode: tenantCode,
+          typeCode:  'sequence',
           params: {
             code1: 'TODO',
           },
@@ -457,6 +460,7 @@ describe('SequencesService', () => {
       const result = await service.generateSequenceItem(
         {
           tenantCode: tenantCode,
+          typeCode  : 'sequence',
           params: {
             code1: 'TODO',
           },
@@ -500,6 +504,7 @@ describe('SequencesService', () => {
       const result = await service.generateSequenceItem(
         {
           tenantCode: tenantCode,
+          typeCode  : 'sequence',
           params: {
             code1: 'TODO',
           },
@@ -543,6 +548,7 @@ describe('SequencesService', () => {
       const result = await service.generateSequenceItem(
         {
           tenantCode: tenantCode,
+          typeCode: 'sequence',
           params: {
             code1: 'TODO',
           },
@@ -586,6 +592,7 @@ describe('SequencesService', () => {
       const result = await service.generateSequenceItem(
         {
           tenantCode: tenantCode,
+          typeCode: 'sequence',
           date : new Date("2024-11-27T13:54:04+07:00"),
           params: {
             code1: 'TODO',
@@ -629,6 +636,7 @@ describe('SequencesService', () => {
       const result = await service.generateSequenceItem(
         {
           tenantCode: tenantCode,
+          typeCode: 'sequence',
           params: {
             code1: 'TODO',
           },
@@ -672,6 +680,7 @@ describe('SequencesService', () => {
       const result = await service.generateSequenceItem(
         {
           tenantCode: tenantCode,
+          typeCode: 'sequence',
           date : new Date("2024-11-27T13:56:39+07:00"),
           params: {
             code1: 'TODO',
@@ -715,6 +724,7 @@ describe('SequencesService', () => {
       const result = await service.generateSequenceItem(
         {
           tenantCode: tenantCode,
+          typeCode: 'sequence',
           params: {
             code1: 'TODO',
           },
@@ -758,6 +768,7 @@ describe('SequencesService', () => {
       const result = await service.generateSequenceItem(
         {
           tenantCode: tenantCode,
+          typeCode: 'sequence',
           params: {
             code1: 'TODO',
           },
@@ -801,6 +812,7 @@ describe('SequencesService', () => {
       const result = await service.generateSequenceItem(
         {
           tenantCode: tenantCode,
+          typeCode: 'sequence',
           params: {
             code1: 'TODO',
           },
@@ -844,6 +856,7 @@ describe('SequencesService', () => {
         {
           tenantCode: tenantCode,
           date : new Date("2024-11-27T13:56:39+07:00"),
+          typeCode: 'sequence',
           params: {
             code1: 'TODO',
           },
@@ -885,6 +898,7 @@ describe('SequencesService', () => {
       const result = await service.generateSequenceItem(
         {
           tenantCode: tenantCode,
+          typeCode: 'sequence',
           params: {
             code1: 'TODO',
           },
@@ -928,6 +942,7 @@ describe('SequencesService', () => {
       const result = await service.generateSequenceItem(
         {
           tenantCode: tenantCode,
+          typeCode: 'sequence',
           rotateBy: RotateByEnum.NONE,
           date: new Date("2024-11-27T13:44:16+07:00"),
           params: {
@@ -974,6 +989,7 @@ describe('SequencesService', () => {
       const result = await service.generateSequenceItem(
         {
           tenantCode: tenantCode,
+          typeCode: 'sequence',
           date: new Date("2024-11-27T13:44:16+07:00"),
           rotateBy: RotateByEnum.NONE,
           params: {
@@ -1021,6 +1037,7 @@ describe('SequencesService', () => {
       const result = await service.generateSequenceItem(
         {
           tenantCode: tenantCode,
+          typeCode: 'sequence',
           params: {
             code1: 'TODO',
           },
@@ -1063,6 +1080,7 @@ describe('SequencesService', () => {
       const result = await service.generateSequenceItem(
         {
           tenantCode: tenantCode,
+          typeCode: 'sequence',
           params: {
             code1: 'TODO',
           },
@@ -1106,6 +1124,7 @@ describe('SequencesService', () => {
       const result = await service.generateSequenceItem(
         {
           tenantCode: tenantCode,
+          typeCode: 'sequence',
           params: {
             code1: 'PI',
           },
