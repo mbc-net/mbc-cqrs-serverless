@@ -97,6 +97,9 @@ export class GenerateFormattedSequenceDto {
   @IsString()
   tenantCode: string
 
+  @IsString()
+  typeCode: string
+
   /**
    * Type code for specific sequence classification.
    */

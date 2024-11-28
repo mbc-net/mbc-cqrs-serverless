@@ -117,10 +117,10 @@ export class SequencesService implements ISequenceService {
     dto: GenerateFormattedSequenceDto,
     options: { invokeContext: IInvoke },
   ): Promise<SequenceEntity> {
-    const { date, rotateBy, tenantCode, params } = dto
+    const { date, rotateBy, tenantCode, params, typeCode } = dto
 
     const generalMasterPk = masterPk(tenantCode)
-    const generalMasterSk = `SEQ${KEY_SEPARATOR}${params?.code1}`
+    const generalMasterSk = `SEQ${KEY_SEPARATOR}${typeCode}`
     this.logger.log('general master pk: ', generalMasterPk)
     this.logger.log('general master sk: ', generalMasterSk)
     const masterData = await this.masterDataProvider.getData({
@@ -128,7 +128,7 @@ export class SequencesService implements ISequenceService {
       sk: generalMasterSk,
     })
     // Get master data for the tenant
-    const { format, typeCode, registerDate, startMonth } = masterData
+    const { format, registerDate, startMonth } = masterData
     const pk = seqPk(tenantCode)
     // Construct the sort key for the sequence
     let sk = [
