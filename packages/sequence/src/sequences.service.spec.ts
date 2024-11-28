@@ -6,7 +6,6 @@ import { RotateByEnum } from './enums/rotate-by.enum';
 import { FiscalYearOptions } from './interfaces/fiscal-year.interface';
 import { SequenceMasterDataProvider } from './sequence-master-factory';
 import { SequenceEntity } from './entities/sequence.entity';
-import { register } from 'module';
 
 
 const optionsMock = {
