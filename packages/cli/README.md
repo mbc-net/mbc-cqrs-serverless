@@ -8,7 +8,7 @@ The MBC CLI is a command-line interface tool that helps you to initialize your m
 
 ## Installation
 
-To install `mbc`, run:
+To install `mbc` command, run:
 
 ```bash
 npm install -g @mbc-cqrs-serverless/cli
