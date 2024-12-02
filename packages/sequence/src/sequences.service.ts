@@ -146,7 +146,7 @@ export class SequencesService implements ISequenceService {
     const issuedAt = toISOStringWithTimezone(date || now)
     const nowFiscalYear = this.getFiscalYear({
       now: date || now,
-      registerTime: registerDate,
+      registerTime: registerDate ? new Date(registerDate) : undefined,
       startMonth,
     })
     const sourceIp =
@@ -283,6 +283,7 @@ export class SequencesService implements ISequenceService {
      */
 
     const { now, startMonth = 4, registerTime } = options
+
 
     const effectiveStartMonth = registerTime
       ? registerTime.getMonth() + 1
