@@ -65,7 +65,7 @@ export class SequencesService implements ISequenceService {
     const sk = `${dto.typeCode}${KEY_SEPARATOR}${rotateVal}`
 
     const sourceIp =
-      options.invokeContext?.event?.requestContext?.http?.sourceIp
+      options?.invokeContext?.event?.requestContext?.http?.sourceIp
     const userContext = getUserContext(options.invokeContext)
     const userId = userContext.userId || 'system'
     const now = new Date()
@@ -115,7 +115,7 @@ export class SequencesService implements ISequenceService {
 
   async generateSequenceItem(
     dto: GenerateFormattedSequenceDto,
-    options: { invokeContext: IInvoke },
+    options?: { invokeContext: IInvoke },
   ): Promise<SequenceEntity> {
     const { date, rotateBy, tenantCode, params, typeCode } = dto
 
@@ -150,9 +150,9 @@ export class SequencesService implements ISequenceService {
       startMonth,
     })
     const sourceIp =
-      options.invokeContext?.event?.requestContext?.http?.sourceIp
-    const userContext = getUserContext(options.invokeContext)
-    const userId = userContext.userId || 'system'
+      options?.invokeContext?.event?.requestContext?.http?.sourceIp
+    const userContext = options ? getUserContext(options.invokeContext) : undefined
+    const userId = userContext?.userId || 'system'
 
     const rotateVal = this.getRotateValue(rotateBy, date)
     sk = `${sk}${KEY_SEPARATOR}${rotateVal}`
@@ -167,7 +167,7 @@ export class SequencesService implements ISequenceService {
           tenantCode: dto.tenantCode,
           type: typeCode,
           seq: { ifNotExists: 0, incrementBy: 1 },
-          requestId: options.invokeContext?.context?.awsRequestId,
+          requestId: options?.invokeContext?.context?.awsRequestId,
           createdAt: { ifNotExists: now },
           createdBy: { ifNotExists: userId },
           createdIp: { ifNotExists: sourceIp },
