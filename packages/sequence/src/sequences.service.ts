@@ -65,7 +65,7 @@ export class SequencesService implements ISequenceService {
     const sk = `${dto.typeCode}${KEY_SEPARATOR}${rotateVal}`
 
     const sourceIp =
-      options.invokeContext?.event?.requestContext?.http?.sourceIp
+      options?.invokeContext?.event?.requestContext?.http?.sourceIp
     const userContext = getUserContext(options.invokeContext)
     const userId = userContext.userId || 'system'
     const now = new Date()
@@ -115,7 +115,7 @@ export class SequencesService implements ISequenceService {
 
   async generateSequenceItem(
     dto: GenerateFormattedSequenceDto,
-    options: { invokeContext: IInvoke },
+    options?: { invokeContext: IInvoke },
   ): Promise<SequenceEntity> {
     const { date, rotateBy, tenantCode, params, typeCode } = dto
 
@@ -146,13 +146,13 @@ export class SequencesService implements ISequenceService {
     const issuedAt = toISOStringWithTimezone(date || now)
     const nowFiscalYear = this.getFiscalYear({
       now: date || now,
-      registerTime: registerDate,
+      registerTime: registerDate ? new Date(registerDate) : undefined,
       startMonth,
     })
     const sourceIp =
-      options.invokeContext?.event?.requestContext?.http?.sourceIp
-    const userContext = getUserContext(options.invokeContext)
-    const userId = userContext.userId || 'system'
+      options?.invokeContext?.event?.requestContext?.http?.sourceIp
+    const userContext = options ? getUserContext(options.invokeContext) : undefined
+    const userId = userContext?.userId || 'system'
 
     const rotateVal = this.getRotateValue(rotateBy, date)
     sk = `${sk}${KEY_SEPARATOR}${rotateVal}`
@@ -167,7 +167,7 @@ export class SequencesService implements ISequenceService {
           tenantCode: dto.tenantCode,
           type: typeCode,
           seq: { ifNotExists: 0, incrementBy: 1 },
-          requestId: options.invokeContext?.context?.awsRequestId,
+          requestId: options?.invokeContext?.context?.awsRequestId,
           createdAt: { ifNotExists: now },
           createdBy: { ifNotExists: userId },
           createdIp: { ifNotExists: sourceIp },
@@ -193,7 +193,7 @@ export class SequencesService implements ISequenceService {
     })
   }
 
-  getRotateValue(rotateBy?: RotateByEnum, forDate?: Date) {
+  private getRotateValue(rotateBy?: RotateByEnum, forDate?: Date) {
     const date = forDate || new Date()
 
     switch (rotateBy) {
@@ -223,7 +223,7 @@ export class SequencesService implements ISequenceService {
     }
   }
 
-  isIncrementNo(
+  private isIncrementNo(
     rotateBy: RotateByEnum | undefined,
     nowFiscalYear: number,
     fiscalYear: number,
@@ -269,7 +269,7 @@ export class SequencesService implements ISequenceService {
     return false
   }
 
-  getFiscalYear(options: FiscalYearOptions): number {
+  private getFiscalYear(options: FiscalYearOptions): number {
     /**
      * Calculates the fiscal year based on the provided `now` and `registerTime`.
      *
@@ -283,6 +283,7 @@ export class SequencesService implements ISequenceService {
      */
 
     const { now, startMonth = 4, registerTime } = options
+
 
     const effectiveStartMonth = registerTime
       ? registerTime.getMonth() + 1
@@ -299,7 +300,7 @@ export class SequencesService implements ISequenceService {
     return fiscalYear - referenceYear + 1
   }
 
-  createFormatDict(
+  private createFormatDict(
     fiscalYear: number,
     fixNo: number,
     now: Date,
@@ -315,7 +316,7 @@ export class SequencesService implements ISequenceService {
     }
   }
 
-  createFormattedNo(format: string, formatDict: SequenceParamsDto) {
+  private createFormattedNo(format: string, formatDict: SequenceParamsDto) {
     let result = ''
 
     const words = format.split('%%')
@@ -349,7 +350,7 @@ export class SequencesService implements ISequenceService {
     return result
   }
 
-  extractPaddingInfo(str: string) {
+  private extractPaddingInfo(str: string) {
     const regex = /:(\d)>(\d)/
     const match = str.match(regex)
 

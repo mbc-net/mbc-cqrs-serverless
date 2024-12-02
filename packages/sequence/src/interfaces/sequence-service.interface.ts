@@ -17,7 +17,7 @@ export interface ISequenceService {
   /**
    * Generate a new sequence based on the provided parameters.
    * @param dto - The data transfer object containing generation parameters.
-   * @param opts - Additional options including invocation context.
+   * @param options - Additional options including invocation context.
    * @returns A promise that resolves to the newly generated sequence's data entity.
    */
   genNewSequence(
@@ -30,12 +30,12 @@ export interface ISequenceService {
   /**
    * Generate a new sequence with a specified format.
    * @param dto - The data transfer object containing parameters for formatted sequence generation.
-   * @param opts - Additional options including invocation context.
+   * @param options - Additional options including invocation context.
    * @returns A promise that resolves to the newly generated formatted sequence's data entity.
    */
   generateSequenceItem(
     dto: GenerateFormattedSequenceDto,
-    options: {
+    options?: {
       invokeContext: IInvoke
     },
   ): Promise<SequenceEntity>
