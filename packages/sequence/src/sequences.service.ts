@@ -151,7 +151,9 @@ export class SequencesService implements ISequenceService {
     })
     const sourceIp =
       options?.invokeContext?.event?.requestContext?.http?.sourceIp
-    const userContext = options ? getUserContext(options.invokeContext) : undefined
+    const userContext = options
+      ? getUserContext(options.invokeContext)
+      : undefined
     const userId = userContext?.userId || 'system'
 
     const rotateVal = this.getRotateValue(rotateBy, date)
@@ -283,7 +285,6 @@ export class SequencesService implements ISequenceService {
      */
 
     const { now, startMonth = 4, registerTime } = options
-
 
     const effectiveStartMonth = registerTime
       ? registerTime.getMonth() + 1

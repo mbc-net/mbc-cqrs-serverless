@@ -8,7 +8,7 @@ This is the core package of the MBC CQRS Serverless framework. It provides the b
 
 ## Installation
 
-To install `mbc`, run:
+To install `mbc` command, run:
 
 ```bash
 npm install -g @mbc-cqrs-serverless/cli

@@ -109,5 +109,6 @@ export class GenerateFormattedSequenceDto {
     description:
       'Parameters for generating the sequence. code1, code2,code3, code4, code5',
   })
-  params: SequenceParamsDto
+  @IsOptional()
+  params?: SequenceParamsDto
 }
