@@ -193,7 +193,7 @@ export class SequencesService implements ISequenceService {
     })
   }
 
-  getRotateValue(rotateBy?: RotateByEnum, forDate?: Date) {
+  private getRotateValue(rotateBy?: RotateByEnum, forDate?: Date) {
     const date = forDate || new Date()
 
     switch (rotateBy) {
@@ -223,7 +223,7 @@ export class SequencesService implements ISequenceService {
     }
   }
 
-  isIncrementNo(
+  private isIncrementNo(
     rotateBy: RotateByEnum | undefined,
     nowFiscalYear: number,
     fiscalYear: number,
@@ -269,7 +269,7 @@ export class SequencesService implements ISequenceService {
     return false
   }
 
-  getFiscalYear(options: FiscalYearOptions): number {
+  private getFiscalYear(options: FiscalYearOptions): number {
     /**
      * Calculates the fiscal year based on the provided `now` and `registerTime`.
      *
@@ -300,7 +300,7 @@ export class SequencesService implements ISequenceService {
     return fiscalYear - referenceYear + 1
   }
 
-  createFormatDict(
+  private createFormatDict(
     fiscalYear: number,
     fixNo: number,
     now: Date,
@@ -316,7 +316,7 @@ export class SequencesService implements ISequenceService {
     }
   }
 
-  createFormattedNo(format: string, formatDict: SequenceParamsDto) {
+  private createFormattedNo(format: string, formatDict: SequenceParamsDto) {
     let result = ''
 
     const words = format.split('%%')
@@ -350,7 +350,7 @@ export class SequencesService implements ISequenceService {
     return result
   }
 
-  extractPaddingInfo(str: string) {
+  private extractPaddingInfo(str: string) {
     const regex = /:(\d)>(\d)/
     const match = str.match(regex)
 
