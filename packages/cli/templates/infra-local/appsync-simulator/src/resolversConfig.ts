@@ -2,7 +2,7 @@ import {
   AppSyncSimulatorPipelineResolverConfig,
   AppSyncSimulatorUnitResolverConfig,
   RESOLVER_KIND,
-} from 'amplify-appsync-simulator';
+} from '@aws-amplify/amplify-appsync-simulator';
 
 export const resolversConfig: (
   | AppSyncSimulatorPipelineResolverConfig

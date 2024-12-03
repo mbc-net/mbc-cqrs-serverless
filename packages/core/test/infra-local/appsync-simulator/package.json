@@ -25,6 +25,9 @@
     "typescript": "^4.9.4"
   },
   "dependencies": {
-    "amplify-appsync-simulator": "https://github.com/tabk30/amplify-appsync-simulator.git"
+    "@aws-amplify/amplify-appsync-simulator": "^2.16.7"
+  },
+  "overrides": {
+    "graphql": "^14.7.0"
   }
 }
