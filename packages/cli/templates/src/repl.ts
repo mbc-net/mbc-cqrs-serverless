@@ -1,6 +1,6 @@
 /* eslint-disable no-console */
-import { repl } from '@nestjs/core'
 import { AppModule } from '@mbc-cqrs-serverless/core'
+import { repl } from '@nestjs/core'
 
 import { MainModule } from './main.module'
 
