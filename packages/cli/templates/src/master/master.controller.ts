@@ -42,7 +42,9 @@ export class MasterController {
   ): Promise<MasterDataEntity> {
     this.logger.debug('cmd:', masterDto)
     this.logger.debug('commandService:' + this.commandService.tableName)
-    const item = await this.commandService.publish(masterDto, { invokeContext })
+    const item = await this.commandService.publishAsync(masterDto, {
+      invokeContext,
+    })
     return new MasterDataEntity(item as MasterDataEntity)
   }
 
