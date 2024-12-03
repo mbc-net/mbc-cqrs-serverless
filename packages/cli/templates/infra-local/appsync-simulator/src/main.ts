@@ -2,17 +2,17 @@ import {
   AmplifyAppSyncSimulator,
   AmplifyAppSyncSimulatorAuthenticationType,
   AmplifyAppSyncSimulatorConfig,
-} from 'amplify-appsync-simulator';
+} from '@aws-amplify/amplify-appsync-simulator'
 
-import { schema } from './schema';
-import { readVTL } from './vtl/readVTL';
-import { resolversConfig } from './resolversConfig';
+import { schema } from './schema'
+import { readVTL } from './vtl/readVTL'
+import { resolversConfig } from './resolversConfig'
 
 class AppSyncSimulator {
-  httpPort: number;
+  httpPort: number
 
   constructor(httpPort: number) {
-    this.httpPort = httpPort;
+    this.httpPort = httpPort
   }
 
   async start() {
@@ -43,19 +43,20 @@ class AppSyncSimulator {
         },
       ],
       resolvers: resolversConfig,
-    };
+    }
     const amplifySimulator = new AmplifyAppSyncSimulator({
       port: this.httpPort,
-    });
-    await amplifySimulator.start();
-    await amplifySimulator.init(simulatorConfig);
+    })
+    console.log('simulatorConfig', simulatorConfig)
+    await amplifySimulator.start()
+    await amplifySimulator.init(simulatorConfig)
   }
 }
 
-const httpPort = Number(process.env.PORT) || 4000;
-const simulator = new AppSyncSimulator(httpPort);
+const httpPort = Number(process.env.PORT) || 4000
+const simulator = new AppSyncSimulator(httpPort)
 simulator.start().then(() => {
   console.log(
     `🚀 App Sync Simulator started at http://localhost:${httpPort}/graphql`,
-  );
-});
+  )
+})
