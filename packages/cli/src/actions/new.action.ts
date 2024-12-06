@@ -63,6 +63,12 @@ export default async function newAction(
   const infraGitignore = path.join(destDir, 'infra/gitignore')
   copyFileSync(infraGitignore, path.join(destDir, 'infra/.gitignore'))
   unlinkSync(infraGitignore)
+  // replace project_name in .env.local
+  updateEnvLocal(
+    path.join(destDir, '.env.local'),
+    '%%projectName%%',
+    projectName,
+  )
   // cp .env.local .env
   copyFileSync(path.join(destDir, '.env.local'), path.join(destDir, '.env'))
 
@@ -139,10 +145,24 @@ function getPackageVersion(packageName: string, isLatest = false): string[] {
   return versions
 }
 
+function updateEnvLocal(
+  envPath: string,
+  searchValue: string,
+  replaceValue: string,
+): void {
+  const envLocalContent = readFileSync(envPath, 'utf8')
+  const newEnvLocalContent = envLocalContent.replaceAll(
+    searchValue,
+    replaceValue,
+  )
+  writeFileSync(envPath, newEnvLocalContent)
+}
+
 export let exportsForTesting = {
   usePackageVersion,
   getPackageVersion,
   isLatestCli,
+  updateEnvLocal,
 }
 if (process.env.NODE_ENV !== 'test') {
   exportsForTesting = undefined
