@@ -69,6 +69,9 @@ export class CommandEventHandler {
       case DataSyncCommandSfnName.WAIT_PREV_COMMAND:
         return await this.waitConfirmToken(event)
 
+      case DataSyncCommandSfnName.SET_TTL_COMMAND:
+        return await this.setTtlCommand(event)
+
       case DataSyncCommandSfnName.HISTORY_COPY:
         return await this.historyCopy(event)
 
@@ -127,6 +130,21 @@ export class CommandEventHandler {
       error: 'version is not match',
       cause:
         'next version must be ' + nextVersion + ' but got ' + new String(1),
+    }
+  }
+
+  protected async setTtlCommand(
+    event: DataSyncCommandSfnEvent,
+  ): Promise<StepFunctionStateInput> {
+    this.logger.debug('setTtlCommand:: ', event.commandRecord)
+
+    await this.commandService.publishItem({
+      pk: event.commandRecord.pk,
+      sk: event.commandRecord.sk,
+    })
+
+    return {
+      result: 'ok',
     }
   }
 

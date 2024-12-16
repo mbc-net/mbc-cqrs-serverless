@@ -14,7 +14,12 @@ import { getUserContext } from '../context/user'
 import { DynamoDbService } from '../data-store/dynamodb.service'
 import { DATA_SYNC_HANDLER_METADATA } from '../decorators'
 import { mergeDeep, pickKeys } from '../helpers'
-import { addSortKeyVersion, removeSortKeyVersion } from '../helpers/key'
+import {
+  addSortKeyVersion,
+  getSortKeyVersion,
+  getTenantCode,
+  removeSortKeyVersion,
+} from '../helpers/key'
 import {
   CommandInputModel,
   CommandModel,
@@ -30,7 +35,9 @@ import { SnsService } from '../queue/sns.service'
 import { ExplorerService } from '../services'
 import { MODULE_OPTIONS_TOKEN } from './command.module-definition'
 import { DataService } from './data.service'
+import { TableType } from './enums'
 import { DataSyncDdsHandler } from './handlers/data-sync-dds.handler'
+import { TtlService } from './ttl.service'
 
 const TABLE_NAME = Symbol('command')
 const DATA_SYNC_HANDLER = Symbol(DATA_SYNC_HANDLER_METADATA)
@@ -52,10 +59,11 @@ export class CommandService implements OnModuleInit, ICommandService {
     private readonly snsService: SnsService,
     private readonly dataSyncDdsHandler: DataSyncDdsHandler,
     private readonly dataService: DataService,
+    private readonly ttlService: TtlService,
   ) {
     this.tableName = this.dynamoDbService.getTableName(
       this.options.tableName,
-      'command',
+      TableType.COMMAND,
     )
     this.logger = new Logger(`${CommandService.name}:${this.tableName}`)
   }
@@ -122,6 +130,9 @@ export class CommandService implements OnModuleInit, ICommandService {
         'The input is not a valid, item not found or version not match',
       )
     }
+    if (!Object.keys(input).includes('ttl')) {
+      delete item.ttl
+    }
     const fullInput = mergeDeep({}, item, input, { version: item.version })
 
     this.logger.debug('publishPartialUpdateSync::', fullInput)
@@ -148,6 +159,9 @@ export class CommandService implements OnModuleInit, ICommandService {
       throw new BadRequestException(
         'The input key is not a valid, item not found',
       )
+    }
+    if (!Object.keys(input).includes('ttl')) {
+      delete item.ttl
     }
     const fullInput = mergeDeep({}, item, input, { version: item.version })
 
@@ -180,6 +194,9 @@ export class CommandService implements OnModuleInit, ICommandService {
         'The input key is not a valid, item not found',
       )
     }
+    if (!Object.keys(input).includes('ttl')) {
+      delete item.ttl
+    }
     const fullInput = mergeDeep({}, item, input, { version: item.version })
 
     this.logger.debug('publishPartialUpdate::', fullInput)
@@ -210,6 +227,10 @@ export class CommandService implements OnModuleInit, ICommandService {
     const version = (item?.version ?? inputVersion) + 1
 
     const command: CommandModel = {
+      ttl: await this.ttlService.calculateTtl(
+        TableType.DATA,
+        getTenantCode(input.pk),
+      ),
       ...input,
       version,
       source: options?.source,
@@ -271,6 +292,10 @@ export class CommandService implements OnModuleInit, ICommandService {
     const version = inputVersion + 1
 
     const command: CommandModel = {
+      ttl: await this.ttlService.calculateTtl(
+        TableType.DATA,
+        getTenantCode(input.pk),
+      ),
       ...input,
       sk: addSortKeyVersion(input.sk, version),
       version,
@@ -432,5 +457,32 @@ export class CommandService implements OnModuleInit, ICommandService {
       structuredClone(pickKeys(item, comparedKeys)),
       structuredClone(pickKeys(input, comparedKeys)),
     )
+  }
+
+  async publishItem(key: DetailKey) {
+    const version = getSortKeyVersion(key.sk)
+    const sk = removeSortKeyVersion(key.sk)
+    if (version <= VERSION_FIRST + 1) {
+      return null
+    }
+
+    const previousSk = addSortKeyVersion(sk, version - 1)
+
+    const command = await this.dynamoDbService.getItem(this.tableName, {
+      pk: key.pk,
+      sk: previousSk,
+    })
+    if (!command) {
+      return null
+    }
+    command.sk = previousSk
+    const ttl = await this.ttlService.calculateTtl(
+      TableType.COMMAND,
+      getTenantCode(key.pk),
+    )
+    command.ttl = ttl
+
+    this.logger.debug('publishItem::', command)
+    return await this.dynamoDbService.putItem(this.tableName, command)
   }
 }

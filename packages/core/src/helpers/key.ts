@@ -1,8 +1,16 @@
 import { DEFAULT_TENANT_CODE } from '../constants'
-import { KEY_SEPARATOR, VER_SEPARATOR } from '../constants/key'
+import { KEY_SEPARATOR, VER_SEPARATOR, VERSION_LATEST } from '../constants/key'
 
 export function addSortKeyVersion(sk: string, version: number) {
   return `${removeSortKeyVersion(sk)}${VER_SEPARATOR}${version}`
+}
+
+export function getSortKeyVersion(sk: string) {
+  const lastDivIdx = sk.lastIndexOf(VER_SEPARATOR)
+  if (lastDivIdx === -1) {
+    return VERSION_LATEST
+  }
+  return +sk.substring(lastDivIdx + 1)
 }
 
 export function removeSortKeyVersion(sk: string) {
@@ -15,6 +23,14 @@ export function removeSortKeyVersion(sk: string) {
 
 export function generateId(pk: string, sk: string) {
   return `${pk}${KEY_SEPARATOR}${removeSortKeyVersion(sk)}`
+}
+
+export function getTenantCode(pk: string) {
+  const lastDivIdx = pk.lastIndexOf(KEY_SEPARATOR)
+  if (lastDivIdx === -1) {
+    return
+  }
+  return pk.substring(lastDivIdx + 1)
 }
 
 const S3_PREFIX = 's3://'
@@ -47,3 +63,5 @@ export const masterPk = (tenantCode?: string) =>
 
 export const seqPk = (tenantCode?: string) =>
   `SEQ${KEY_SEPARATOR}${tenantCode || DEFAULT_TENANT_CODE}`
+
+export const ttlSk = (tableName: string) => `TTL${KEY_SEPARATOR}${tableName}`

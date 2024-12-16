@@ -1,10 +1,12 @@
 import { Inject, Injectable, Logger } from '@nestjs/common'
 
 import { DynamoDbService } from '../data-store/dynamodb.service'
-import { addSortKeyVersion } from '../helpers'
+import { addSortKeyVersion, getTenantCode } from '../helpers'
 import { CommandModuleOptions, DataModel, DetailKey } from '../interfaces'
 import { MODULE_OPTIONS_TOKEN } from './command.module-definition'
 import { DataService } from './data.service'
+import { TableType } from './enums'
+import { TtlService } from './ttl.service'
 
 const TABLE_NAME = Symbol('history')
 
@@ -18,10 +20,11 @@ export class HistoryService {
     private readonly options: CommandModuleOptions,
     private readonly dynamoDbService: DynamoDbService,
     private readonly dataService: DataService,
+    private readonly ttlService: TtlService,
   ) {
     this.tableName = this.dynamoDbService.getTableName(
       this.options.tableName,
-      'history',
+      TableType.HISTORY,
     )
     this.logger = new Logger(`${HistoryService.name}:${this.tableName}`)
   }
@@ -40,6 +43,11 @@ export class HistoryService {
       return null
     }
     data.sk = addSortKeyVersion(data.sk, data.version)
+    const ttl = await this.ttlService.calculateTtl(
+      TableType.HISTORY,
+      getTenantCode(key.pk),
+    )
+    data.ttl = ttl
 
     this.logger.debug('publish::', data)
     return await this.dynamoDbService.putItem(this.tableName, data)

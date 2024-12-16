@@ -11,6 +11,7 @@ import {
   DetailKey,
 } from '../interfaces'
 import { MODULE_OPTIONS_TOKEN } from './command.module-definition'
+import { TableType } from './enums'
 
 const TABLE_NAME = Symbol('data')
 
@@ -26,7 +27,7 @@ export class DataService {
   ) {
     this.tableName = this.dynamoDbService.getTableName(
       this.options.tableName,
-      'data',
+      TableType.DATA,
     )
     this.logger = new Logger(`${DataService.name}:${this.tableName}`)
   }

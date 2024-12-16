@@ -10,6 +10,7 @@ import { CommandService } from './command.service'
 import { DataService } from './data.service'
 import { DataSyncDdsHandler } from './handlers/data-sync-dds.handler'
 import { HistoryService } from './history.service'
+import { TtlService } from './ttl.service'
 
 @Module({
   imports: [],
@@ -17,11 +18,18 @@ import { HistoryService } from './history.service'
     ExplorerService,
     CommandService,
     DataService,
+    TtlService,
     HistoryService,
     CommandEventHandler,
     DataSyncDdsHandler,
   ],
-  exports: [CommandService, DataService, HistoryService, CommandEventHandler],
+  exports: [
+    CommandService,
+    DataService,
+    HistoryService,
+    CommandEventHandler,
+    TtlService,
+  ],
 })
 export class CommandModule extends ConfigurableModuleClass {
   static register(options: typeof OPTIONS_TYPE): DynamicModule {
