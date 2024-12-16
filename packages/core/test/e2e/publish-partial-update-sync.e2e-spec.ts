@@ -11,87 +11,51 @@ import {
 
 const API_PATH = '/api/testing/sync'
 
-describe('publishSync', () => {
-  it('should be stored correct data in the data DDB table', async () => {
+describe('publishPartialUpdateSync', () => {
+  it('should be stored correct updated data in the data DDB table', async () => {
     // Arrange
     const payload = {
       pk: 'TEST#MBC',
-      sk: 'publish-sync#data',
-      id: 'TEST#MBC#publish-sync#data',
+      sk: 'publish-partial-update-sync#data',
+      id: 'TEST#MBC#publish-partial-update-sync#data',
       name: 'testing#data',
       version: 0,
-      code: 'publish-sync#data',
+      code: 'publish-partial-update-sync#data',
       type: 'TEST',
     }
 
+    const postRes = await request(config.apiBaseUrl)
+      .post(API_PATH)
+      .send(payload)
+
+    expect(postRes.statusCode).toEqual(201)
+
+    const updatePayload = {
+      pk: 'TEST#MBC',
+      sk: 'publish-partial-update-sync#data',
+      name: 'update name',
+      version: 1,
+    }
+
     // Action
-    const res = await request(config.apiBaseUrl).post(API_PATH).send(payload)
+    const putRes = await request(config.apiBaseUrl)
+      .put(API_PATH)
+      .send(updatePayload)
 
     // Assert
-    expect(res.statusCode).toEqual(201)
-
     const data = await getItem(getTableName('testing_table', TableType.DATA), {
       pk: payload.pk,
       sk: payload.sk,
     })
 
-    expect(data).toMatchObject({
-      ...payload,
-      version: 1,
-    })
-  }, 40000)
-
-  it('should return invalid input version', async () => {
-    // Arrange
-    const payload = {
-      pk: 'TEST#MBC',
-      sk: 'publish-sync_1',
-      id: 'TEST#MBC#publish-sync_1',
-      name: 'testing',
-      version: 1,
-      code: 'publish-sync_1',
-      type: 'TEST',
-    }
-
-    // Action
-    const res = await request(config.apiBaseUrl).post(API_PATH).send(payload)
-
-    // Assert
-    expect(res.statusCode).toEqual(400)
-    expect(res.body?.message).toEqual(
-      'Invalid input version. The input version must be equal to the latest version',
-    )
-  }, 40000)
-
-  it('should store the latest data with default TTL (null)', async () => {
-    // Arrange
-    const payload = {
-      pk: 'TEST#MBC',
-      sk: 'publish-sync#data1',
-      id: 'TEST#MBC#publish-sync#data1',
-      name: 'testing#ttl',
-      version: 0,
-      code: 'publish-sync#data1',
-      type: 'TEST',
-    }
-
-    // Action
-    const res = await request(config.apiBaseUrl).post(API_PATH).send(payload)
-
-    // Assert
-    expect(res.statusCode).toEqual(201)
-
-    const data = await getItem(getTableName('testing_table', TableType.DATA), {
-      pk: payload.pk,
-      sk: payload.sk,
-    })
+    console.log('putRes', putRes.body)
 
     expect(data).toMatchObject({
       ...payload,
-      ttl: null,
-      version: 1,
+      name: updatePayload.name,
+      version: 2,
     })
-  })
+  }, 40000)
 
   it('should store the latest data with configuration TTL in DDB (90 days)', async () => {
     // Arrange
@@ -115,24 +79,39 @@ describe('publishSync', () => {
 
     const payload = {
       pk: 'TEST#MBC',
-      sk: 'publish-sync#data90',
-      id: 'TEST#MBC#publish-sync#data90',
-      name: 'testing#ttl',
+      sk: 'publish-partial-update-sync#data90',
+      id: 'TEST#MBC#publish-partial-update-sync#data90',
+      name: 'testing#data',
       version: 0,
-      code: 'publish-sync#data90',
+      code: 'publish-partial-update-sync#data90',
       type: 'TEST',
     }
 
+    const postRes = await request(config.apiBaseUrl)
+      .post(API_PATH)
+      .send(payload)
+
+    expect(postRes.statusCode).toEqual(201)
+
+    const updatePayload = {
+      pk: payload.pk,
+      sk: payload.sk,
+      name: 'update name',
+      version: 1,
+    }
+
     // Action
-    const res = await request(config.apiBaseUrl).post(API_PATH).send(payload)
+    const putRes = await request(config.apiBaseUrl)
+      .put(API_PATH)
+      .send(updatePayload)
 
     // Assert
-    expect(res.statusCode).toEqual(201)
-
     const data = await getItem(getTableName('testing_table', TableType.DATA), {
       pk: payload.pk,
       sk: payload.sk,
     })
+
+    console.log('putRes', putRes.body)
 
     expect(data?.ttl >= ttl).toBeTruthy()
 
@@ -140,9 +119,9 @@ describe('publishSync', () => {
       pk: ttlData.pk,
       sk: ttlData.sk,
     })
-  })
+  }, 40000)
 
-  it('should store the latest data with input TTL (30 days)', async () => {
+  it('should store the latest data with input TTL', async () => {
     // Arrange
     const ttlData = {
       pk: 'MASTER#MBC',
@@ -164,31 +143,46 @@ describe('publishSync', () => {
 
     const payload = {
       pk: 'TEST#MBC',
-      sk: 'publish-sync#data-in-30',
-      id: 'TEST#MBC#publish-sync#data-in-30',
-      name: 'testing#ttl',
+      sk: 'publish-partial-update-sync#data30',
+      id: 'TEST#MBC#publish-partial-update-sync#data30',
+      name: 'testing#data',
       version: 0,
-      code: 'publish-sync#data-in-30',
+      code: 'publish-partial-update-sync#data30',
       type: 'TEST',
+    }
+
+    const postRes = await request(config.apiBaseUrl)
+      .post(API_PATH)
+      .send(payload)
+
+    expect(postRes.statusCode).toEqual(201)
+
+    const updatePayload = {
+      pk: payload.pk,
+      sk: payload.sk,
+      name: 'update name',
+      version: 1,
       ttl,
     }
 
     // Action
-    const res = await request(config.apiBaseUrl).post(API_PATH).send(payload)
+    const putRes = await request(config.apiBaseUrl)
+      .put(API_PATH)
+      .send(updatePayload)
 
     // Assert
-    expect(res.statusCode).toEqual(201)
-
     const data = await getItem(getTableName('testing_table', TableType.DATA), {
       pk: payload.pk,
       sk: payload.sk,
     })
 
-    expect(data?.ttt == ttl).toBeTruthy()
+    console.log('putRes', putRes.body)
+
+    expect(data?.ttl == ttl).toBeTruthy()
 
     deleteItem(masterDataTableName, {
       pk: ttlData.pk,
       sk: ttlData.sk,
     })
-  })
+  }, 40000)
 })

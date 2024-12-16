@@ -1,8 +1,9 @@
-import { Body, Controller, Logger, Post } from '@nestjs/common'
+import { Body, Controller, Logger, Post, Put } from '@nestjs/common'
 import { ApiTags } from '@nestjs/swagger'
 
 import {
   CommandDto,
+  CommandPartialInputModel,
   CommandService,
   IInvoke,
   INVOKE_CONTEXT,
@@ -38,6 +39,22 @@ export class TestController {
     const item = await this.commandService.publishSync(commandDto, {
       invokeContext,
     })
+    return item
+  }
+
+  @Put('/sync')
+  async publishPartialUpdateSync(
+    @INVOKE_CONTEXT() invokeContext: IInvoke,
+    @Body() commandDto: CommandPartialInputModel,
+  ) {
+    this.logger.debug('cmd:', commandDto)
+    this.logger.debug('commandService:' + this.commandService.tableName)
+    const item = await this.commandService.publishPartialUpdateSync(
+      commandDto,
+      {
+        invokeContext,
+      },
+    )
     return item
   }
 }

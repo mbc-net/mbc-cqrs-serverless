@@ -186,7 +186,7 @@ stepFunctions:
             Choices:
               - Variable: $.result
                 NumericEquals: 0
-                Next: history_copy
+                Next: set_ttl_command
               - Variable: $.result
                 NumericEquals: 1
                 Next: wait_prev_command
@@ -203,6 +203,24 @@ stepFunctions:
                 input.$: $
                 context.$: $$
                 taskToken.$: $$.Task.Token
+            Retry:
+              - ErrorEquals:
+                  - Lambda.ServiceException
+                  - Lambda.AWSLambdaException
+                  - Lambda.SdkClientException
+                IntervalSeconds: 2
+                MaxAttempts: 5
+                BackoffRate: 2
+            OutputPath: $.Payload[0][0]
+            Next: set_ttl_command
+          set_ttl_command:
+            Type: Task
+            Resource: arn:aws:states:::lambda:invoke
+            Parameters:
+              FunctionName: arn:aws:lambda:ap-northeast-1:101010101010:function:serverless-example-dev-main
+              Payload:
+                input.$: $
+                context.$: $$
             Retry:
               - ErrorEquals:
                   - Lambda.ServiceException
