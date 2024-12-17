@@ -26,6 +26,7 @@ import { CommandService } from './command.service'
 import { DataSyncDdsHandler } from './handlers/data-sync-dds.handler'
 import { HistoryService } from './history.service'
 import { DataSyncCommandSfnName } from '../command-events/sfn-name.enum'
+import { TtlService } from './ttl.service'
 
 export class MockedHandler implements IDataSyncHandler {
   async up(cmd: CommandModel): Promise<any> {
@@ -98,8 +99,15 @@ const createEvent = (
 
 const sfnCheckVersionEvent = createEvent(DataSyncCommandSfnName.CHECK_VERSION)
 
+const sfnSetTtlCommandEvent = createEvent(
+  DataSyncCommandSfnName.SET_TTL_COMMAND,
+  {
+    result: 0,
+  },
+)
+
 const sfnHistoryCopyEvent = createEvent(DataSyncCommandSfnName.HISTORY_COPY, {
-  result: 0,
+  result: 'ok',
 })
 
 const sfnTransformDataEvent = createEvent(
@@ -138,6 +146,7 @@ describe('DataSyncCommandSfnEventHandler', () => {
           DynamoDbService,
           SnsService,
           MockedHandler,
+          TtlService,
           {
             provide: MODULE_OPTIONS_TOKEN,
             useValue: {
@@ -268,6 +277,54 @@ describe('DataSyncCommandSfnEventHandler', () => {
       })
     })
 
+    it('should return result = ok when executing the correct set ttl command event', async () => {
+      // Arrange
+      dynamoDBMock.on(UpdateItemCommand).resolves({} as any)
+      snsMock.on(PublishCommand).resolves({} as any)
+      dynamoDBMock
+        .on(GetItemCommand)
+        .resolves({ Item: { sk: { S: '1726027976' }, version: { N: '1' } } })
+
+      // Action
+      const result = await commandEventHandler.execute(sfnSetTtlCommandEvent)
+
+      // Assert
+      expect(result).toEqual({ result: 'ok' })
+    })
+
+    it('should call the AWS service with the correct parameters when executing the set ttl command event', async () => {
+      // Arrange
+      dynamoDBMock.on(UpdateItemCommand).resolves({} as any)
+      snsMock.on(PublishCommand).resolves({} as any)
+      dynamoDBMock
+        .on(GetItemCommand)
+        .resolves({ Item: { sk: { S: '1726027976' }, version: { N: '1' } } })
+
+      // Action
+      await commandEventHandler.execute(sfnSetTtlCommandEvent)
+
+      // Assert
+      expect(dynamoDBMock).toHaveReceivedCommandTimes(UpdateItemCommand, 2)
+
+      expect(snsMock).toHaveReceivedCommandWith(PublishCommand, {
+        Message: expect.stringContaining('set_ttl_command'),
+      })
+      expect(dynamoDBMock).toHaveReceivedNthCommandWith(1, UpdateItemCommand, {
+        TableName: 'env-app_name-table_name-command',
+        Key: { pk: { S: 'tenantCode#test' }, sk: { S: '1726027976@1' } },
+        ExpressionAttributeValues: expect.objectContaining({
+          ':status': { S: 'set_ttl_command:STARTED' },
+        }),
+      })
+      expect(dynamoDBMock).toHaveReceivedNthCommandWith(2, UpdateItemCommand, {
+        TableName: 'env-app_name-table_name-command',
+        Key: { pk: { S: 'tenantCode#test' }, sk: { S: '1726027976@1' } },
+        ExpressionAttributeValues: expect.objectContaining({
+          ':status': { S: 'set_ttl_command:FINISHED' },
+        }),
+      })
+    })
+
     it('should return result = ok when executing the correct history copy event', async () => {
       // Arrange
       dynamoDBMock.on(UpdateItemCommand).resolves({} as any)
@@ -296,7 +353,7 @@ describe('DataSyncCommandSfnEventHandler', () => {
 
       // Assert
       expect(dynamoDBMock).toHaveReceivedCommandTimes(UpdateItemCommand, 2)
-      expect(dynamoDBMock).toHaveReceivedCommandTimes(GetItemCommand, 1)
+      expect(dynamoDBMock).toHaveReceivedCommandTimes(GetItemCommand, 2)
       expect(snsMock).toHaveReceivedCommandTimes(PublishCommand, 2)
 
       expect(snsMock).toHaveReceivedCommandWith(PublishCommand, {
@@ -313,11 +370,22 @@ describe('DataSyncCommandSfnEventHandler', () => {
         TableName: 'env-app_name-table_name-data',
         Key: { pk: { S: 'tenantCode#test' }, sk: { S: '1726027976' } },
       })
-      expect(dynamoDBMock).toHaveReceivedNthCommandWith(3, PutItemCommand, {
-        TableName: 'env-app_name-table_name-history',
-        Item: { sk: { S: '1726027976@1' }, version: { N: '1' } },
+      expect(dynamoDBMock).toHaveReceivedNthCommandWith(3, GetItemCommand, {
+        Key: {
+          pk: { S: 'MASTER#test' },
+          sk: { S: 'TTL#env-app_name-table_name-history' },
+        },
+        TableName: 'env-app_name-master-data',
       })
-      expect(dynamoDBMock).toHaveReceivedNthCommandWith(4, UpdateItemCommand, {
+      expect(dynamoDBMock).toHaveReceivedNthCommandWith(4, PutItemCommand, {
+        TableName: 'env-app_name-table_name-history',
+        Item: {
+          sk: { S: '1726027976@1' },
+          version: { N: '1' },
+          ttl: { NULL: true },
+        },
+      })
+      expect(dynamoDBMock).toHaveReceivedNthCommandWith(5, UpdateItemCommand, {
         TableName: 'env-app_name-table_name-command',
         Key: { pk: { S: 'tenantCode#test' }, sk: { S: '1726027976@1' } },
         ExpressionAttributeValues: expect.objectContaining({

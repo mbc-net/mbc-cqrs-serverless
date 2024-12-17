@@ -138,7 +138,7 @@ export class CommandEventHandler {
   ): Promise<StepFunctionStateInput> {
     this.logger.debug('setTtlCommand:: ', event.commandRecord)
 
-    await this.commandService.publishItem({
+    await this.commandService.updateTtl({
       pk: event.commandRecord.pk,
       sk: event.commandRecord.sk,
     })

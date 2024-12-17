@@ -60,10 +60,10 @@ export interface ICommandService {
   ): Promise<CommandModel>
 
   /**
-   * Publishes an old command by updating its TTL.
+   * Update the ttl for the previous command.
    *
    * @param {DetailKey} key - The primary and sort key details for the item.
    * @returns {Promise<any | null>} A promise resolving to the result of the put operation, or `null` if the operation is not applicable.
    */
-  publishItem(key: DetailKey): Promise<any | null>
+  updateTtl(key: DetailKey): Promise<any | null>
 }

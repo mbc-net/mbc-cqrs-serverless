@@ -67,6 +67,9 @@ export class CommandService implements OnModuleInit, ICommandService {
     )
     this.logger = new Logger(`${CommandService.name}:${this.tableName}`)
   }
+  publishItem(key: DetailKey): Promise<any | null> {
+    throw new Error('Method not implemented.')
+  }
 
   onModuleInit() {
     if (!this.options.disableDefaultHandler) {
@@ -459,7 +462,7 @@ export class CommandService implements OnModuleInit, ICommandService {
     )
   }
 
-  async publishItem(key: DetailKey) {
+  async updateTtl(key: DetailKey) {
     const version = getSortKeyVersion(key.sk)
     const sk = removeSortKeyVersion(key.sk)
     if (version <= VERSION_FIRST + 1) {
@@ -480,9 +483,17 @@ export class CommandService implements OnModuleInit, ICommandService {
       TableType.COMMAND,
       getTenantCode(key.pk),
     )
-    command.ttl = ttl
 
-    this.logger.debug('publishItem::', command)
-    return await this.dynamoDbService.putItem(this.tableName, command)
+    this.logger.debug('updateTtl::', command)
+    return await this.dynamoDbService.updateItem(
+      this.tableName,
+      {
+        pk: key.pk,
+        sk: previousSk,
+      },
+      {
+        set: { ttl },
+      },
+    )
   }
 }
