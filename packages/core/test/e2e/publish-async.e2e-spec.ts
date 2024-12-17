@@ -1,7 +1,13 @@
 import request from 'supertest'
 
 import { config } from './config'
-import { getItem, getTableName, TableType } from './dynamo-client'
+import {
+  deleteItem,
+  getItem,
+  getTableName,
+  putItem,
+  TableType,
+} from './dynamo-client'
 import { syncDataFinished } from './utils'
 
 const API_PATH = '/api/testing'
@@ -161,4 +167,161 @@ describe('Publish', () => {
       'ConditionalCheckFailedException: The conditional request failed',
     )
   }, 80000)
+
+  it('should store command, data, history with configuration TTL in ddb', async () => {
+    // Arrange
+    const ttlCommand = {
+      pk: 'MASTER#MBC',
+      sk: 'TTL#local-test-testing_table-command',
+      id: 'MASTER#MBC#TTL#local-test-testing_table-command',
+      code: 'MASTER#MBC#TTL#local-test-testing_table-command',
+      type: 'TTL',
+      name: 'TTL#local-test-testing_table-command',
+      version: 0,
+      attributes: {
+        days: 30,
+      },
+    }
+    const ttlHistory = {
+      pk: 'MASTER#MBC',
+      sk: 'TTL#local-test-testing_table-history',
+      id: 'MASTER#MBC#TTL#local-test-testing_table-history',
+      code: 'MASTER#MBC#TTL#local-test-testing_table-history',
+      type: 'TTL',
+      name: 'TTL#local-test-testing_table-history',
+      version: 0,
+      attributes: {
+        days: 45,
+      },
+    }
+    const ttlData = {
+      pk: 'MASTER#MBC',
+      sk: 'TTL#local-test-testing_table-data',
+      id: 'MASTER#MBC#TTL#local-test-testing_table-data',
+      code: 'MASTER#MBC#TTL#local-test-testing_table-data',
+      type: 'TTL',
+      name: 'TTL#local-test-testing_table-data',
+      version: 0,
+      attributes: {
+        days: 90,
+      },
+    }
+
+    const masterDataTableName = getTableName('master', TableType.DATA)
+
+    await Promise.all([
+      putItem(masterDataTableName, ttlCommand),
+      putItem(masterDataTableName, ttlHistory),
+      putItem(masterDataTableName, ttlData),
+    ])
+
+    // TODO:
+    const payload = {
+      pk: 'TEST#MBC',
+      sk: 'publish-partial-update-async#data',
+      id: 'TEST#MBC#publish-partial-update-async#data',
+      name: 'testing#data',
+      version: 0,
+      code: 'publish-partial-update-async#data',
+      type: 'TEST',
+    }
+
+    const postRes = await request(config.apiBaseUrl)
+      .post(API_PATH)
+      .send(payload)
+    console.log('$#@!$postRes$@#', postRes.body)
+    expect(postRes.statusCode).toEqual(201)
+    await syncDataFinished('testing_table', {
+      pk: payload.pk,
+      sk: `${payload.sk}@1`,
+    })
+    const validTtl = {
+      command: Math.floor(
+        (new Date().getTime() + 30 * 24 * 60 * 60 * 1000) / 1000,
+      ), // 30 days
+      history: Math.floor(
+        (new Date().getTime() + 45 * 24 * 60 * 60 * 1000) / 1000,
+      ), // 45 days
+      data: Math.floor(
+        (new Date().getTime() + 90 * 24 * 60 * 60 * 1000) / 1000,
+      ), // 90 days
+    }
+
+    const updatePayload = {
+      pk: payload.pk,
+      sk: payload.sk,
+      name: 'update name',
+      version: 1,
+    }
+
+    // Action
+    const putRes = await request(config.apiBaseUrl)
+      .put(API_PATH)
+      .send(updatePayload)
+    await syncDataFinished('testing_table', {
+      pk: payload.pk,
+      sk: `${payload.sk}@2`,
+    })
+    console.log('$@#$@#$putRes$@#$@#', putRes.body)
+
+    // Assert
+    const data = await getItem(getTableName('testing_table', TableType.DATA), {
+      pk: payload.pk,
+      sk: payload.sk,
+    })
+    console.log('🚀 ~ data ~ data:', data)
+
+    expect(data?.ttl >= validTtl.data).toBeTruthy()
+
+    const newestCommand = await getItem(
+      getTableName('testing_table', TableType.COMMAND),
+      {
+        pk: payload.pk,
+        sk: `${payload.sk}@2`,
+      },
+    )
+
+    console.log('🚀 ~ newestCommand ~ newestCommand:', newestCommand)
+
+    expect(newestCommand?.ttl >= validTtl.data).toBeTruthy()
+
+    const oldCommand = await getItem(
+      getTableName('testing_table', TableType.COMMAND),
+      {
+        pk: payload.pk,
+        sk: `${payload.sk}@1`,
+      },
+    )
+
+    console.log('🚀 ~ oldCommand ~ oldCommand:', oldCommand)
+
+    expect(oldCommand?.ttl >= validTtl.command).toBeTruthy()
+
+    const history = await getItem(
+      getTableName('testing_table', TableType.HISTORY),
+      {
+        pk: payload.pk,
+        sk: `${payload.sk}@1`,
+      },
+    )
+
+    console.log('🚀 ~ history ~ history:', history)
+
+    expect(history?.ttl >= validTtl.history).toBeTruthy()
+
+    await Promise.all([
+      deleteItem(masterDataTableName, {
+        pk: ttlData.pk,
+        sk: ttlData.sk,
+      }),
+      deleteItem(masterDataTableName, {
+        pk: ttlHistory.pk,
+        sk: ttlHistory.sk,
+      }),
+      deleteItem(masterDataTableName, {
+        pk: ttlHistory.pk,
+        sk: ttlHistory.sk,
+      }),
+    ])
+  }, 150000)
 })

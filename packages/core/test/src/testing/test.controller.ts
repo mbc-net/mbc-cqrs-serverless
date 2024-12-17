@@ -29,6 +29,22 @@ export class TestController {
     return item
   }
 
+  @Put('/')
+  async publishPartialUpdateAsync(
+    @INVOKE_CONTEXT() invokeContext: IInvoke,
+    @Body() commandDto: CommandPartialInputModel,
+  ) {
+    this.logger.debug('cmd:', commandDto)
+    this.logger.debug('commandService:' + this.commandService.tableName)
+    const item = await this.commandService.publishPartialUpdateAsync(
+      commandDto,
+      {
+        invokeContext,
+      },
+    )
+    return item
+  }
+
   @Post('/sync')
   async publishCommandSync(
     @INVOKE_CONTEXT() invokeContext: IInvoke,

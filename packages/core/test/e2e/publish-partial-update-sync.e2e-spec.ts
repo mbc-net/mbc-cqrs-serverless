@@ -115,7 +115,7 @@ describe('publishPartialUpdateSync', () => {
 
     expect(data?.ttl >= ttl).toBeTruthy()
 
-    deleteItem(masterDataTableName, {
+    await deleteItem(masterDataTableName, {
       pk: ttlData.pk,
       sk: ttlData.sk,
     })
@@ -180,7 +180,7 @@ describe('publishPartialUpdateSync', () => {
 
     expect(data?.ttl == ttl).toBeTruthy()
 
-    deleteItem(masterDataTableName, {
+    await deleteItem(masterDataTableName, {
       pk: ttlData.pk,
       sk: ttlData.sk,
     })

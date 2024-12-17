@@ -136,7 +136,7 @@ describe('publishSync', () => {
 
     expect(data?.ttl >= ttl).toBeTruthy()
 
-    deleteItem(masterDataTableName, {
+    await deleteItem(masterDataTableName, {
       pk: ttlData.pk,
       sk: ttlData.sk,
     })
@@ -183,10 +183,11 @@ describe('publishSync', () => {
       pk: payload.pk,
       sk: payload.sk,
     })
+    console.log('🚀 ~ data ~ data:', data)
 
-    expect(data?.ttt == ttl).toBeTruthy()
+    expect(data?.ttl == ttl).toBeTruthy()
 
-    deleteItem(masterDataTableName, {
+    await deleteItem(masterDataTableName, {
       pk: ttlData.pk,
       sk: ttlData.sk,
     })
