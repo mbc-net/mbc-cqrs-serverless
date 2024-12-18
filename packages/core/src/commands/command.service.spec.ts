@@ -261,7 +261,6 @@ describe('CommandService', () => {
       const item = await commandService.publishSync(inputItem, {
         invokeContext: {},
       })
-      console.log('$@#$@', item)
       expect(item).toBeDefined()
       expect(item).toMatchObject({
         ...inputItem,

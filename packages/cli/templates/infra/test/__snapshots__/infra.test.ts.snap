@@ -242,7 +242,7 @@ exports[`snapshot test for InfraStack 1`] = `
                   "Arn",
                 ],
               },
-              "","Payload":{"input.$":"$","context.$":"$$"}}},"check_version_result":{"Type":"Choice","Choices":[{"Variable":"$.result","NumericEquals":0,"Next":"history_copy"},{"Variable":"$.result","NumericEquals":1,"Next":"wait_prev_command"},{"Variable":"$.result","NumericEquals":-1,"Next":"fail"}],"Default":"wait_prev_command"},"wait_prev_command":{"Next":"history_copy","Retry":[{"ErrorEquals":["Lambda.ClientExecutionTimeoutException","Lambda.ServiceException","Lambda.AWSLambdaException","Lambda.SdkClientException"],"IntervalSeconds":2,"MaxAttempts":6,"BackoffRate":2}],"Type":"Task","OutputPath":"$.Payload[0][0]","Resource":"arn:",
+              "","Payload":{"input.$":"$","context.$":"$$"}}},"check_version_result":{"Type":"Choice","Choices":[{"Variable":"$.result","NumericEquals":0,"Next":"set_ttl_command"},{"Variable":"$.result","NumericEquals":1,"Next":"wait_prev_command"},{"Variable":"$.result","NumericEquals":-1,"Next":"fail"}],"Default":"wait_prev_command"},"wait_prev_command":{"Next":"set_ttl_command","Retry":[{"ErrorEquals":["Lambda.ClientExecutionTimeoutException","Lambda.ServiceException","Lambda.AWSLambdaException","Lambda.SdkClientException"],"IntervalSeconds":2,"MaxAttempts":6,"BackoffRate":2}],"Type":"Task","OutputPath":"$.Payload[0][0]","Resource":"arn:",
               {
                 "Ref": "AWS::Partition",
               },
@@ -253,7 +253,18 @@ exports[`snapshot test for InfraStack 1`] = `
                   "Arn",
                 ],
               },
-              "","Payload":{"input.$":"$","context.$":"$$","taskToken.$":"$$.Task.Token"}}},"history_copy":{"Next":"transform_data","Retry":[{"ErrorEquals":["Lambda.ClientExecutionTimeoutException","Lambda.ServiceException","Lambda.AWSLambdaException","Lambda.SdkClientException"],"IntervalSeconds":2,"MaxAttempts":6,"BackoffRate":2}],"Type":"Task","OutputPath":"$.Payload[0][0]","Resource":"arn:",
+              "","Payload":{"input.$":"$","context.$":"$$","taskToken.$":"$$.Task.Token"}}},"set_ttl_command":{"Next":"history_copy","Retry":[{"ErrorEquals":["Lambda.ClientExecutionTimeoutException","Lambda.ServiceException","Lambda.AWSLambdaException","Lambda.SdkClientException"],"IntervalSeconds":2,"MaxAttempts":6,"BackoffRate":2}],"Type":"Task","OutputPath":"$.Payload[0][0]","Resource":"arn:",
+              {
+                "Ref": "AWS::Partition",
+              },
+              ":states:::lambda:invoke","Parameters":{"FunctionName":"",
+              {
+                "Fn::GetAtt": [
+                  "lambdaapi893CD94E",
+                  "Arn",
+                ],
+              },
+              "","Payload":{"input.$":"$","context.$":"$$"}}},"history_copy":{"Next":"transform_data","Retry":[{"ErrorEquals":["Lambda.ClientExecutionTimeoutException","Lambda.ServiceException","Lambda.AWSLambdaException","Lambda.SdkClientException"],"IntervalSeconds":2,"MaxAttempts":6,"BackoffRate":2}],"Type":"Task","OutputPath":"$.Payload[0][0]","Resource":"arn:",
               {
                 "Ref": "AWS::Partition",
               },

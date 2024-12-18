@@ -2,6 +2,7 @@ import {
   DetailKey,
   DynamoDbService,
   IMasterDataProvider,
+  TableType,
 } from '@mbc-cqrs-serverless/core'
 import { Inject, Injectable, Optional } from '@nestjs/common'
 
@@ -16,7 +17,7 @@ export class SequenceMasterDataProvider implements IMasterDataProvider {
     @Optional()
     private readonly defaultValue: Record<string, any>,
   ) {
-    this.tableName = dynamoDbService.getTableName('master', 'data')
+    this.tableName = dynamoDbService.getTableName('master', TableType.DATA)
   }
   async getData(key: DetailKey): Promise<any> {
     try {
