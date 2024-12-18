@@ -72,7 +72,7 @@ export class InfraStack extends cdk.Stack {
         mfa: cdk.aws_cognito.Mfa.OFF,
         accountRecovery: cdk.aws_cognito.AccountRecovery.NONE,
         customAttributes: {
-          tenant_code: new cdk.aws_cognito.StringAttribute({
+          tenant: new cdk.aws_cognito.StringAttribute({
             mutable: true,
             maxLen: 50,
           }),
