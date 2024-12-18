@@ -12,6 +12,7 @@ import { Injectable, Logger } from '@nestjs/common'
 import { ConfigService } from '@nestjs/config'
 import { ulid } from 'ulid'
 
+import { TableType } from '../commands'
 import {
   isS3AttributeKey,
   parseS3AttributeKey,
@@ -427,10 +428,7 @@ export class DynamoDbService {
     return ret
   }
 
-  getTableName(
-    moduleName: string,
-    type?: 'command' | 'data' | 'history',
-  ): string {
+  getTableName(moduleName: string, type?: TableType): string {
     let tableName = this.tablePrefix + moduleName
     if (type) {
       tableName = `${tableName}-${type}`

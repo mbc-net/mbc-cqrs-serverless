@@ -2,6 +2,7 @@ import {
   CommandInputModel,
   CommandModel,
   CommandPartialInputModel,
+  DetailKey,
   ICommandOptions,
 } from '.'
 
@@ -57,4 +58,12 @@ export interface ICommandService {
     input: CommandPartialInputModel,
     options: ICommandOptions,
   ): Promise<CommandModel>
+
+  /**
+   * Update the ttl for the previous command.
+   *
+   * @param {DetailKey} key - The primary and sort key details for the item.
+   * @returns {Promise<any | null>} A promise resolving to the result of the put operation, or `null` if the operation is not applicable.
+   */
+  updateTtl(key: DetailKey): Promise<any | null>
 }

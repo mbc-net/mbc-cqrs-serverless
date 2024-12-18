@@ -11,7 +11,7 @@
           "Value": "admin@test.com"
         },
         {
-          "Name": "custom:tenant_code",
+          "Name": "custom:tenant",
           "Value": "mbc"
         },
         {
@@ -261,7 +261,7 @@
         }
       },
       {
-        "Name": "custom:tenant_code",
+        "Name": "custom:tenant",
         "AttributeDataType": "String",
         "DeveloperOnlyAttribute": false,
         "Mutable": true,

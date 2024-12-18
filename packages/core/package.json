@@ -1,6 +1,6 @@
 {
   "name": "@mbc-cqrs-serverless/core",
-  "version": "0.1.42-beta.0",
+  "version": "0.1.43-beta.0",
   "description": "CQRS and event base core",
   "keywords": [
     "mbc",

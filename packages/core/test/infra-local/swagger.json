@@ -37,6 +37,19 @@
         },
         "responses": { "201": { "description": "" } },
         "tags": ["testing"]
+      },
+      "put": {
+        "operationId": "TestController_publishPartialUpdateAsync",
+        "parameters": [
+          {
+            "in": "header",
+            "required": false,
+            "name": "x-tenant-code",
+            "schema": {}
+          }
+        ],
+        "responses": { "200": { "description": "" } },
+        "tags": ["testing"]
       }
     },
     "/api/testing/sync": {
@@ -59,6 +72,19 @@
           }
         },
         "responses": { "201": { "description": "" } },
+        "tags": ["testing"]
+      },
+      "put": {
+        "operationId": "TestController_publishPartialUpdateSync",
+        "parameters": [
+          {
+            "in": "header",
+            "required": false,
+            "name": "x-tenant-code",
+            "schema": {}
+          }
+        ],
+        "responses": { "200": { "description": "" } },
         "tags": ["testing"]
       }
     }
