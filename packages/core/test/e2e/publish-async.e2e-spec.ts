@@ -229,7 +229,7 @@ describe('Publish', () => {
     const postRes = await request(config.apiBaseUrl)
       .post(API_PATH)
       .send(payload)
-    console.log('$#@!$postRes$@#', postRes.body)
+    console.log('postRes', postRes.body)
     expect(postRes.statusCode).toEqual(201)
     await syncDataFinished('testing_table', {
       pk: payload.pk,
@@ -262,7 +262,7 @@ describe('Publish', () => {
       pk: payload.pk,
       sk: `${payload.sk}@2`,
     })
-    console.log('$@#$@#$putRes$@#$@#', putRes.body)
+    console.log('putRes', putRes.body)
 
     // Assert
     const data = await getItem(getTableName('testing_table', TableType.DATA), {

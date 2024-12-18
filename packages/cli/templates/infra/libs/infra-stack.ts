@@ -697,9 +697,15 @@ export class InfraStack extends cdk.Stack {
       transformData,
       cdk.aws_stepfunctions.IntegrationPattern.REQUEST_RESPONSE,
     )
+    const setTtlCommand = lambdaInvoke(
+      'set_ttl_command',
+      historyCopy,
+      cdk.aws_stepfunctions.IntegrationPattern.REQUEST_RESPONSE,
+    )
+
     const waitPrevCommand = lambdaInvoke(
       'wait_prev_command',
-      historyCopy,
+      setTtlCommand,
       cdk.aws_stepfunctions.IntegrationPattern.WAIT_FOR_TASK_TOKEN,
     )
 
@@ -713,7 +719,7 @@ export class InfraStack extends cdk.Stack {
     )
       .when(
         cdk.aws_stepfunctions.Condition.numberEquals('$.result', 0),
-        historyCopy,
+        setTtlCommand,
       )
       .when(
         cdk.aws_stepfunctions.Condition.numberEquals('$.result', 1),
