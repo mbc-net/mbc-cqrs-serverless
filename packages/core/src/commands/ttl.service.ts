@@ -24,7 +24,7 @@ export class TtlService implements ITtlService {
     startDate?: Date,
   ): Promise<number | null> {
     const numberOfDay = await this.getTtlConfiguration(type, tenantCode)
-    this.logger.log('numberOfDay', numberOfDay)
+    this.logger.debug('numberOfDay', numberOfDay)
     return numberOfDay ? this.calculateUnixTime(numberOfDay, startDate) : null
   }
 

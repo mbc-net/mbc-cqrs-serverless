@@ -213,7 +213,7 @@ export class CommandEventHandler {
     event: DataSyncCommandSfnEvent,
     errorDetails: any,
   ): Promise<void> {
-    this.logger.log('event', event)
+    this.logger.debug('event', event)
     const alarm: INotification = {
       action: 'sfn-alarm',
       id: `${event.commandKey.pk}#${event.commandKey.sk}`,
