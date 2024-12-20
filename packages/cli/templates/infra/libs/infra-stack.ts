@@ -334,6 +334,7 @@ export class InfraStack extends cdk.Stack {
       S3_BUCKET_NAME: ddbBucket.bucketName,
       SFN_COMMAND_ARN: commandSfnArn,
       SNS_TOPIC_ARN: mainSns.topicArn,
+      SNS_ALARM_TOPIC_ARN: alarmSns.topicArn,
       COGNITO_USER_POOL_ID: userPool.userPoolId,
       APPSYNC_ENDPOINT: appSyncApi.graphqlUrl,
       SES_FROM_EMAIL: props.config.fromEmailAddress,
@@ -838,6 +839,7 @@ export class InfraStack extends cdk.Stack {
     ddbBucket.grantReadWrite(lambdaApi)
     publicBucket.grantReadWrite(lambdaApi)
     mainSns.grantPublish(lambdaApi)
+    alarmSns.grantPublish(lambdaApi)
     taskSqs.grantSendMessages(lambdaApi)
     notifySqs.grantSendMessages(lambdaApi)
     appSyncApi.grantMutation(lambdaApi)
@@ -912,6 +914,7 @@ export class InfraStack extends cdk.Stack {
       ddbBucket.grantReadWrite(taskRole)
       publicBucket.grantReadWrite(taskRole)
       mainSns.grantPublish(taskRole)
+      alarmSns.grantPublish(taskRole)
       taskSqs.grantSendMessages(taskRole)
       notifySqs.grantSendMessages(taskRole)
       appSyncApi.grantMutation(taskRole)

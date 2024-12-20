@@ -642,6 +642,9 @@ exports[`snapshot test for InfraStack 1`] = `
             },
             "SES_FROM_EMAIL": "noreply@mbc-cqrs-serverless.mbc-net.com",
             "SFN_COMMAND_ARN": "arn:aws:states:ap-northeast-1:101010101010:stateMachine:dev-cdk-test-deploy-command-handler",
+            "SNS_ALARM_TOPIC_ARN": {
+              "Ref": "alarmsnsFB7BBC3B",
+            },
             "SNS_TOPIC_ARN": {
               "Ref": "mainsnsC0381B34",
             },
@@ -992,6 +995,13 @@ exports[`snapshot test for InfraStack 1`] = `
               "Effect": "Allow",
               "Resource": {
                 "Ref": "mainsnsC0381B34",
+              },
+            },
+            {
+              "Action": "sns:Publish",
+              "Effect": "Allow",
+              "Resource": {
+                "Ref": "alarmsnsFB7BBC3B",
               },
             },
             {
