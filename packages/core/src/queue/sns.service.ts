@@ -1,33 +1,33 @@
-import { PublishCommand, SNSClient } from '@aws-sdk/client-sns'
+import { PublishCommand } from '@aws-sdk/client-sns'
 import { Injectable } from '@nestjs/common'
 import { ConfigService } from '@nestjs/config'
 
 import { SnsEvent } from './sns.event'
-
-const CLIENT_INSTANCE = Symbol('sns-client')
+import { SnsClientFactory } from './sns-client-factory'
 
 @Injectable()
 export class SnsService {
-  private [CLIENT_INSTANCE]: SNSClient
-  private topicArn: string
+  private readonly defaultTopicArn: string
 
-  constructor(private readonly config: ConfigService) {
-    this[CLIENT_INSTANCE] = new SNSClient({
-      endpoint: config.get<string>('SNS_ENDPOINT'),
-      region: config.get<string>('SNS_REGION'),
-    })
-
-    this.topicArn = config.get<string>('SNS_TOPIC_ARN')
+  constructor(
+    private readonly snsClientFactory: SnsClientFactory,
+    private readonly config: ConfigService,
+  ) {
+    this.defaultTopicArn = this.config.get<string>('SNS_TOPIC_ARN')
   }
 
-  get client(): SNSClient {
-    return this[CLIENT_INSTANCE]
-  }
+  publish<T extends SnsEvent>(msg: T, topicArn?: string) {
+    const resolvedTopicArn = topicArn || this.defaultTopicArn
 
-  publish<T extends SnsEvent>(msg: T) {
-    return this.client.send(
+    if (!resolvedTopicArn) {
+      throw new Error('No topic ARN provided or configured as default.')
+    }
+
+    const client = this.snsClientFactory.getClient(resolvedTopicArn)
+
+    return client.send(
       new PublishCommand({
-        TopicArn: this.topicArn,
+        TopicArn: resolvedTopicArn,
         MessageAttributes: {
           action: {
             DataType: 'String',

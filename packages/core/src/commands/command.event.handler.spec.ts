@@ -27,6 +27,7 @@ import { DataSyncDdsHandler } from './handlers/data-sync-dds.handler'
 import { HistoryService } from './history.service'
 import { DataSyncCommandSfnName } from '../command-events/sfn-name.enum'
 import { TtlService } from './ttl.service'
+import { SnsClientFactory } from '../queue/sns-client-factory'
 
 export class MockedHandler implements IDataSyncHandler {
   async up(cmd: CommandModel): Promise<any> {
@@ -127,6 +128,8 @@ const sfnFinishDataEvent = createEvent(DataSyncCommandSfnName.FINISH)
 const keys = {
   NODE_ENV: 'env',
   APP_NAME: 'app_name',
+  SNS_TOPIC_ARN: 'main_topic_arn',
+  SNS_ALARM_TOPIC_ARN: 'alarm_topic_arn',
 }
 
 describe('DataSyncCommandSfnEventHandler', () => {
@@ -147,6 +150,7 @@ describe('DataSyncCommandSfnEventHandler', () => {
           SnsService,
           MockedHandler,
           TtlService,
+          SnsClientFactory,
           {
             provide: MODULE_OPTIONS_TOKEN,
             useValue: {
@@ -238,6 +242,30 @@ describe('DataSyncCommandSfnEventHandler', () => {
 
       // Assert
       expect(result).toEqual(expect.objectContaining({ result: -1 }))
+    })
+
+    it('should publish sns alarm when executing the stale check version event ', async () => {
+      // Arrange
+      dynamoDBMock.on(UpdateItemCommand).resolves({} as any)
+      snsMock.on(PublishCommand).resolves({} as any)
+      dynamoDBMock.on(GetItemCommand).resolves({
+        Item: {
+          version: {
+            N: '1',
+          },
+        },
+      })
+
+      // Action
+      const result = await commandEventHandler.execute(sfnCheckVersionEvent)
+
+      // Assert
+      expect(snsMock).toHaveReceivedCommandTimes(PublishCommand, 3)
+      expect(snsMock).toHaveReceivedNthCommandWith(2, PublishCommand, {
+        Message: expect.stringMatching(
+          /(?=.*"action":"sfn-alarm")(?=.*next version must be 2 but got 1)/g,
+        ),
+      })
     })
 
     it('should call the AWS service with the correct parameters when executing the correct check version event', async () => {
@@ -447,7 +475,7 @@ describe('DataSyncCommandSfnEventHandler', () => {
       })
     })
 
-    it('should throw not found handler error when executing the sync data event', async () => {
+    it('should throw not found handler error and publish sns alarm when executing the sync data event', async () => {
       // Arrange
       dynamoDBMock.on(UpdateItemCommand).resolves({} as any)
       snsMock.on(PublishCommand).resolves({} as any)
@@ -461,9 +489,15 @@ describe('DataSyncCommandSfnEventHandler', () => {
           }),
         ),
       ).rejects.toThrow('SyncDataHandler not found!')
+
+      expect(snsMock).toHaveReceivedNthCommandWith(3, PublishCommand, {
+        Message: expect.stringMatching(
+          /(?=.*"action":"sfn-alarm")(?=.*Error: SyncDataHandler not found!)/g,
+        ),
+      })
     })
 
-    it('should throw empty handler error when executing the sync data event', async () => {
+    it('should throw empty handler error and publish sns alarm when executing the sync data event', async () => {
       // Arrange
       dynamoDBMock.on(UpdateItemCommand).resolves({} as any)
       snsMock.on(PublishCommand).resolves({} as any)
@@ -478,6 +512,12 @@ describe('DataSyncCommandSfnEventHandler', () => {
           }),
         ),
       ).rejects.toThrow('SyncDataHandler empty!')
+
+      expect(snsMock).toHaveReceivedNthCommandWith(3, PublishCommand, {
+        Message: expect.stringMatching(
+          /(?=.*"action":"sfn-alarm")(?=.*Error: SyncDataHandler empty!)/g,
+        ),
+      })
     })
 
     it('should call handler up when executing the correct sync data event', async () => {

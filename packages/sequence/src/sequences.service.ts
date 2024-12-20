@@ -121,8 +121,8 @@ export class SequencesService implements ISequenceService {
 
     const generalMasterPk = masterPk(tenantCode)
     const generalMasterSk = `SEQ${KEY_SEPARATOR}${typeCode}`
-    this.logger.log('general master pk: ', generalMasterPk)
-    this.logger.log('general master sk: ', generalMasterSk)
+    this.logger.debug('general master pk: ', generalMasterPk)
+    this.logger.debug('general master sk: ', generalMasterSk)
     const masterData = await this.masterDataProvider.getData({
       pk: generalMasterPk,
       sk: generalMasterSk,
@@ -288,7 +288,7 @@ export class SequencesService implements ISequenceService {
 
     const effectiveStartMonth = registerTime
       ? registerTime.getMonth() + 1
-      : startMonth ?? 4
+      : (startMonth ?? 4)
     const referenceYear = registerTime ? registerTime.getFullYear() : 1953 // Reference year
 
     // Determine the current fiscal year

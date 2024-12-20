@@ -40,6 +40,10 @@ custom:
                 ['notification-action', 'command-status', 'task-status'],
             }
         queue: http://localhost:9324/101010101010/notification-queue
+      - topic:
+          topicName: AlarmSnsTopic
+          rawMessageDelivery: 'true'
+        queue: http://localhost:9324/101010101010/alarm-queue
     # host: 0.0.0.0 # Optional, defaults to 127.0.0.1 if not provided to serverless-offline
     # sns-endpoint: http://127.0.0.1:4567 # Optional. Only if you want to use a custom SNS provider endpoint
     # sns-subscribe-endpoint: http://127.0.0.1:3000 # Optional. Only if you want to use a custom subscribe endpoint from SNS to send messages back to
@@ -93,6 +97,7 @@ provider:
   region: ap-northeast-1
   runtime: nodejs18.x
   profile: serverless
+  timeout: 100
   httpApi:
     authorizers:
       localAuthorizer:

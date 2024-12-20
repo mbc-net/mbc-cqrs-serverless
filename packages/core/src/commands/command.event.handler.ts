@@ -1,4 +1,5 @@
 import { Inject, Injectable, Logger } from '@nestjs/common'
+import { ConfigService } from '@nestjs/config'
 
 import {
   DataSyncCommandSfnEvent,
@@ -7,7 +8,8 @@ import {
 import { DataSyncCommandSfnName } from '../command-events/sfn-name.enum'
 import { S3Service } from '../data-store'
 import { removeSortKeyVersion } from '../helpers/key'
-import { CommandModuleOptions } from '../interfaces'
+import { CommandModuleOptions, INotification } from '../interfaces'
+import { SnsService } from '../queue'
 import { MODULE_OPTIONS_TOKEN } from './command.module-definition'
 import { CommandService } from './command.service'
 import { DataService } from './data.service'
@@ -17,6 +19,7 @@ import { HistoryService } from './history.service'
 @Injectable()
 export class CommandEventHandler {
   private readonly logger: Logger
+  private readonly alarmTopicArn: string
 
   constructor(
     @Inject(MODULE_OPTIONS_TOKEN)
@@ -25,10 +28,13 @@ export class CommandEventHandler {
     private readonly dataService: DataService,
     private readonly historyService: HistoryService,
     private readonly s3Service: S3Service,
+    private readonly snsService: SnsService,
+    private readonly config: ConfigService,
   ) {
     this.logger = new Logger(
       `${CommandEventHandler.name}:${this.options.tableName}`,
     )
+    this.alarmTopicArn = this.config.get<string>('SNS_ALARM_TOPIC_ARN')
   }
 
   async execute(
@@ -55,6 +61,7 @@ export class CommandEventHandler {
         getCommandStatus(event.stepStateName, CommandStatus.STATUS_FAILED),
         event.commandRecord.requestId,
       )
+      await this.publishAlarm(event, (error as Error).stack)
       throw error
     }
   }
@@ -125,12 +132,15 @@ export class CommandEventHandler {
       }
     }
 
-    return {
+    const errorDetails = {
       result: -1,
       error: 'version is not match',
       cause:
         'next version must be ' + nextVersion + ' but got ' + new String(1),
     }
+
+    await this.publishAlarm(event, errorDetails)
+    return errorDetails
   }
 
   protected async setTtlCommand(
@@ -197,5 +207,28 @@ export class CommandEventHandler {
     this.logger.debug('checkNextToken:: ', event.commandRecord)
 
     return null
+  }
+
+  protected async publishAlarm(
+    event: DataSyncCommandSfnEvent,
+    errorDetails: any,
+  ): Promise<void> {
+    this.logger.debug('event', event)
+    const alarm: INotification = {
+      action: 'sfn-alarm',
+      id: `${event.commandKey.pk}#${event.commandKey.sk}`,
+      table: this.options.tableName,
+      pk: event.commandKey.pk,
+      sk: event.commandKey.sk,
+      tenantCode: event.commandKey.pk.substring(
+        event.commandKey.pk.indexOf('#') + 1,
+      ),
+      content: {
+        errorMessage: errorDetails,
+        sfnId: event.source,
+      },
+    }
+    this.logger.error('alarm:::', alarm)
+    await this.snsService.publish<INotification>(alarm, this.alarmTopicArn)
   }
 }
