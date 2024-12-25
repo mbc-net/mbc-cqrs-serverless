@@ -8,23 +8,28 @@ import {
   SnsService,
 } from '@mbc-cqrs-serverless/core'
 import { Injectable, Logger } from '@nestjs/common'
+import { ConfigService } from '@nestjs/config'
 import { ulid } from 'ulid'
 
 import { CreateTaskDto } from './dto/create-task.dto'
 import { TaskEntity } from './entity/task.entity'
 import { TaskListEntity } from './entity/task-list.entity'
 import { TaskStatusEnum } from './enums/status.enum'
+import { TaskQueueEvent } from './event'
 
 @Injectable()
 export class TaskService {
   private readonly logger = new Logger(TaskService.name)
   private readonly tableName: string
+  private readonly alarmTopicArn: string
 
   constructor(
     private readonly dynamoDbService: DynamoDbService,
     private readonly snsService: SnsService,
+    private readonly config: ConfigService,
   ) {
     this.tableName = dynamoDbService.getTableName('tasks')
+    this.alarmTopicArn = this.config.get<string>('SNS_ALARM_TOPIC_ARN')
   }
 
   async createTask(
@@ -119,5 +124,23 @@ export class TaskService {
       lastSk,
       items: items.map((item) => new TaskEntity(item)),
     })
+  }
+
+  async publishAlarm(event: TaskQueueEvent, errorDetails: any): Promise<void> {
+    this.logger.debug('event', event)
+    const taskKey = event.taskEvent.taskKey
+    const alarm: INotification = {
+      action: 'sfn-alarm',
+      id: `${taskKey.pk}#${taskKey.sk}`,
+      table: this.tableName,
+      pk: taskKey.pk,
+      sk: taskKey.sk,
+      tenantCode: taskKey.pk.substring(taskKey.pk.indexOf('#') + 1),
+      content: {
+        errorMessage: errorDetails,
+      },
+    }
+    this.logger.error('alarm:::', alarm)
+    await this.snsService.publish<INotification>(alarm, this.alarmTopicArn)
   }
 }

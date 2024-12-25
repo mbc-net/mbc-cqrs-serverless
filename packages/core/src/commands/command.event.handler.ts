@@ -225,7 +225,7 @@ export class CommandEventHandler {
       ),
       content: {
         errorMessage: errorDetails,
-        sfnId: event.source,
+        sfnId: event.context.Execution.Id,
       },
     }
     this.logger.error('alarm:::', alarm)
