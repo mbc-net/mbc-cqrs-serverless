@@ -1,6 +1,7 @@
 import { DataStoreModule } from '@mbc-cqrs-serverless/core/dist'
 import { DynamicModule, Module } from '@nestjs/common'
 
+import { SettingService } from './setting.service'
 import { TenantController } from './tenant.controller'
 import {
   ConfigurableModuleClass,
@@ -10,8 +11,8 @@ import { TenantService } from './tenant.service'
 
 @Module({
   imports: [DataStoreModule],
-  providers: [TenantService],
-  exports: [TenantService],
+  providers: [TenantService, SettingService],
+  exports: [TenantService, SettingService],
 })
 export class TenantModule extends ConfigurableModuleClass {
   static register(options: typeof OPTIONS_TYPE): DynamicModule {
