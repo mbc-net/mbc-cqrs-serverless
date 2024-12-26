@@ -57,11 +57,11 @@ export class CreateSettingByTenantDto {
   @ApiProperty({
     type: String,
     example: '1#2',
-    description: 'The group name for the setting.',
+    description: 'The group name or user id for the setting.',
   })
   @IsOptional()
   @IsString()
-  group?: string
+  entityIdentifier?: string
 
   /**
    * Additional attributes for the tenant (required).

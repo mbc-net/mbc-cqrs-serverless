@@ -1,4 +1,9 @@
-import { DataEntity, DetailKey, IInvoke } from '@mbc-cqrs-serverless/core'
+import {
+  CommandModel,
+  DataModel,
+  DetailKey,
+  IInvoke,
+} from '@mbc-cqrs-serverless/core'
 
 import { CreateSettingByTenantDto } from '../dto/settings/create.setting.dto'
 
@@ -12,7 +17,7 @@ export interface ISettingService {
    * @param key - The key used to identify the tenant code details.
    * @returns A promise that resolves to the tenant code's data entity.
    */
-  getSetting(key: DetailKey): Promise<DataEntity>
+  getSetting(key: DetailKey): Promise<DataModel>
 
   /**
    * Creates a new tenant code based on the provided data.
@@ -26,7 +31,7 @@ export interface ISettingService {
     options: {
       invokeContext: IInvoke
     },
-  ): Promise<DataEntity>
+  ): Promise<CommandModel>
 
   /**
    * Updates an existing tenant code with new data.
@@ -34,7 +39,7 @@ export interface ISettingService {
    * @param options - Options including the invocation context.
    * @returns A promise that resolves to the updated tenant code's data entity.
    */
-  updateSetting(options: { invokeContext: IInvoke }): Promise<DataEntity>
+  updateSetting(options: { invokeContext: IInvoke }): Promise<CommandModel>
 
   /**
    * Deletes an existing tenant code identified by the specified key.
@@ -46,5 +51,5 @@ export interface ISettingService {
   deleteSetting(
     key: DetailKey,
     options: { invokeContext: IInvoke },
-  ): Promise<DataEntity>
+  ): Promise<CommandModel>
 }

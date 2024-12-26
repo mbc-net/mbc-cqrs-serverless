@@ -1,4 +1,4 @@
-import { DataStoreModule } from '@mbc-cqrs-serverless/core/dist'
+import { CommandModule } from '@mbc-cqrs-serverless/core'
 import { DynamicModule, Module } from '@nestjs/common'
 
 import { SettingService } from './setting.service'
@@ -10,7 +10,11 @@ import {
 import { TenantService } from './tenant.service'
 
 @Module({
-  imports: [DataStoreModule],
+  imports: [
+    CommandModule.register({
+      tableName: 'tenant',
+    }),
+  ],
   providers: [TenantService, SettingService],
   exports: [TenantService, SettingService],
 })

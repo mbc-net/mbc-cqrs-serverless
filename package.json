@@ -86,7 +86,8 @@
     "packages/sequence",
     "packages/task",
     "packages/cli",
-    "packages/ui-setting"
+    "packages/ui-setting",
+    "packages/tenant"
   ],
   "jest": {
     "moduleFileExtensions": [

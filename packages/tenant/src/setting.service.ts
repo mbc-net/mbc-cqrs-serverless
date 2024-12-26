@@ -1,89 +1,88 @@
 import {
+  CommandDto,
+  CommandModel,
+  CommandService,
   DataEntity,
+  DataModel,
+  DataService,
   DetailKey,
-  DynamoDbService,
-  getUserContext,
+  generateId,
   IInvoke,
   KEY_SEPARATOR,
+  VERSION_FIRST,
 } from '@mbc-cqrs-serverless/core'
-import { Injectable, Logger } from '@nestjs/common'
+import { Injectable, Logger, NotFoundException } from '@nestjs/common'
 
 import { CreateSettingByTenantDto } from './dto/settings/create.setting.dto'
+import { SettingTypeEnum } from './enums/setting.enum'
 import { ISettingService } from './interfaces/setting.service.interface'
 @Injectable()
 export class SettingService implements ISettingService {
   private readonly logger = new Logger(SettingService.name)
-  private readonly tableName: string
 
-  constructor(private readonly dynamoDbService: DynamoDbService) {
-    this.tableName = dynamoDbService.getTableName('tenants')
-    this.logger.debug('tableName: ' + this.tableName)
-  }
-  async getSetting(key: DetailKey): Promise<DataEntity> {
-    return await this.dynamoDbService.getItem(this.tableName, key)
+  constructor(
+    private readonly commandService: CommandService,
+    private readonly dataService: DataService,
+  ) {}
+  async getSetting(key: DetailKey): Promise<DataModel> {
+    return await this.dataService.getItem(key)
   }
 
   async createSetting(
     dto: CreateSettingByTenantDto,
     options: { invokeContext: IInvoke },
-  ): Promise<DataEntity> {
-    const { name, tenantCode, attributes } = dto
-    const pk = `${tenantCode}${KEY_SEPARATOR}${name}`
-    const sk = `SETTING`
+  ): Promise<CommandModel> {
+    const { name, tenantCode, attributes, entityIdentifier, type, code } = dto
 
-    const sourceIp =
-      options?.invokeContext?.event?.requestContext?.http?.sourceIp
-    const userContext = getUserContext(options.invokeContext)
-    const userId = userContext.userId || 'system'
-    const now = new Date()
-    const item = await this.dynamoDbService.updateItem(
-      this.tableName,
-      { pk, sk },
-      {
-        set: {
-          code: sk,
-          name: name,
-          tenantCode: tenantCode,
-          type: name,
-          requestId: options.invokeContext?.context?.awsRequestId,
-          createdAt: { ifNotExists: now },
-          createdBy: { ifNotExists: userId },
-          createdIp: { ifNotExists: sourceIp },
-          updatedAt: now,
-          updatedBy: userId,
-          updatedIp: sourceIp,
-          atttributes: attributes,
-        },
-      },
-    )
+    const basePk = `SETTING${KEY_SEPARATOR}${tenantCode || SettingTypeEnum.TENANT_COMMON}`
+    let pk = basePk
 
-    return item
+    if (
+      type === SettingTypeEnum.TENANT_GROUP ||
+      type === SettingTypeEnum.TENANT_USER
+    ) {
+      pk += `${KEY_SEPARATOR}${type}${KEY_SEPARATOR}${entityIdentifier}`
+    }
+
+    const sk = code
+
+    const commad: CommandDto = {
+      sk,
+      pk,
+      code: sk,
+      name: name,
+      id: generateId(pk, sk),
+      tenantCode: tenantCode || SettingTypeEnum.TENANT_COMMON,
+      type: type,
+      version: VERSION_FIRST,
+
+      attributes,
+    }
+    return await this.commandService.publishAsync(commad, options)
   }
+
   updateSetting(): Promise<DataEntity> {
     throw new Error('Method not implemented.')
   }
+
   async deleteSetting(
     key: DetailKey,
     options: { invokeContext: IInvoke },
-  ): Promise<DataEntity> {
+  ): Promise<CommandModel> {
     const { pk, sk } = key
-    const sourceIp =
-      options?.invokeContext?.event?.requestContext?.http?.sourceIp
-    const userContext = getUserContext(options.invokeContext)
-    const userId = userContext.userId || 'system'
-    const now = new Date()
-    const item = await this.dynamoDbService.updateItem(
-      this.tableName,
-      { pk, sk },
+    const data = await this.dataService.getItem(key)
+    if (!data) {
+      throw new NotFoundException()
+    }
+
+    const item = await this.commandService.publishPartialUpdateAsync(
       {
-        set: {
-          isDeleted: true,
-          createdIp: { ifNotExists: sourceIp },
-          updatedAt: now,
-          updatedBy: userId,
-          updatedIp: sourceIp,
-        },
+        pk,
+        sk,
+        version: data.version,
+        isDeleted: true,
       },
+      options,
     )
 
     return item

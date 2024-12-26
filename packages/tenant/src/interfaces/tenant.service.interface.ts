@@ -1,4 +1,9 @@
-import { DataEntity, DetailKey, IInvoke } from '@mbc-cqrs-serverless/core'
+import {
+  CommandModel,
+  DataModel,
+  DetailKey,
+  IInvoke,
+} from '@mbc-cqrs-serverless/core'
 
 import { CreateTenantDto } from '../dto/tenant/create.tenant.dto'
 
@@ -12,7 +17,7 @@ export interface ITenantService {
    * @param key - The key used to identify the tenant code details.
    * @returns A promise that resolves to the tenant code's data entity.
    */
-  getTenantCode(key: DetailKey): Promise<DataEntity>
+  getTenantCode(key: DetailKey): Promise<DataModel>
 
   /**
    * Creates a new tenant code based on the provided data.
@@ -34,7 +39,7 @@ export interface ITenantService {
    * @param options - Options including the invocation context.
    * @returns A promise that resolves to the updated tenant code's data entity.
    */
-  updateTenantCode(options: { invokeContext: IInvoke }): Promise<DataEntity>
+  updateTenantCode(options: { invokeContext: IInvoke }): Promise<CommandModel>
 
   /**
    * Deletes an existing tenant code identified by the specified key.
@@ -46,5 +51,5 @@ export interface ITenantService {
   deleteTenantCode(
     key: DetailKey,
     options: { invokeContext: IInvoke },
-  ): Promise<DataEntity>
+  ): Promise<CommandModel>
 }
