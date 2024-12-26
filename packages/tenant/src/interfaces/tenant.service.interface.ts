@@ -1,6 +1,6 @@
 import { DataEntity, DetailKey, IInvoke } from '@mbc-cqrs-serverless/core'
 
-import { CreateTenantDto } from '../dto/create.dto'
+import { CreateTenantDto } from '../dto/tenant/create.tenant.dto'
 
 /**
  * Interface representing the service responsible for managing tenant codes.
@@ -26,7 +26,7 @@ export interface ITenantService {
     options: {
       invokeContext: IInvoke
     },
-  ): Promise<DataEntity>
+  ): Promise<Record<string, any>>
 
   /**
    * Updates an existing tenant code with new data.

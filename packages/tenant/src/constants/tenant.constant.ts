@@ -1,0 +1,1 @@
+export const TENANT_SYSTEM_PREFIX = 'TENANT'

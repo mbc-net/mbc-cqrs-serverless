@@ -8,7 +8,7 @@ import {
 } from '@mbc-cqrs-serverless/core'
 import { Injectable, Logger } from '@nestjs/common'
 
-import { CreateSettingByTenantDto } from './dto/create.setting.dto'
+import { CreateSettingByTenantDto } from './dto/settings/create.setting.dto'
 import { ISettingService } from './interfaces/setting.service.interface'
 @Injectable()
 export class SettingService implements ISettingService {

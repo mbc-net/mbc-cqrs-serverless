@@ -2,7 +2,7 @@ import { DetailDto, IInvoke, INVOKE_CONTEXT } from '@mbc-cqrs-serverless/core'
 import { Body, Controller, Delete, Get, Param, Post } from '@nestjs/common'
 import { ApiTags } from '@nestjs/swagger'
 
-import { CreateTenantDto } from './dto/create.dto'
+import { CreateTenantDto } from './dto/tenant/create.tenant.dto'
 import { TenantService } from './tenant.service'
 
 @ApiTags('tenant')

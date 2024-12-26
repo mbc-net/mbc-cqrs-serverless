@@ -1,6 +1,6 @@
 import { DataEntity, DetailKey, IInvoke } from '@mbc-cqrs-serverless/core'
 
-import { CreateSettingByTenantDto } from '../dto/create.setting.dto'
+import { CreateSettingByTenantDto } from '../dto/settings/create.setting.dto'
 
 /**
  * Interface representing the service responsible for managing tenant codes.

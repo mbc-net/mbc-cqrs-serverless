@@ -1,11 +1,9 @@
 import { ApiProperty } from '@nestjs/swagger'
-import { IsEnum, IsOptional, IsString } from 'class-validator'
-
-import { TenantTypeEnum } from '../enums/tenant.enum'
+import { IsOptional, IsString } from 'class-validator'
 
 export class CreateTenantDto {
   /**
-   * Value for tenent code create (require).
+   * Value for tenant code create (require).
    */
   @ApiProperty({
     type: String,
@@ -16,14 +14,17 @@ export class CreateTenantDto {
   @IsString()
   code: string
 
+  /**
+   * Value for tenant name create (require).
+   */
   @ApiProperty({
-    enum: TenantTypeEnum,
-    example: TenantTypeEnum.TENANT_SYSTEM,
+    type: String,
+    example: 'MBC',
     required: true,
-    description: ' describes the tenant as a System Group or User',
+    description: 'tenantName ',
   })
-  @IsEnum(TenantTypeEnum)
-  type: TenantTypeEnum
+  @IsString()
+  name: string
 
   @IsOptional()
   @IsString()
