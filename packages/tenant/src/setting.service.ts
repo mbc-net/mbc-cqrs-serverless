@@ -3,7 +3,6 @@ import {
   CommandModel,
   CommandService,
   DataEntity,
-  DataModel,
   DataService,
   DetailKey,
   generateId,
@@ -14,14 +13,17 @@ import {
 } from '@mbc-cqrs-serverless/core'
 import { Injectable, Logger, NotFoundException } from '@nestjs/common'
 
+import {
+  SETTING_TENANT_PREFIX,
+  TENANT_SYSTEM_PREFIX,
+} from './constants/tenant.constant'
 import { CreateSettingDto } from './dto/settings/create.setting.dto'
+import { CreateCommonTenantSettingDto } from './dto/settings/create-common.setting.dto'
+import { CreateCroupSettingDto } from './dto/settings/create-group-setting.dto'
+import { CreateUserSettingDto } from './dto/settings/create-user.setting.dto'
+import { SettingEntity } from './entities/setting.entity'
 import { SettingTypeEnum } from './enums/setting.enum'
 import { ISettingService } from './interfaces/setting.service.interface'
-import { CreateCommonTenantSettingDto } from './dto/settings/create-common.setting.dto'
-import { SETTING_TENANT_PREFIX, TENANT_SYSTEM_PREFIX } from './constants/tenant.constant'
-import { CreateCroupSettingDto } from './dto/settings/create-group-setting.dto'
-import { SettingEntity } from './entities/setting.entity'
-import { CreateUserSettingDto } from './dto/settings/create-user.setting.dto'
 @Injectable()
 export class SettingService implements ISettingService {
   private readonly logger = new Logger(SettingService.name)
@@ -29,70 +31,75 @@ export class SettingService implements ISettingService {
   constructor(
     private readonly commandService: CommandService,
     private readonly dataService: DataService,
-  ) { }
+  ) {}
 
   async getSetting(
     key: string,
     options: { invokeContext: IInvoke },
   ): Promise<SettingEntity> {
-    const { tenantCode, tenantRole, userId } = getUserContext(options.invokeContext);
-    const basePk = `${SETTING_TENANT_PREFIX}${KEY_SEPARATOR}${tenantCode}`;
+    const { tenantCode, tenantRole, userId } = getUserContext(
+      options.invokeContext,
+    )
+    const basePk = `${SETTING_TENANT_PREFIX}${KEY_SEPARATOR}${tenantCode}`
 
     // Try fetching user-level setting first
     let setting = await this.dataService.getItem({
       pk: `${basePk}${KEY_SEPARATOR}${SettingTypeEnum.TENANT_USER}${KEY_SEPARATOR}${userId}`,
-      sk: key
-    });
+      sk: key,
+    })
 
     if (setting) {
       return new SettingEntity({
         id: setting.id,
-        settingValue: setting.attributes
-      });
+        settingValue: setting.attributes,
+      })
     }
 
     // Fetch tenant settings
     const tenant = await this.dataService.getItem({
       pk: `${TENANT_SYSTEM_PREFIX}${KEY_SEPARATOR}${tenantCode}`,
-      sk: SETTING_TENANT_PREFIX
-    });
+      sk: SETTING_TENANT_PREFIX,
+    })
 
     if (tenant?.attributes) {
-      const groupSettingByRole = tenant.attributes.find(i => i.tenantRole === tenantRole);
+      const groupSettingByRole = tenant.attributes.find(
+        (i) => i.tenantRole === tenantRole,
+      )
 
       if (groupSettingByRole) {
         // TODO: Handle group-specific settings retrieval here
-        return null; // Placeholder for actual group settings retrieval logic
+        return null // Placeholder for actual group settings retrieval logic
       }
     }
 
     // Fallback to common tenant-level settings
     setting = await this.dataService.getItem({
       pk: `${basePk}`,
-      sk: key
-    });
+      sk: key,
+    })
 
     if (setting) {
       return new SettingEntity({
         id: setting.id,
-        settingValue: setting.attributes
-      });
+        settingValue: setting.attributes,
+      })
     }
 
     setting = await this.dataService.getItem({
       pk: `${SETTING_TENANT_PREFIX}${KEY_SEPARATOR}${SettingTypeEnum.TENANT_COMMON}`,
-      sk: key
-    });
+      sk: key,
+    })
 
     return new SettingEntity({
       id: setting.id,
-      settingValue: setting.attributes
-    });
+      settingValue: setting.attributes,
+    })
   }
 
-
-
-  async createCommonTenantSetting(dto: CreateCommonTenantSettingDto, options: { invokeContext: IInvoke }): Promise<CommandModel> {
+  async createCommonTenantSetting(
+    dto: CreateCommonTenantSettingDto,
+    options: { invokeContext: IInvoke },
+  ): Promise<CommandModel> {
     const { name, attributes, code } = dto
 
     const pk = `${SETTING_TENANT_PREFIX}${KEY_SEPARATOR}${SettingTypeEnum.TENANT_COMMON}`
@@ -112,7 +119,10 @@ export class SettingService implements ISettingService {
     }
     return await this.commandService.publishAsync(commad, options)
   }
-  async createTenantSetting(dto: CreateSettingDto, options: { invokeContext: IInvoke }): Promise<CommandModel> {
+  async createTenantSetting(
+    dto: CreateSettingDto,
+    options: { invokeContext: IInvoke },
+  ): Promise<CommandModel> {
     const { name, tenantCode, attributes, code } = dto
 
     const pk = `${SETTING_TENANT_PREFIX}${KEY_SEPARATOR}${tenantCode}`
@@ -133,15 +143,16 @@ export class SettingService implements ISettingService {
     return await this.commandService.publishAsync(commad, options)
   }
 
-  async createGroupSetting(dto: CreateCroupSettingDto, options: { invokeContext: IInvoke }): Promise<CommandModel> {
+  async createGroupSetting(
+    dto: CreateCroupSettingDto,
+    options: { invokeContext: IInvoke },
+  ): Promise<CommandModel> {
     const { name, tenantCode, attributes, code, groupName } = dto
 
     const basePk = `${SETTING_TENANT_PREFIX}${KEY_SEPARATOR}${tenantCode}`
     let pk = basePk
 
-
     pk += `${KEY_SEPARATOR}${SettingTypeEnum.TENANT_GROUP}${KEY_SEPARATOR}${groupName}`
-
 
     const sk = code
 
@@ -159,7 +170,10 @@ export class SettingService implements ISettingService {
     }
     return await this.commandService.publishAsync(commad, options)
   }
-  async createUserSetting(dto: CreateUserSettingDto, options: { invokeContext: IInvoke }): Promise<CommandModel> {
+  async createUserSetting(
+    dto: CreateUserSettingDto,
+    options: { invokeContext: IInvoke },
+  ): Promise<CommandModel> {
     const { name, tenantCode, attributes, code, userId } = dto
 
     const basePk = `${SETTING_TENANT_PREFIX}${KEY_SEPARATOR}${tenantCode}`
@@ -183,9 +197,6 @@ export class SettingService implements ISettingService {
     }
     return await this.commandService.publishAsync(commad, options)
   }
-
-
-
 
   updateSetting(): Promise<DataEntity> {
     throw new Error('Method not implemented.')

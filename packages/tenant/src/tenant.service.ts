@@ -12,7 +12,10 @@ import {
 } from '@mbc-cqrs-serverless/core'
 import { Injectable, Logger, NotFoundException } from '@nestjs/common'
 
-import { SETTING_TENANT_PREFIX, TENANT_SYSTEM_PREFIX } from './constants/tenant.constant'
+import {
+  SETTING_TENANT_PREFIX,
+  TENANT_SYSTEM_PREFIX,
+} from './constants/tenant.constant'
 import { CreateTenantDto } from './dto/tenant/create.tenant.dto'
 import { ITenantService } from './interfaces/tenant.service.interface'
 
@@ -23,7 +26,7 @@ export class TenantService implements ITenantService {
   constructor(
     private readonly commandService: CommandService,
     private readonly dataService: DataService,
-  ) { }
+  ) {}
   async getTenant(key: DetailKey): Promise<DataModel> {
     return await this.dataService.getItem(key)
   }
