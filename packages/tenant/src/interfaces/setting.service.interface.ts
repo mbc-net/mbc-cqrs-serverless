@@ -9,6 +9,8 @@ import { CreateSettingDto } from '../dto/settings/create.setting.dto'
 import { UpdateSettingDto } from '../dto/settings/update.setting.dto'
 import { CreateCommonTenantSettingDto } from '../dto/settings/create-common.setting.dto'
 import { CreateCroupSettingDto } from '../dto/settings/create-group-setting.dto'
+import { SettingEntity } from '../entities/setting.entity'
+import { CreateUserSettingDto } from '../dto/settings/create-user.setting.dto'
 
 export interface ISettingService {
   /**
@@ -21,7 +23,7 @@ export interface ISettingService {
   getSetting(
     key: string,
     options: { invokeContext: IInvoke },
-  ): Promise<DataModel>
+  ): Promise<SettingEntity>
 
   /**
    * Creates a new setting code based on the provided data.
@@ -121,7 +123,7 @@ export interface ISettingService {
   ): Promise<CommandModel>
 
   createUserSetting(
-    dto: CreateSettingDto,
+    dto: CreateUserSettingDto,
     options: {
       invokeContext: IInvoke
     },

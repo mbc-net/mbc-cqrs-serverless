@@ -21,8 +21,8 @@ export class TenantService implements ITenantService {
   private readonly logger = new Logger(TenantService.name)
 
   constructor(
-    private readonly commandService: CommandService, //...te
-    private readonly dataService: DataService, // ten
+    private readonly commandService: CommandService,
+    private readonly dataService: DataService,
   ) { }
   async getTenant(key: DetailKey): Promise<DataModel> {
     return await this.dataService.getItem(key)

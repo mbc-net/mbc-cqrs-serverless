@@ -8,11 +8,11 @@ import { TenantService } from './tenant.service'
 @ApiTags('tenant')
 @Controller()
 export class TenantController {
-  constructor(private readonly tenantService: TenantService) {}
+  constructor(private readonly tenantService: TenantService) { }
 
   @Get('/:pk/:sk')
   async getTenant(@Param() dto: DetailDto) {
-    return await this.tenantService.getTenantCode(dto)
+    return await this.tenantService.getTenant(dto)
   }
 
   @Post()
