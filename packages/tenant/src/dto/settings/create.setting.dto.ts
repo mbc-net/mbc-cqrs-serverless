@@ -1,9 +1,8 @@
 import { ApiProperty } from '@nestjs/swagger'
-import { IsEnum, IsObject, IsOptional, IsString } from 'class-validator'
+import { IsObject, IsOptional, IsString } from 'class-validator'
 
-import { SettingTypeEnum } from '../../enums/setting.enum'
 
-export class CreateSettingByTenantDto {
+export class CreateSettingDto {
   /**
    * Name of the setting for the tenant code (required).
    */
@@ -40,29 +39,6 @@ export class CreateSettingByTenantDto {
   })
   @IsString()
   tenantCode: string
-
-  @ApiProperty({
-    enum: SettingTypeEnum,
-    example: SettingTypeEnum.TENANT_COMMON,
-    required: true,
-    description: 'The type of the setting.',
-  })
-  @IsEnum(SettingTypeEnum)
-  type: SettingTypeEnum
-
-  /**
-   * Group name for the setting (optional).
-   * @example '1#2'
-   */
-  @ApiProperty({
-    type: String,
-    example: '1#2',
-    description: 'The group name or user id for the setting.',
-  })
-  @IsOptional()
-  @IsString()
-  entityIdentifier?: string
-
   /**
    * Additional attributes for the tenant (required).
    */

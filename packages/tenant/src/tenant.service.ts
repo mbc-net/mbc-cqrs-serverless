@@ -12,7 +12,7 @@ import {
 } from '@mbc-cqrs-serverless/core'
 import { Injectable, Logger, NotFoundException } from '@nestjs/common'
 
-import { TENANT_SYSTEM_PREFIX } from './constants/tenant.constant'
+import { SETTING_TENANT_PREFIX, TENANT_SYSTEM_PREFIX } from './constants/tenant.constant'
 import { CreateTenantDto } from './dto/tenant/create.tenant.dto'
 import { ITenantService } from './interfaces/tenant.service.interface'
 
@@ -23,18 +23,18 @@ export class TenantService implements ITenantService {
   constructor(
     private readonly commandService: CommandService, //...te
     private readonly dataService: DataService, // ten
-  ) {}
-  async getTenantCode(key: DetailKey): Promise<DataModel> {
+  ) { }
+  async getTenant(key: DetailKey): Promise<DataModel> {
     return await this.dataService.getItem(key)
   }
 
-  async createTenantCode(
+  async createTenant(
     dto: CreateTenantDto,
     options: { invokeContext: IInvoke },
   ): Promise<CommandModel> {
     const { name, code, description } = dto
     const pk = `${TENANT_SYSTEM_PREFIX}${KEY_SEPARATOR}${code}`
-    const sk = 'SETTING'
+    const sk = SETTING_TENANT_PREFIX
 
     const command: CommandDto = {
       pk: pk,
@@ -53,10 +53,10 @@ export class TenantService implements ITenantService {
     return await this.commandService.publishAsync(command, options)
   }
 
-  updateTenantCode(): Promise<CommandModel> {
+  updateTenant(): Promise<CommandModel> {
     throw new Error('Method not implemented.')
   }
-  async deleteTenantCode(
+  async deleteTenant(
     key: DetailKey,
     options: { invokeContext: IInvoke },
   ): Promise<CommandModel> {
