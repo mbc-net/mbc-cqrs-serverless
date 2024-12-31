@@ -144,7 +144,7 @@ export class SettingService implements ISettingService {
       name: name,
       id: generateId(pk, sk),
       tenantCode: tenantCode,
-      type: SettingTypeEnum.TENANT_SYSTEM,
+      type: SettingTypeEnum.TENANT,
       version: VERSION_FIRST,
 
       attributes,

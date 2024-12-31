@@ -1,6 +1,6 @@
 export enum SettingTypeEnum {
   TENANT_COMMON = 'COMMON',
-  TENANT_SYSTEM = 'TENANT',
+  TENANT = 'TENANT',
   TENANT_GROUP = 'GROUP',
   TENANT_USER = 'USER',
 }
