@@ -1,10 +1,8 @@
 import {
   CommandDto,
-  CommandModule,
   CommandService,
   DataService,
   generateId,
-  getUserContext,
   JwtClaims,
   KEY_SEPARATOR,
   VERSION_FIRST,
@@ -32,7 +30,6 @@ const optionsMock = {
           jwt: {
             claims: {
               sub: 'abc',
-              'custom:tenant': 'MBC',
               'custom:roles': '[{"tenant":"MBC","role":"admin"}]',
             } as JwtClaims,
           },
@@ -78,11 +75,10 @@ describe('SettingService', () => {
     expect(service).toBeDefined()
   })
   it('should return user-level setting if found', async () => {
-    const { tenantCode, userId } = getUserContext(optionsMock.invokeContext)
 
     jest.spyOn(dataService, 'getItem').mockResolvedValue({
-      pk: 'SETTING#MBC#USER#abc',
-      sk: 'UserListSetting',
+      pk: 'SETTING#MBC',
+      sk: 'USER#abcUserListSetting',
       id: 'SETTING#MBC#USER#abc#UserListSetting',
       attributes: {},
       code: 'UserListSetting',
@@ -214,8 +210,8 @@ describe('SettingService', () => {
       const pk = `${SETTING_TENANT_PREFIX}${KEY_SEPARATOR}${tenantCode}`
       const sk = settingCode
       const mockResponse = {
-        pk: 'SETTING#MBC#GROUP#1',
-        sk: 'UserListSetting',
+        pk: 'SETTING#MBC',
+        sk: 'GROUP#1#UserListSetting',
         id: 'SETTING#MBC#GROUP#1#UserListSetting',
         attributes: {},
         code: 'UserListSetting',
@@ -239,8 +235,8 @@ describe('SettingService', () => {
       }
 
       jest.spyOn(commandService, 'publishAsync').mockResolvedValue({
-        pk: 'SETTING#MBC#GROUP#1',
-        sk: 'UserListSetting',
+        pk: 'SETTING#MBC',
+        sk: 'GROUP#1#UserListSetting',
         id: 'SETTING#MBC#GROUP#1#UserListSetting',
         attributes: {},
         code: 'UserListSetting',
@@ -264,8 +260,8 @@ describe('SettingService', () => {
       const pk = `${SETTING_TENANT_PREFIX}${KEY_SEPARATOR}${tenantCode}`
       const sk = settingCode
       const mockResponse = {
-        pk: 'SETTING#MBC#USER#abc',
-        sk: 'UserListSetting',
+        pk: 'SETTING#MBC',
+        sk: 'USER#abcUserListSetting',
         id: 'SETTING#MBC#USER#abc#UserListSetting',
         attributes: {},
         code: 'UserListSetting',
@@ -289,8 +285,8 @@ describe('SettingService', () => {
       }
 
       jest.spyOn(commandService, 'publishAsync').mockResolvedValue({
-        pk: 'SETTING#MBC#USER#abc',
-        sk: 'UserListSetting',
+        pk: 'SETTING#MBC',
+        sk: 'USER#abcUserListSetting',
         id: 'SETTING#MBC#USER#abc#UserListSetting',
         attributes: {},
         code: 'UserListSetting',

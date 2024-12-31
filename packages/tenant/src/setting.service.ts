@@ -40,12 +40,12 @@ export class SettingService implements ISettingService {
     const { tenantCode, tenantRole, userId } = getUserContext(
       options.invokeContext,
     )
-    const basePk = `${SETTING_TENANT_PREFIX}${KEY_SEPARATOR}${tenantCode}`
+    const pk = `${SETTING_TENANT_PREFIX}${KEY_SEPARATOR}${tenantCode}`
 
     // Try fetching user-level setting first
     let setting = await this.dataService.getItem({
-      pk: `${basePk}${KEY_SEPARATOR}${SettingTypeEnum.TENANT_USER}${KEY_SEPARATOR}${userId}`,
-      sk: key,
+      pk: pk,
+      sk: `${SettingTypeEnum.TENANT_USER}${KEY_SEPARATOR}${userId}${KEY_SEPARATOR}${key}`,
     })
 
     if (setting) {
@@ -67,14 +67,23 @@ export class SettingService implements ISettingService {
       )
 
       if (groupSettingByRole) {
-        // TODO: Handle group-specific settings retrieval here
-        return null // Placeholder for actual group settings retrieval logic
+        setting = await this.getGroupSetting(
+          groupSettingByRole.setting_groups,
+          tenantCode,
+          key,
+        )
+        if (setting) {
+          return new SettingEntity({
+            id: setting.id,
+            settingValue: setting.attributes,
+          })
+        }
       }
     }
 
     // Fallback to common tenant-level settings
     setting = await this.dataService.getItem({
-      pk: `${basePk}`,
+      pk: pk,
       sk: key,
     })
 
@@ -149,12 +158,9 @@ export class SettingService implements ISettingService {
   ): Promise<CommandModel> {
     const { name, tenantCode, attributes, code, groupName } = dto
 
-    const basePk = `${SETTING_TENANT_PREFIX}${KEY_SEPARATOR}${tenantCode}`
-    let pk = basePk
+    const pk = `${SETTING_TENANT_PREFIX}${KEY_SEPARATOR}${tenantCode}`
 
-    pk += `${KEY_SEPARATOR}${SettingTypeEnum.TENANT_GROUP}${KEY_SEPARATOR}${groupName}`
-
-    const sk = code
+    const sk = `${SettingTypeEnum.TENANT_GROUP}${KEY_SEPARATOR}${groupName}${KEY_SEPARATOR}${code}`
 
     const commad: CommandDto = {
       sk,
@@ -176,12 +182,9 @@ export class SettingService implements ISettingService {
   ): Promise<CommandModel> {
     const { name, tenantCode, attributes, code, userId } = dto
 
-    const basePk = `${SETTING_TENANT_PREFIX}${KEY_SEPARATOR}${tenantCode}`
-    let pk = basePk
+    const pk = `${SETTING_TENANT_PREFIX}${KEY_SEPARATOR}${tenantCode}`
 
-    pk += `${KEY_SEPARATOR}${SettingTypeEnum.TENANT_USER}${KEY_SEPARATOR}${userId}`
-
-    const sk = code
+    const sk = `${SettingTypeEnum.TENANT_USER}${KEY_SEPARATOR}${userId}${KEY_SEPARATOR}${code}`
 
     const commad: CommandDto = {
       sk,
@@ -223,5 +226,25 @@ export class SettingService implements ISettingService {
     )
 
     return item
+  }
+
+  private async getGroupSetting(
+    groups: string[],
+    tenantCode: string,
+    settingId: string,
+  ) {
+    for (const key of groups) {
+      const pk = `${SETTING_TENANT_PREFIX}${KEY_SEPARATOR}${tenantCode}`
+      const sk = `${SettingTypeEnum.TENANT_GROUP}${KEY_SEPARATOR}${key}${KEY_SEPARATOR}${settingId}`
+      const result = await this.dataService.getItem({
+        pk: pk,
+        sk: sk,
+      })
+
+      if (result) {
+        return result // Return the first result found
+      }
+    }
+    return null
   }
 }

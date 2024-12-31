@@ -1,16 +1,11 @@
-import {
-  CommandModel,
-  DataModel,
-  DetailKey,
-  IInvoke,
-} from '@mbc-cqrs-serverless/core'
+import { CommandModel, DetailKey, IInvoke } from '@mbc-cqrs-serverless/core'
 
 import { CreateSettingDto } from '../dto/settings/create.setting.dto'
-import { UpdateSettingDto } from '../dto/settings/update.setting.dto'
 import { CreateCommonTenantSettingDto } from '../dto/settings/create-common.setting.dto'
 import { CreateCroupSettingDto } from '../dto/settings/create-group-setting.dto'
-import { SettingEntity } from '../entities/setting.entity'
 import { CreateUserSettingDto } from '../dto/settings/create-user.setting.dto'
+import { UpdateSettingDto } from '../dto/settings/update.setting.dto'
+import { SettingEntity } from '../entities/setting.entity'
 
 export interface ISettingService {
   /**
@@ -98,15 +93,12 @@ export interface ISettingService {
     options: { invokeContext: IInvoke },
   ): Promise<CommandModel>
 
-
   createCommonTenantSetting(
     dto: CreateCommonTenantSettingDto,
     options: {
       invokeContext: IInvoke
     },
   ): Promise<CommandModel>
-
-
 
   createTenantSetting(
     dto: CreateSettingDto,
@@ -115,11 +107,11 @@ export interface ISettingService {
     },
   ): Promise<CommandModel>
 
-
-  createGroupSetting(dto: CreateCroupSettingDto,
+  createGroupSetting(
+    dto: CreateCroupSettingDto,
     options: {
       invokeContext: IInvoke
-    }
+    },
   ): Promise<CommandModel>
 
   createUserSetting(
