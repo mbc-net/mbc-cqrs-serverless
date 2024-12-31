@@ -7,6 +7,7 @@ import {
 
 import { AddGroupTenantDto } from '../dto/tenant/add-group-tenant.dto'
 import { CreateTenantDto } from '../dto/tenant/create.tenant.dto'
+import { CreateCommonTenantDto } from '../dto/tenant/create-common-tenant.dto'
 import { UpdateTenantDto } from '../dto/tenant/update.tenant.dto'
 
 /**
@@ -20,7 +21,6 @@ export interface ITenantService {
    * @returns A promise that resolves to the tenant code's data entity.
    */
   getTenant(key: DetailKey): Promise<DataModel>
-
   /**
    * Creates a new tenant code based on the provided data.
    *
@@ -82,5 +82,12 @@ export interface ITenantService {
   addGroup(
     dto: AddGroupTenantDto,
     context: { invokeContext: IInvoke },
+  ): Promise<CommandModel>
+
+  createCommonTenant(
+    dto: CreateCommonTenantDto,
+    context: {
+      invokeContext: IInvoke
+    },
   ): Promise<CommandModel>
 }

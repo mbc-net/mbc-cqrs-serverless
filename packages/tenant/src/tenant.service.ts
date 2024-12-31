@@ -19,6 +19,8 @@ import {
 } from './constants/tenant.constant'
 import { AddGroupTenantDto } from './dto/tenant/add-group-tenant.dto'
 import { CreateTenantDto } from './dto/tenant/create.tenant.dto'
+import { CreateCommonTenantDto } from './dto/tenant/create-common-tenant.dto'
+import { SettingTypeEnum } from './enums/setting.enum'
 import { ITenantService } from './interfaces/tenant.service.interface'
 
 @Injectable()
@@ -33,6 +35,29 @@ export class TenantService implements ITenantService {
     return await this.dataService.getItem(key)
   }
 
+  async createCommonTenant(
+    dto: CreateCommonTenantDto,
+    context: { invokeContext: IInvoke },
+  ): Promise<CommandModel> {
+    const { name, description } = dto
+    const pk = `${TENANT_SYSTEM_PREFIX}${KEY_SEPARATOR}${SettingTypeEnum.TENANT_COMMON}`
+    const sk = SETTING_TENANT_PREFIX
+
+    const command: CommandDto = {
+      pk: pk,
+      sk: sk,
+      code: sk,
+      id: generateId(pk, sk),
+      name: name,
+      tenantCode: SettingTypeEnum.TENANT_COMMON,
+      type: SettingTypeEnum.TENANT_COMMON,
+      version: VERSION_FIRST,
+      attributes: {
+        description: description,
+      },
+    }
+    return await this.commandService.publishAsync(command, context)
+  }
   async createTenant(
     dto: CreateTenantDto,
     context: { invokeContext: IInvoke },
