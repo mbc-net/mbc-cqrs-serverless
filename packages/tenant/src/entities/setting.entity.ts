@@ -1,8 +1,8 @@
 export class SettingEntity {
-    id: string
-    settingValue: Object
+  id: string
+  settingValue: object
 
-    constructor(partial: Partial<SettingEntity>) {
-        Object.assign(this, partial)
-    }
+  constructor(partial: Partial<SettingEntity>) {
+    Object.assign(this, partial)
+  }
 }

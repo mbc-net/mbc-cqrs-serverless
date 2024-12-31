@@ -5,6 +5,7 @@ import {
   IInvoke,
 } from '@mbc-cqrs-serverless/core'
 
+import { AddGroupTenantDto } from '../dto/tenant/add-group-tenant.dto'
 import { CreateTenantDto } from '../dto/tenant/create.tenant.dto'
 import { UpdateTenantDto } from '../dto/tenant/update.tenant.dto'
 
@@ -45,14 +46,12 @@ export interface ITenantService {
    *       - attributes: object
    *       - name: MBC
    *       - type: string
-
-
    * @param options - Additional options including the invocation context.
    * @returns A promise that resolves to the newly created tenant code's data entity.
    */
   createTenant(
     dto: CreateTenantDto,
-    options: {
+    context: {
       invokeContext: IInvoke
     },
   ): Promise<Record<string, any>>
@@ -65,7 +64,7 @@ export interface ITenantService {
    */
   updateTenant(
     dto: UpdateTenantDto,
-    options: { invokeContext: IInvoke },
+    context: { invokeContext: IInvoke },
   ): Promise<CommandModel>
 
   /**
@@ -77,6 +76,11 @@ export interface ITenantService {
    */
   deleteTenant(
     key: DetailKey,
-    options: { invokeContext: IInvoke },
+    context: { invokeContext: IInvoke },
+  ): Promise<CommandModel>
+
+  addGroup(
+    dto: AddGroupTenantDto,
+    context: { invokeContext: IInvoke },
   ): Promise<CommandModel>
 }

@@ -6,6 +6,7 @@ import {
   DataService,
   DetailKey,
   generateId,
+  getUserContext,
   IInvoke,
   KEY_SEPARATOR,
   VERSION_FIRST,
@@ -16,6 +17,7 @@ import {
   SETTING_TENANT_PREFIX,
   TENANT_SYSTEM_PREFIX,
 } from './constants/tenant.constant'
+import { AddGroupTenantDto } from './dto/tenant/add-group-tenant.dto'
 import { CreateTenantDto } from './dto/tenant/create.tenant.dto'
 import { ITenantService } from './interfaces/tenant.service.interface'
 
@@ -33,7 +35,7 @@ export class TenantService implements ITenantService {
 
   async createTenant(
     dto: CreateTenantDto,
-    options: { invokeContext: IInvoke },
+    context: { invokeContext: IInvoke },
   ): Promise<CommandModel> {
     const { name, code, description } = dto
     const pk = `${TENANT_SYSTEM_PREFIX}${KEY_SEPARATOR}${code}`
@@ -53,7 +55,7 @@ export class TenantService implements ITenantService {
       },
     }
 
-    return await this.commandService.publishAsync(command, options)
+    return await this.commandService.publishAsync(command, context)
   }
 
   updateTenant(): Promise<CommandModel> {
@@ -61,7 +63,7 @@ export class TenantService implements ITenantService {
   }
   async deleteTenant(
     key: DetailKey,
-    options: { invokeContext: IInvoke },
+    context: { invokeContext: IInvoke },
   ): Promise<CommandModel> {
     const data = await this.dataService.getItem(key)
     if (!data) {
@@ -76,9 +78,88 @@ export class TenantService implements ITenantService {
         version: data.version,
         isDeleted: true,
       },
-      options,
+      context,
     )
 
     return item
+  }
+  async addGroup(
+    dto: AddGroupTenantDto,
+    context: { invokeContext: IInvoke },
+  ): Promise<CommandModel> {
+    const { role, groupId } = dto
+    const { tenantCode } = getUserContext(context.invokeContext)
+
+    const tenant = await this.dataService.getItem({
+      pk: `${TENANT_SYSTEM_PREFIX}${KEY_SEPARATOR}${tenantCode}`,
+      sk: SETTING_TENANT_PREFIX,
+    })
+
+    // Helper to create a new attribute
+    const createNewAttribute = () => ({
+      tenantRole: role,
+      groups: [groupId],
+      setting_groups: [groupId],
+      setting_groups_mode: 'auto',
+    })
+
+    // Helper to update an existing attribute
+    const updateAttribute = (item) => {
+      if (item.groups.includes(groupId)) return item
+
+      const newGroups = [...item.groups, groupId]
+      const newSettingGroups =
+        item.setting_groups_mode === 'customized'
+          ? [...item.setting_groups, groupId]
+          : this.sortGroups(newGroups)
+
+      return {
+        ...item,
+        groups: newGroups,
+        setting_groups: newSettingGroups,
+        setting_groups_mode: item.setting_groups_mode || 'auto',
+      }
+    }
+
+    // If tenant exists and has attributes
+    if (Array.isArray(tenant?.attributes) && tenant.attributes.length > 0) {
+      const existingRole = tenant.attributes.find((i) => i.tenantRole === role)
+
+      const updatedAttributes = existingRole
+        ? tenant.attributes.map((item) =>
+            item.tenantRole === role ? updateAttribute(item) : item,
+          )
+        : [...tenant.attributes, createNewAttribute()]
+
+      return await this.commandService.publishPartialUpdateAsync(
+        {
+          pk: tenant.pk,
+          sk: tenant.sk,
+          version: tenant.version,
+          attributes: updatedAttributes,
+        },
+        context,
+      )
+    }
+
+    // If tenant does not exist or has no attributes
+    return await this.commandService.publishPartialUpdateAsync(
+      {
+        pk: tenant.pk,
+        sk: tenant.sk,
+        version: tenant.version,
+        attributes: [createNewAttribute()],
+      },
+      context,
+    )
+  }
+
+  private sortGroups(groups: string[]) {
+    groups.sort((a, b) => {
+      const countA = a.split('#').length - 1
+      const countB = b.split('#').length - 1
+
+      return countB !== countA ? countB - countA : a.localeCompare(b)
+    })
   }
 }

@@ -14,109 +14,63 @@ export interface ISettingService {
    * Return the settings result for the user.
    * @param key - The key used to identify the setting e.g. UserListSetting
    * @returns A promise that resolves to the setting s data entity.
+   *     Example SettingEntity
+   *     {
+   *       id: SETTING#mbc#USER#abc#UserListSetting
+   *       settingValue: object
+   *     }
    */
   getSetting(
     key: string,
-    options: { invokeContext: IInvoke },
+    context: { invokeContext: IInvoke },
   ): Promise<SettingEntity>
-
-  /**
-   * Creates a new setting code based on the provided data.
-   *
-   * @param dto - The data transfer object containing the parameters required for creating a setting.
-   * dto contains:
-   *   - name: string - The name of the setting.
-   *   - code: string - The code of the setting.
-   *   - tenantCode: string - The tenantCode of the setting, e.g., (COMMON, MBC, MAI).
-   *   - type: string - The type, which can be common, tenant, group, or user.
-   *   - entityIdentifier: string - The group identifier, e.g., (group:1, 1#2, 1#4, 1#2#3), (user:abc).
-   *   - attributes: object - The setting data.
-   *     Example SettingEntity:
-   *     - User level:
-   *       - pk: SETTING#mbc#USER#abc
-   *       - sk: UserListSetting
-   *       - id: SETTING#mbc#USER#abc#UserListSetting
-   *       - attributes: object
-   *       - name: UserListSetting
-   *       - type: USER
-   *     - Group level:
-   *       - pk: SETTING#MBC#group2#4
-   *       - sk: UserListSetting
-   *       - id: SETTING#mbc#group#2#4#UserListSetting
-   *       - attributes: object
-   *       - name: UserListSetting
-   *       - type: GROUP
-   *     - Tenant :
-   *       - pk: SETTING#MBC
-   *       - sk: UserListSetting
-   *       - id: SETTING#mbc#UserListSetting
-   *       - attributes: object
-   *       - name: UserListSetting
-   *       - type: Tenant
-   *     - COMMON:
-   *       - pk: SETTING#COMMON
-   *       - sk: UserListSetting
-   *       - id: SETTING#COMMON#UserListSetting
-   *       - attributes: object
-   *       - name: string
-   *       - type: string
-   * @param options - Additional options including the invocation context.
-   * @returns A promise that resolves to the newly created setting's data entity.
-   */
-  // createSetting(
-  //   dto: CreateSettingByTenantDto,
-  //   options: {
-  //     invokeContext: IInvoke
-  //   },
-  // ): Promise<CommandModel>
-
   /**
    * Updates an existing tenant code with new data.
    *
-   * @param options - Options including the invocation context.
+   * @param context - The invocation context.
    * @returns A promise that resolves to the updated tenant code's data entity.
    */
   updateSetting(
     dto: UpdateSettingDto,
-    options: { invokeContext: IInvoke },
+    context: { invokeContext: IInvoke },
   ): Promise<CommandModel>
 
   /**
    * Deletes an existing tenant code identified by the specified key.
    *
    * @param key - The key used to identify the tenant code to delete.
-   * @param options - Additional options including the invocation context.
+   * @param context - The invocation context.
    * @returns A promise that resolves to the data entity of the deleted tenant code.
    */
   deleteSetting(
     key: DetailKey,
-    options: { invokeContext: IInvoke },
+    context: { invokeContext: IInvoke },
   ): Promise<CommandModel>
 
   createCommonTenantSetting(
     dto: CreateCommonTenantSettingDto,
-    options: {
+    context: {
       invokeContext: IInvoke
     },
   ): Promise<CommandModel>
 
   createTenantSetting(
     dto: CreateSettingDto,
-    options: {
+    context: {
       invokeContext: IInvoke
     },
   ): Promise<CommandModel>
 
   createGroupSetting(
     dto: CreateCroupSettingDto,
-    options: {
+    context: {
       invokeContext: IInvoke
     },
   ): Promise<CommandModel>
 
   createUserSetting(
     dto: CreateUserSettingDto,
-    options: {
+    context: {
       invokeContext: IInvoke
     },
   ): Promise<CommandModel>
