@@ -25,7 +25,7 @@ export class SequenceMasterDataProvider implements IMasterDataProvider {
       if (!item) {
         return this.defaultValue
       }
-      return item
+      return item.attributes
     } catch (error) {
       return this.defaultValue
     }
