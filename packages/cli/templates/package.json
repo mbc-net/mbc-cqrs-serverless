@@ -73,7 +73,7 @@
     "nestjs-spelunker": "^1.3.0",
     "prettier": "^3.1.1",
     "run-script-os": "^1.1.6",
-    "serverless": "^3.38.0",
+    "serverless": "^3.40.0",
     "serverless-dynamodb": "^0.2.47",
     "serverless-localstack": "^1.1.2",
     "serverless-offline": "^13.3.2",
