@@ -1,6 +1,5 @@
 import { ApiProperty } from '@nestjs/swagger'
-import { IsObject, IsOptional, IsString } from 'class-validator'
-
+import { IsObject, IsString } from 'class-validator'
 
 export class CreateSettingDto {
   /**
@@ -49,5 +48,5 @@ export class CreateSettingDto {
     description: 'Additional attributes describing the tenant.',
   })
   @IsObject()
-  attributes: object
+  settingValue: object
 }

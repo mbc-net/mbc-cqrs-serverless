@@ -36,5 +36,5 @@ export class CreateCommonTenantSettingDto {
     description: 'Additional attributes describing the tenant.',
   })
   @IsObject()
-  attributes: object
+  settingValue: object
 }

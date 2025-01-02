@@ -109,11 +109,10 @@ export class SettingService implements ISettingService {
     dto: CreateCommonTenantSettingDto,
     options: { invokeContext: IInvoke },
   ): Promise<CommandModel> {
-    const { name, attributes, code } = dto
+    const { name, settingValue, code } = dto
 
     const pk = `${SETTING_TENANT_PREFIX}${KEY_SEPARATOR}${SettingTypeEnum.TENANT_COMMON}`
     const sk = code
-
     const commad: CommandDto = {
       sk,
       pk,
@@ -124,7 +123,7 @@ export class SettingService implements ISettingService {
       type: SettingTypeEnum.TENANT_COMMON,
       version: VERSION_FIRST,
 
-      attributes,
+      attributes: settingValue,
     }
     return await this.commandService.publishAsync(commad, options)
   }
@@ -132,7 +131,7 @@ export class SettingService implements ISettingService {
     dto: CreateSettingDto,
     options: { invokeContext: IInvoke },
   ): Promise<CommandModel> {
-    const { name, tenantCode, attributes, code } = dto
+    const { name, tenantCode, settingValue, code } = dto
 
     const pk = `${SETTING_TENANT_PREFIX}${KEY_SEPARATOR}${tenantCode}`
     const sk = code
@@ -147,7 +146,7 @@ export class SettingService implements ISettingService {
       type: SettingTypeEnum.TENANT,
       version: VERSION_FIRST,
 
-      attributes,
+      attributes: settingValue,
     }
     return await this.commandService.publishAsync(commad, options)
   }
@@ -156,7 +155,7 @@ export class SettingService implements ISettingService {
     dto: CreateCroupSettingDto,
     options: { invokeContext: IInvoke },
   ): Promise<CommandModel> {
-    const { name, tenantCode, attributes, code, groupName } = dto
+    const { name, tenantCode, settingValue, code, groupName } = dto
 
     const pk = `${SETTING_TENANT_PREFIX}${KEY_SEPARATOR}${tenantCode}`
 
@@ -172,7 +171,7 @@ export class SettingService implements ISettingService {
       type: SettingTypeEnum.TENANT_GROUP,
       version: VERSION_FIRST,
 
-      attributes,
+      attributes: settingValue,
     }
     return await this.commandService.publishAsync(commad, options)
   }
@@ -180,7 +179,7 @@ export class SettingService implements ISettingService {
     dto: CreateUserSettingDto,
     options: { invokeContext: IInvoke },
   ): Promise<CommandModel> {
-    const { name, tenantCode, attributes, code, userId } = dto
+    const { name, tenantCode, settingValue, code, userId } = dto
 
     const pk = `${SETTING_TENANT_PREFIX}${KEY_SEPARATOR}${tenantCode}`
 
@@ -196,7 +195,7 @@ export class SettingService implements ISettingService {
       type: SettingTypeEnum.TENANT_USER,
       version: VERSION_FIRST,
 
-      attributes,
+      attributes: settingValue,
     }
     return await this.commandService.publishAsync(commad, options)
   }
