@@ -2,7 +2,6 @@ import {
   CommandDto,
   CommandModel,
   CommandService,
-  DataEntity,
   DataService,
   DetailKey,
   generateId,
@@ -21,6 +20,8 @@ import { CreateSettingDto } from '../dto/settings/create.setting.dto'
 import { CreateCommonTenantSettingDto } from '../dto/settings/create-common.setting.dto'
 import { CreateCroupSettingDto } from '../dto/settings/create-group-setting.dto'
 import { CreateUserSettingDto } from '../dto/settings/create-user.setting.dto'
+import { GetSettingDto } from '../dto/settings/get-setting.dto'
+import { UpdateSettingDto } from '../dto/settings/update.setting.dto'
 import { SettingEntity } from '../entities/setting.entity'
 import { SettingTypeEnum } from '../enums/setting.enum'
 import { ISettingService } from '../interfaces/setting.service.interface'
@@ -35,18 +36,19 @@ export class SettingTenantService implements ISettingService {
   ) {}
 
   async getSetting(
-    key: string,
+    dto: GetSettingDto,
     options: { invokeContext: IInvoke },
   ): Promise<SettingEntity> {
     const { tenantCode, tenantRole, userId } = getUserContext(
       options.invokeContext,
     )
+    const settingCode = dto.settingCode
     const pk = `${SETTING_TENANT_PREFIX}${KEY_SEPARATOR}${tenantCode}`
 
     // Try fetching user-level setting first
     let setting = await this.dataService.getItem({
       pk: pk,
-      sk: `${SettingTypeEnum.TENANT_USER}${KEY_SEPARATOR}${userId}${KEY_SEPARATOR}${key}`,
+      sk: `${SettingTypeEnum.TENANT_USER}${KEY_SEPARATOR}${userId}${KEY_SEPARATOR}${dto.settingCode}`,
     })
 
     if (setting) {
@@ -71,7 +73,7 @@ export class SettingTenantService implements ISettingService {
         setting = await this.getGroupSetting(
           groupSettingByRole.setting_groups,
           tenantCode,
-          key,
+          settingCode,
         )
         if (setting) {
           return new SettingEntity({
@@ -85,7 +87,7 @@ export class SettingTenantService implements ISettingService {
     // Fallback to common tenant-level settings
     setting = await this.dataService.getItem({
       pk: pk,
-      sk: key,
+      sk: settingCode,
     })
 
     if (setting) {
@@ -97,7 +99,7 @@ export class SettingTenantService implements ISettingService {
 
     setting = await this.dataService.getItem({
       pk: `${SETTING_TENANT_PREFIX}${KEY_SEPARATOR}${SettingTypeEnum.TENANT_COMMON}`,
-      sk: key,
+      sk: settingCode,
     })
 
     return new SettingEntity({
@@ -201,8 +203,27 @@ export class SettingTenantService implements ISettingService {
     return await this.commandService.publishAsync(commad, options)
   }
 
-  updateSetting(): Promise<DataEntity> {
-    throw new Error('Method not implemented.')
+  async updateSetting(
+    key: DetailKey,
+    dto: UpdateSettingDto,
+    context: { invokeContext: IInvoke },
+  ): Promise<CommandModel> {
+    const { pk, sk } = key
+    const data = await this.dataService.getItem(key)
+    if (!data) {
+      throw new NotFoundException()
+    }
+    const item = await this.commandService.publishPartialUpdateAsync(
+      {
+        pk,
+        sk,
+        name: dto.name,
+        attributes: dto.settingValue,
+        version: data.version,
+      },
+      context,
+    )
+    return item
   }
 
   async deleteSetting(

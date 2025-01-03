@@ -63,6 +63,7 @@ export interface ITenantService {
    * @returns A promise that resolves to the updated tenant code's data entity.
    */
   updateTenant(
+    key: DetailKey,
     dto: UpdateTenantDto,
     context: { invokeContext: IInvoke },
   ): Promise<CommandModel>

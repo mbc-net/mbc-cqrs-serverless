@@ -5,7 +5,7 @@ import {
 } from '@mbc-cqrs-serverless/core'
 import { DynamicModule, Module } from '@nestjs/common'
 
-import { TenantController } from './controllers'
+import { TenantController, TenantSettingController } from './controllers'
 import { SettingTenantService, TenantService } from './services'
 import {
   ConfigurableModuleClass,
@@ -32,6 +32,7 @@ export class TenantModule extends ConfigurableModuleClass {
         module.controllers = []
       }
       module.controllers.push(TenantController)
+      module.controllers.push(TenantSettingController)
     }
 
     return {

@@ -4,6 +4,7 @@ import { CreateSettingDto } from '../dto/settings/create.setting.dto'
 import { CreateCommonTenantSettingDto } from '../dto/settings/create-common.setting.dto'
 import { CreateCroupSettingDto } from '../dto/settings/create-group-setting.dto'
 import { CreateUserSettingDto } from '../dto/settings/create-user.setting.dto'
+import { GetSettingDto } from '../dto/settings/get-setting.dto'
 import { UpdateSettingDto } from '../dto/settings/update.setting.dto'
 import { SettingEntity } from '../entities/setting.entity'
 
@@ -21,7 +22,7 @@ export interface ISettingService {
    *     }
    */
   getSetting(
-    key: string,
+    key: GetSettingDto,
     context: { invokeContext: IInvoke },
   ): Promise<SettingEntity>
   /**
@@ -31,6 +32,7 @@ export interface ISettingService {
    * @returns A promise that resolves to the updated tenant code's data entity.
    */
   updateSetting(
+    params: DetailKey,
     dto: UpdateSettingDto,
     context: { invokeContext: IInvoke },
   ): Promise<CommandModel>

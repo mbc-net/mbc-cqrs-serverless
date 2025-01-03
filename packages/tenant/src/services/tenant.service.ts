@@ -20,6 +20,7 @@ import {
 import { AddGroupTenantDto } from '../dto/tenant/add-group-tenant.dto'
 import { CreateTenantDto } from '../dto/tenant/create.tenant.dto'
 import { CreateCommonTenantDto } from '../dto/tenant/create-common-tenant.dto'
+import { UpdateTenantDto } from '../dto/tenant/update.tenant.dto'
 import { SettingTypeEnum } from '../enums/setting.enum'
 import { ITenantService } from '../interfaces/tenant.service.interface'
 
@@ -84,8 +85,27 @@ export class TenantService implements ITenantService {
     return await this.commandService.publishAsync(command, context)
   }
 
-  updateTenant(): Promise<CommandModel> {
-    throw new Error('Method not implemented.')
+  async updateTenant(
+    key: DetailKey,
+    dto: UpdateTenantDto,
+    context: { invokeContext: IInvoke },
+  ): Promise<CommandModel> {
+    const { pk, sk } = key
+    const data = await this.dataService.getItem(key)
+    if (!data) {
+      throw new NotFoundException()
+    }
+    const item = await this.commandService.publishPartialUpdateAsync(
+      {
+        pk,
+        sk,
+        name: dto.name,
+        attributes: dto.attributes,
+        version: data.version,
+      },
+      context,
+    )
+    return item
   }
   async deleteTenant(
     key: DetailKey,
