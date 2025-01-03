@@ -26,6 +26,15 @@ export class CreateCommonTenantSettingDto {
   })
   @IsString()
   code: string
+
+  @ApiProperty({
+    type: String,
+    example: 'UserListSetting',
+    required: true,
+    description: 'The name of the setting.',
+  })
+  @IsString()
+  type: string
   /**
    * Additional attributes for the tenant (required).
    */

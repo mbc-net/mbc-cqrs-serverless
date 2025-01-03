@@ -88,7 +88,7 @@ describe('SettingService', () => {
       type: 'USER#',
     })
 
-    const response = await service.getSetting({settingCode:'UserListSetting'}, optionsMock)
+    const response = await service.getSetting({type:'UserListSetting',code:""}, optionsMock)
     expect(response).toEqual(
       new SettingEntity({
         id: 'SETTING#MBC#USER#abc#UserListSetting',

@@ -42,13 +42,13 @@ export class SettingTenantService implements ISettingService {
     const { tenantCode, tenantRole, userId } = getUserContext(
       options.invokeContext,
     )
-    const settingCode = dto.settingCode
+    const { code, type } = dto
     const pk = `${SETTING_TENANT_PREFIX}${KEY_SEPARATOR}${tenantCode}`
 
     // Try fetching user-level setting first
     let setting = await this.dataService.getItem({
       pk: pk,
-      sk: `${SettingTypeEnum.TENANT_USER}${KEY_SEPARATOR}${userId}${KEY_SEPARATOR}${dto.settingCode}`,
+      sk: `${SettingTypeEnum.TENANT_USER}${KEY_SEPARATOR}${userId}${KEY_SEPARATOR}${type}${KEY_SEPARATOR}${code}`,
     })
 
     if (setting) {
@@ -73,7 +73,8 @@ export class SettingTenantService implements ISettingService {
         setting = await this.getGroupSetting(
           groupSettingByRole.setting_groups,
           tenantCode,
-          settingCode,
+          type,
+          code,
         )
         if (setting) {
           return new SettingEntity({
@@ -87,7 +88,7 @@ export class SettingTenantService implements ISettingService {
     // Fallback to common tenant-level settings
     setting = await this.dataService.getItem({
       pk: pk,
-      sk: settingCode,
+      sk: `${type}${KEY_SEPARATOR}${code}`,
     })
 
     if (setting) {
@@ -99,8 +100,11 @@ export class SettingTenantService implements ISettingService {
 
     setting = await this.dataService.getItem({
       pk: `${SETTING_TENANT_PREFIX}${KEY_SEPARATOR}${SettingTypeEnum.TENANT_COMMON}`,
-      sk: settingCode,
+      sk: `${type}${KEY_SEPARATOR}${code}`,
     })
+    if (!setting) {
+      throw new NotFoundException()
+    }
 
     return new SettingEntity({
       id: setting.id,
@@ -112,10 +116,10 @@ export class SettingTenantService implements ISettingService {
     dto: CreateCommonTenantSettingDto,
     options: { invokeContext: IInvoke },
   ): Promise<CommandModel> {
-    const { name, settingValue, code } = dto
+    const { name, settingValue, code, type } = dto
 
     const pk = `${SETTING_TENANT_PREFIX}${KEY_SEPARATOR}${SettingTypeEnum.TENANT_COMMON}`
-    const sk = code
+    const sk = `${type}${KEY_SEPARATOR}${code}`
     const commad: CommandDto = {
       sk,
       pk,
@@ -123,7 +127,7 @@ export class SettingTenantService implements ISettingService {
       name: name,
       id: generateId(pk, sk),
       tenantCode: SettingTypeEnum.TENANT_COMMON,
-      type: SettingTypeEnum.TENANT_COMMON,
+      type: type,
       version: VERSION_FIRST,
 
       attributes: settingValue,
@@ -134,10 +138,10 @@ export class SettingTenantService implements ISettingService {
     dto: CreateSettingDto,
     options: { invokeContext: IInvoke },
   ): Promise<CommandModel> {
-    const { name, tenantCode, settingValue, code } = dto
+    const { name, tenantCode, settingValue, code, type } = dto
 
     const pk = `${SETTING_TENANT_PREFIX}${KEY_SEPARATOR}${tenantCode}`
-    const sk = code
+    const sk = `${type}${KEY_SEPARATOR}${code}`
 
     const commad: CommandDto = {
       sk,
@@ -146,7 +150,7 @@ export class SettingTenantService implements ISettingService {
       name: name,
       id: generateId(pk, sk),
       tenantCode: tenantCode,
-      type: SettingTypeEnum.TENANT,
+      type: type,
       version: VERSION_FIRST,
 
       attributes: settingValue,
@@ -158,11 +162,11 @@ export class SettingTenantService implements ISettingService {
     dto: CreateCroupSettingDto,
     options: { invokeContext: IInvoke },
   ): Promise<CommandModel> {
-    const { name, tenantCode, settingValue, code, groupName } = dto
+    const { name, tenantCode, settingValue, code, groupName, type } = dto
 
     const pk = `${SETTING_TENANT_PREFIX}${KEY_SEPARATOR}${tenantCode}`
 
-    const sk = `${SettingTypeEnum.TENANT_GROUP}${KEY_SEPARATOR}${groupName}${KEY_SEPARATOR}${code}`
+    const sk = `${SettingTypeEnum.TENANT_GROUP}${KEY_SEPARATOR}${groupName}${KEY_SEPARATOR}${type}${KEY_SEPARATOR}${code}`
 
     const commad: CommandDto = {
       sk,
@@ -171,7 +175,7 @@ export class SettingTenantService implements ISettingService {
       name: name,
       id: generateId(pk, sk),
       tenantCode: tenantCode,
-      type: SettingTypeEnum.TENANT_GROUP,
+      type: type,
       version: VERSION_FIRST,
 
       attributes: settingValue,
@@ -182,11 +186,11 @@ export class SettingTenantService implements ISettingService {
     dto: CreateUserSettingDto,
     options: { invokeContext: IInvoke },
   ): Promise<CommandModel> {
-    const { name, tenantCode, settingValue, code, userId } = dto
+    const { name, tenantCode, settingValue, code, userId, type } = dto
 
     const pk = `${SETTING_TENANT_PREFIX}${KEY_SEPARATOR}${tenantCode}`
 
-    const sk = `${SettingTypeEnum.TENANT_USER}${KEY_SEPARATOR}${userId}${KEY_SEPARATOR}${code}`
+    const sk = `${SettingTypeEnum.TENANT_USER}${KEY_SEPARATOR}${userId}${KEY_SEPARATOR}${type}${KEY_SEPARATOR}${code}`
 
     const commad: CommandDto = {
       sk,
@@ -195,7 +199,7 @@ export class SettingTenantService implements ISettingService {
       name: name,
       id: generateId(pk, sk),
       tenantCode: tenantCode,
-      type: SettingTypeEnum.TENANT_USER,
+      type: type,
       version: VERSION_FIRST,
 
       attributes: settingValue,
@@ -252,11 +256,12 @@ export class SettingTenantService implements ISettingService {
   private async getGroupSetting(
     groups: string[],
     tenantCode: string,
-    settingId: string,
+    type: string,
+    code: string,
   ) {
     for (const key of groups) {
       const pk = `${SETTING_TENANT_PREFIX}${KEY_SEPARATOR}${tenantCode}`
-      const sk = `${SettingTypeEnum.TENANT_GROUP}${KEY_SEPARATOR}${key}${KEY_SEPARATOR}${settingId}`
+      const sk = `${SettingTypeEnum.TENANT_GROUP}${KEY_SEPARATOR}${key}${KEY_SEPARATOR}${type}${KEY_SEPARATOR}${code}`
       const result = await this.dataService.getItem({
         pk: pk,
         sk: sk,
