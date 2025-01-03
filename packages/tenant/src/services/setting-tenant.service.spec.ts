@@ -9,10 +9,10 @@ import {
 } from '@mbc-cqrs-serverless/core'
 import { Test, TestingModule } from '@nestjs/testing'
 
-import { SETTING_TENANT_PREFIX } from './constants/tenant.constant'
-import { SettingEntity } from './entities/setting.entity'
-import { SettingTypeEnum } from './enums/setting.enum'
-import { SettingService } from './setting.service'
+import { SETTING_TENANT_PREFIX } from '../constants/tenant.constant'
+import { SettingEntity } from '../entities/setting.entity'
+import { SettingTypeEnum } from '../enums/setting.enum'
+import { SettingTenantService } from './setting-tenant.service'
 import { TenantService } from './tenant.service'
 
 const optionsMock = {
@@ -43,13 +43,13 @@ const optionsMock = {
 }
 
 describe('SettingService', () => {
-  let service: SettingService
+  let service: SettingTenantService
   let dataService: DataService
   let commandService: CommandService
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
-        SettingService, 
+        SettingTenantService, 
         TenantService, 
         {
           provide: CommandService,
@@ -66,7 +66,7 @@ describe('SettingService', () => {
       ],
     }).compile()
 
-    service = module.get<SettingService>(SettingService)
+    service = module.get<SettingTenantService>(SettingTenantService)
     dataService = module.get<DataService>(DataService)
     commandService = module.get<CommandService>(CommandService)
   })

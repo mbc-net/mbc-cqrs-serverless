@@ -1,22 +1,27 @@
-import { CommandModule } from '@mbc-cqrs-serverless/core'
+import {
+  CommandModule,
+  DataStoreModule,
+  QueueModule,
+} from '@mbc-cqrs-serverless/core'
 import { DynamicModule, Module } from '@nestjs/common'
 
-import { SettingService } from './setting.service'
-import { TenantController } from './tenant.controller'
+import { TenantController } from './controllers'
+import { SettingTenantService, TenantService } from './services'
 import {
   ConfigurableModuleClass,
   OPTIONS_TYPE,
 } from './tenant.module-definition'
-import { TenantService } from './tenant.service'
 
 @Module({
   imports: [
     CommandModule.register({
       tableName: 'tenant',
     }),
+    DataStoreModule,
+    QueueModule,
   ],
-  providers: [TenantService, SettingService],
-  exports: [TenantService, SettingService],
+  providers: [TenantService, SettingTenantService],
+  exports: [TenantService, SettingTenantService],
 })
 export class TenantModule extends ConfigurableModuleClass {
   static register(options: typeof OPTIONS_TYPE): DynamicModule {

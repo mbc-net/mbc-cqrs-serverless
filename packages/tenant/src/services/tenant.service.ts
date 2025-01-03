@@ -16,12 +16,12 @@ import { Injectable, Logger, NotFoundException } from '@nestjs/common'
 import {
   SETTING_TENANT_PREFIX,
   TENANT_SYSTEM_PREFIX,
-} from './constants/tenant.constant'
-import { AddGroupTenantDto } from './dto/tenant/add-group-tenant.dto'
-import { CreateTenantDto } from './dto/tenant/create.tenant.dto'
-import { CreateCommonTenantDto } from './dto/tenant/create-common-tenant.dto'
-import { SettingTypeEnum } from './enums/setting.enum'
-import { ITenantService } from './interfaces/tenant.service.interface'
+} from '../constants/tenant.constant'
+import { AddGroupTenantDto } from '../dto/tenant/add-group-tenant.dto'
+import { CreateTenantDto } from '../dto/tenant/create.tenant.dto'
+import { CreateCommonTenantDto } from '../dto/tenant/create-common-tenant.dto'
+import { SettingTypeEnum } from '../enums/setting.enum'
+import { ITenantService } from '../interfaces/tenant.service.interface'
 
 @Injectable()
 export class TenantService implements ITenantService {
@@ -31,6 +31,7 @@ export class TenantService implements ITenantService {
     private readonly commandService: CommandService,
     private readonly dataService: DataService,
   ) {}
+
   async getTenant(key: DetailKey): Promise<DataModel> {
     return await this.dataService.getItem(key)
   }

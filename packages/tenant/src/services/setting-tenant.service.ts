@@ -16,17 +16,18 @@ import { Injectable, Logger, NotFoundException } from '@nestjs/common'
 import {
   SETTING_TENANT_PREFIX,
   TENANT_SYSTEM_PREFIX,
-} from './constants/tenant.constant'
-import { CreateSettingDto } from './dto/settings/create.setting.dto'
-import { CreateCommonTenantSettingDto } from './dto/settings/create-common.setting.dto'
-import { CreateCroupSettingDto } from './dto/settings/create-group-setting.dto'
-import { CreateUserSettingDto } from './dto/settings/create-user.setting.dto'
-import { SettingEntity } from './entities/setting.entity'
-import { SettingTypeEnum } from './enums/setting.enum'
-import { ISettingService } from './interfaces/setting.service.interface'
+} from '../constants/tenant.constant'
+import { CreateSettingDto } from '../dto/settings/create.setting.dto'
+import { CreateCommonTenantSettingDto } from '../dto/settings/create-common.setting.dto'
+import { CreateCroupSettingDto } from '../dto/settings/create-group-setting.dto'
+import { CreateUserSettingDto } from '../dto/settings/create-user.setting.dto'
+import { SettingEntity } from '../entities/setting.entity'
+import { SettingTypeEnum } from '../enums/setting.enum'
+import { ISettingService } from '../interfaces/setting.service.interface'
+
 @Injectable()
-export class SettingService implements ISettingService {
-  private readonly logger = new Logger(SettingService.name)
+export class SettingTenantService implements ISettingService {
+  private readonly logger = new Logger(SettingTenantService.name)
 
   constructor(
     private readonly commandService: CommandService,
