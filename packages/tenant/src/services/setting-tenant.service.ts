@@ -19,15 +19,18 @@ import {
 
 import {
   SETTING_TENANT_PREFIX,
+  TENANT_SK,
   TENANT_SYSTEM_PREFIX,
 } from '../constants/tenant.constant'
 import { CreateSettingDto } from '../dto/settings/create.setting.dto'
 import { CreateCommonTenantSettingDto } from '../dto/settings/create-common.setting.dto'
 import { CreateCroupSettingDto } from '../dto/settings/create-group-setting.dto'
 import { CreateUserSettingDto } from '../dto/settings/create-user.setting.dto'
+import { GetListSettingDto } from '../dto/settings/get-list-setting.dto'
 import { GetSettingDto } from '../dto/settings/get-setting.dto'
 import { UpdateSettingDto } from '../dto/settings/update.setting.dto'
 import { SettingEntity } from '../entities/setting.entity'
+import { SettingListEntity } from '../entities/setting-list.entity'
 import { SettingTypeEnum } from '../enums/setting.enum'
 import { ISettingService } from '../interfaces/setting.service.interface'
 
@@ -40,6 +43,45 @@ export class SettingTenantService implements ISettingService {
     private readonly dataService: DataService,
   ) {}
 
+  private async fetchSetting(
+    pk: string,
+    skPrefix: string,
+    type: string,
+    code?: string,
+  ): Promise<any> {
+    const sk = code
+      ? `${skPrefix}${type}${KEY_SEPARATOR}${code}`
+      : skPrefix + type
+    return code
+      ? this.dataService.getItem({ pk, sk })
+      : this.dataService.listItemsByPk(pk, { startFromSk: sk })
+  }
+
+  private mapSettings(settings: any[]): SettingEntity[] {
+    return settings.map(
+      (item) =>
+        new SettingEntity({
+          id: item.id,
+          settingValue: item.attributes,
+        }),
+    )
+  }
+
+  private async fetchGroupSetting(
+    groups: string[],
+    tenantCode: string,
+    type: string,
+    code?: string,
+  ): Promise<any> {
+    const pk = `${SETTING_TENANT_PREFIX}${KEY_SEPARATOR}${tenantCode}`
+    for (const group of groups) {
+      const skPrefix = `${SettingTypeEnum.TENANT_GROUP}${KEY_SEPARATOR}${group}${KEY_SEPARATOR}`
+      const result = await this.fetchSetting(pk, skPrefix, type, code)
+      if (result) return result
+    }
+    return null
+  }
+
   async getSetting(
     dto: GetSettingDto,
     options: { invokeContext: IInvoke },
@@ -50,11 +92,13 @@ export class SettingTenantService implements ISettingService {
     const { code, type } = dto
     const pk = `${SETTING_TENANT_PREFIX}${KEY_SEPARATOR}${tenantCode}`
 
-    // Try fetching user-level setting first
-    let setting = await this.dataService.getItem({
-      pk: pk,
-      sk: `${SettingTypeEnum.TENANT_USER}${KEY_SEPARATOR}${userId}${KEY_SEPARATOR}${type}${KEY_SEPARATOR}${code}`,
-    })
+    // Fetch user-level setting
+    let setting = await this.fetchSetting(
+      pk,
+      `${SettingTypeEnum.TENANT_USER}${KEY_SEPARATOR}${userId}${KEY_SEPARATOR}`,
+      type,
+      code,
+    )
 
     if (setting) {
       return new SettingEntity({
@@ -63,7 +107,7 @@ export class SettingTenantService implements ISettingService {
       })
     }
 
-    // Fetch tenant settings
+    // Fetch tenant-level group settings
     const tenant = await this.dataService.getItem({
       pk: `${TENANT_SYSTEM_PREFIX}${KEY_SEPARATOR}${tenantCode}`,
       sk: SETTING_TENANT_PREFIX,
@@ -75,7 +119,7 @@ export class SettingTenantService implements ISettingService {
       )
 
       if (groupSettingByRole) {
-        setting = await this.getGroupSetting(
+        setting = await this.fetchGroupSetting(
           groupSettingByRole.setting_groups,
           tenantCode,
           type,
@@ -91,11 +135,7 @@ export class SettingTenantService implements ISettingService {
     }
 
     // Fallback to common tenant-level settings
-    setting = await this.dataService.getItem({
-      pk: pk,
-      sk: `${type}${KEY_SEPARATOR}${code}`,
-    })
-
+    setting = await this.fetchSetting(pk, '', type, code)
     if (setting) {
       return new SettingEntity({
         id: setting.id,
@@ -103,18 +143,80 @@ export class SettingTenantService implements ISettingService {
       })
     }
 
-    setting = await this.dataService.getItem({
-      pk: `${SETTING_TENANT_PREFIX}${KEY_SEPARATOR}${SettingTypeEnum.TENANT_COMMON}`,
-      sk: `${type}${KEY_SEPARATOR}${code}`,
-    })
-    if (!setting) {
-      throw new NotFoundException()
-    }
+    setting = await this.fetchSetting(
+      `${SETTING_TENANT_PREFIX}${KEY_SEPARATOR}${SettingTypeEnum.TENANT_COMMON}`,
+      '',
+      type,
+      code,
+    )
+    if (!setting) throw new NotFoundException()
 
     return new SettingEntity({
       id: setting.id,
       settingValue: setting.attributes,
     })
+  }
+
+  async getListSetting(
+    dto: GetListSettingDto,
+    context: { invokeContext: IInvoke },
+  ): Promise<SettingListEntity> {
+    const { tenantCode, tenantRole, userId } = getUserContext(
+      context.invokeContext,
+    )
+    const { type } = dto
+    const pk = `${SETTING_TENANT_PREFIX}${KEY_SEPARATOR}${tenantCode}`
+
+    // Fetch user-level settings
+    let settings = await this.fetchSetting(
+      pk,
+      `${SettingTypeEnum.TENANT_USER}${KEY_SEPARATOR}${userId}${KEY_SEPARATOR}`,
+      type,
+    )
+    if (settings?.items.length) {
+      return new SettingListEntity({ items: this.mapSettings(settings.items) })
+    }
+
+    // Fetch tenant-level group settings
+    const tenant = await this.dataService.getItem({
+      pk: `${TENANT_SYSTEM_PREFIX}${KEY_SEPARATOR}${tenantCode}`,
+      sk: SETTING_TENANT_PREFIX,
+    })
+
+    if (tenant?.attributes?.setting) {
+      const groupSettingByRole = tenant.attributes.setting.find(
+        (i) => i.tenantRole === tenantRole,
+      )
+
+      if (groupSettingByRole) {
+        settings = await this.fetchGroupSetting(
+          groupSettingByRole.setting_groups,
+          tenantCode,
+          type,
+        )
+        if (settings?.items.length) {
+          return new SettingListEntity({
+            items: this.mapSettings(settings.items),
+          })
+        }
+      }
+    }
+
+    // Fallback to common tenant-level settings
+    settings = await this.fetchSetting(pk, '', type)
+    if (settings?.items.length) {
+      return new SettingListEntity({ items: this.mapSettings(settings.items) })
+    }
+
+    settings = await this.fetchSetting(
+      `${SETTING_TENANT_PREFIX}${KEY_SEPARATOR}${SettingTypeEnum.TENANT_COMMON}`,
+      '',
+      type,
+    )
+
+    if (!settings?.items.length) throw new NotFoundException()
+
+    return new SettingListEntity({ items: this.mapSettings(settings.items) })
   }
 
   async createCommonTenantSetting(
@@ -124,7 +226,7 @@ export class SettingTenantService implements ISettingService {
     const { name, settingValue, code, type } = dto
 
     const tenantPK = `${TENANT_SYSTEM_PREFIX}${KEY_SEPARATOR}${SettingTypeEnum.TENANT_COMMON}`
-    const tenantSK = SETTING_TENANT_PREFIX
+    const tenantSK = TENANT_SK
     const tenant = await this.dataService.getItem({
       pk: tenantPK,
       sk: tenantSK,
@@ -155,7 +257,7 @@ export class SettingTenantService implements ISettingService {
   ): Promise<CommandModel> {
     const { name, tenantCode, settingValue, code, type } = dto
     const tenantPK = `${TENANT_SYSTEM_PREFIX}${KEY_SEPARATOR}${tenantCode}`
-    const tenantSK = SETTING_TENANT_PREFIX
+    const tenantSK = TENANT_SK
 
     const tenant = await this.dataService.getItem({
       pk: tenantPK,
@@ -190,7 +292,7 @@ export class SettingTenantService implements ISettingService {
     const { name, tenantCode, settingValue, code, groupName, type } = dto
 
     const tenantPK = `${TENANT_SYSTEM_PREFIX}${KEY_SEPARATOR}${tenantCode}`
-    const tenantSK = SETTING_TENANT_PREFIX
+    const tenantSK = TENANT_SK
 
     const tenant = await this.dataService.getItem({
       pk: tenantPK,
@@ -224,7 +326,7 @@ export class SettingTenantService implements ISettingService {
   ): Promise<CommandModel> {
     const { name, tenantCode, settingValue, code, userId, type } = dto
     const tenantPK = `${TENANT_SYSTEM_PREFIX}${KEY_SEPARATOR}${tenantCode}`
-    const tenantSK = SETTING_TENANT_PREFIX
+    const tenantSK = TENANT_SK
 
     const tenant = await this.dataService.getItem({
       pk: tenantPK,
@@ -297,26 +399,5 @@ export class SettingTenantService implements ISettingService {
     )
 
     return item
-  }
-
-  private async getGroupSetting(
-    groups: string[],
-    tenantCode: string,
-    type: string,
-    code: string,
-  ) {
-    for (const key of groups) {
-      const pk = `${SETTING_TENANT_PREFIX}${KEY_SEPARATOR}${tenantCode}`
-      const sk = `${SettingTypeEnum.TENANT_GROUP}${KEY_SEPARATOR}${key}${KEY_SEPARATOR}${type}${KEY_SEPARATOR}${code}`
-      const result = await this.dataService.getItem({
-        pk: pk,
-        sk: sk,
-      })
-
-      if (result) {
-        return result // Return the first result found
-      }
-    }
-    return null
   }
 }

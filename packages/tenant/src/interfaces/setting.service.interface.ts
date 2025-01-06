@@ -4,9 +4,11 @@ import { CreateSettingDto } from '../dto/settings/create.setting.dto'
 import { CreateCommonTenantSettingDto } from '../dto/settings/create-common.setting.dto'
 import { CreateCroupSettingDto } from '../dto/settings/create-group-setting.dto'
 import { CreateUserSettingDto } from '../dto/settings/create-user.setting.dto'
+import { GetListSettingDto } from '../dto/settings/get-list-setting.dto'
 import { GetSettingDto } from '../dto/settings/get-setting.dto'
 import { UpdateSettingDto } from '../dto/settings/update.setting.dto'
 import { SettingEntity } from '../entities/setting.entity'
+import { SettingListEntity } from '../entities/setting-list.entity'
 
 export interface ISettingService {
   /**
@@ -25,6 +27,12 @@ export interface ISettingService {
     key: GetSettingDto,
     context: { invokeContext: IInvoke },
   ): Promise<SettingEntity>
+
+  getListSetting(
+    key: GetListSettingDto,
+    context: { invokeContext: IInvoke },
+  ): Promise<SettingListEntity>
+
   /**
    * Updates an existing tenant code with new data.
    *

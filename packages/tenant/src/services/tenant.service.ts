@@ -13,10 +13,7 @@ import {
 } from '@mbc-cqrs-serverless/core'
 import { Injectable, Logger, NotFoundException } from '@nestjs/common'
 
-import {
-  SETTING_TENANT_PREFIX,
-  TENANT_SYSTEM_PREFIX,
-} from '../constants/tenant.constant'
+import { TENANT_SK, TENANT_SYSTEM_PREFIX } from '../constants/tenant.constant'
 import { AddGroupTenantDto } from '../dto/tenant/add-group-tenant.dto'
 import { CreateTenantDto } from '../dto/tenant/create.tenant.dto'
 import { CreateCommonTenantDto } from '../dto/tenant/create-common-tenant.dto'
@@ -43,7 +40,7 @@ export class TenantService implements ITenantService {
   ): Promise<CommandModel> {
     const { name, description } = dto
     const pk = `${TENANT_SYSTEM_PREFIX}${KEY_SEPARATOR}${SettingTypeEnum.TENANT_COMMON}`
-    const sk = SETTING_TENANT_PREFIX
+    const sk = TENANT_SK
 
     const command: CommandDto = {
       pk: pk,
@@ -66,7 +63,7 @@ export class TenantService implements ITenantService {
   ): Promise<CommandModel> {
     const { name, code, description } = dto
     const pk = `${TENANT_SYSTEM_PREFIX}${KEY_SEPARATOR}${code}`
-    const sk = SETTING_TENANT_PREFIX
+    const sk = TENANT_SK
 
     const command: CommandDto = {
       pk: pk,
@@ -138,7 +135,7 @@ export class TenantService implements ITenantService {
 
     const tenant = await this.dataService.getItem({
       pk: `${TENANT_SYSTEM_PREFIX}${KEY_SEPARATOR}${tenantCode}`,
-      sk: SETTING_TENANT_PREFIX,
+      sk: TENANT_SK,
     })
 
     // Helper to create a new attribute

@@ -7,7 +7,6 @@ import {
   Param,
   Patch,
   Post,
-  Query,
 } from '@nestjs/common'
 import { ApiTags } from '@nestjs/swagger'
 
@@ -15,6 +14,7 @@ import { CreateSettingDto } from '../dto/settings/create.setting.dto'
 import { CreateCommonTenantSettingDto } from '../dto/settings/create-common.setting.dto'
 import { CreateCroupSettingDto } from '../dto/settings/create-group-setting.dto'
 import { CreateUserSettingDto } from '../dto/settings/create-user.setting.dto'
+import { GetListSettingDto } from '../dto/settings/get-list-setting.dto'
 import { GetSettingDto } from '../dto/settings/get-setting.dto'
 import { UpdateSettingDto } from '../dto/settings/update.setting.dto'
 import { SettingTenantService } from '../services'
@@ -24,9 +24,19 @@ import { SettingTenantService } from '../services'
 export class TenantSettingController {
   constructor(private readonly settingTenantSerivce: SettingTenantService) {}
 
-  @Get()
-  async getTenant(
-    @Query() dto: GetSettingDto,
+  @Get('/:type')
+  async getListSetting(
+    @Param() dto: GetListSettingDto,
+    @INVOKE_CONTEXT() invokeContext: IInvoke,
+  ) {
+    return await this.settingTenantSerivce.getListSetting(dto, {
+      invokeContext,
+    })
+  }
+
+  @Get('/:type/:code')
+  async getSettingDetail(
+    @Param() dto: GetSettingDto,
     @INVOKE_CONTEXT() invokeContext: IInvoke,
   ) {
     return await this.settingTenantSerivce.getSetting(dto, { invokeContext })
