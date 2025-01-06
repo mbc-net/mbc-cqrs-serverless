@@ -22,14 +22,14 @@ import { SettingTenantService } from '../services'
 @ApiTags('setting')
 @Controller('setting')
 export class TenantSettingController {
-  constructor(private readonly settingTenantSerivce: SettingTenantService) {}
+  constructor(private readonly settingTenantService: SettingTenantService) {}
 
   @Get('/:type')
   async getListSetting(
     @Param() dto: GetListSettingDto,
     @INVOKE_CONTEXT() invokeContext: IInvoke,
   ) {
-    return await this.settingTenantSerivce.getListSetting(dto, {
+    return await this.settingTenantService.getListSetting(dto, {
       invokeContext,
     })
   }
@@ -39,7 +39,7 @@ export class TenantSettingController {
     @Param() dto: GetSettingDto,
     @INVOKE_CONTEXT() invokeContext: IInvoke,
   ) {
-    return await this.settingTenantSerivce.getSetting(dto, { invokeContext })
+    return await this.settingTenantService.getSetting(dto, { invokeContext })
   }
 
   @Post('common')
@@ -47,7 +47,7 @@ export class TenantSettingController {
     @INVOKE_CONTEXT() invokeContext: IInvoke,
     @Body() dto: CreateCommonTenantSettingDto,
   ) {
-    return await this.settingTenantSerivce.createCommonTenantSetting(dto, {
+    return await this.settingTenantService.createCommonTenantSetting(dto, {
       invokeContext,
     })
   }
@@ -57,7 +57,7 @@ export class TenantSettingController {
     @INVOKE_CONTEXT() invokeContext: IInvoke,
     @Body() dto: CreateSettingDto,
   ) {
-    return await this.settingTenantSerivce.createTenantSetting(dto, {
+    return await this.settingTenantService.createTenantSetting(dto, {
       invokeContext,
     })
   }
@@ -66,7 +66,7 @@ export class TenantSettingController {
     @INVOKE_CONTEXT() invokeContext: IInvoke,
     @Body() dto: CreateCroupSettingDto,
   ) {
-    return await this.settingTenantSerivce.createGroupSetting(dto, {
+    return await this.settingTenantService.createGroupSetting(dto, {
       invokeContext,
     })
   }
@@ -75,7 +75,7 @@ export class TenantSettingController {
     @INVOKE_CONTEXT() invokeContext: IInvoke,
     @Body() dto: CreateUserSettingDto,
   ) {
-    return await this.settingTenantSerivce.createUserSetting(dto, {
+    return await this.settingTenantService.createUserSetting(dto, {
       invokeContext,
     })
   }
@@ -86,7 +86,7 @@ export class TenantSettingController {
     @Body() dto: UpdateSettingDto,
     @INVOKE_CONTEXT() invokeContext: IInvoke,
   ) {
-    return await this.settingTenantSerivce.updateSetting(key, dto, {
+    return await this.settingTenantService.updateSetting(key, dto, {
       invokeContext,
     })
   }
@@ -96,6 +96,6 @@ export class TenantSettingController {
     @Param() dto: DetailDto,
     @INVOKE_CONTEXT() invokeContext: IInvoke,
   ) {
-    return await this.settingTenantSerivce.deleteSetting(dto, { invokeContext })
+    return await this.settingTenantService.deleteSetting(dto, { invokeContext })
   }
 }

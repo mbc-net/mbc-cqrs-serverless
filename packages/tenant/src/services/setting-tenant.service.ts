@@ -237,7 +237,7 @@ export class SettingTenantService implements ISettingService {
 
     const pk = `${SETTING_TENANT_PREFIX}${KEY_SEPARATOR}${SettingTypeEnum.TENANT_COMMON}`
     const sk = `${type}${KEY_SEPARATOR}${code}`
-    const commad: CommandDto = {
+    const command: CommandDto = {
       sk,
       pk,
       code: sk,
@@ -249,7 +249,7 @@ export class SettingTenantService implements ISettingService {
 
       attributes: settingValue,
     }
-    return await this.commandService.publishAsync(commad, options)
+    return await this.commandService.publishAsync(command, options)
   }
   async createTenantSetting(
     dto: CreateSettingDto,
@@ -270,7 +270,7 @@ export class SettingTenantService implements ISettingService {
     const pk = `${SETTING_TENANT_PREFIX}${KEY_SEPARATOR}${tenantCode}`
     const sk = `${type}${KEY_SEPARATOR}${code}`
 
-    const commad: CommandDto = {
+    const command: CommandDto = {
       sk,
       pk,
       code: sk,
@@ -282,7 +282,7 @@ export class SettingTenantService implements ISettingService {
 
       attributes: settingValue,
     }
-    return await this.commandService.publishAsync(commad, options)
+    return await this.commandService.publishAsync(command, options)
   }
 
   async createGroupSetting(
@@ -306,7 +306,7 @@ export class SettingTenantService implements ISettingService {
 
     const sk = `${SettingTypeEnum.TENANT_GROUP}${KEY_SEPARATOR}${groupName}${KEY_SEPARATOR}${type}${KEY_SEPARATOR}${code}`
 
-    const commad: CommandDto = {
+    const command: CommandDto = {
       sk,
       pk,
       code: sk,
@@ -318,7 +318,7 @@ export class SettingTenantService implements ISettingService {
 
       attributes: settingValue,
     }
-    return await this.commandService.publishAsync(commad, options)
+    return await this.commandService.publishAsync(command, options)
   }
   async createUserSetting(
     dto: CreateUserSettingDto,
@@ -340,7 +340,7 @@ export class SettingTenantService implements ISettingService {
 
     const sk = `${SettingTypeEnum.TENANT_USER}${KEY_SEPARATOR}${userId}${KEY_SEPARATOR}${type}${KEY_SEPARATOR}${code}`
 
-    const commad: CommandDto = {
+    const command: CommandDto = {
       sk,
       pk,
       code: sk,
@@ -352,7 +352,7 @@ export class SettingTenantService implements ISettingService {
 
       attributes: settingValue,
     }
-    return await this.commandService.publishAsync(commad, options)
+    return await this.commandService.publishAsync(command, options)
   }
 
   async updateSetting(
