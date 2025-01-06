@@ -168,40 +168,48 @@ export class TenantService implements ITenantService {
     }
 
     // If tenant exists and has attributes
-    if (Array.isArray(tenant?.attributes) && tenant.attributes.length > 0) {
-      const existingRole = tenant.attributes.find((i) => i.tenantRole === role)
+    if (
+      Array.isArray(tenant?.attributes?.setting) &&
+      tenant.attributes.setting.length > 0
+    ) {
+      const existingRole = tenant.attributes.setting.find(
+        (i) => i.tenantRole === role,
+      )
 
       const updatedAttributes = existingRole
-        ? tenant.attributes.map((item) =>
+        ? tenant.attributes.setting.map((item) =>
             item.tenantRole === role ? updateAttribute(item) : item,
           )
-        : [...tenant.attributes, createNewAttribute()]
+        : [...tenant.attributes.setting, createNewAttribute()]
 
       return await this.commandService.publishPartialUpdateAsync(
         {
           pk: tenant.pk,
           sk: tenant.sk,
           version: tenant.version,
-          attributes: updatedAttributes,
+          attributes: {
+            setting: updatedAttributes,
+          },
         },
         context,
       )
     }
-
     // If tenant does not exist or has no attributes
     return await this.commandService.publishPartialUpdateAsync(
       {
         pk: tenant.pk,
         sk: tenant.sk,
         version: tenant.version,
-        attributes: [createNewAttribute()],
+        attributes: {
+          setting: [createNewAttribute()],
+        },
       },
       context,
     )
   }
 
   private sortGroups(groups: string[]) {
-    groups.sort((a, b) => {
+    return groups.sort((a, b) => {
       const countA = a.split('#').length - 1
       const countB = b.split('#').length - 1
 

@@ -10,6 +10,7 @@ import {
 } from '@nestjs/common'
 import { ApiTags } from '@nestjs/swagger'
 
+import { AddGroupTenantDto } from '../dto/tenant/add-group-tenant.dto'
 import { CreateTenantDto } from '../dto/tenant/create.tenant.dto'
 import { CreateCommonTenantDto } from '../dto/tenant/create-common-tenant.dto'
 import { UpdateTenantDto } from '../dto/tenant/update.tenant.dto'
@@ -57,5 +58,13 @@ export class TenantController {
     @INVOKE_CONTEXT() invokeContext: IInvoke,
   ) {
     return await this.tenantService.deleteTenant(dto, { invokeContext })
+  }
+
+  @Post('group')
+  async addGroup(
+    @Body() dto: AddGroupTenantDto,
+    @INVOKE_CONTEXT() invokeContext: IInvoke,
+  ) {
+    return await this.tenantService.addGroup(dto, { invokeContext })
   }
 }

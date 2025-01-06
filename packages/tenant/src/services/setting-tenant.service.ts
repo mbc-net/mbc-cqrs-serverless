@@ -10,7 +10,12 @@ import {
   KEY_SEPARATOR,
   VERSION_FIRST,
 } from '@mbc-cqrs-serverless/core'
-import { Injectable, Logger, NotFoundException } from '@nestjs/common'
+import {
+  BadRequestException,
+  Injectable,
+  Logger,
+  NotFoundException,
+} from '@nestjs/common'
 
 import {
   SETTING_TENANT_PREFIX,
@@ -64,8 +69,8 @@ export class SettingTenantService implements ISettingService {
       sk: SETTING_TENANT_PREFIX,
     })
 
-    if (tenant?.attributes) {
-      const groupSettingByRole = tenant.attributes.find(
+    if (tenant?.attributes?.setting) {
+      const groupSettingByRole = tenant.attributes.setting.find(
         (i) => i.tenantRole === tenantRole,
       )
 
@@ -118,6 +123,16 @@ export class SettingTenantService implements ISettingService {
   ): Promise<CommandModel> {
     const { name, settingValue, code, type } = dto
 
+    const tenantPK = `${TENANT_SYSTEM_PREFIX}${KEY_SEPARATOR}${SettingTypeEnum.TENANT_COMMON}`
+    const tenantSK = SETTING_TENANT_PREFIX
+    const tenant = await this.dataService.getItem({
+      pk: tenantPK,
+      sk: tenantSK,
+    })
+    if (!tenant) {
+      throw new BadRequestException('Tenant not exist')
+    }
+
     const pk = `${SETTING_TENANT_PREFIX}${KEY_SEPARATOR}${SettingTypeEnum.TENANT_COMMON}`
     const sk = `${type}${KEY_SEPARATOR}${code}`
     const commad: CommandDto = {
@@ -139,6 +154,16 @@ export class SettingTenantService implements ISettingService {
     options: { invokeContext: IInvoke },
   ): Promise<CommandModel> {
     const { name, tenantCode, settingValue, code, type } = dto
+    const tenantPK = `${TENANT_SYSTEM_PREFIX}${KEY_SEPARATOR}${tenantCode}`
+    const tenantSK = SETTING_TENANT_PREFIX
+
+    const tenant = await this.dataService.getItem({
+      pk: tenantPK,
+      sk: tenantSK,
+    })
+    if (!tenant) {
+      throw new BadRequestException('Tenant not exist')
+    }
 
     const pk = `${SETTING_TENANT_PREFIX}${KEY_SEPARATOR}${tenantCode}`
     const sk = `${type}${KEY_SEPARATOR}${code}`
@@ -164,6 +189,17 @@ export class SettingTenantService implements ISettingService {
   ): Promise<CommandModel> {
     const { name, tenantCode, settingValue, code, groupName, type } = dto
 
+    const tenantPK = `${TENANT_SYSTEM_PREFIX}${KEY_SEPARATOR}${tenantCode}`
+    const tenantSK = SETTING_TENANT_PREFIX
+
+    const tenant = await this.dataService.getItem({
+      pk: tenantPK,
+      sk: tenantSK,
+    })
+    if (!tenant) {
+      throw new BadRequestException('Tenant not exist')
+    }
+
     const pk = `${SETTING_TENANT_PREFIX}${KEY_SEPARATOR}${tenantCode}`
 
     const sk = `${SettingTypeEnum.TENANT_GROUP}${KEY_SEPARATOR}${groupName}${KEY_SEPARATOR}${type}${KEY_SEPARATOR}${code}`
@@ -187,6 +223,16 @@ export class SettingTenantService implements ISettingService {
     options: { invokeContext: IInvoke },
   ): Promise<CommandModel> {
     const { name, tenantCode, settingValue, code, userId, type } = dto
+    const tenantPK = `${TENANT_SYSTEM_PREFIX}${KEY_SEPARATOR}${tenantCode}`
+    const tenantSK = SETTING_TENANT_PREFIX
+
+    const tenant = await this.dataService.getItem({
+      pk: tenantPK,
+      sk: tenantSK,
+    })
+    if (!tenant) {
+      throw new BadRequestException('Tenant not exist')
+    }
 
     const pk = `${SETTING_TENANT_PREFIX}${KEY_SEPARATOR}${tenantCode}`
 
