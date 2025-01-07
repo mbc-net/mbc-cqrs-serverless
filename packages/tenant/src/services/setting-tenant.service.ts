@@ -149,7 +149,10 @@ export class SettingTenantService implements ISettingService {
       type,
       code,
     )
-    if (!setting) throw new NotFoundException()
+    if (!setting) {
+      this.logger.error(`Setting not found ${code}`)
+      throw new BadRequestException()
+    }
 
     return new SettingEntity({
       id: setting.id,
@@ -214,7 +217,10 @@ export class SettingTenantService implements ISettingService {
       type,
     )
 
-    if (!settings?.items.length) throw new NotFoundException()
+    if (!settings?.items.length) {
+      this.logger.error(`Setting not found`)
+      throw new BadRequestException()
+    }
 
     return new SettingListEntity({ items: this.mapSettings(settings.items) })
   }
@@ -232,6 +238,7 @@ export class SettingTenantService implements ISettingService {
       sk: tenantSK,
     })
     if (!tenant) {
+      this.logger.error(`Tenant not exist ${SettingTypeEnum.TENANT_COMMON}`)
       throw new BadRequestException('Tenant not exist')
     }
 
@@ -264,6 +271,7 @@ export class SettingTenantService implements ISettingService {
       sk: tenantSK,
     })
     if (!tenant) {
+      this.logger.error(`Tenant not exist ${tenantCode}`)
       throw new BadRequestException('Tenant not exist')
     }
 

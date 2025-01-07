@@ -15,7 +15,7 @@ export class CreateCroupSettingDto {
   name: string
 
   /**
-   * Name of the setting for the tenant code (required).
+   * Type of the setting for the tenant code (required).
    */
   @ApiProperty({
     type: String,
@@ -25,6 +25,10 @@ export class CreateCroupSettingDto {
   })
   @IsString()
   type: string
+
+  /**
+   * code of the setting for the tenant code (required).
+   */
 
   @ApiProperty({
     type: String,

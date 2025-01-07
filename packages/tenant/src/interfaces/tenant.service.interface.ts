@@ -5,10 +5,11 @@ import {
   IInvoke,
 } from '@mbc-cqrs-serverless/core'
 
-import { AddGroupTenantDto } from '../dto/tenant/add-group-tenant.dto'
+import { AddTenantGroupDto } from '../dto/tenant/add-group-tenant.dto'
 import { CreateTenantDto } from '../dto/tenant/create.tenant.dto'
 import { CreateCommonTenantDto } from '../dto/tenant/create-common-tenant.dto'
 import { UpdateTenantDto } from '../dto/tenant/update.tenant.dto'
+import { UpdateTenantGroupDto } from '../dto/tenant/update-tenant-group.dto'
 
 /**
  * Interface representing the service responsible for managing tenant codes.
@@ -21,45 +22,25 @@ export interface ITenantService {
    * @returns A promise that resolves to the tenant code's data entity.
    */
   getTenant(key: DetailKey): Promise<DataModel>
+
   /**
    * Creates a new tenant code based on the provided data.
    *
    * @param dto - The data transfer object containing the parameters required for creating a tenant code.
-   *  dto contains:
-   *   - name: string - The name of the setting.
-   *   - code: string - The code of the setting.
-   *   - description: string .
-   *   - attributes: object - The setting data.
-   *     Example TenantCodeEntity:
-   *      + COMMON
-   *       - pk: TENANT#COMMON
-   *       - sk: ''
-   *       - id: TENANT#COMMON
-   *       - attributes: object
-   *       - name: COMMON
-   *       - type: string
-   
-   *      + Tenant MBC
-   *       - pk: TENANT#COMMON
-   *       - sk: mbc
-   *       - id: TENANT#COMMON#mbc
-   *       - attributes: object
-   *       - name: MBC
-   *       - type: string
-   * @param options - Additional options including the invocation context.
+   * @param context - Additional options including the invocation context.
    * @returns A promise that resolves to the newly created tenant code's data entity.
    */
   createTenant(
     dto: CreateTenantDto,
-    context: {
-      invokeContext: IInvoke
-    },
-  ): Promise<Record<string, any>>
+    context: { invokeContext: IInvoke },
+  ): Promise<CommandModel>
 
   /**
    * Updates an existing tenant code with new data.
    *
-   * @param options - Options including the invocation context.
+   * @param key - The key used to identify the tenant code to update.
+   * @param dto - The data transfer object containing the updated parameters for the tenant code.
+   * @param context - Additional options including the invocation context.
    * @returns A promise that resolves to the updated tenant code's data entity.
    */
   updateTenant(
@@ -72,7 +53,7 @@ export interface ITenantService {
    * Deletes an existing tenant code identified by the specified key.
    *
    * @param key - The key used to identify the tenant code to delete.
-   * @param options - Additional options including the invocation context.
+   * @param context - Additional options including the invocation context.
    * @returns A promise that resolves to the data entity of the deleted tenant code.
    */
   deleteTenant(
@@ -80,15 +61,41 @@ export interface ITenantService {
     context: { invokeContext: IInvoke },
   ): Promise<CommandModel>
 
-  addGroup(
-    dto: AddGroupTenantDto,
+  /**
+   * Creates a new common tenant code based on the provided data.
+   *
+   * @param dto - The data transfer object containing the parameters required for creating a common tenant code.
+   * @param context - Additional options including the invocation context.
+   * @returns A promise that resolves to the newly created common tenant code's data entity.
+   */
+  createCommonTenant(
+    dto: CreateCommonTenantDto,
     context: { invokeContext: IInvoke },
   ): Promise<CommandModel>
 
-  createCommonTenant(
-    dto: CreateCommonTenantDto,
-    context: {
-      invokeContext: IInvoke
-    },
+  /**
+   * Adds a group to the tenant code.
+   *
+   * @param dto - The data transfer object containing the parameters required for adding a group to the tenant code.
+   * @param context - Additional options including the invocation context.
+   * @returns A promise that resolves to the data entity of the tenant code with the added group.
+   */
+  addTenantGroup(
+    dto: AddTenantGroupDto,
+    context: { invokeContext: IInvoke },
+  ): Promise<CommandModel>
+
+  /**
+   * Customizes the setting groups for a tenant, switching to `customized` mode.
+   *
+   * @param key - The key used to identify the tenant.
+   * @param settingGroups - The custom setting groups to assign.
+   * @param context - Additional options including the invocation context.
+   * @returns A promise that resolves to the updated tenant's data entity.
+   */
+  customizeSettingGroups(
+    key: DetailKey,
+    dto: UpdateTenantGroupDto,
+    context: { invokeContext: IInvoke },
   ): Promise<CommandModel>
 }

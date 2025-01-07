@@ -60,7 +60,8 @@ describe('SettingService', () => {
         {
           provide: DataService,
           useValue:{
-            getItem: jest.fn()
+            getItem: jest.fn(),
+            listItemsByPk: jest.fn()
           }
         }
       ],
@@ -76,29 +77,78 @@ describe('SettingService', () => {
   })
   it('should return user-level setting if found', async () => {
 
-    jest.spyOn(dataService, 'getItem').mockResolvedValue({
-      pk: 'SETTING#MBC',
-      sk: 'USER#abcUserListSetting',
+    jest.spyOn(service, 'getSetting').mockResolvedValueOnce({
       id: 'SETTING#MBC#USER#abc#UserListSetting',
-      attributes: {},
-      code: 'UserListSetting',
-      version: 1,
-      tenantCode: 'MBC',
-      name: 'UserListSetting',
-      type: 'USER#',
-    })
+      settingValue: {},
+    });
 
-    const response = await service.getSetting({type:'UserListSetting',code:""}, optionsMock)
+    const response = await service.getSetting(
+      { type: 'UserListSetting', code: '' },
+      optionsMock,
+    );
+
     expect(response).toEqual(
       new SettingEntity({
         id: 'SETTING#MBC#USER#abc#UserListSetting',
         settingValue: {},
       }),
-    )
+    );
   })
-  it('should return group-level setting if found', async () => {})
-  it('should return tenant-level setting if found', async () => {})
-  it('should return common-level setting if found', async () => {})
+  it('should return group-level setting if found', async () => {
+
+    jest.spyOn(service, 'getSetting').mockResolvedValueOnce({
+      id: 'SETTING#MBC#GROUP#1#UserListSetting',
+      settingValue: {},
+    });
+
+    const response = await service.getSetting(
+      { type: 'UserListSetting', code: 'GroupSettingCode' },
+      optionsMock,
+    );
+
+    expect(response).toEqual(
+      new SettingEntity({
+        id: 'SETTING#MBC#GROUP#1#UserListSetting',
+        settingValue: {},
+      }),
+    );
+  })
+  it('should return tenant-level setting if found', async () => {
+    jest.spyOn(service, 'getSetting').mockResolvedValueOnce({
+      id: 'SETTING#MBC#TENANT#TenantListSetting',
+      settingValue: {},
+    });
+
+    const response = await service.getSetting(
+      { type: 'TenantListSetting', code: '' },
+      optionsMock,
+    );
+
+    expect(response).toEqual(
+      new SettingEntity({
+        id: 'SETTING#MBC#TENANT#TenantListSetting',
+        settingValue: {},
+      }),
+    );
+  })
+  it('should return common-level setting if found', async () => {
+    jest.spyOn(service, 'getSetting').mockResolvedValueOnce({
+      id: 'SETTING#COMMON#CommonListSetting',
+      settingValue: {},
+    });
+
+    const response = await service.getSetting(
+      { type: 'CommonListSetting', code: '' },
+      optionsMock,
+    );
+
+    expect(response).toEqual(
+      new SettingEntity({
+        id: 'SETTING#COMMON#CommonListSetting',
+        settingValue: {},
+      }),
+    );
+  })
 
   describe('createCommonTenantSetting', () => {
     it('should call createCommonTenantSetting with correct parameters and return the result', async () => {
@@ -120,7 +170,7 @@ describe('SettingService', () => {
         type: 'COMMON',
       }
 
-      const commad: CommandDto = {
+      const command: CommandDto = {
         sk,
         pk,
         code: sk,
@@ -144,7 +194,7 @@ describe('SettingService', () => {
         name: 'UserListSetting',
         type: 'COMMON',
       })
-      const result = await commandService.publishAsync(commad, optionsMock)
+      const result = await commandService.publishAsync(command, optionsMock)
 
       expect(result).toEqual(mockResponse)
     })
@@ -170,7 +220,7 @@ describe('SettingService', () => {
         type: 'TENANT',
       }
 
-      const commad: CommandDto = {
+      const command: CommandDto = {
         sk,
         pk,
         code: sk,
@@ -194,7 +244,7 @@ describe('SettingService', () => {
         name: 'UserListSetting',
         type: 'TENANT',
       })
-      const result = await commandService.publishAsync(commad, optionsMock)
+      const result = await commandService.publishAsync(command, optionsMock)
 
       expect(result).toEqual(mockResponse)
     })
@@ -300,7 +350,58 @@ describe('SettingService', () => {
       expect(result).toEqual(mockResponse)
     })
   })
-  describe('updateSetting', () => {})
+  describe('updateSetting', () => {
+    it('should call updateSetting with correct parameters and return the result', async () => {
+      const settingCode = ' UserListSetting'
+      const settingValue = {}
+      const settingName = 'user list setting'
+      const tenantCode = 'MBC'
 
-  describe('deleteSetting', () => {})
+      const pk = `${SETTING_TENANT_PREFIX}${KEY_SEPARATOR}${tenantCode}`
+      const sk = settingCode
+      const mockResponse = {
+        pk: 'SETTING#MBC',
+        sk: 'USER#abcUserListSetting',
+        id: 'SETTING#MBC#USER#abc#UserListSetting',
+        attributes: {},
+        code: 'UserListSetting',
+        version: 1,
+        tenantCode: 'MBC',
+        name: 'UserListSetting',
+        type: 'USER',
+      }
+
+      const command: CommandDto = {
+        sk,
+        pk,
+        code: sk,
+        name: settingName,
+        id: generateId(pk, sk),
+        tenantCode: SettingTypeEnum.TENANT_COMMON,
+        type: SettingTypeEnum.TENANT_COMMON,
+        version: VERSION_FIRST,
+
+        attributes: settingValue,
+      }
+
+      jest.spyOn(commandService, 'publishAsync').mockResolvedValue({
+        pk: 'SETTING#MBC',
+        sk: 'USER#abcUserListSetting',
+        id: 'SETTING#MBC#USER#abc#UserListSetting',
+        attributes: {},
+        code: 'UserListSetting',
+        version: 1,
+        tenantCode: 'MBC',
+        name: 'UserListSetting',
+        type: 'USER',
+      })
+      const result = await commandService.publishAsync(command, optionsMock)
+
+      expect(result).toEqual(mockResponse)
+    })
+  })
+
+  describe('deleteSetting', () => {
+    
+  })
 })

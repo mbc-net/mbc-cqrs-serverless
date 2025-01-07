@@ -14,6 +14,10 @@ export class CreateCommonTenantDto {
   @IsString()
   name: string
 
+  /**
+   * description for tenant code
+   */
+
   @IsOptional()
   @IsString()
   @ApiProperty({

@@ -14,10 +14,6 @@ export class CreateSettingDto {
   @IsString()
   name: string
 
-  /**
-   * Name of the setting for the tenant code (required).
-   */
-
   @ApiProperty({
     type: String,
     example: 'UserListSetting',
@@ -29,7 +25,7 @@ export class CreateSettingDto {
 
   @ApiProperty({
     type: String,
-    example: 'UserListSetting',
+    example: 'area',
     required: true,
     description: 'The name of the setting.',
   })

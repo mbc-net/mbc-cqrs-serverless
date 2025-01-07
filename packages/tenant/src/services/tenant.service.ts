@@ -6,18 +6,19 @@ import {
   DataService,
   DetailKey,
   generateId,
-  getUserContext,
   IInvoke,
   KEY_SEPARATOR,
   VERSION_FIRST,
 } from '@mbc-cqrs-serverless/core'
+import { BadRequestException } from '@nestjs/common'
 import { Injectable, Logger, NotFoundException } from '@nestjs/common'
 
 import { TENANT_SK, TENANT_SYSTEM_PREFIX } from '../constants/tenant.constant'
-import { AddGroupTenantDto } from '../dto/tenant/add-group-tenant.dto'
+import { AddTenantGroupDto } from '../dto/tenant/add-group-tenant.dto'
 import { CreateTenantDto } from '../dto/tenant/create.tenant.dto'
 import { CreateCommonTenantDto } from '../dto/tenant/create-common-tenant.dto'
 import { UpdateTenantDto } from '../dto/tenant/update.tenant.dto'
+import { UpdateTenantGroupDto } from '../dto/tenant/update-tenant-group.dto'
 import { SettingTypeEnum } from '../enums/setting.enum'
 import { ITenantService } from '../interfaces/tenant.service.interface'
 
@@ -126,17 +127,20 @@ export class TenantService implements ITenantService {
 
     return item
   }
-  async addGroup(
-    dto: AddGroupTenantDto,
+  async addTenantGroup(
+    dto: AddTenantGroupDto,
     context: { invokeContext: IInvoke },
   ): Promise<CommandModel> {
-    const { role, groupId } = dto
-    const { tenantCode } = getUserContext(context.invokeContext)
+    const { role, groupId, tenantCode } = dto
 
     const tenant = await this.dataService.getItem({
       pk: `${TENANT_SYSTEM_PREFIX}${KEY_SEPARATOR}${tenantCode}`,
       sk: TENANT_SK,
     })
+    if (!tenant) {
+      this.logger.error(`Tenant not found for addGroup: ${tenantCode}`)
+      throw new BadRequestException('Tenant not found')
+    }
 
     // Helper to create a new attribute
     const createNewAttribute = () => ({
@@ -199,6 +203,50 @@ export class TenantService implements ITenantService {
         version: tenant.version,
         attributes: {
           setting: [createNewAttribute()],
+        },
+      },
+      context,
+    )
+  }
+
+  async customizeSettingGroups(
+    key: DetailKey,
+    dto: UpdateTenantGroupDto,
+    context: { invokeContext: IInvoke },
+  ): Promise<CommandModel> {
+    const { pk, sk } = key
+    const { role, settingGroups, tenantCode } = dto
+
+    const tenant = await this.dataService.getItem({
+      pk: `${TENANT_SYSTEM_PREFIX}${KEY_SEPARATOR}${tenantCode}`,
+      sk: TENANT_SK,
+    })
+    if (!tenant) {
+      this.logger.error(`Tenant not found for customizeSettingGroups: ${key}`)
+      throw new BadRequestException(
+        `Tenant not found for key: ${JSON.stringify(key)}`,
+      )
+    }
+
+    const settings = tenant.attributes?.setting || []
+    const updatedSettings = settings.map((item) => {
+      if (item.tenantRole !== role) return item
+
+      return {
+        ...item,
+        setting_groups: settingGroups,
+        setting_groups_mode: 'customized',
+      }
+    })
+
+    return await this.commandService.publishPartialUpdateAsync(
+      {
+        pk,
+        sk,
+        version: tenant.version,
+        attributes: {
+          ...tenant.attributes,
+          setting: updatedSettings,
         },
       },
       context,

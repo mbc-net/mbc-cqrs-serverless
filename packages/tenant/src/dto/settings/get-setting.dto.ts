@@ -14,6 +14,10 @@ export class GetSettingDto {
   })
   @IsString()
   type: string
+
+  /**
+   * code of the setting for the tenant code (required).
+   */
   @ApiProperty({
     type: String,
     example: ' User List Setting',

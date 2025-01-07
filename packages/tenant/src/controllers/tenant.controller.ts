@@ -10,10 +10,11 @@ import {
 } from '@nestjs/common'
 import { ApiTags } from '@nestjs/swagger'
 
-import { AddGroupTenantDto } from '../dto/tenant/add-group-tenant.dto'
+import { AddTenantGroupDto } from '../dto/tenant/add-group-tenant.dto'
 import { CreateTenantDto } from '../dto/tenant/create.tenant.dto'
 import { CreateCommonTenantDto } from '../dto/tenant/create-common-tenant.dto'
 import { UpdateTenantDto } from '../dto/tenant/update.tenant.dto'
+import { UpdateTenantGroupDto } from '../dto/tenant/update-tenant-group.dto'
 import { TenantService } from '../services'
 
 @ApiTags('tenant')
@@ -62,9 +63,20 @@ export class TenantController {
 
   @Post('group')
   async addGroup(
-    @Body() dto: AddGroupTenantDto,
+    @Body() dto: AddTenantGroupDto,
     @INVOKE_CONTEXT() invokeContext: IInvoke,
   ) {
-    return await this.tenantService.addGroup(dto, { invokeContext })
+    return await this.tenantService.addTenantGroup(dto, { invokeContext })
+  }
+
+  @Patch('group/:pk/:sk')
+  async customizeSettingGroups(
+    @Param() key: DetailDto,
+    @INVOKE_CONTEXT() invokeContext: IInvoke,
+    @Body() dto: UpdateTenantGroupDto,
+  ) {
+    return await this.tenantService.customizeSettingGroups(key, dto, {
+      invokeContext,
+    })
   }
 }

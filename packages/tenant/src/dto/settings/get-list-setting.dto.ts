@@ -3,7 +3,7 @@ import { IsString } from 'class-validator'
 
 export class GetListSettingDto {
   /**
-   * Name of the setting for the tenant code (required).
+   * type of the setting for the tenant code (required).
    */
   @ApiProperty({
     type: String,
