@@ -1,3 +1,4 @@
+import { createMock } from '@golevelup/ts-jest'
 import { Test } from '@nestjs/testing'
 import { ModuleMocker, MockFunctionMetadata } from 'jest-mock'
 
@@ -7,6 +8,17 @@ import { CommandService } from './command.service'
 import { DataService } from './data.service'
 import { addSortKeyVersion } from '../helpers/key'
 import { BadRequestException } from '@nestjs/common'
+import { TtlService } from './ttl.service'
+import {
+  DynamoDBClient,
+  GetItemCommand,
+  PutItemCommand,
+  UpdateItemCommand,
+} from '@aws-sdk/client-dynamodb'
+import { MODULE_OPTIONS_TOKEN } from './command.module-definition'
+import { ConfigService } from '@nestjs/config'
+import 'aws-sdk-client-mock-jest'
+import { mockClient } from 'aws-sdk-client-mock'
 
 const moduleMocker = new ModuleMocker(global)
 
@@ -21,6 +33,16 @@ function buildItem(key: DetailKey, version = 0, attributes = {}) {
     type: '',
     attributes,
   }
+}
+
+const config = {
+  DYNAMODB_ENDPOINT: 'http://localhost:8000',
+  DYNAMODB_REGION: 'ap-northeast-1',
+  AWS_ACCESS_KEY_ID: 'local',
+  AWS_SECRET_ACCESS_KEY: 'local',
+  AWS_DEFAULT_REGION: 'ap-northeast-1',
+  NODE_ENV: 'local',
+  APP_NAME: 'suisss-recruit',
 }
 
 describe('CommandService', () => {
@@ -278,6 +300,75 @@ describe('CommandService', () => {
           'Invalid input version. The input version must be equal to the latest version',
         ),
       )
+    })
+  })
+})
+
+describe('CommandService', () => {
+  let commandService: CommandService
+  let dynamoDbService: DynamoDbService
+  let ttlService: TtlService
+  const dynamoDBMock = mockClient(DynamoDBClient)
+
+  beforeEach(async () => {
+    const moduleRef = await Test.createTestingModule({
+      providers: [
+        CommandService,
+        DynamoDbService,
+        TtlService,
+        {
+          provide: MODULE_OPTIONS_TOKEN,
+          useValue: {
+            tableName: 'master',
+          },
+        },
+        {
+          provide: ConfigService,
+          useValue: {
+            get: (key) => config[key],
+          },
+        },
+      ],
+    })
+      .useMocker(createMock)
+      .compile()
+
+    commandService = moduleRef.get<CommandService>(CommandService)
+    ttlService = moduleRef.get<TtlService>(TtlService)
+  })
+
+  describe('updateTtl', () => {
+    it('should update with default TTL (null)', async () => {
+      dynamoDBMock.on(GetItemCommand).resolves({
+        Item: {},
+      })
+      dynamoDBMock.on(PutItemCommand).resolves({} as any)
+      jest.spyOn(ttlService, 'calculateTtl').mockResolvedValue(-1)
+      await commandService.updateTtl({
+        pk: 'master',
+        sk: 'test_ttl@2',
+      })
+
+      expect(dynamoDBMock).toHaveReceivedCommandTimes(PutItemCommand, 1)
+    })
+
+    it('should not update ttl when version is less than 1', async () => {
+      dynamoDBMock.on(GetItemCommand).resolves({
+        Item: {},
+      })
+      dynamoDBMock.on(UpdateItemCommand).resolves({} as any)
+      jest.spyOn(ttlService, 'calculateTtl').mockResolvedValue(null)
+      await commandService.updateTtl({
+        pk: 'master',
+        sk: 'test_ttl@0',
+      })
+
+      expect(dynamoDBMock).toHaveReceivedCommandTimes(UpdateItemCommand, 0)
+    })
+
+    afterEach(() => {
+      jest.clearAllMocks()
+      dynamoDBMock.reset()
     })
   })
 })
