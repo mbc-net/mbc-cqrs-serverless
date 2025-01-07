@@ -69,13 +69,12 @@ export class TenantController {
     return await this.tenantService.addTenantGroup(dto, { invokeContext })
   }
 
-  @Patch('group/:pk/:sk')
+  @Patch('group')
   async customizeSettingGroups(
-    @Param() key: DetailDto,
     @INVOKE_CONTEXT() invokeContext: IInvoke,
     @Body() dto: UpdateTenantGroupDto,
   ) {
-    return await this.tenantService.customizeSettingGroups(key, dto, {
+    return await this.tenantService.customizeSettingGroups(dto, {
       invokeContext,
     })
   }

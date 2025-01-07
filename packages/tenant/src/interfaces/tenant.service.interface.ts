@@ -94,7 +94,6 @@ export interface ITenantService {
    * @returns A promise that resolves to the updated tenant's data entity.
    */
   customizeSettingGroups(
-    key: DetailKey,
     dto: UpdateTenantGroupDto,
     context: { invokeContext: IInvoke },
   ): Promise<CommandModel>

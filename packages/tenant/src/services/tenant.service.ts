@@ -210,11 +210,9 @@ export class TenantService implements ITenantService {
   }
 
   async customizeSettingGroups(
-    key: DetailKey,
     dto: UpdateTenantGroupDto,
     context: { invokeContext: IInvoke },
   ): Promise<CommandModel> {
-    const { pk, sk } = key
     const { role, settingGroups, tenantCode } = dto
 
     const tenant = await this.dataService.getItem({
@@ -222,9 +220,11 @@ export class TenantService implements ITenantService {
       sk: TENANT_SK,
     })
     if (!tenant) {
-      this.logger.error(`Tenant not found for customizeSettingGroups: ${key}`)
+      this.logger.error(
+        `Tenant not found for customizeSettingGroups: ${tenantCode}`,
+      )
       throw new BadRequestException(
-        `Tenant not found for key: ${JSON.stringify(key)}`,
+        `Tenant not found for key: ${JSON.stringify(tenantCode)}`,
       )
     }
 
@@ -241,8 +241,8 @@ export class TenantService implements ITenantService {
 
     return await this.commandService.publishPartialUpdateAsync(
       {
-        pk,
-        sk,
+        pk: tenant.pk,
+        sk: tenant.sk,
         version: tenant.version,
         attributes: {
           ...tenant.attributes,
