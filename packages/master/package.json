@@ -1,7 +1,7 @@
 {
   "name": "@mbc-cqrs-serverless/master",
   "version": "0.1.48-beta.0",
-  "description": "Setting master data",
+  "description": " Master data management such as setting, sequence, etc.",
   "keywords": [
     "mbc",
     "cqrs",
