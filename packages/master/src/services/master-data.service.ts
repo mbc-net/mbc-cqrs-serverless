@@ -34,7 +34,12 @@ export class MasterDataService implements IMasterDataService {
   ) {}
 
   async list(tenantCode: string, searchDto: DataSettingSearchDto) {
-    const pk = generateMasterPk(tenantCode)
+    let pk
+    if (tenantCode) {
+      pk = generateMasterPk(tenantCode)
+    } else {
+      pk = generateMasterPk('COMMON')
+    }
     const query = { sk: undefined }
     if (searchDto.settingCode) {
       query.sk = {

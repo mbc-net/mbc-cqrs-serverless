@@ -35,8 +35,7 @@ export class MasterDataController {
     @INVOKE_CONTEXT() ctx: IInvoke,
     @Query() searchDto: DataSettingSearchDto,
   ) {
-    const userContext = getUserContext(ctx)
-    return await this.masterDataService.list(userContext.tenantCode, searchDto)
+    return await this.masterDataService.list(searchDto.tenantCode, searchDto)
   }
 
   @Get('/:pk/:sk')
