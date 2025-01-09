@@ -18,7 +18,7 @@ import { UpdateTenantGroupDto } from '../dto/tenant/update-tenant-group.dto'
 import { TenantService } from '../services'
 
 @ApiTags('tenant')
-@Controller('tenant')
+@Controller('api/tenant')
 export class TenantController {
   constructor(private readonly tenantService: TenantService) {}
 

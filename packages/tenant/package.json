@@ -1,6 +1,6 @@
 {
   "name": "@mbc-cqrs-serverless/tenant",
-  "version": "0.1.44-beta.0",
+  "version": "0.1.48-beta.0",
   "description": "Setting master data",
   "keywords": [
     "mbc",
@@ -25,7 +25,8 @@
   ],
   "scripts": {
     "build": "rm -rf dist && nest build",
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "postinstall": "node ./dist/update-scheme.js"
   },
   "repository": {
     "type": "git",
@@ -41,6 +42,6 @@
     "access": "public"
   },
   "dependencies": {
-    "@mbc-cqrs-serverless/core": "^0.1.44-beta.0"
+    "@mbc-cqrs-serverless/core": "^0.1.48-beta.0"
   }
 }

@@ -6,12 +6,12 @@ import {
 import { DynamicModule, Module } from '@nestjs/common'
 
 import { TABLE_NAME } from './constants'
-import { TenantController } from './controllers'
-import { TenantService } from './services'
+import { MasterDataController, MasterSettingController } from './controllers'
 import {
   ConfigurableModuleClass,
   OPTIONS_TYPE,
-} from './tenant.module-definition'
+} from './master.module-definition'
+import { MasterDataService, MasterSettingService } from './services'
 
 @Module({
   imports: [
@@ -21,10 +21,10 @@ import {
     DataStoreModule,
     QueueModule,
   ],
-  providers: [TenantService],
-  exports: [TenantService],
+  providers: [MasterDataService, MasterSettingService],
+  exports: [MasterDataService, MasterSettingService],
 })
-export class TenantModule extends ConfigurableModuleClass {
+export class MasterModule extends ConfigurableModuleClass {
   static register(options: typeof OPTIONS_TYPE): DynamicModule {
     const module = super.register(options)
 
@@ -32,8 +32,10 @@ export class TenantModule extends ConfigurableModuleClass {
       if (!module.controllers) {
         module.controllers = []
       }
-      module.controllers.push(TenantController)
+      module.controllers.push(MasterDataController)
+      module.controllers.push(MasterSettingController)
     }
+
     return {
       ...module,
     }
