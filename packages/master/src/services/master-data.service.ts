@@ -45,15 +45,17 @@ export class MasterDataService implements IMasterDataService {
       query.sk = {
         skExpession: 'begins_with(sk, :settingCode)',
         skAttributeValues: {
-          ':settingCode': `${DATA_SK_PREFIX}${KEY_SEPARATOR}${searchDto.settingCode}${KEY_SEPARATOR}`,
+          ':settingCode': `${DATA_SK_PREFIX}${KEY_SEPARATOR}${searchDto.settingCode}`,
         },
       }
+      const res = await this.dataService.listItemsByPk(pk, query)
+      return new MasterDataListEntity(res)
     }
     const res = (await this.dataService.listItemsByPk(pk, {
       sk: {
         skExpession: 'begins_with(sk, :settingCode)',
         skAttributeValues: {
-          ':settingCode': `${DATA_SK_PREFIX}${KEY_SEPARATOR}}`,
+          ':settingCode': `${DATA_SK_PREFIX}${KEY_SEPARATOR}`,
         },
       },
     })) as MasterDataListEntity

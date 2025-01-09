@@ -19,7 +19,11 @@ import {
   NotFoundException,
 } from '@nestjs/common'
 
-import { SETTING_TENANT_PREFIX, TENANT_SYSTEM_PREFIX } from '../constants'
+import {
+  SETTING_SK_PREFIX,
+  SETTING_TENANT_PREFIX,
+  TENANT_SYSTEM_PREFIX,
+} from '../constants'
 import {
   CommonSettingDto,
   GetSettingDto,
@@ -30,7 +34,7 @@ import {
 } from '../dto'
 import { MasterSettingEntity } from '../entities'
 import { SettingTypeEnum } from '../enums'
-import { generateMasterPk } from '../helpers'
+import { generateMasterPk, generateMasterSettingSk } from '../helpers'
 import { IMasterSettingService } from '../interfaces'
 
 @Injectable()
@@ -66,7 +70,7 @@ export class MasterSettingService implements IMasterSettingService {
   ): Promise<any> {
     const pk = `${SETTING_TENANT_PREFIX}${KEY_SEPARATOR}${tenantCode}`
     for (const group of groups) {
-      const skPrefix = `${SettingTypeEnum.TENANT_GROUP}${KEY_SEPARATOR}${group}${KEY_SEPARATOR}`
+      const skPrefix = `${SETTING_SK_PREFIX}${KEY_SEPARATOR}${SettingTypeEnum.TENANT_GROUP}${KEY_SEPARATOR}${group}${KEY_SEPARATOR}`
       const result = await this.fetchSetting(pk, skPrefix, code)
       if (result) return result
     }
@@ -86,7 +90,7 @@ export class MasterSettingService implements IMasterSettingService {
     // Fetch user-level setting
     let setting = await this.fetchSetting(
       pk,
-      `${SettingTypeEnum.TENANT_USER}${KEY_SEPARATOR}${userId}${KEY_SEPARATOR}`,
+      `${SETTING_SK_PREFIX}${KEY_SEPARATOR}${SettingTypeEnum.TENANT_USER}${KEY_SEPARATOR}${userId}${KEY_SEPARATOR}`,
       code,
     )
 
@@ -129,7 +133,11 @@ export class MasterSettingService implements IMasterSettingService {
     }
 
     // Fallback to common tenant-level settings
-    setting = await this.fetchSetting(pk, '', code)
+    setting = await this.fetchSetting(
+      pk,
+      `${SETTING_SK_PREFIX}${KEY_SEPARATOR}`,
+      code,
+    )
     if (setting) {
       return new MasterSettingEntity({
         id: setting.id,
@@ -139,7 +147,7 @@ export class MasterSettingService implements IMasterSettingService {
 
     setting = await this.fetchSetting(
       `${SETTING_TENANT_PREFIX}${KEY_SEPARATOR}${SettingTypeEnum.TENANT_COMMON}`,
-      '',
+      `${SETTING_SK_PREFIX}${KEY_SEPARATOR}`,
       code,
     )
     if (!setting) {
@@ -160,7 +168,7 @@ export class MasterSettingService implements IMasterSettingService {
     const { name, settingValue, code } = dto
 
     const pk = generateMasterPk(SettingTypeEnum.TENANT_COMMON)
-    const sk = `${code}`
+    const sk = generateMasterSettingSk(code)
     const command: CommandDto = {
       sk,
       pk,
@@ -182,12 +190,12 @@ export class MasterSettingService implements IMasterSettingService {
     const { name, tenantCode, settingValue, code } = dto
 
     const pk = generateMasterPk(tenantCode)
-    const sk = `${code}`
+    const sk = generateMasterSettingSk(code)
 
     const command: CommandDto = {
       sk,
       pk,
-      code: sk,
+      code: code,
       name: name,
       id: generateId(pk, sk),
       tenantCode: tenantCode,
@@ -207,7 +215,7 @@ export class MasterSettingService implements IMasterSettingService {
 
     const pk = generateMasterPk(tenantCode)
 
-    const sk = `${SettingTypeEnum.TENANT_GROUP}${KEY_SEPARATOR}${groupName}${KEY_SEPARATOR}${code}`
+    const sk = `${SETTING_SK_PREFIX}${KEY_SEPARATOR}${SettingTypeEnum.TENANT_GROUP}${KEY_SEPARATOR}${groupName}${KEY_SEPARATOR}${code}`
 
     const command: CommandDto = {
       sk,
@@ -231,7 +239,7 @@ export class MasterSettingService implements IMasterSettingService {
 
     const pk = generateMasterPk(tenantCode)
 
-    const sk = `${SettingTypeEnum.TENANT_USER}${KEY_SEPARATOR}${userId}${KEY_SEPARATOR}${code}`
+    const sk = `${SETTING_SK_PREFIX}${KEY_SEPARATOR}${SettingTypeEnum.TENANT_USER}${KEY_SEPARATOR}${userId}${KEY_SEPARATOR}${code}`
 
     const command: CommandDto = {
       sk,
