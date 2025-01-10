@@ -43,6 +43,8 @@
     "access": "public"
   },
   "dependencies": {
+    "@mbc-cqrs-serverless/core": "file:../core",
+    "cd": "^0.3.3",
     "commander": "^11.1.0",
     "rimraf": "^5.0.5"
   },

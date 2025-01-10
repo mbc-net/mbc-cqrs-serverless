@@ -67,6 +67,7 @@
     "ulid": "^2.3.0"
   },
   "devDependencies": {
+    "@aws-sdk/client-dynamodb": "^3.726.0",
     "@types/node": "^22.10.5",
     "serverless": "^3.40.0",
     "serverless-dynamodb": "^0.2.47",
