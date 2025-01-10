@@ -61,9 +61,16 @@ export function deserializeToInternal<T extends CommandEntity | DataEntity>(
   entity.sk = sk || data.code;
   entity.name = data.name;
 
-  // Separate attributes from base properties
+  // Copy entity-specific fields first
+  ['version', 'tenantCode', 'type', 'isDeleted', 'status', 'createdAt', 'updatedAt', 'createdBy', 'updatedBy', 'createdIp', 'updatedIp'].forEach(key => {
+    if (key in data) {
+      entity[key] = data[key];
+    }
+  });
+
+  // Separate remaining fields into attributes
   Object.keys(data).forEach(key => {
-    if (!['id', 'code', 'pk', 'sk', 'name'].includes(key)) {
+    if (!['id', 'code', 'pk', 'sk', 'name', 'version', 'tenantCode', 'type', 'isDeleted', 'status', 'createdAt', 'updatedAt', 'createdBy', 'updatedBy', 'createdIp', 'updatedIp'].includes(key)) {
       if (key in entity) {
         entity[key] = data[key];
       } else {
