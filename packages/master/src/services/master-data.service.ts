@@ -2,9 +2,11 @@ import {
   CommandService,
   DataService,
   DetailDto,
+  DynamoDbService,
   generateId,
   IInvoke,
   KEY_SEPARATOR,
+  TableType,
   VERSION_FIRST,
 } from '@mbc-cqrs-serverless/core'
 import {
@@ -14,7 +16,12 @@ import {
   NotFoundException,
 } from '@nestjs/common'
 
-import { DATA_SK_PREFIX, MASTER_PK_PREFIX } from '../constants'
+import {
+  DATA_SK_PREFIX,
+  MASTER_PK_PREFIX,
+  SETTING_TENANT_PREFIX,
+  TENANT_SYSTEM_PREFIX,
+} from '../constants'
 import {
   CreateMasterDataDto,
   DataSettingSearchDto,
@@ -27,11 +34,19 @@ import { IMasterDataService } from '../interfaces'
 @Injectable()
 export class MasterDataService implements IMasterDataService {
   private readonly logger = new Logger(MasterDataService.name)
+  private tenantTableName: string
 
   constructor(
     private readonly commandService: CommandService,
     private readonly dataService: DataService,
-  ) {}
+    private readonly dynamoDbService: DynamoDbService,
+  ) {
+    this.tenantTableName = dynamoDbService.getTableName(
+      'tenant',
+      TableType.DATA,
+    )
+    this.logger.debug('tableName: ' + this.tenantTableName)
+  }
 
   async list(tenantCode: string, searchDto: DataSettingSearchDto) {
     let pk
@@ -76,6 +91,14 @@ export class MasterDataService implements IMasterDataService {
     const pk = generateMasterPk(tenantCode)
     const sk = generateMasterDataSk(settingCode, code)
     const id = generateId(pk, sk)
+
+    const tenant = await this.dynamoDbService.getItem(this.tenantTableName, {
+      pk: `${TENANT_SYSTEM_PREFIX}${KEY_SEPARATOR}${tenantCode}`,
+      sk: SETTING_TENANT_PREFIX,
+    })
+    if (!tenant) {
+      throw new BadRequestException(`Tenant not found: ${tenantCode}`)
+    }
 
     const dataSetting = await this.dataService.getItem({ pk, sk })
 

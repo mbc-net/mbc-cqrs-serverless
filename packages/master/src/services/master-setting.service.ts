@@ -167,6 +167,16 @@ export class MasterSettingService implements IMasterSettingService {
   ): Promise<CommandModel> {
     const { name, settingValue, code } = dto
 
+    const tenant = await this.dynamoDbService.getItem(this.tenantTableName, {
+      pk: `${TENANT_SYSTEM_PREFIX}${KEY_SEPARATOR}${SettingTypeEnum.TENANT_COMMON}`,
+      sk: SETTING_TENANT_PREFIX,
+    })
+    if (!tenant) {
+      throw new BadRequestException(
+        `Tenant not found: ${SettingTypeEnum.TENANT_COMMON}`,
+      )
+    }
+
     const pk = generateMasterPk(SettingTypeEnum.TENANT_COMMON)
     const sk = generateMasterSettingSk(code)
     const command: CommandDto = {
@@ -192,6 +202,14 @@ export class MasterSettingService implements IMasterSettingService {
     const pk = generateMasterPk(tenantCode)
     const sk = generateMasterSettingSk(code)
 
+    const tenant = await this.dynamoDbService.getItem(this.tenantTableName, {
+      pk: `${TENANT_SYSTEM_PREFIX}${KEY_SEPARATOR}${tenantCode}`,
+      sk: SETTING_TENANT_PREFIX,
+    })
+    if (!tenant) {
+      throw new BadRequestException(`Tenant not found: ${tenantCode}`)
+    }
+
     const command: CommandDto = {
       sk,
       pk,
@@ -214,6 +232,14 @@ export class MasterSettingService implements IMasterSettingService {
     const { name, tenantCode, settingValue, code, groupName } = dto
 
     const pk = generateMasterPk(tenantCode)
+
+    const tenant = await this.dynamoDbService.getItem(this.tenantTableName, {
+      pk: `${TENANT_SYSTEM_PREFIX}${KEY_SEPARATOR}${tenantCode}`,
+      sk: SETTING_TENANT_PREFIX,
+    })
+    if (!tenant) {
+      throw new BadRequestException(`Tenant not found: ${tenantCode}`)
+    }
 
     const sk = `${SETTING_SK_PREFIX}${KEY_SEPARATOR}${SettingTypeEnum.TENANT_GROUP}${KEY_SEPARATOR}${groupName}${KEY_SEPARATOR}${code}`
 
@@ -238,6 +264,14 @@ export class MasterSettingService implements IMasterSettingService {
     const { name, tenantCode, settingValue, code, userId } = dto
 
     const pk = generateMasterPk(tenantCode)
+
+    const tenant = await this.dynamoDbService.getItem(this.tenantTableName, {
+      pk: `${TENANT_SYSTEM_PREFIX}${KEY_SEPARATOR}${tenantCode}`,
+      sk: SETTING_TENANT_PREFIX,
+    })
+    if (!tenant) {
+      throw new BadRequestException(`Tenant not found: ${tenantCode}`)
+    }
 
     const sk = `${SETTING_SK_PREFIX}${KEY_SEPARATOR}${SettingTypeEnum.TENANT_USER}${KEY_SEPARATOR}${userId}${KEY_SEPARATOR}${code}`
 
