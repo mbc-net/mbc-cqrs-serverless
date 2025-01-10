@@ -135,10 +135,25 @@ function deserializeToInternal<T extends CommandEntity | DataEntity>(
 ### シリアライズマッピング
 | 内部フィールド | 外部フィールド | 説明 |
 |--------------|--------------|------|
-| pk + sk | id | 結合された主キー |
+| pk + sk | id | 一意識別のための結合主キー |
+| cpk | cpk | コマンドテーブル用の主キー |
+| csk | csk | コマンドテーブル用のソートキー |
+| pk | pk | データテーブル用の主キー |
+| sk | sk | データテーブル用のソートキー |
 | sk | code | コードとして使用されるソートキー |
-| name | name | 第1階層のプロパティ |
-| attributes.* | * | フラット化された属性 |
-| version | version | エンティティのバージョン |
 | tenantCode | tenantCode | テナント識別子 |
-| type | type | エンティティタイプ |
+| type | type | エンティティタイプ（例：PROJECT） |
+| seq | seq | 並び順用のシーケンス番号 |
+| name | name | エンティティ名（第1階層のプロパティ） |
+| version | version | 楽観的ロック用のバージョン |
+| isDeleted | isDeleted | 削除フラグ |
+| createdBy | createdBy | 作成者のユーザID or ユーザ名 |
+| createdIp | createdIp | 作成者のアクセス元IPアドレス |
+| createdAt | createdAt | 作成日時 |
+| updatedBy | updatedBy | 更新者のユーザID or ユーザ名 |
+| updatedIp | updatedIp | 更新者のアクセス元IPアドレス |
+| updatedAt | updatedAt | 更新日時 |
+| description | description | エンティティの説明 |
+| status | status | CQRS用処理ステータス |
+| dueDate | dueDate | DynamoDBのTTL等に使用 |
+| attributes.* | * | 内部構造からフラット化された属性 |

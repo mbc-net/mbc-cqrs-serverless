@@ -135,10 +135,25 @@ Returns:
 ### Serialization Mapping
 | Internal Field | External Field | Description |
 |---------------|----------------|-------------|
-| pk + sk | id | Combined primary key |
-| sk | code | Sort key used as code |
-| name | name | First level property |
-| attributes.* | * | Flattened attributes |
-| version | version | Entity version |
+| pk + sk | id | Combined primary key for unique identification |
+| cpk | cpk | Command table primary key |
+| csk | csk | Command table sort key |
+| pk | pk | Data table primary key |
+| sk | sk | Data table sort key |
+| sk | code | Sort key used as code identifier |
 | tenantCode | tenantCode | Tenant identifier |
-| type | type | Entity type |
+| type | type | Entity type (e.g., PROJECT) |
+| seq | seq | Sequence number for ordering |
+| name | name | Entity name (first level property) |
+| version | version | Entity version for optimistic locking |
+| isDeleted | isDeleted | Soft delete flag |
+| createdBy | createdBy | User ID or name of creator |
+| createdIp | createdIp | IP address of creator |
+| createdAt | createdAt | Creation timestamp |
+| updatedBy | updatedBy | User ID or name of last updater |
+| updatedIp | updatedIp | IP address of last updater |
+| updatedAt | updatedAt | Last update timestamp |
+| description | description | Entity description |
+| status | status | CQRS processing status |
+| dueDate | dueDate | TTL for DynamoDB expiration |
+| attributes.* | * | Flattened attributes from internal structure |
