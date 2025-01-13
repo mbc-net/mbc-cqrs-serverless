@@ -260,6 +260,7 @@ export class TenantService implements ITenantService {
 
       return {
         ...item,
+        groups: settingGroups,
         setting_groups: settingGroups,
         setting_groups_mode: 'customized',
       }
