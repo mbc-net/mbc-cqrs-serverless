@@ -11,14 +11,16 @@ import {
   VERSION_FIRST,
 } from '@mbc-cqrs-serverless/core'
 import { BadRequestException } from '@nestjs/common'
-import { Injectable, Logger, NotFoundException } from '@nestjs/common'
+import { Injectable, Logger } from '@nestjs/common'
 
 import { TENANT_SK, TENANT_SYSTEM_PREFIX } from '../constants/tenant.constant'
-import { AddTenantGroupDto } from '../dto/tenant/add-group-tenant.dto'
-import { CreateTenantDto } from '../dto/tenant/create.tenant.dto'
-import { CreateCommonTenantDto } from '../dto/tenant/create-common-tenant.dto'
-import { UpdateTenantDto } from '../dto/tenant/update.tenant.dto'
-import { UpdateTenantGroupDto } from '../dto/tenant/update-tenant-group.dto'
+import {
+  CommonTenantCreateDto,
+  TenantCreateDto,
+  TenantGroupAddDto,
+  TenantGroupUpdateDto,
+  TenantUpdateDto,
+} from '../dto'
 import { SettingTypeEnum } from '../enums/setting.enum'
 import { ITenantService } from '../interfaces/tenant.service.interface'
 
@@ -36,12 +38,22 @@ export class TenantService implements ITenantService {
   }
 
   async createCommonTenant(
-    dto: CreateCommonTenantDto,
+    dto: CommonTenantCreateDto,
     context: { invokeContext: IInvoke },
   ): Promise<CommandModel> {
     const { name, description } = dto
     const pk = `${TENANT_SYSTEM_PREFIX}${KEY_SEPARATOR}${SettingTypeEnum.TENANT_COMMON}`
     const sk = TENANT_SK
+
+    const tenant = await this.dataService.getItem({
+      pk,
+      sk,
+    })
+    if (tenant) {
+      throw new BadRequestException(
+        `Tenant already exist: ${SettingTypeEnum.TENANT_COMMON}`,
+      )
+    }
 
     const command: CommandDto = {
       pk: pk,
@@ -59,12 +71,22 @@ export class TenantService implements ITenantService {
     return await this.commandService.publishAsync(command, context)
   }
   async createTenant(
-    dto: CreateTenantDto,
+    dto: TenantCreateDto,
     context: { invokeContext: IInvoke },
   ): Promise<CommandModel> {
     const { name, code, description } = dto
     const pk = `${TENANT_SYSTEM_PREFIX}${KEY_SEPARATOR}${code}`
     const sk = TENANT_SK
+
+    const tenant = await this.dataService.getItem({
+      pk,
+      sk,
+    })
+    if (tenant) {
+      throw new BadRequestException(
+        `Tenant already exist: ${SettingTypeEnum.TENANT_COMMON}`,
+      )
+    }
 
     const command: CommandDto = {
       pk: pk,
@@ -85,13 +107,15 @@ export class TenantService implements ITenantService {
 
   async updateTenant(
     key: DetailKey,
-    dto: UpdateTenantDto,
+    dto: TenantUpdateDto,
     context: { invokeContext: IInvoke },
   ): Promise<CommandModel> {
     const { pk, sk } = key
     const data = await this.dataService.getItem(key)
     if (!data) {
-      throw new NotFoundException()
+      throw new BadRequestException(
+        `Tenant not found for update: ${JSON.stringify(key)}`,
+      )
     }
     const item = await this.commandService.publishPartialUpdateAsync(
       {
@@ -111,7 +135,9 @@ export class TenantService implements ITenantService {
   ): Promise<CommandModel> {
     const data = await this.dataService.getItem(key)
     if (!data) {
-      throw new NotFoundException()
+      throw new BadRequestException(
+        `Tenant not found for delete: ${JSON.stringify(key)}`,
+      )
     }
     const { pk, sk } = key
 
@@ -128,7 +154,7 @@ export class TenantService implements ITenantService {
     return item
   }
   async addTenantGroup(
-    dto: AddTenantGroupDto,
+    dto: TenantGroupAddDto,
     context: { invokeContext: IInvoke },
   ): Promise<CommandModel> {
     const { role, groupId, tenantCode } = dto
@@ -210,7 +236,7 @@ export class TenantService implements ITenantService {
   }
 
   async customizeSettingGroups(
-    dto: UpdateTenantGroupDto,
+    dto: TenantGroupUpdateDto,
     context: { invokeContext: IInvoke },
   ): Promise<CommandModel> {
     const { role, settingGroups, tenantCode } = dto

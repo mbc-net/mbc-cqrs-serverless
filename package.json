@@ -28,7 +28,7 @@
     "fargate",
     "step-functions",
     "sqs",
-    "typpescript"
+    "typescript"
   ],
   "author": "Murakami Business Consulting, Inc.",
   "license": "MIT",

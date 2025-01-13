@@ -19,7 +19,7 @@ import {
 import { ApiTags } from '@nestjs/swagger'
 
 import { CreateMasterDataDto } from '../dto/master-data/data-create.dto'
-import { DataSettingSearchDto } from '../dto/master-data/data-search.dto'
+import { MasterDataSearchDto } from '../dto/master-data/data-search.dto'
 import { UpdateDataSettingDto } from '../dto/master-data/data-update.dto'
 import { MasterDataService } from '../services/master-data.service'
 
@@ -33,9 +33,9 @@ export class MasterDataController {
   @Get('/')
   async listData(
     @INVOKE_CONTEXT() ctx: IInvoke,
-    @Query() searchDto: DataSettingSearchDto,
+    @Query() searchDto: MasterDataSearchDto,
   ) {
-    return await this.masterDataService.list(searchDto.tenantCode, searchDto)
+    return await this.masterDataService.list(searchDto)
   }
 
   @Get('/:pk/:sk')

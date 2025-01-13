@@ -10,11 +10,13 @@ import {
 } from '@nestjs/common'
 import { ApiTags } from '@nestjs/swagger'
 
-import { AddTenantGroupDto } from '../dto/tenant/add-group-tenant.dto'
-import { CreateTenantDto } from '../dto/tenant/create.tenant.dto'
-import { CreateCommonTenantDto } from '../dto/tenant/create-common-tenant.dto'
-import { UpdateTenantDto } from '../dto/tenant/update.tenant.dto'
-import { UpdateTenantGroupDto } from '../dto/tenant/update-tenant-group.dto'
+import {
+  CommonTenantCreateDto,
+  TenantCreateDto,
+  TenantGroupAddDto,
+  TenantGroupUpdateDto,
+  TenantUpdateDto,
+} from '../dto'
 import { TenantService } from '../services'
 
 @ApiTags('tenant')
@@ -30,7 +32,7 @@ export class TenantController {
   @Post('common')
   async createTenantCommon(
     @INVOKE_CONTEXT() invokeContext: IInvoke,
-    @Body() dto: CreateCommonTenantDto,
+    @Body() dto: CommonTenantCreateDto,
   ) {
     return await this.tenantService.createCommonTenant(dto, { invokeContext })
   }
@@ -38,7 +40,7 @@ export class TenantController {
   @Post()
   async createTenant(
     @INVOKE_CONTEXT() invokeContext: IInvoke,
-    @Body() dto: CreateTenantDto,
+    @Body() dto: TenantCreateDto,
   ) {
     return await this.tenantService.createTenant(dto, {
       invokeContext,
@@ -48,7 +50,7 @@ export class TenantController {
   async updateTenant(
     @Param() key: DetailDto,
     @INVOKE_CONTEXT() invokeContext: IInvoke,
-    @Body() dto: UpdateTenantDto,
+    @Body() dto: TenantUpdateDto,
   ) {
     return await this.tenantService.updateTenant(key, dto, { invokeContext })
   }
@@ -63,7 +65,7 @@ export class TenantController {
 
   @Post('group')
   async addGroup(
-    @Body() dto: AddTenantGroupDto,
+    @Body() dto: TenantGroupAddDto,
     @INVOKE_CONTEXT() invokeContext: IInvoke,
   ) {
     return await this.tenantService.addTenantGroup(dto, { invokeContext })
@@ -72,7 +74,7 @@ export class TenantController {
   @Patch('group')
   async customizeSettingGroups(
     @INVOKE_CONTEXT() invokeContext: IInvoke,
-    @Body() dto: UpdateTenantGroupDto,
+    @Body() dto: TenantGroupUpdateDto,
   ) {
     return await this.tenantService.customizeSettingGroups(dto, {
       invokeContext,

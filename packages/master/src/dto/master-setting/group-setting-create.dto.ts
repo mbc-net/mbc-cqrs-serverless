@@ -49,7 +49,7 @@ export class GroupSettingDto {
   })
   @IsOptional()
   @IsString()
-  groupName?: string
+  groupId: string
 
   /**
    * Additional attributes for the tenant (required).

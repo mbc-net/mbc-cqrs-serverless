@@ -1,6 +1,6 @@
 import { IsOptional, IsString } from 'class-validator'
 
-export class DataSettingSearchDto {
+export class MasterDataSearchDto {
   @IsString()
   @IsOptional()
   settingCode?: string

@@ -5,11 +5,13 @@ import {
   IInvoke,
 } from '@mbc-cqrs-serverless/core'
 
-import { AddTenantGroupDto } from '../dto/tenant/add-group-tenant.dto'
-import { CreateTenantDto } from '../dto/tenant/create.tenant.dto'
-import { CreateCommonTenantDto } from '../dto/tenant/create-common-tenant.dto'
-import { UpdateTenantDto } from '../dto/tenant/update.tenant.dto'
-import { UpdateTenantGroupDto } from '../dto/tenant/update-tenant-group.dto'
+import {
+  CommonTenantCreateDto,
+  TenantCreateDto,
+  TenantGroupAddDto,
+  TenantGroupUpdateDto,
+  TenantUpdateDto,
+} from '../dto'
 
 /**
  * Interface representing the service responsible for managing tenant codes.
@@ -31,7 +33,7 @@ export interface ITenantService {
    * @returns A promise that resolves to the newly created tenant code's data entity.
    */
   createTenant(
-    dto: CreateTenantDto,
+    dto: TenantCreateDto,
     context: { invokeContext: IInvoke },
   ): Promise<CommandModel>
 
@@ -45,7 +47,7 @@ export interface ITenantService {
    */
   updateTenant(
     key: DetailKey,
-    dto: UpdateTenantDto,
+    dto: TenantUpdateDto,
     context: { invokeContext: IInvoke },
   ): Promise<CommandModel>
 
@@ -69,7 +71,7 @@ export interface ITenantService {
    * @returns A promise that resolves to the newly created common tenant code's data entity.
    */
   createCommonTenant(
-    dto: CreateCommonTenantDto,
+    dto: CommonTenantCreateDto,
     context: { invokeContext: IInvoke },
   ): Promise<CommandModel>
 
@@ -81,7 +83,7 @@ export interface ITenantService {
    * @returns A promise that resolves to the data entity of the tenant code with the added group.
    */
   addTenantGroup(
-    dto: AddTenantGroupDto,
+    dto: TenantGroupAddDto,
     context: { invokeContext: IInvoke },
   ): Promise<CommandModel>
 
@@ -94,7 +96,7 @@ export interface ITenantService {
    * @returns A promise that resolves to the updated tenant's data entity.
    */
   customizeSettingGroups(
-    dto: UpdateTenantGroupDto,
+    dto: TenantGroupUpdateDto,
     context: { invokeContext: IInvoke },
   ): Promise<CommandModel>
 }

@@ -1,7 +1,7 @@
 import { ApiProperty } from '@nestjs/swagger'
 import { IsString } from 'class-validator'
 
-export class AddTenantGroupDto {
+export class TenantGroupAddDto {
   /**
    * Value for tenant name create (require).
    */

@@ -12,12 +12,7 @@ import {
   TableType,
   VERSION_FIRST,
 } from '@mbc-cqrs-serverless/core'
-import {
-  BadRequestException,
-  Injectable,
-  Logger,
-  NotFoundException,
-} from '@nestjs/common'
+import { BadRequestException, Injectable, Logger } from '@nestjs/common'
 
 import {
   SETTING_SK_PREFIX,
@@ -167,18 +162,12 @@ export class MasterSettingService implements IMasterSettingService {
   ): Promise<CommandModel> {
     const { name, settingValue, code } = dto
 
-    const tenant = await this.dynamoDbService.getItem(this.tenantTableName, {
-      pk: `${TENANT_SYSTEM_PREFIX}${KEY_SEPARATOR}${SettingTypeEnum.TENANT_COMMON}`,
-      sk: SETTING_TENANT_PREFIX,
-    })
-    if (!tenant) {
-      throw new BadRequestException(
-        `Tenant not found: ${SettingTypeEnum.TENANT_COMMON}`,
-      )
-    }
-
     const pk = generateMasterPk(SettingTypeEnum.TENANT_COMMON)
     const sk = generateMasterSettingSk(code)
+    const setting = await this.dataService.getItem({ pk, sk })
+    if (setting) {
+      throw new BadRequestException(`Setting already exists: ${code}`)
+    }
     const command: CommandDto = {
       sk,
       pk,
@@ -188,7 +177,7 @@ export class MasterSettingService implements IMasterSettingService {
       tenantCode: SettingTypeEnum.TENANT_COMMON,
       type: SettingTypeEnum.TENANT_COMMON,
       version: VERSION_FIRST,
-
+      isDeleted: false,
       attributes: settingValue,
     }
     return await this.commandService.publishAsync(command, options)
@@ -202,12 +191,9 @@ export class MasterSettingService implements IMasterSettingService {
     const pk = generateMasterPk(tenantCode)
     const sk = generateMasterSettingSk(code)
 
-    const tenant = await this.dynamoDbService.getItem(this.tenantTableName, {
-      pk: `${TENANT_SYSTEM_PREFIX}${KEY_SEPARATOR}${tenantCode}`,
-      sk: SETTING_TENANT_PREFIX,
-    })
-    if (!tenant) {
-      throw new BadRequestException(`Tenant not found: ${tenantCode}`)
+    const setting = await this.dataService.getItem({ pk, sk })
+    if (setting) {
+      throw new BadRequestException(`Setting already exists: ${code}`)
     }
 
     const command: CommandDto = {
@@ -219,7 +205,7 @@ export class MasterSettingService implements IMasterSettingService {
       tenantCode: tenantCode,
       type: SettingTypeEnum.TENANT,
       version: VERSION_FIRST,
-
+      isDeleted: false,
       attributes: settingValue,
     }
     return await this.commandService.publishAsync(command, options)
@@ -229,19 +215,16 @@ export class MasterSettingService implements IMasterSettingService {
     dto: GroupSettingDto,
     options: { invokeContext: IInvoke },
   ): Promise<CommandModel> {
-    const { name, tenantCode, settingValue, code, groupName } = dto
+    const { name, tenantCode, settingValue, code, groupId } = dto
 
     const pk = generateMasterPk(tenantCode)
 
-    const tenant = await this.dynamoDbService.getItem(this.tenantTableName, {
-      pk: `${TENANT_SYSTEM_PREFIX}${KEY_SEPARATOR}${tenantCode}`,
-      sk: SETTING_TENANT_PREFIX,
-    })
-    if (!tenant) {
-      throw new BadRequestException(`Tenant not found: ${tenantCode}`)
-    }
+    const sk = `${SETTING_SK_PREFIX}${KEY_SEPARATOR}${SettingTypeEnum.TENANT_GROUP}${KEY_SEPARATOR}${groupId}${KEY_SEPARATOR}${code}`
 
-    const sk = `${SETTING_SK_PREFIX}${KEY_SEPARATOR}${SettingTypeEnum.TENANT_GROUP}${KEY_SEPARATOR}${groupName}${KEY_SEPARATOR}${code}`
+    const setting = await this.dataService.getItem({ pk, sk })
+    if (setting) {
+      throw new BadRequestException(`Setting already exists: ${code}`)
+    }
 
     const command: CommandDto = {
       sk,
@@ -252,7 +235,7 @@ export class MasterSettingService implements IMasterSettingService {
       tenantCode: tenantCode,
       type: SettingTypeEnum.TENANT_GROUP,
       version: VERSION_FIRST,
-
+      isDeleted: false,
       attributes: settingValue,
     }
     return await this.commandService.publishAsync(command, options)
@@ -265,15 +248,12 @@ export class MasterSettingService implements IMasterSettingService {
 
     const pk = generateMasterPk(tenantCode)
 
-    const tenant = await this.dynamoDbService.getItem(this.tenantTableName, {
-      pk: `${TENANT_SYSTEM_PREFIX}${KEY_SEPARATOR}${tenantCode}`,
-      sk: SETTING_TENANT_PREFIX,
-    })
-    if (!tenant) {
-      throw new BadRequestException(`Tenant not found: ${tenantCode}`)
-    }
-
     const sk = `${SETTING_SK_PREFIX}${KEY_SEPARATOR}${SettingTypeEnum.TENANT_USER}${KEY_SEPARATOR}${userId}${KEY_SEPARATOR}${code}`
+
+    const setting = await this.dataService.getItem({ pk, sk })
+    if (setting) {
+      throw new BadRequestException(`Setting already exists: ${code}`)
+    }
 
     const command: CommandDto = {
       sk,
@@ -284,7 +264,7 @@ export class MasterSettingService implements IMasterSettingService {
       tenantCode: tenantCode,
       type: SettingTypeEnum.TENANT_USER,
       version: VERSION_FIRST,
-
+      isDeleted: false,
       attributes: settingValue,
     }
     return await this.commandService.publishAsync(command, options)
@@ -298,7 +278,7 @@ export class MasterSettingService implements IMasterSettingService {
     const { pk, sk } = key
     const data = await this.dataService.getItem(key)
     if (!data) {
-      throw new NotFoundException()
+      throw new BadRequestException("Setting doesn't exist")
     }
     const item = await this.commandService.publishPartialUpdateAsync(
       {

@@ -1,7 +1,10 @@
 import { ApiProperty } from '@nestjs/swagger'
-import { IsArray, IsString } from 'class-validator'
+import { IsOptional, IsString } from 'class-validator'
 
-export class UpdateTenantGroupDto {
+export class TenantCreateDto {
+  /**
+   * Value for tenant code create (require).
+   */
   @ApiProperty({
     type: String,
     example: 'MBC',
@@ -9,23 +12,27 @@ export class UpdateTenantGroupDto {
     description: 'tenantCode ',
   })
   @IsString()
-  tenantCode: string
+  code: string
 
+  /**
+   * Value for tenant name create (require).
+   */
   @ApiProperty({
     type: String,
     example: 'MBC',
     required: true,
     description: 'tenantName ',
   })
-  @IsArray()
-  settingGroups: string[]
+  @IsString()
+  name: string
 
+  @IsOptional()
   @IsString()
   @ApiProperty({
     type: String,
     example: 'describes the tenant ',
-    required: true,
+    required: false,
     description: 'description for tenant code',
   })
-  role: string
+  description?: string
 }
