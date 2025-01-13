@@ -1,4 +1,8 @@
-import { EventBus, EventHandler, IEventHandler } from '@mbc-cqrs-serverless/core'
+import {
+  EventBus,
+  EventHandler,
+  IEventHandler,
+} from '@mbc-cqrs-serverless/core'
 import { Inject, Logger, OnModuleInit } from '@nestjs/common'
 import { ModuleRef } from '@nestjs/core'
 
@@ -49,9 +53,12 @@ export class TaskQueueEventHandler
     } catch (error) {
       // update status failed
       this.logger.error(error)
-      await this.taskService.updateStatus(taskKey, TaskStatusEnum.FAILED, {
-        error,
-      })
+      await Promise.all([
+        this.taskService.updateStatus(taskKey, TaskStatusEnum.FAILED, {
+          error,
+        }),
+        this.taskService.publishAlarm(event, (error as Error).stack),
+      ])
       throw error
     }
   }
