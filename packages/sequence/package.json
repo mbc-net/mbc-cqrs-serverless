@@ -1,6 +1,6 @@
 {
   "name": "@mbc-cqrs-serverless/sequence",
-  "version": "0.1.47-beta.0",
+  "version": "0.1.48-beta.0",
   "description": "Generate increment sequence with time-rotation",
   "keywords": [
     "mbc",
@@ -15,7 +15,7 @@
     "fargate",
     "step-functions",
     "sqs",
-    "typpescript"
+    "typescript"
   ],
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",

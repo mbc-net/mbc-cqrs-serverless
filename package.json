@@ -28,7 +28,7 @@
     "fargate",
     "step-functions",
     "sqs",
-    "typpescript"
+    "typescript"
   ],
   "author": "Murakami Business Consulting, Inc.",
   "license": "MIT",
@@ -86,7 +86,9 @@
     "packages/sequence",
     "packages/task",
     "packages/cli",
-    "packages/ui-setting"
+    "packages/ui-setting",
+    "packages/tenant",
+    "packages/master"
   ],
   "jest": {
     "moduleFileExtensions": [
