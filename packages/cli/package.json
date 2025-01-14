@@ -1,6 +1,6 @@
 {
   "name": "@mbc-cqrs-serverless/cli",
-  "version": "0.1.45-beta.0",
+  "version": "0.1.47-beta.0",
   "description": "a CLI to get started with MBC CQRS serverless framework",
   "keywords": [
     "mbc",
@@ -15,7 +15,7 @@
     "fargate",
     "step-functions",
     "sqs",
-    "typpescript"
+    "typescript"
   ],
   "bin": {
     "mbc": "./dist/index.js"

@@ -14,17 +14,20 @@ jobs:
   unit_tests:
     name: Unit Test
     runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        node-version: [18.x, 20.x, 22.x]
     steps:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
       - uses: actions/setup-node@v4
         with:
-          node-version: 18
+          node-version: ${{ matrix.node-version }}
           cache: npm
 
       - name: Install dependencies
-        run: npm ci
+        run: npm ci --ignore-scripts
 
       - name: Build packages
         run: npm run build
@@ -36,7 +39,7 @@ jobs:
         uses: dorny/test-reporter@v1
         if: success() || failure()
         with:
-          name: Unit Tests Reporter
+          name: Unit Tests Reporter-${{ matrix.node-version }}
           path: report/unit.xml
           reporter: jest-junit
           fail-on-error: 'true'
@@ -45,17 +48,20 @@ jobs:
     name: E2e Test For Core package
     needs: unit_tests
     runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        node-version: [18.x, 20.x, 22.x]
     steps:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
       - uses: actions/setup-node@v4
         with:
-          node-version: 18
+          node-version: ${{ matrix.node-version }}
           cache: npm
 
       - name: Install dependencies
-        run: npm ci
+        run: npm ci --ignore-scripts
 
       - name: Build test
         run: npx lerna run build:test --scope=@mbc-cqrs-serverless/core
@@ -67,14 +73,14 @@ jobs:
         name: 'upload artifact'
         if: success() || failure()
         with:
-          name: my-artifacts
+          name: core-report-artifact-${{ matrix.node-version }}
           path: ./packages/core/test/scripts/*.out.txt
 
       - name: E2E Test Report
         uses: dorny/test-reporter@v1
         if: success() || failure()
         with:
-          name: E2E Core Tests Reporter
+          name: E2E Core Tests Reporter-${{ matrix.node-version }}
           path: report/e2e-core.xml
           reporter: jest-junit
           fail-on-error: 'true'
@@ -92,7 +98,7 @@ jobs:
           node-version: 18
           cache: npm
       - name: Install dependencies
-        run: npm ci
+        run: npm ci --ignore-scripts
 
       - name: Build packages
         run: npx lerna run build

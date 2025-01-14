@@ -484,16 +484,9 @@ export class CommandService implements OnModuleInit, ICommandService {
       getTenantCode(key.pk),
     )
 
+    command.ttl = ttl
+
     this.logger.debug('updateTtl::', command)
-    return await this.dynamoDbService.updateItem(
-      this.tableName,
-      {
-        pk: key.pk,
-        sk: previousSk,
-      },
-      {
-        set: { ttl },
-      },
-    )
+    return await this.dynamoDbService.putItem(this.tableName, command)
   }
 }

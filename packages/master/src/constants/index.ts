@@ -1,0 +1,6 @@
+export const TENANT_SYSTEM_PREFIX = 'TENANT'
+export const TABLE_NAME = 'master'
+export const SETTING_TENANT_PREFIX = 'MASTER'
+export const MASTER_PK_PREFIX = 'MASTER'
+export const SETTING_SK_PREFIX = 'MASTER_SETTING'
+export const DATA_SK_PREFIX = 'MASTER_DATA'
