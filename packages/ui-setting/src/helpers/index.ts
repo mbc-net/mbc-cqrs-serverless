@@ -1,7 +1,7 @@
 import { KEY_SEPARATOR, removeSortKeyVersion } from '@mbc-cqrs-serverless/core'
 
 export const MASTER_PK_PREFIX = 'MASTER'
-export const SETTING_SK_PREFIX = 'master_setting'
+export const SETTING_SK_PREFIX = 'MASTER_SETTING'
 
 export function generateSettingPk(tenantCode: string) {
   return `${MASTER_PK_PREFIX}${KEY_SEPARATOR}${tenantCode}`

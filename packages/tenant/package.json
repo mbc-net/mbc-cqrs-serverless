@@ -1,0 +1,47 @@
+{
+  "name": "@mbc-cqrs-serverless/tenant",
+  "version": "0.1.48-beta.0",
+  "description": "Multiple tenant management",
+  "keywords": [
+    "mbc",
+    "cqrs",
+    "serverless",
+    "framework",
+    "event-driven",
+    "backend",
+    "aws",
+    "lambda",
+    "ecs",
+    "fargate",
+    "step-functions",
+    "sqs",
+    "typescript"
+  ],
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "files": [
+    "dist",
+    "!dist/tsconfig.tsbuildinfo"
+  ],
+  "scripts": {
+    "build": "rm -rf dist && nest build",
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "postinstall": "node ./dist/update-scheme.js"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/mbc-net/mbc-cqrs-serverless.git"
+  },
+  "author": "Murakami Business Consulting, Inc.",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/mbc-net/mbc-cqrs-serverless/issues"
+  },
+  "homepage": "https://mbc-cqrs-serverless.mbc-net.com/",
+  "publishConfig": {
+    "access": "public"
+  },
+  "dependencies": {
+    "@mbc-cqrs-serverless/core": "^0.1.48-beta.0"
+  }
+}

@@ -27,7 +27,7 @@ jobs:
           cache: npm
 
       - name: Install dependencies
-        run: npm ci
+        run: npm ci --ignore-scripts
 
       - name: Build packages
         run: npm run build
@@ -61,7 +61,7 @@ jobs:
           cache: npm
 
       - name: Install dependencies
-        run: npm ci
+        run: npm ci --ignore-scripts
 
       - name: Build test
         run: npx lerna run build:test --scope=@mbc-cqrs-serverless/core
@@ -98,7 +98,7 @@ jobs:
           node-version: 18
           cache: npm
       - name: Install dependencies
-        run: npm ci
+        run: npm ci --ignore-scripts
 
       - name: Build packages
         run: npx lerna run build
@@ -111,6 +111,6 @@ jobs:
           git config user.name "${{ github.actor }}"
           git config user.email "${{ github.actor}}@users.noreply.github.com"
 
-          npx lerna version prepatch --force-publish --no-changelog --yes
+          npx lerna version prepatch --force-publish --yes
 
           npx lerna publish from-git --yes

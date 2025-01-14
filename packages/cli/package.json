@@ -15,7 +15,7 @@
     "fargate",
     "step-functions",
     "sqs",
-    "typpescript"
+    "typescript"
   ],
   "bin": {
     "mbc": "./dist/index.js"

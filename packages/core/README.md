@@ -1,99 +1,206 @@
 ![MBC CQRS serverless framework](https://mbc-cqrs-serverless.mbc-net.com/img/mbc-cqrs-serverless.png)
 
-# MBC CQRS serverless framework CORE package
+# MBC CQRS serverless framework Core package
 
 ## Description
 
-This is the core package of the MBC CQRS Serverless framework. It provides the basic functionality of CQRS.
+The Core package provides the foundational functionality for the MBC CQRS Serverless framework. It implements:
+
+- Command Query Responsibility Segregation (CQRS) patterns
+- Event-driven architecture support
+- Data persistence and retrieval
+- Authentication and authorization
+- Multi-tenant data isolation
+- AWS service integrations
 
 ## Installation
 
-To install `mbc` command, run:
-
 ```bash
-npm install -g @mbc-cqrs-serverless/cli
+npm install @mbc-cqrs-serverless/core
 ```
 
 ## Usage
 
-### `mbc new|n [projectName@version]`
+### Basic Setup
 
-There are 3 usages for the new command:
+1. Import and configure the core module:
+```typescript
+import { CoreModule } from '@mbc-cqrs-serverless/core';
+import { Module } from '@nestjs/common';
 
-- `mbc new`
-    - Creates a new project in the current folder using a default name with the latest framework version.
-- `mbc new [projectName]`
-    - Creates a new project in the `projectName` folder using the latest framework version.
-- `mbc new [projectName@version]`
-    - If the specified version exists, the CLI uses that exact version.
-    - If the provided version is a prefix, the CLI uses the latest version matching that prefix.
-    - If no matching version is found, the CLI logs an error and provides a list of available versions for the user.
-
-To change current directory
-
-```bash
-cd [projectName]
+@Module({
+  imports: [
+    CoreModule.forRoot({
+      region: 'ap-northeast-1',
+      stage: 'dev',
+    }),
+  ],
+})
+export class AppModule {}
 ```
 
-## Run the Development Server
-1. Run npm run build to the build project using development mode.
-2. Open in other terminal session and run npm run offline:docker
-3. Open in other terminal session and run npm run migrate to migrate RDS and dynamoDB table
-4. Finally, run npm run offline:sls to start serverless offline mode.
+### Command Handling
 
-After the server runs successfully, you can see:
+1. Create a command:
+```typescript
+import { CommandInputModel } from '@mbc-cqrs-serverless/core';
 
-```bash
-DEBUG[serverless-offline-sns][adapter]: successfully subscribed queue "http://localhost:9324/101010101010/notification-queue" to topic: "arn:aws:sns:ap-northeast-1:101010101010:MySnsTopic"
-Offline Lambda Server listening on http://localhost:4000
-serverless-offline-aws-eventbridge :: Plugin ready
-serverless-offline-aws-eventbridge :: Mock server running at port: 4010
-Starting Offline SQS at stage dev (ap-northeast-1)
-Starting Offline Dynamodb Streams at stage dev (ap-northeast-1)
-
-Starting Offline at stage dev (ap-northeast-1)
-
-Offline [http for lambda] listening on http://localhost:3002
-Function names exposed for local invocation by aws-sdk:
-           * main: serverless-example-dev-main
-Configuring JWT Authorization: ANY /{proxy+}
-
-   ┌────────────────────────────────────────────────────────────────────────┐
-   │                                                                        │
-   │   ANY | http://localhost:3000/api/public                               │
-   │   POST | http://localhost:3000/2015-03-31/functions/main/invocations   │
-   │   ANY | http://localhost:3000/swagger-ui/{proxy*}                      │
-   │   POST | http://localhost:3000/2015-03-31/functions/main/invocations   │
-   │   ANY | http://localhost:3000/{proxy*}                                 │
-   │   POST | http://localhost:3000/2015-03-31/functions/main/invocations   │
-   │                                                                        │
-   └────────────────────────────────────────────────────────────────────────┘
-
-Server ready: http://localhost:3000 🚀
+export class CreateUserCommand implements CommandInputModel {
+  readonly pk: string;
+  readonly sk: string;
+  readonly id: string;
+  
+  constructor(public readonly userId: string, public readonly userData: any) {
+    this.pk = `USER#${userId}`;
+    this.sk = `METADATA#${userId}`;
+    this.id = userId;
+  }
+}
 ```
 
-You can also use several endpoints:
+2. Implement a command handler:
+```typescript
+import { CommandHandler, ICommandHandler } from '@mbc-cqrs-serverless/core';
 
-- API gateway: http://localhost:3000
-- Offline Lambda Server: http://localhost:4000
-- HTTP for lambda: http://localhost:3002
-- Step functions: http://localhost:8083
-- DynamoDB: http://localhost:8000
-- DynamoDB admin: http://localhost:8001
-- SNS: http://localhost:4002
-- SQS: http://localhost:9324
-- SQS admin: http://localhost:9325
-- Localstack: http://localhost:4566
-- AppSync: http://localhost:4001
-- Cognito: http://localhost:9229
-- EventBridge: http://localhost:4010
-- Simple Email Service: http://localhost:8005
-- Run `npx prisma studio` to open studio web: http://localhost:5000
+@CommandHandler(CreateUserCommand)
+export class CreateUserHandler implements ICommandHandler<CreateUserCommand> {
+  async execute(command: CreateUserCommand): Promise<void> {
+    // Implementation
+  }
+}
+```
 
+### Event Handling
+
+1. Create an event handler:
+```typescript
+import { EventsHandler, IEventHandler } from '@mbc-cqrs-serverless/core';
+import { UserCreatedEvent } from './user-created.event';
+
+@EventsHandler(UserCreatedEvent)
+export class UserCreatedHandler implements IEventHandler<UserCreatedEvent> {
+  async handle(event: UserCreatedEvent): Promise<void> {
+    // Implementation
+  }
+}
+```
+
+### Data Access
+
+1. Use the DataService for persistence:
+```typescript
+import { DataService, InjectDataService } from '@mbc-cqrs-serverless/core';
+
+@Injectable()
+export class UserService {
+  constructor(
+    @InjectDataService() private readonly dataService: DataService
+  ) {}
+
+  async getUser(userId: string): Promise<User> {
+    return this.dataService.findOne({
+      pk: `USER#${userId}`,
+      sk: `METADATA#${userId}`,
+    });
+  }
+}
+```
+
+### Authentication & Authorization
+
+1. Implement role-based access:
+```typescript
+import { RolesGuard, Roles } from '@mbc-cqrs-serverless/core';
+
+@Controller('users')
+@UseGuards(RolesGuard)
+export class UserController {
+  @Post()
+  @Roles('admin')
+  async createUser(@Body() userData: CreateUserDto): Promise<void> {
+    // Implementation
+  }
+}
+```
+
+### Multi-tenancy
+
+1. Configure tenant isolation:
+```typescript
+import { TenantContext, UseTenant } from '@mbc-cqrs-serverless/core';
+
+@Injectable()
+export class UserService {
+  @UseTenant()
+  async getUsersForTenant(
+    @TenantContext() tenantId: string
+  ): Promise<User[]> {
+    // Implementation with automatic tenant isolation
+  }
+}
+```
+
+### AWS Integration
+
+1. Use AWS services:
+```typescript
+import { 
+  StepFunctionService, 
+  NotificationService 
+} from '@mbc-cqrs-serverless/core';
+
+@Injectable()
+export class WorkflowService {
+  constructor(
+    private readonly stepFunctions: StepFunctionService,
+    private readonly notifications: NotificationService
+  ) {}
+
+  async startWorkflow(data: any): Promise<void> {
+    await this.stepFunctions.startExecution({
+      stateMachineArn: 'your-state-machine-arn',
+      input: JSON.stringify(data),
+    });
+  }
+}
+```
+
+## Error Handling
+
+The core package provides standardized error handling:
+
+```typescript
+import { 
+  CommandError,
+  ValidationError,
+  NotFoundError 
+} from '@mbc-cqrs-serverless/core';
+
+@CommandHandler(UpdateUserCommand)
+export class UpdateUserHandler implements ICommandHandler<UpdateUserCommand> {
+  async execute(command: UpdateUserCommand): Promise<void> {
+    if (!command.userId) {
+      throw new ValidationError('User ID is required');
+    }
+    
+    const user = await this.userService.findById(command.userId);
+    if (!user) {
+      throw new NotFoundError(`User ${command.userId} not found`);
+    }
+    
+    // Implementation
+  }
+}
+```
 
 ## Documentation
 
-Visit https://mbc-cqrs-serverless.mbc-net.com/ to view the full documentation.
+Visit https://mbc-cqrs-serverless.mbc-net.com/ to view the full documentation, including:
+- Architecture overview
+- Core concepts and patterns
+- AWS integration details
+- Security features
+- API reference
 
 ## License
 
