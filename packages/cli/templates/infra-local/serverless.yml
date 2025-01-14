@@ -106,13 +106,13 @@ provider:
         issuerUrl: http://localhost:9229/local_2G7noHgW
         audience:
           - dnk8y7ii3wled35p3lw0l2cd7
-      keycloakAuthorizer:
-        type: jwt
-        identitySource: $request.header.Authorization
-        issuerUrl: http://localhost:8180/realms/master
-        # issuerUrl: http://localhost:8180/auth/realms/master # old version
-        audience:
-          - cqrs-demo
+      # keycloakAuthorizer:
+      #   type: jwt
+      #   identitySource: $request.header.Authorization
+      #   issuerUrl: http://localhost:8180/realms/master
+      #   # issuerUrl: http://localhost:8180/auth/realms/master # old version
+      #   audience:
+      #     - cqrs-demo
 
 functions:
   main:
@@ -148,7 +148,7 @@ functions:
       - stream:
           type: dynamodb
           maximumRetryAttempts: 10
-          arn: ${env:LOCAL_DDB_MASTER_STREAM}
+          arn: ${env:LOCAL_DDB_SAMPLE_STREAM}
           filterPatterns:
             - eventName: [INSERT]
 

@@ -1,8 +1,13 @@
 # Welcome to your CDK TypeScript project
 
-This is a blank project for CDK development with TypeScript.
+This is a project for CDK development with TypeScript.
 
 The `cdk.json` file tells the CDK Toolkit how to execute your app.
+
+## Instruction
+
+- Install requirement package by using command `pnpm install`
+- Update test snapshot by using command `npm run test -- --updateSnapshot`
 
 ## Use SSO profile
 

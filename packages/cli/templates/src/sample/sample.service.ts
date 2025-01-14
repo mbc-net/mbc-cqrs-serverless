@@ -4,17 +4,17 @@ import { Prisma } from '@prisma/client'
 import { getOrderBys } from 'src/helpers'
 import { PrismaService } from 'src/prisma'
 
-import { MasterDataEntity } from './entity/master-data.entity'
-import { MasterDataListEntity } from './entity/master-data-list.entity'
+import { SampleDataEntity } from './entity/sample-data.entity'
+import { SampleDataListEntity } from './entity/sample-data-list.entity'
 
 @Injectable()
-export class MasterService {
-  private readonly logger = new Logger(MasterService.name)
+export class SampleService {
+  private readonly logger = new Logger(SampleService.name)
 
   constructor(private readonly prismaService: PrismaService) {}
 
-  async searchData(searchDto: SearchDto): Promise<MasterDataListEntity> {
-    const where: Prisma.MasterWhereInput = {
+  async searchData(searchDto: SearchDto): Promise<SampleDataListEntity> {
+    const where: Prisma.SampleWhereInput = {
       isDeleted: false,
     }
     if (searchDto.keyword?.trim()) {
@@ -33,23 +33,23 @@ export class MasterService {
     const { pageSize = 10, page = 1, orderBys = ['-createdAt'] } = searchDto
 
     const [total, items] = await Promise.all([
-      this.prismaService.master.count({ where }),
-      this.prismaService.master.findMany({
+      this.prismaService.sample.count({ where }),
+      this.prismaService.sample.findMany({
         where,
         take: pageSize,
         skip: pageSize * (page - 1),
-        orderBy: getOrderBys<Prisma.MasterOrderByWithRelationInput>(orderBys),
+        orderBy: getOrderBys<Prisma.SampleOrderByWithRelationInput>(orderBys),
       }),
     ])
 
-    return new MasterDataListEntity({
+    return new SampleDataListEntity({
       total,
       items: items.map(
         (item) =>
-          new MasterDataEntity({
+          new SampleDataEntity({
             ...item,
             attributes: {
-              master: item.atttributesMaster as object,
+              value: item.attributes as object,
             },
           }),
       ),

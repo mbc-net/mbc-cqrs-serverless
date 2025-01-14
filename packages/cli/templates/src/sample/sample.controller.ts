@@ -18,68 +18,68 @@ import {
 } from '@nestjs/common'
 import { ApiTags } from '@nestjs/swagger'
 
-import { MasterCommandDto } from './dto/master-command.dto'
-import { MasterCommandEntity } from './entity/master-command.entity'
-import { MasterDataEntity } from './entity/master-data.entity'
-import { MasterDataListEntity } from './entity/master-data-list.entity'
-import { MasterService } from './master.service'
+import { SampleCommandDto } from './dto/sample-command.dto'
+import { SampleCommandEntity } from './entity/sample-command.entity'
+import { SampleDataEntity } from './entity/sample-data.entity'
+import { SampleDataListEntity } from './entity/sample-data-list.entity'
+import { SampleService } from './sample.service'
 
-@Controller('api/master')
-@ApiTags('master')
-export class MasterController {
-  private readonly logger = new Logger(MasterController.name)
+@Controller('api/sample')
+@ApiTags('sample')
+export class SampleController {
+  private readonly logger = new Logger(SampleController.name)
 
   constructor(
     private readonly commandService: CommandService,
     private readonly dataService: DataService,
-    private readonly masterService: MasterService,
+    private readonly sampleService: SampleService,
   ) {}
 
   @Post('/')
   async publishCommand(
     @INVOKE_CONTEXT() invokeContext: IInvoke,
-    @Body() masterDto: MasterCommandDto,
-  ): Promise<MasterDataEntity> {
-    this.logger.debug('cmd:', masterDto)
+    @Body() sampleDto: SampleCommandDto,
+  ): Promise<SampleDataEntity> {
+    this.logger.debug('cmd:', sampleDto)
     this.logger.debug('commandService:' + this.commandService.tableName)
-    const item = await this.commandService.publishAsync(masterDto, {
+    const item = await this.commandService.publishAsync(sampleDto, {
       invokeContext,
     })
-    return new MasterDataEntity(item as MasterDataEntity)
+    return new SampleDataEntity(item as SampleDataEntity)
   }
 
   @Get('command/:pk/:sk')
   async getCommand(
     @Param() detailDto: DetailDto,
-  ): Promise<MasterCommandEntity> {
+  ): Promise<SampleCommandEntity> {
     this.logger.debug('commandService:' + this.commandService.tableName)
     const item = await this.commandService.getItem(detailDto)
     if (!item) {
       throw new NotFoundException()
     }
     this.logger.debug('item:', item)
-    return new MasterCommandEntity(item as MasterCommandEntity)
+    return new SampleCommandEntity(item as SampleCommandEntity)
   }
 
   @Get('data/:pk/:sk')
-  async getData(@Param() detailDto: DetailDto): Promise<MasterDataEntity> {
+  async getData(@Param() detailDto: DetailDto): Promise<SampleDataEntity> {
     this.logger.debug('dataService:' + this.dataService.tableName)
     const item = await this.dataService.getItem(detailDto)
     if (!item) {
       throw new NotFoundException()
     }
     this.logger.debug('item:', item)
-    return new MasterDataEntity(item as MasterDataEntity)
+    return new SampleDataEntity(item as SampleDataEntity)
   }
 
   @Get('data/:pk')
-  async listDataByPk(@Param('pk') pk: string): Promise<MasterDataListEntity> {
+  async listDataByPk(@Param('pk') pk: string): Promise<SampleDataListEntity> {
     const res = await this.dataService.listItemsByPk(pk)
-    return new MasterDataListEntity(res as MasterDataListEntity)
+    return new SampleDataListEntity(res as SampleDataListEntity)
   }
 
   @Get('data')
   async searchData(@Query() searchDto: SearchDto) {
-    return await this.masterService.searchData(searchDto)
+    return await this.sampleService.searchData(searchDto)
   }
 }

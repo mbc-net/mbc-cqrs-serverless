@@ -1,6 +1,6 @@
 import { IsObject } from 'class-validator'
 
-export class MasterAttributes {
+export class SampleAttributes {
   @IsObject()
-  master: object
+  value: object
 }

@@ -779,7 +779,7 @@ export class InfraStack extends cdk.Stack {
       }),
     )
     // dynamodb event source
-    const tableNames = ['tasks', 'master-command']
+    const tableNames = ['tasks', 'sample-command']
     for (const tableName of tableNames) {
       const tableDesc = new cdk.custom_resources.AwsCustomResource(
         this,
