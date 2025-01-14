@@ -4,104 +4,185 @@
 
 ## Description
 
-This package is a sequence package that runs on the MBC CQRS serverless framework.
-Used when assigning numbers.
-Numbers can also be rotated by fiscal year, year, month, or day.
+The Sequence package provides robust sequence number generation functionality for the MBC CQRS Serverless framework. It supports:
 
-## Installation mbc command to create a project
-
-To install `mbc` command, run:
-
-```bash
-npm install -g @mbc-cqrs-serverless/cli
-```
-
-## Create a project
-
-### `mbc new|n [projectName@version]`
-
-There are 3 usages for the new command:
-
-- `mbc new`
-    - Creates a new project in the current folder using a default name with the latest framework version.
-- `mbc new [projectName]`
-    - Creates a new project in the `projectName` folder using the latest framework version.
-- `mbc new [projectName@version]`
-    - If the specified version exists, the CLI uses that exact version.
-    - If the provided version is a prefix, the CLI uses the latest version matching that prefix.
-    - If no matching version is found, the CLI logs an error and provides a list of available versions for the user.
-
-To change current directory
-
-```bash
-cd [projectName]
-```
+- Flexible sequence number generation
+- Rotation by fiscal year, year, month, or day
+- Customizable number formats
+- Multi-tenant sequence management
+- Atomic operations for concurrent access
 
 ## Installation
 
 ```bash
-npm i @mbc-cqrs-serverless/sequence
+npm install @mbc-cqrs-serverless/sequence
 ```
 
-## Run the Development Server
-1. Run npm run build to the build project using development mode.
-2. Open in other terminal session and run npm run offline:docker
-3. Open in other terminal session and run npm run migrate to migrate RDS and dynamoDB table
-4. Finally, run npm run offline:sls to start serverless offline mode.
+## Usage
 
-After the server runs successfully, you can see:
+### Basic Setup
 
-```bash
-DEBUG[serverless-offline-sns][adapter]: successfully subscribed queue "http://localhost:9324/101010101010/notification-queue" to topic: "arn:aws:sns:ap-northeast-1:101010101010:MySnsTopic"
-Offline Lambda Server listening on http://localhost:4000
-serverless-offline-aws-eventbridge :: Plugin ready
-serverless-offline-aws-eventbridge :: Mock server running at port: 4010
-Starting Offline SQS at stage dev (ap-northeast-1)
-Starting Offline Dynamodb Streams at stage dev (ap-northeast-1)
+1. Import and configure the sequence module:
+```typescript
+import { SequenceModule } from '@mbc-cqrs-serverless/sequence';
+import { Module } from '@nestjs/common';
 
-Starting Offline at stage dev (ap-northeast-1)
-
-Offline [http for lambda] listening on http://localhost:3002
-Function names exposed for local invocation by aws-sdk:
-           * main: serverless-example-dev-main
-Configuring JWT Authorization: ANY /{proxy+}
-
-   ┌────────────────────────────────────────────────────────────────────────┐
-   │                                                                        │
-   │   ANY | http://localhost:3000/api/public                               │
-   │   POST | http://localhost:3000/2015-03-31/functions/main/invocations   │
-   │   ANY | http://localhost:3000/swagger-ui/{proxy*}                      │
-   │   POST | http://localhost:3000/2015-03-31/functions/main/invocations   │
-   │   ANY | http://localhost:3000/{proxy*}                                 │
-   │   POST | http://localhost:3000/2015-03-31/functions/main/invocations   │
-   │                                                                        │
-   └────────────────────────────────────────────────────────────────────────┘
-
-Server ready: http://localhost:3000 🚀
+@Module({
+  imports: [
+    SequenceModule.forRoot({
+      tableName: 'sequences',
+      region: 'ap-northeast-1',
+    }),
+  ],
+})
+export class AppModule {}
 ```
 
-You can also use several endpoints:
+### Creating Sequences
 
-- API gateway: http://localhost:3000
-- Offline Lambda Server: http://localhost:4000
-- HTTP for lambda: http://localhost:3002
-- Step functions: http://localhost:8083
-- DynamoDB: http://localhost:8000
-- DynamoDB admin: http://localhost:8001
-- SNS: http://localhost:4002
-- SQS: http://localhost:9324
-- SQS admin: http://localhost:9325
-- Localstack: http://localhost:4566
-- AppSync: http://localhost:4001
-- Cognito: http://localhost:9229
-- EventBridge: http://localhost:4010
-- Simple Email Service: http://localhost:8005
-- Run `npx prisma studio` to open studio web: http://localhost:5000
+1. Define a sequence configuration:
+```typescript
+import { 
+  SequenceConfig,
+  RotateByEnum 
+} from '@mbc-cqrs-serverless/sequence';
 
+const invoiceSequence: SequenceConfig = {
+  name: 'INVOICE',
+  prefix: 'INV',
+  padding: 6,
+  rotateBy: RotateByEnum.FISCAL_YEAR,
+  startNumber: 1,
+};
+```
+
+2. Use the sequence service:
+```typescript
+import { SequencesService } from '@mbc-cqrs-serverless/sequence';
+
+@Injectable()
+export class InvoiceService {
+  constructor(
+    private readonly sequencesService: SequencesService
+  ) {}
+
+  async generateInvoiceNumber(): Promise<string> {
+    const sequence = await this.sequencesService.next('INVOICE');
+    return sequence.formattedNo; // Returns: "INV000001"
+  }
+}
+```
+
+### Rotation Strategies
+
+1. Yearly rotation:
+```typescript
+const yearlySequence: SequenceConfig = {
+  name: 'YEARLY_DOC',
+  prefix: 'DOC',
+  rotateBy: RotateByEnum.YEAR,
+  format: '{{prefix}}-{{year}}-{{no}}', // DOC-2024-0001
+};
+```
+
+2. Monthly rotation:
+```typescript
+const monthlySequence: SequenceConfig = {
+  name: 'MONTHLY_ORDER',
+  prefix: 'ORD',
+  rotateBy: RotateByEnum.MONTH,
+  format: '{{prefix}}{{year}}{{month}}{{no}}', // ORD202401001
+};
+```
+
+3. Daily rotation:
+```typescript
+const dailySequence: SequenceConfig = {
+  name: 'DAILY_TICKET',
+  prefix: 'TKT',
+  rotateBy: RotateByEnum.DAY,
+  format: '{{prefix}}-{{date}}-{{no}}', // TKT-20240101-001
+};
+```
+
+### Custom Formatting
+
+1. Define custom format patterns:
+```typescript
+const customSequence: SequenceConfig = {
+  name: 'CUSTOM_DOC',
+  prefix: 'DOC',
+  format: '{{prefix}}/{{year}}/{{tenantCode}}/{{no}}',
+  padding: 4,
+};
+```
+
+2. Use with tenant context:
+```typescript
+@Injectable()
+export class DocumentService {
+  constructor(
+    private readonly sequencesService: SequencesService
+  ) {}
+
+  @UseTenant()
+  async generateDocumentNumber(
+    @TenantContext() tenantCode: string
+  ): Promise<string> {
+    const sequence = await this.sequencesService.next('CUSTOM_DOC', {
+      tenantCode,
+    });
+    return sequence.formattedNo; // Returns: "DOC/2024/TENANT1/0001"
+  }
+}
+```
+
+### Concurrent Access
+
+The package handles concurrent access automatically:
+
+```typescript
+@Injectable()
+export class BulkProcessor {
+  constructor(
+    private readonly sequencesService: SequencesService
+  ) {}
+
+  async processBatch(): Promise<string[]> {
+    // Safe for concurrent access
+    const numbers = await Promise.all(
+      Array(10).fill(null).map(() => 
+        this.sequencesService.next('BATCH_SEQ')
+      )
+    );
+    return numbers.map(seq => seq.formattedNo);
+  }
+}
+```
+
+### Error Handling
+
+```typescript
+import { SequenceError } from '@mbc-cqrs-serverless/sequence';
+
+try {
+  await sequencesService.next('INVALID_SEQ');
+} catch (error) {
+  if (error instanceof SequenceError) {
+    console.error('Sequence error:', error.message);
+  }
+}
+```
 
 ## Documentation
 
-Visit https://mbc-cqrs-serverless.mbc-net.com/ to view the full documentation.
+
+Visit https://mbc-cqrs-serverless.mbc-net.com/ to view the full documentation, including:
+- Sequence configuration options
+- Rotation strategies
+- Format customization
+- Usage examples
+- API reference
 
 ## License
 
