@@ -1,0 +1,11 @@
+{
+  "$schema": "../../../node_modules/@angular-devkit/schematics/collection-schema.json",
+  "schematics": {
+    "controller": {
+      "factory": "./lib/controller/controller.factory#main",
+      "description": "Create a mbc-cqrs-serverless controller.",
+      "schema": "./lib/controller/schema.json",
+      "aliases": ["co"]
+    }
+  }
+}

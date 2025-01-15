@@ -17,6 +17,7 @@
     "sqs",
     "typescript"
   ],
+  "schematics": "./dist/schematics/collection.json",
   "bin": {
     "mbc": "./dist/index.js"
   },
@@ -27,7 +28,7 @@
   ],
   "scripts": {
     "build": "rm -rf dist && tsc",
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "postbuild": "copyfiles ./schematics/collection.json ./schematics/**/schema.json ./schematics/**/files/** ./schematics/**/units/** dist && copyfiles -u 2 -a dist/src/**/* dist && copyfiles -u 2 -a dist/src/index.js dist && rm -rf dist/src"
   },
   "repository": {
     "type": "git",
@@ -43,10 +44,16 @@
     "access": "public"
   },
   "dependencies": {
+    "@angular-devkit/core": "^17.3.11",
+    "@angular-devkit/schematics": "^17.3.11",
+    "@angular-devkit/schematics-cli": "^17.3.11",
+    "@schematics/angular": "^17.3.11",
+    "chalk": "^4.1.2",
     "commander": "^11.1.0",
     "rimraf": "^5.0.5"
   },
   "devDependencies": {
-    "@faker-js/faker": "^8.3.1"
+    "@faker-js/faker": "^8.3.1",
+    "copyfiles": "^2.4.1"
   }
 }

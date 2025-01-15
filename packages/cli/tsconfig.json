@@ -5,5 +5,9 @@
     "sourceMap": false,
     "outDir": "./dist"
   },
-  "include": ["./src"]
+  "include": ["./src", "./schematics"],
+  "exclude": [
+    "schematics/**/files/**/*",
+    "schematics/**/units/**/*"
+  ]
 }
