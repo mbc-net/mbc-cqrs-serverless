@@ -6,9 +6,9 @@ export interface ModuleOptions {
   /**
    * Flag to indicate if prisma schema is created.
    */
-  schema?: boolean
+  schema: boolean
   /**
    * Command processing mode
    */
-  mode?: string
+  mode: 'sync' | 'async'
 }
