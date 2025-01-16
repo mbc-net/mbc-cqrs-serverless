@@ -8,7 +8,6 @@ import { SchematicOption } from '../schematics'
 export default async function generateAction(
   schematic: string,
   name: string,
-  path: string,
   options: object,
   command: Command,
 ) {
@@ -23,11 +22,15 @@ export default async function generateAction(
 
   const formatOptions: Input[] = []
   formatOptions.push({ name: 'dry-run', value: !!commandOptions.dryRun })
+  formatOptions.push({ name: 'mode', value: commandOptions.mode })
+  formatOptions.push({
+    name: 'schema',
+    value: !!commandOptions.schema || !!commandOptions.noSchema, // noSchema > schema
+  })
 
   const inputs: Input[] = []
   inputs.push({ name: 'schematic', value: schematic })
   inputs.push({ name: 'name', value: name })
-  inputs.push({ name: 'path', value: path })
 
   const fullInputs = formatOptions.concat(inputs)
 

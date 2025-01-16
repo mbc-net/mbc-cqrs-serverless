@@ -17,9 +17,8 @@ function createController(options: ControllerOptions): Rule {
   return mergeWith(
     apply(url('./files'), [
       template({
-        classify: strings.classify,
-        dasherize: strings.dasherize,
-        name: options.name,
+        ...strings,
+        ...options,
       }),
       move(normalize(`/src/${strings.dasherize(options.name)}`)),
     ]),
@@ -30,9 +29,8 @@ function createUnitTest(options: ControllerOptions): Rule {
   return mergeWith(
     apply(url('./units'), [
       template({
-        classify: strings.classify,
-        dasherize: strings.dasherize,
-        name: options.name,
+        ...strings,
+        ...options,
         specFileSuffix: 'spec',
       }),
       move(normalize(`/test/unit/${strings.dasherize(options.name)}`)),

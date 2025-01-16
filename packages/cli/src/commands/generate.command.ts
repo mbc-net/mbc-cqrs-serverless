@@ -4,7 +4,7 @@ import generateAction from '../actions/generate.action'
 
 export async function generateCommand(program: Command) {
   program
-    .command('generate <schematic> [name] [path]')
+    .command('generate <schematic> [name]')
     .alias('g')
     .description(buildDescription())
     .option(
@@ -16,7 +16,8 @@ export async function generateCommand(program: Command) {
       'Specify the mode of operation: sync or async (default: async)',
       'async',
     )
-    .option('--schema', 'Enable schema generation (default: false)', false)
+    .option('--schema', 'Enable schema generation (default: false)', true)
+    .option('--no-schema', 'Enable schema generation (default: false)', false)
     .action(generateAction)
 }
 

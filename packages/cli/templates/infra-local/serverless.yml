@@ -29,16 +29,12 @@ custom:
       - topic:
           topicName: CqrsSnsTopic
           rawMessageDelivery: 'true'
-          filterPolicy: { 'action': ['task-execute'] }
+          filterPolicy: { 'action': [ 'task-execute' ] }
         queue: http://localhost:9324/101010101010/task-action-queue
       - topic:
           topicName: CqrsSnsTopic
           rawMessageDelivery: 'true'
-          filterPolicy:
-            {
-              'action':
-                ['notification-action', 'command-status', 'task-status'],
-            }
+          filterPolicy: { 'action': [ 'notification-action', 'command-status', 'task-status' ] }
         queue: http://localhost:9324/101010101010/notification-queue
       - topic:
           topicName: AlarmSnsTopic
@@ -118,23 +114,25 @@ functions:
   main:
     handler: ../dist/main.handler
     events:
-      - httpApi: # public api
+      - httpApi:
+          # public api
           method: GET
           path: /
       - httpApi:
           method: ANY
           path: '/swagger-ui/{proxy+}'
-      - httpApi: # protected api
+      - httpApi:
+          # protected api
           method: ANY
           path: '/{proxy+}'
           authorizer:
             name: localAuthorizer
           # authorizer:
           #   name: keycloakAuthorizer
-      # - eventBridge:
-      #     eventBus: marketing
-      #     # run every 5 minutes
-      #     schedule: "cron(0/5 * * * ? *)"
+          # - eventBridge:
+          #     eventBus: marketing
+          #     # run every 5 minutes
+          #     schedule: "cron(0/5 * * * ? *)"
       - sqs:
           arn:
             Fn::GetAtt:
@@ -150,7 +148,7 @@ functions:
           maximumRetryAttempts: 10
           arn: ${env:LOCAL_DDB_SAMPLE_STREAM}
           filterPatterns:
-            - eventName: [INSERT]
+            - eventName: [ INSERT ]
 
 stepFunctions:
   # https://goessner.net/articles/JsonPath/index.html

@@ -6,6 +6,12 @@
       "description": "Create a mbc-cqrs-serverless controller.",
       "schema": "./lib/controller/schema.json",
       "aliases": ["co"]
+    },
+    "module": {
+      "factory": "./lib/module/module.factory#main",
+      "description": "Create a mbc-cqrs-serverless module.",
+      "schema": "./lib/module/schema.json",
+      "aliases": ["mo"]
     }
   }
 }

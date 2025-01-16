@@ -50,6 +50,7 @@
     "@schematics/angular": "^17.3.11",
     "chalk": "^4.1.2",
     "commander": "^11.1.0",
+    "js-yaml": "^4.1.0",
     "rimraf": "^5.0.5"
   },
   "devDependencies": {
