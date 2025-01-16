@@ -19,44 +19,47 @@ describe('Service Factory', () => {
     const files: string[] = tree.files
 
     expect(
-      files.find((filename) => filename === '/src/foo/foo.controller.ts'),
+      files.find((filename) => filename === '/src/foo/foo.service.ts'),
     ).toBeDefined()
     expect(
       files.find(
-        (filename) => filename === '/test/unit/foo/foo.controller.spec.ts',
+        (filename) => filename === '/test/unit/foo/foo.service.spec.ts',
       ),
     ).toBeDefined()
-    expect(tree.readContent('/src/foo/foo.controller.ts')).toEqual(
-      "import { Controller, Logger } from '@nestjs/common';\n" +
-        "import { ApiTags } from '@nestjs/swagger'\n" +
+    expect(tree.readContent('/src/foo/foo.service.ts')).toEqual(
+      "import { CommandService, DataService } from '@mbc-cqrs-serverless/core'\n" +
+        "import { Injectable, Logger } from '@nestjs/common'\n" +
         '\n' +
-        "@ApiTags('foo')\n" +
-        "@Controller('api/foo')\n" +
-        'export class FooController {\n' +
-        '    private readonly logger = new Logger(FooController.name)\n' +
+        '@Injectable()\n' +
+        'export class FooService {\n' +
+        '  private readonly logger = new Logger(FooService.name)\n' +
         '\n' +
-        '    constructor() {}\n' +
-        '\n' +
+        '  constructor(\n' +
+        '    private readonly commandService: CommandService,\n' +
+        '    private readonly dataService: DataService,\n' +
+        '  ) {}\n' +
         '}\n',
     )
-    expect(tree.readContent('/test/unit/foo/foo.controller.spec.ts')).toEqual(
+    console.log(tree.readContent('/test/unit/foo/foo.service.spec.ts'))
+
+    expect(tree.readContent('/test/unit/foo/foo.service.spec.ts')).toEqual(
       "import { createMock } from '@golevelup/ts-jest'\n" +
         "import { Test, TestingModule } from '@nestjs/testing'\n" +
-        "import { FooController } from 'src/foo/foo.controller'\n" +
+        "import { FooService } from 'src/foo/foo.service'\n" +
         '\n' +
-        "describe('FooController', () => {\n" +
-        '  let controller: FooController\n' +
+        "describe('FooService', () => {\n" +
+        '  let service: FooService\n' +
         '\n' +
         '  beforeEach(async () => {\n' +
         '    const module: TestingModule = await Test.createTestingModule({\n' +
-        '      controllers: [FooController],\n' +
+        '      controllers: [FooService],\n' +
         '    }).useMocker(createMock).compile()\n' +
         '\n' +
-        '    controller = module.get<FooController>(FooController)\n' +
+        '    service = module.get<FooService>(FooService)\n' +
         '  })\n' +
         '\n' +
         "  it('should be defined', () => {\n" +
-        '    expect(controller).toBeDefined()\n' +
+        '    expect(service).toBeDefined()\n' +
         '  })\n' +
         '})\n',
     )
