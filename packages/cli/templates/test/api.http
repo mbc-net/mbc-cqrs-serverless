@@ -40,3 +40,28 @@ X-Amz-Target: AWSCognitoIdentityProviderService.InitiateAuth
 GET {{endpoint}}
 Accept: application/json
 Authorization: {{token}}
+
+###
+# sample
+POST {{apiBaseUrl}}/sample
+Accept: application/json
+Content-Type: application/json
+Authorization: {{token}}
+X-Tenant-Code: mbc
+
+{
+  "pk": "SAMPLE#mbc",
+  "sk": "foo#bar",
+  "id": "SAMPLE#mbc#foo#bar",
+  "code": "foo#bar",
+  "name": "Test",
+  "version": 0,
+  "isDeleted": true,
+  "type": "SAMPLE",
+  "tenantCode": "mbc",
+  "attributes": {
+    "value": {
+      "foo": "bar"
+    }
+  }
+}

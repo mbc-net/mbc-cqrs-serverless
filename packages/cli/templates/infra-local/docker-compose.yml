@@ -38,7 +38,7 @@ services:
   dynamodb-admin:
     image: aaronshaf/dynamodb-admin
     environment:
-      - DYNAMO_ENDPOINT=dynamodb-local:8000
+      - DYNAMO_ENDPOINT=http://dynamodb-local:8000
       - AWS_REGION=ap-northeast-1
       - AWS_ACCESS_KEY_ID=local
       - AWS_SECRET_ACCESS_KEY=local
