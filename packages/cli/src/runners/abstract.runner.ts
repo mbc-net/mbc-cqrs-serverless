@@ -15,15 +15,11 @@ export class AbstractRunner {
     cwd: string = process.cwd(),
   ): Promise<null | string> {
     const args: string[] = [command]
-    console.log('🚀 ~ AbstractRunner ~ args:', args)
     const options: SpawnOptions = {
       cwd,
       stdio: collect ? 'pipe' : 'inherit',
       shell: true,
     }
-    console.log('🚀 ~ AbstractRunner ~ options:', options)
-    console.log('🚀 ~ this.binary ~ this.binary:', this.binary)
-    console.log('🚀 ~ this.args ~ this.args:', this.args)
     return new Promise<null | string>((resolve, reject) => {
       const child: ChildProcess = spawn(
         `${this.binary}`,

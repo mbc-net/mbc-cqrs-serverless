@@ -3,6 +3,7 @@ import { Command } from 'commander'
 import { Input } from '../commands/command.input'
 import { SchematicRunner } from '../runners/schematic.runner'
 import { SchematicOption } from '../schematics'
+import { logger } from '../ui'
 
 /* eslint-disable no-console */
 export default async function generateAction(
@@ -11,14 +12,12 @@ export default async function generateAction(
   options: object,
   command: Command,
 ) {
-  console.log(
+  logger.info(
     `Executing command '${command.name()}' for application with options '${JSON.stringify(
       options,
     )}'`,
   )
-  console.log({ schematic, name, options })
   const commandOptions = command.opts()
-  console.log('commandOptions', commandOptions)
 
   const formatOptions: Input[] = []
   formatOptions.push({ name: 'dry-run', value: !!commandOptions.dryRun })
@@ -34,15 +33,10 @@ export default async function generateAction(
 
   const fullInputs = formatOptions.concat(inputs)
 
-  console.log('fullInputs', fullInputs)
-
   const schematicOptions: SchematicOption[] = mapSchematicOptions(fullInputs)
-
-  console.log('schematicOptions', schematicOptions)
 
   const runner = new SchematicRunner()
   const fullCommand = buildCommandLine(schematic, schematicOptions)
-  console.log('🚀 ~ fullCommand:', fullCommand)
 
   runner.run(fullCommand)
 }
