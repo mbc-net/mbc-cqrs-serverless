@@ -54,7 +54,10 @@ describe('newAction', () => {
     expect(mockExecSync).toHaveBeenCalledWith('git init', {
       cwd: path.join(process.cwd(), projectName),
     })
-    expect(mockExecSync).toHaveBeenCalledWith('npm i', {
+    expect(mockExecSync).toHaveBeenCalledWith('npm i --ignore-scripts', {
+      cwd: path.join(process.cwd(), projectName),
+    })
+    expect(mockExecSync).toHaveBeenCalledWith('npx prisma generate', {
       cwd: path.join(process.cwd(), projectName),
     })
   })
@@ -86,7 +89,10 @@ describe('newAction', () => {
     expect(mockExecSync).toHaveBeenCalledWith('git init', {
       cwd: path.join(process.cwd(), projectName),
     })
-    expect(mockExecSync).toHaveBeenCalledWith('npm i', {
+    expect(mockExecSync).toHaveBeenCalledWith('npm i --ignore-scripts', {
+      cwd: path.join(process.cwd(), projectName),
+    })
+    expect(mockExecSync).toHaveBeenCalledWith('npx prisma generate', {
       cwd: path.join(process.cwd(), projectName),
     })
   })
@@ -97,7 +103,7 @@ describe('newAction', () => {
     const mockVersions = ['1.0.0', '1.1.0', '1.2.0']
     mockExecSync.mockReturnValueOnce(Buffer.from(JSON.stringify(mockVersions)))
 
-    const consoleSpy = jest.spyOn(console, 'log').mockImplementation()
+    const consoleSpy = jest.spyOn(console, 'error').mockImplementation()
 
     await newAction(`${projectName}@${invalidVersion}`, {}, mockCommand)
 
@@ -105,8 +111,7 @@ describe('newAction', () => {
       'npm view @mbc-cqrs-serverless/core versions --json',
     )
     expect(consoleSpy).toHaveBeenCalledWith(
-      'The specified package version does not exist. Please chose a valid version!\n',
-      mockVersions,
+      expect.stringContaining('The specified package version does not exist'),
     )
     consoleSpy.mockRestore()
   })

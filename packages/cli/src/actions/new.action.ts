@@ -44,7 +44,7 @@ export default async function newAction(
       packageVersion = `^${matchVersions.at(-1)}` // use the patch and minor versions
     } else {
       logger.error(
-        `The specified package version does not exist. Please chose a valid version!\n ${versions}`,
+        `The specified package version does not exist. Please chose a valid version! ${versions}`,
       )
       return
     }
