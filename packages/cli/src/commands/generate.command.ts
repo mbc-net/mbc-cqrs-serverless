@@ -17,8 +17,8 @@ export async function generateCommand(program: Command) {
       'Specify the mode of operation: sync or async (default: async)',
       'async',
     )
-    .option('--schema', 'Enable schema generation (default: false)', true)
-    .option('--no-schema', 'Enable schema generation (default: false)', false)
+    .option('--schema', 'Enable schema generation (default: true)', true)
+    .option('--no-schema', 'Disable schema generation (default: false)', false)
     .action(generateAction)
 }
 
