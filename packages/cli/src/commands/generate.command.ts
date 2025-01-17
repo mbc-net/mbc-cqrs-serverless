@@ -1,6 +1,7 @@
 import { Command } from 'commander'
 
 import generateAction from '../actions/generate.action'
+import { buildSchematicsListAsTable } from '../schematics/schematic.colection'
 
 export async function generateCommand(program: Command) {
   program
@@ -21,9 +22,10 @@ export async function generateCommand(program: Command) {
     .action(generateAction)
 }
 
-function buildDescription() {
-  // const collection = await this.getCollection()
-  return 'Generate a MBC element.'
-  // `  Schematics available on ${chalk.bold(collection)} collection:\n` +
-  // this.buildSchematicsListAsTable(await this.getSchematics(collection))
+function buildDescription(): string {
+  return (
+    'Generate a MBC-cqrs-serverless element.\n' +
+    `  Schematics available on the collection:\n` +
+    buildSchematicsListAsTable()
+  )
 }
