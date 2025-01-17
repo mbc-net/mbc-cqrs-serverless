@@ -1,0 +1,34 @@
+{
+  "$schema": "../../../node_modules/@angular-devkit/schematics/collection-schema.json",
+  "schematics": {
+    "module": {
+      "factory": "./lib/module/module.factory#main",
+      "description": "Create a mbc-cqrs-serverless module.",
+      "schema": "./lib/module/schema.json",
+      "aliases": ["mo"]
+    },
+    "controller": {
+      "factory": "./lib/controller/controller.factory#main",
+      "description": "Create a mbc-cqrs-serverless controller.",
+      "schema": "./lib/controller/schema.json",
+      "aliases": ["co"]
+    },
+    "service": {
+      "factory": "./lib/service/service.factory#main",
+      "description": "Create a mbc-cqrs-serverless service.",
+      "schema": "./lib/service/schema.json",
+      "aliases": ["se"]
+    },
+    "entity": {
+      "factory": "./lib/entity/entity.factory#main",
+      "description": "Create a mbc-cqrs-serverless entity.",
+      "schema": "./lib/entity/schema.json",
+      "aliases": ["en"]
+    },
+    "dto": {
+      "factory": "./lib/dto/dto.factory#main",
+      "description": "Create a mbc-cqrs-serverless dto.",
+      "schema": "./lib/dto/schema.json"
+    }
+  }
+}

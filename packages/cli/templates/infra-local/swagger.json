@@ -1,0 +1,396 @@
+{
+  "openapi": "3.0.0",
+  "paths": {
+    "/": {
+      "get": {
+        "operationId": "AppController_getHello",
+        "parameters": [
+          {
+            "in": "header",
+            "required": false,
+            "name": "x-tenant-code",
+            "schema": {}
+          }
+        ],
+        "responses": { "200": { "description": "" } },
+        "tags": ["main"]
+      }
+    },
+    "/api/sample": {
+      "post": {
+        "operationId": "SampleController_publishCommand",
+        "parameters": [
+          {
+            "in": "header",
+            "required": false,
+            "name": "x-tenant-code",
+            "schema": {}
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/SampleCommandDto" }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/SampleDataEntity" }
+              }
+            }
+          }
+        },
+        "tags": ["sample"]
+      }
+    },
+    "/api/sample/command/{pk}/{sk}": {
+      "get": {
+        "operationId": "SampleController_getCommand",
+        "parameters": [
+          {
+            "name": "pk",
+            "required": true,
+            "in": "path",
+            "schema": { "type": "string" }
+          },
+          {
+            "name": "sk",
+            "required": true,
+            "in": "path",
+            "schema": { "type": "string" }
+          },
+          {
+            "in": "header",
+            "required": false,
+            "name": "x-tenant-code",
+            "schema": {}
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/SampleCommandEntity" }
+              }
+            }
+          }
+        },
+        "tags": ["sample"]
+      }
+    },
+    "/api/sample/data/{pk}/{sk}": {
+      "get": {
+        "operationId": "SampleController_getData",
+        "parameters": [
+          {
+            "name": "pk",
+            "required": true,
+            "in": "path",
+            "schema": { "type": "string" }
+          },
+          {
+            "name": "sk",
+            "required": true,
+            "in": "path",
+            "schema": { "type": "string" }
+          },
+          {
+            "in": "header",
+            "required": false,
+            "name": "x-tenant-code",
+            "schema": {}
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/SampleDataEntity" }
+              }
+            }
+          }
+        },
+        "tags": ["sample"]
+      }
+    },
+    "/api/sample/data/{pk}": {
+      "get": {
+        "operationId": "SampleController_listDataByPk",
+        "parameters": [
+          {
+            "name": "pk",
+            "required": true,
+            "in": "path",
+            "schema": { "type": "string" }
+          },
+          {
+            "in": "header",
+            "required": false,
+            "name": "x-tenant-code",
+            "schema": {}
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SampleDataListEntity"
+                }
+              }
+            }
+          }
+        },
+        "tags": ["sample"]
+      }
+    },
+    "/api/sample/data": {
+      "get": {
+        "operationId": "SampleController_searchData",
+        "parameters": [
+          {
+            "name": "page",
+            "required": false,
+            "in": "query",
+            "schema": { "type": "number" }
+          },
+          {
+            "name": "pageSize",
+            "required": false,
+            "in": "query",
+            "schema": { "type": "number" }
+          },
+          {
+            "name": "keyword",
+            "required": false,
+            "in": "query",
+            "schema": { "type": "string" }
+          },
+          {
+            "name": "id",
+            "required": false,
+            "in": "query",
+            "schema": { "type": "string" }
+          },
+          {
+            "name": "pk",
+            "required": false,
+            "in": "query",
+            "schema": { "type": "string" }
+          },
+          {
+            "name": "sk",
+            "required": false,
+            "in": "query",
+            "schema": { "type": "string" }
+          },
+          {
+            "name": "orderBys",
+            "required": false,
+            "in": "query",
+            "schema": { "type": "array", "items": { "type": "string" } }
+          },
+          {
+            "in": "header",
+            "required": false,
+            "name": "x-tenant-code",
+            "schema": {}
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SampleDataListEntity"
+                }
+              }
+            }
+          }
+        },
+        "tags": ["sample"]
+      }
+    }
+  },
+  "info": {
+    "title": "serverless",
+    "description": "The serverless API",
+    "version": "1.0.0",
+    "contact": {}
+  },
+  "tags": [],
+  "servers": [{ "url": "http://localhost:3000/", "description": "local" }],
+  "components": {
+    "securitySchemes": {
+      "Api-Key": { "type": "apiKey", "in": "header", "name": "Authorization" }
+    },
+    "schemas": {
+      "SampleAttributes": {
+        "type": "object",
+        "properties": { "value": { "type": "object" } },
+        "required": ["value"]
+      },
+      "SampleCommandDto": {
+        "type": "object",
+        "properties": {
+          "pk": { "type": "string" },
+          "sk": { "type": "string" },
+          "id": { "type": "string" },
+          "code": { "type": "string" },
+          "name": { "type": "string" },
+          "version": { "type": "number" },
+          "tenantCode": { "type": "string" },
+          "type": { "type": "string" },
+          "seq": { "type": "number" },
+          "ttl": { "type": "number" },
+          "isDeleted": { "type": "boolean" },
+          "attributes": { "$ref": "#/components/schemas/SampleAttributes" }
+        },
+        "required": [
+          "pk",
+          "sk",
+          "id",
+          "code",
+          "name",
+          "version",
+          "tenantCode",
+          "type",
+          "attributes"
+        ]
+      },
+      "SampleDataEntity": {
+        "type": "object",
+        "properties": {
+          "cpk": { "type": "string" },
+          "csk": { "type": "string" },
+          "source": { "type": "string" },
+          "requestId": { "type": "string" },
+          "createdAt": { "format": "date-time", "type": "string" },
+          "updatedAt": { "format": "date-time", "type": "string" },
+          "createdBy": { "type": "string" },
+          "updatedBy": { "type": "string" },
+          "createdIp": { "type": "string" },
+          "updatedIp": { "type": "string" },
+          "pk": { "type": "string" },
+          "sk": { "type": "string" },
+          "id": { "type": "string" },
+          "code": { "type": "string" },
+          "name": { "type": "string" },
+          "version": { "type": "number" },
+          "tenantCode": { "type": "string" },
+          "type": { "type": "string" },
+          "seq": { "type": "number" },
+          "ttl": { "type": "number" },
+          "isDeleted": { "type": "boolean" },
+          "attributes": { "$ref": "#/components/schemas/SampleAttributes" }
+        },
+        "required": [
+          "pk",
+          "sk",
+          "id",
+          "code",
+          "name",
+          "version",
+          "tenantCode",
+          "type",
+          "attributes"
+        ]
+      },
+      "SampleCommandEntity": {
+        "type": "object",
+        "properties": {
+          "source": { "type": "string" },
+          "isDeleted": { "type": "boolean" },
+          "status": { "type": "string" },
+          "requestId": { "type": "string" },
+          "createdAt": { "format": "date-time", "type": "string" },
+          "updatedAt": { "format": "date-time", "type": "string" },
+          "createdBy": { "type": "string" },
+          "updatedBy": { "type": "string" },
+          "createdIp": { "type": "string" },
+          "updatedIp": { "type": "string" },
+          "pk": { "type": "string" },
+          "sk": { "type": "string" },
+          "id": { "type": "string" },
+          "code": { "type": "string" },
+          "name": { "type": "string" },
+          "version": { "type": "number" },
+          "tenantCode": { "type": "string" },
+          "type": { "type": "string" },
+          "seq": { "type": "number" },
+          "ttl": { "type": "number" },
+          "attributes": { "$ref": "#/components/schemas/SampleAttributes" }
+        },
+        "required": [
+          "pk",
+          "sk",
+          "id",
+          "code",
+          "name",
+          "version",
+          "tenantCode",
+          "type",
+          "attributes"
+        ]
+      },
+      "DataEntity": {
+        "type": "object",
+        "properties": {
+          "cpk": { "type": "string" },
+          "csk": { "type": "string" },
+          "source": { "type": "string" },
+          "requestId": { "type": "string" },
+          "createdAt": { "format": "date-time", "type": "string" },
+          "updatedAt": { "format": "date-time", "type": "string" },
+          "createdBy": { "type": "string" },
+          "updatedBy": { "type": "string" },
+          "createdIp": { "type": "string" },
+          "updatedIp": { "type": "string" },
+          "pk": { "type": "string" },
+          "sk": { "type": "string" },
+          "id": { "type": "string" },
+          "code": { "type": "string" },
+          "name": { "type": "string" },
+          "version": { "type": "number" },
+          "tenantCode": { "type": "string" },
+          "type": { "type": "string" },
+          "seq": { "type": "number" },
+          "ttl": { "type": "number" },
+          "isDeleted": { "type": "boolean" }
+        },
+        "required": [
+          "pk",
+          "sk",
+          "id",
+          "code",
+          "name",
+          "version",
+          "tenantCode",
+          "type"
+        ]
+      },
+      "SampleDataListEntity": {
+        "type": "object",
+        "properties": {
+          "total": { "type": "number" },
+          "lastSk": { "type": "string" },
+          "items": {
+            "type": "array",
+            "items": { "$ref": "#/components/schemas/DataEntity" }
+          }
+        },
+        "required": ["items"]
+      }
+    }
+  },
+  "security": [{ "Api-Key": [] }]
+}

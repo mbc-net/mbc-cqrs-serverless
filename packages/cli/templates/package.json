@@ -45,6 +45,7 @@
     "prisma": "^5.7.1"
   },
   "devDependencies": {
+    "@golevelup/ts-jest": "^0.6.1",
     "@mbc-cqrs-serverless/cli": "",
     "@nestjs/cli": "^10.2.1",
     "@nestjs/common": "^10.3.0",

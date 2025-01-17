@@ -13,14 +13,12 @@ datasource db {
   relationMode = "prisma"
 }
 
-model Master {
+model Sample {
   id             String   @id
   cpk            String // コマンド用PK
   csk            String // コマンド用SK
-  pk             String // データ用PK, MASTER#tenantCode (テナントコード)
+  pk             String // データ用PK, SAMPLE#tenantCode (テナントコード)
   sk             String // データ用SK, マスタ種別コード#マスタコード
-  masterTypeCode String   @map("master_type_code") // マスタ種別コード, 【共通マスタ】 or 【テナント固有マスタ】
-  masterCode     String   @map("master_code") // マスタコード
   tenantCode     String   @map("tenant_code") // テナントコード, 【テナントコードマスタ】
   seq            Int      @default(0) // 並び順, 採番機能を使用する
   code           String // レコードのコード, マスタ種別コード#マスタコード
@@ -34,12 +32,11 @@ model Master {
   updatedIp      String   @default("") @map("updated_ip") // 更新IP, IPv6も考慮する
   updatedAt      DateTime @updatedAt @map("updated_at") @db.Timestamp(0) // 更新日時
 
-  atttributesMaster Json? @map("atttributes_master")
+  attributes Json? @map("attributes")
 
   @@unique([cpk, csk])
   @@unique([pk, sk])
   @@unique([tenantCode, code])
-  @@unique([tenantCode, masterTypeCode, masterCode])
   @@index([tenantCode, name])
-  @@map("masters")
+  @@map("samples")
 }

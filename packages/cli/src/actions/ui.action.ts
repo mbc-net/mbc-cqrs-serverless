@@ -4,13 +4,15 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'fs'
 import path from 'path'
 import { rimrafSync } from 'rimraf'
 
+import { logger } from '../ui'
+
 const repoUrl = 'https://gitlab.com/mbc-net/common/mbc-cqrs-ui-common.git'
 
 const componentOptions = ['all', 'appsync', 'component']
 
 /* eslint-disable no-console */
 export default async function uiAction(options: object, command: Command) {
-  console.log(
+  logger.info(
     `Executing command '${command.name()}' for application with options '${JSON.stringify(
       options,
     )}'`,
@@ -21,14 +23,14 @@ export default async function uiAction(options: object, command: Command) {
   if (
     componentOptions.findIndex((optionName) => optionName === component) === -1
   ) {
-    console.error(
+    logger.error(
       `Please choose correct component options: ${componentOptions.join(', ')}`,
     )
   }
 
   // Check command run in base src
   if (!existsSync(path.join(process.cwd(), 'tsconfig.json'))) {
-    console.log('Please run command in base folder')
+    logger.error('Please run command in base folder')
     return
   }
 
@@ -42,7 +44,7 @@ export default async function uiAction(options: object, command: Command) {
     tsconfig?.compilerOptions?.paths &&
     tsconfig?.compilerOptions?.paths.hasOwnProperty('@ms/*')
   ) {
-    console.log('The project already contain mbc-cqrs-ui-common')
+    logger.error('The project already contain mbc-cqrs-ui-common')
     return
   }
 
@@ -78,9 +80,10 @@ export default async function uiAction(options: object, command: Command) {
   modifyDependencies({ pathDir, component })
 
   // npm install
-  console.log('Installing packages')
+  logger.title('deps', `Installing dependencies`)
   const logs = execSync('npm i')
   console.log(logs.toString())
+  logger.success(`Dependencies installed`)
 }
 
 const installTemplate = ({
