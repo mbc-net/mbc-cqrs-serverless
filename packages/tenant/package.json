@@ -26,7 +26,8 @@
   "scripts": {
     "build": "rm -rf dist && nest build",
     "test": "echo \"Error: no test specified\" && exit 1",
-    "postinstall": "node ./dist/update-scheme.js"
+    "prepare": "npm run build",
+    "postinstall": " node ./dist/update-scheme.js"
   },
   "repository": {
     "type": "git",
