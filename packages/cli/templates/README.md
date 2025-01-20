@@ -46,7 +46,7 @@ $ npm run offline:docker
 $ npm run migrate
 
 # copy dynamodb stream arn to `.env` file
-      # LOCAL_DDB_MASTER_STREAM=arn:aws:dynamodb:ddblocal:000000000000:table/local-demo-master-command/stream/2024-01-02T03:07:49.349
+#LOCAL_DDB_SAMPLE_STREAM=arn:aws:dynamodb:ddblocal:000000000000:table/local-test-cli-sample-command/stream/2025-01-14T12:05:57.881
 
 # serverless, open in other terminal session
 $ npm run offline:sls

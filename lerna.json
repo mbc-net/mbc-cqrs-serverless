@@ -1,5 +1,11 @@
 {
   "$schema": "node_modules/lerna/schemas/lerna-schema.json",
-  "version": "0.1.47-beta.0",
-  "packages": ["packages/*"]
+  "version": "0.1.50-beta.0",
+  "packages": ["packages/*"],
+  "command": {
+    "version": {
+      "changelogPreset": "angular",
+      "conventionalCommits": true
+    }
+  }
 }

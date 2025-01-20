@@ -1,3 +1,4 @@
+import chalk from 'chalk'
 import { execSync } from 'child_process'
 import { Command } from 'commander'
 import {
@@ -11,6 +12,8 @@ import {
 } from 'fs'
 import path from 'path'
 
+import { logger } from '../ui'
+
 /* eslint-disable no-console */
 export default async function newAction(
   name: string = '',
@@ -19,7 +22,7 @@ export default async function newAction(
 ) {
   const [projectName, version = 'latest'] = name.split('@')
 
-  console.log(
+  logger.info(
     `Executing command '${command.name()}' for application '${projectName}' with options '${JSON.stringify(
       options,
     )}'`,
@@ -40,16 +43,18 @@ export default async function newAction(
     } else if (matchVersions.length !== 0) {
       packageVersion = `^${matchVersions.at(-1)}` // use the patch and minor versions
     } else {
-      console.log(
-        'The specified package version does not exist. Please chose a valid version!\n',
-        versions,
+      logger.error(
+        `The specified package version does not exist. Please chose a valid version! ${versions}`,
       )
       return
     }
   }
-
   const destDir = path.join(process.cwd(), projectName)
-  console.log('Generating MBC cqrs serverless application in', destDir)
+  logger.title(
+    'MBC',
+    `Generating MBC cqrs serverless application in ${chalk.green(destDir)}`,
+  )
+
   mkdirSync(destDir, { recursive: true })
   useTemplate(destDir)
 
@@ -73,13 +78,20 @@ export default async function newAction(
   copyFileSync(path.join(destDir, '.env.local'), path.join(destDir, '.env'))
 
   // git init
+  logger.title('git', 'Initializing git repository.')
+
   let logs = execSync('git init', { cwd: destDir })
-  console.log(logs.toString())
+
+  logger.success('Initialized a git repository.')
 
   // npm install
-  console.log('Installing packages in', destDir)
-  logs = execSync('npm i', { cwd: destDir })
+  logger.title('deps', `Installing dependencies`)
+  logs = execSync('npm i --ignore-scripts', { cwd: destDir })
+  execSync('npx prisma generate', { cwd: destDir })
   console.log(logs.toString())
+  logger.success(`Dependencies installed`)
+
+  logger.title('MBC', `Your application was created!`)
 }
 
 function useTemplate(destDir: string) {
