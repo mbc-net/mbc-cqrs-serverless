@@ -1,5 +1,5 @@
 import { ApiProperty } from '@nestjs/swagger'
-import { IsOptional, IsString } from 'class-validator'
+import { IsObject, IsOptional, IsString } from 'class-validator'
 
 export class TenantCreateDto {
   /**
@@ -27,12 +27,12 @@ export class TenantCreateDto {
   name: string
 
   @IsOptional()
-  @IsString()
+  @IsObject()
   @ApiProperty({
-    type: String,
+    type: Object,
     example: 'describes the tenant ',
     required: false,
     description: 'description for tenant code',
   })
-  description?: string
+  attributes?: object
 }
