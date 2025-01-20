@@ -41,7 +41,7 @@ export class TenantService implements ITenantService {
     dto: CommonTenantCreateDto,
     context: { invokeContext: IInvoke },
   ): Promise<CommandModel> {
-    const { name, description } = dto
+    const { name, attributes } = dto
     const pk = `${TENANT_SYSTEM_PREFIX}${KEY_SEPARATOR}${SettingTypeEnum.TENANT_COMMON}`
     const sk = TENANT_SK
 
@@ -64,9 +64,7 @@ export class TenantService implements ITenantService {
       tenantCode: SettingTypeEnum.TENANT_COMMON,
       type: SettingTypeEnum.TENANT_COMMON,
       version: VERSION_FIRST,
-      attributes: {
-        description: description,
-      },
+      attributes: attributes,
     }
     return await this.commandService.publishAsync(command, context)
   }
@@ -74,7 +72,7 @@ export class TenantService implements ITenantService {
     dto: TenantCreateDto,
     context: { invokeContext: IInvoke },
   ): Promise<CommandModel> {
-    const { name, code, description } = dto
+    const { name, code, attributes } = dto
     const pk = `${TENANT_SYSTEM_PREFIX}${KEY_SEPARATOR}${code}`
     const sk = TENANT_SK
 
@@ -97,9 +95,7 @@ export class TenantService implements ITenantService {
       tenantCode: code,
       type: code,
       version: VERSION_FIRST,
-      attributes: {
-        description: description,
-      },
+      attributes: attributes,
     }
 
     return await this.commandService.publishAsync(command, context)
