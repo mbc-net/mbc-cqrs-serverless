@@ -1,16 +1,20 @@
-name: Run test
+name: Run tests on PR
 
 on:
   pull_request:
     types: [opened, synchronize]
     branches:
       - develop
-      - main
+
+permissions:
+  contents: write
+  actions: read
+  checks: write
 
 jobs:
   unit_tests:
     name: Unit Test
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, linux, ARM64]
     steps:
       - uses: actions/checkout@v4
         with:
@@ -29,10 +33,19 @@ jobs:
       - name: Run Unit Tests
         run: npm run test
 
+      - name: Unit Test Report
+        uses: dorny/test-reporter@v1
+        if: success() || failure()
+        with:
+          name: Unit Tests Reporter
+          path: report/unit.xml
+          reporter: jest-junit
+          fail-on-error: 'true'
+
   e2e_tests:
     name: E2e Test For Core package
     needs: unit_tests
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, linux, ARM64]
     steps:
       - uses: actions/checkout@v4
         with:
@@ -57,3 +70,12 @@ jobs:
         with:
           name: my-artifacts
           path: ./packages/core/test/scripts/*.out.txt
+
+      - name: E2E Test Report
+        uses: dorny/test-reporter@v1
+        if: success() || failure()
+        with:
+          name: E2E Core Tests Reporter
+          path: report/e2e-core.xml
+          reporter: jest-junit
+          fail-on-error: 'true'
