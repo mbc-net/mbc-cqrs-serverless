@@ -27,6 +27,16 @@ export class TaskController {
     return await this.tasksService.createTask(dto, { invokeContext })
   }
 
+  @Post('/step-function-task')
+  async createStepFunctionTask(
+    @INVOKE_CONTEXT() invokeContext: IInvoke,
+    @Body() dto: CreateTaskDto,
+  ) {
+    return await this.tasksService.createStepFunctionTask(dto, {
+      invokeContext,
+    })
+  }
+
   @Get('/:pk/:sk')
   async getTask(@Param() detailDto: DetailDto) {
     const item = await this.tasksService.getTask(detailDto)
