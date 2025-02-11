@@ -38,11 +38,13 @@ export class TaskSfnEventHandler
     this.logger.debug('executing::', event)
 
     const taskKey = event.taskKey
-    this.logger.debug('task key: ', taskKey)
+    this.logger.debug('sfn task key: ', taskKey)
 
     try {
       await this.taskService.updateStatus(taskKey, TaskStatusEnum.PROCESSING)
       const events = await this.eventFactory.transformStepFunctionTask(event)
+      console.log('events@#$', events)
+      console.log('eventseventBus@#$', this.eventBus)
       const result = await Promise.all(
         events.map((event) => this.eventBus.execute(event)),
       )

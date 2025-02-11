@@ -22,7 +22,7 @@ import { TaskService } from './task.service'
     TaskSfnEventHandler,
     SubTaskQueueEventHandler,
   ],
-  exports: [TaskService],
+  exports: [TaskService, SubTaskQueueEventHandler],
 })
 export class TaskModule extends ConfigurableModuleClass {
   static register(options: typeof OPTIONS_TYPE): DynamicModule {

@@ -22,6 +22,11 @@ export class TaskEntity extends CommandEntity {
   attributes?: {
     result?: any
     error?: any
+    subTaskCount?: number
+    subTaskFailedCount?: number
+    subTaskRunningCount?: number
+    subTaskSucceedCount?: number
+    subTasks?: any
   }
 
   constructor(partial: Partial<TaskEntity>) {

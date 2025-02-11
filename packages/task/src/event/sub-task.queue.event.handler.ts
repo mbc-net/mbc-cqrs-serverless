@@ -24,7 +24,11 @@ export class SubTaskQueueEventHandler
 
     const subTasks = await this.taskService.getAllSubTask(task) // children key
 
+    console.log('subTasks', subTasks)
+
     const taskStatus = await this.taskService.formatTaskStatus(subTasks)
+
+    console.log('taskStatus', taskStatus)
 
     await this.taskService.updateStepFunctionTask(
       {

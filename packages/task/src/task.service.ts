@@ -7,7 +7,7 @@ import {
   KEY_SEPARATOR,
   SnsService,
 } from '@mbc-cqrs-serverless/core'
-import { Injectable, Logger } from '@nestjs/common'
+import { Injectable, Logger, NotFoundException } from '@nestjs/common'
 import { ConfigService } from '@nestjs/config'
 import { ulid } from 'ulid'
 
@@ -17,9 +17,10 @@ import { TaskListEntity } from './entity/task-list.entity'
 import { TaskStatusEnum } from './enums/status.enum'
 import { TaskQueueEvent } from './event'
 import { StepFunctionTaskEvent } from './event/task.sfn.event'
+import { ITaskService } from './interfaces/task-service.interface'
 
 @Injectable()
-export class TaskService {
+export class TaskService implements ITaskService {
   private readonly logger = new Logger(TaskService.name)
   private readonly tableName: string
   private readonly alarmTopicArn: string
@@ -35,12 +36,13 @@ export class TaskService {
 
   async createTask(
     dto: CreateTaskDto,
-    opts: {
+    options: {
       invokeContext: IInvoke
     },
   ): Promise<TaskEntity> {
-    const sourceIp = opts.invokeContext?.event?.requestContext?.http?.sourceIp
-    const userContext = getUserContext(opts.invokeContext)
+    const sourceIp =
+      options.invokeContext?.event?.requestContext?.http?.sourceIp
+    const userContext = getUserContext(options.invokeContext)
 
     const taskCode = ulid()
     const pk = `TASK${KEY_SEPARATOR}${dto.tenantCode}`
@@ -57,7 +59,7 @@ export class TaskService {
       tenantCode: dto.tenantCode,
       status: TaskStatusEnum.CREATED,
       input: dto.input,
-      requestId: opts.invokeContext?.context?.awsRequestId,
+      requestId: options.invokeContext?.context?.awsRequestId,
       createdAt: new Date(),
       updatedAt: new Date(),
       createdBy: userContext.userId,
@@ -73,12 +75,13 @@ export class TaskService {
 
   async createStepFunctionTask(
     dto: CreateTaskDto,
-    opts: {
+    options: {
       invokeContext: IInvoke
     },
   ): Promise<TaskEntity> {
-    const sourceIp = opts.invokeContext?.event?.requestContext?.http?.sourceIp
-    const userContext = getUserContext(opts.invokeContext)
+    const sourceIp =
+      options.invokeContext?.event?.requestContext?.http?.sourceIp
+    const userContext = getUserContext(options.invokeContext)
 
     const taskCode = ulid()
     const pk = `SFN_TASK${KEY_SEPARATOR}${dto.tenantCode}`
@@ -95,7 +98,7 @@ export class TaskService {
       tenantCode: dto.tenantCode,
       status: TaskStatusEnum.CREATED,
       input: dto.input,
-      requestId: opts.invokeContext?.context?.awsRequestId,
+      requestId: options.invokeContext?.context?.awsRequestId,
       createdAt: new Date(),
       updatedAt: new Date(),
       createdBy: userContext.userId,
@@ -147,7 +150,7 @@ export class TaskService {
     return subTasks
   }
 
-  async getAllSubTask(subTask: DetailKey): Promise<[TaskEntity]> {
+  async getAllSubTask(subTask: DetailKey): Promise<TaskEntity[]> {
     const parentKey = subTask.sk
       .split(KEY_SEPARATOR)
       .slice(0, -1)
@@ -236,7 +239,8 @@ export class TaskService {
 
   async listItemsByPk(
     tenantCode: string,
-    opts?: {
+    type?: string,
+    options?: {
       sk?: {
         skExpession: string
         skAttributeValues: Record<string, string>
@@ -247,15 +251,18 @@ export class TaskService {
       order?: 'asc' | 'desc'
     },
   ): Promise<TaskListEntity> {
-    const pk = `TASK${KEY_SEPARATOR}${tenantCode}`
+    if (!['TASK', 'SFN_TASK'].includes(type)) {
+      throw new NotFoundException()
+    }
+    const pk = `${type}${KEY_SEPARATOR}${tenantCode}`
 
     const { lastSk, items } = await this.dynamoDbService.listItemsByPk(
       this.tableName,
       pk,
-      opts?.sk,
-      opts?.startFromSk,
-      opts?.limit,
-      opts?.order,
+      options?.sk,
+      options?.startFromSk,
+      options?.limit,
+      options?.order,
     )
 
     return new TaskListEntity({
@@ -290,18 +297,9 @@ export class TaskService {
     await this.snsService.publish<INotification>(alarm, this.alarmTopicArn)
   }
 
-  async formatTaskStatus(originTasks: TaskEntity[]) {
-    const tasks = await Promise.all(
-      originTasks.map((task) =>
-        this.getTask({
-          pk: task.pk,
-          sk: task.sk,
-        }),
-      ),
-    )
-
+  async formatTaskStatus(tasks: TaskEntity[]) {
     const result = {
-      subTaskCount: originTasks.length,
+      subTaskCount: tasks.length,
       subTaskSucceedCount: this.countTaskStatus(
         tasks,
         TaskStatusEnum.COMPLETED,

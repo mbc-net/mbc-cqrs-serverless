@@ -7,6 +7,7 @@ import {
   NotFoundException,
   Param,
   Post,
+  Query,
 } from '@nestjs/common'
 import { ApiTags } from '@nestjs/swagger'
 
@@ -48,7 +49,7 @@ export class TaskController {
   }
 
   @Get('/:pk')
-  async listTaskByPk(@Param('pk') pk: string) {
-    return await this.tasksService.listItemsByPk(pk)
+  async listTaskByPk(@Param('pk') pk: string, @Query('type') type: string) {
+    return await this.tasksService.listItemsByPk(pk, type)
   }
 }
