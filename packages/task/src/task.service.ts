@@ -18,6 +18,7 @@ import { TaskStatusEnum } from './enums/status.enum'
 import { TaskQueueEvent } from './event'
 import { StepFunctionTaskEvent } from './event/task.sfn.event'
 import { ITaskService } from './interfaces/task-service.interface'
+import { TaskTypesEnum } from './enums'
 
 @Injectable()
 export class TaskService implements ITaskService {
@@ -84,7 +85,7 @@ export class TaskService implements ITaskService {
     const userContext = getUserContext(options.invokeContext)
 
     const taskCode = ulid()
-    const pk = `SFN_TASK${KEY_SEPARATOR}${dto.tenantCode}`
+    const pk = `${TaskTypesEnum.SFN_TASK}${KEY_SEPARATOR}${dto.tenantCode}`
     const sk = `${dto.taskType}${KEY_SEPARATOR}${taskCode}`
 
     const item = {
@@ -252,7 +253,9 @@ export class TaskService implements ITaskService {
     },
   ): Promise<TaskListEntity> {
     if (!['TASK', 'SFN_TASK'].includes(type)) {
-      throw new NotFoundException()
+      throw new NotFoundException(
+        `The type of task, must be either "TASK" or "SFN_TASK"`,
+      )
     }
     const pk = `${type}${KEY_SEPARATOR}${tenantCode}`
 

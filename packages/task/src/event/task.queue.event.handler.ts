@@ -8,6 +8,7 @@ import { Inject, Logger, OnModuleInit } from '@nestjs/common'
 import { ConfigService } from '@nestjs/config'
 import { ModuleRef } from '@nestjs/core'
 
+import { TaskTypesEnum } from '../enums'
 import { TaskStatusEnum } from '../enums/status.enum'
 import { TASK_QUEUE_EVENT_FACTORY } from '../task.module-definition'
 import { TaskService } from '../task.service'
@@ -44,7 +45,7 @@ export class TaskQueueEventHandler
   async execute(event: TaskQueueEvent): Promise<any> {
     this.logger.debug('task queue event executing::', event)
 
-    if (event.taskEvent.taskKey.pk.startsWith('SFN_TASK')) {
+    if (event.taskEvent.taskKey.pk.startsWith(TaskTypesEnum.SFN_TASK)) {
       this.handleStepFunctionTask(event)
     } else {
       this.handleTask(event)
