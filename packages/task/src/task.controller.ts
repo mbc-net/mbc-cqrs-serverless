@@ -7,6 +7,7 @@ import {
   NotFoundException,
   Param,
   Post,
+  Query,
 } from '@nestjs/common'
 import { ApiTags } from '@nestjs/swagger'
 
@@ -27,6 +28,16 @@ export class TaskController {
     return await this.tasksService.createTask(dto, { invokeContext })
   }
 
+  @Post('/step-function-task')
+  async createStepFunctionTask(
+    @INVOKE_CONTEXT() invokeContext: IInvoke,
+    @Body() dto: CreateTaskDto,
+  ) {
+    return await this.tasksService.createStepFunctionTask(dto, {
+      invokeContext,
+    })
+  }
+
   @Get('/:pk/:sk')
   async getTask(@Param() detailDto: DetailDto) {
     const item = await this.tasksService.getTask(detailDto)
@@ -38,7 +49,7 @@ export class TaskController {
   }
 
   @Get('/:pk')
-  async listTaskByPk(@Param('pk') pk: string) {
-    return await this.tasksService.listItemsByPk(pk)
+  async listTaskByPk(@Param('pk') pk: string, @Query('type') type: string) {
+    return await this.tasksService.listItemsByPk(pk, type)
   }
 }

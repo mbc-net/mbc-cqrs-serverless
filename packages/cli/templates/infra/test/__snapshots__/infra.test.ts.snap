@@ -48,7 +48,7 @@ exports[`snapshot test for InfraStack 1`] = `
       },
     },
     "UserPoolId": {
-      "Value": "ap-northeast-1_xlQVMPxtx",
+      "Value": "ap-northeast-1_NfyqKTjPS",
     },
     "httpdistributiondomain": {
       "Value": {
@@ -56,6 +56,11 @@ exports[`snapshot test for InfraStack 1`] = `
           "httpdistribution87A15827",
           "DomainName",
         ],
+      },
+    },
+    "sfnTaskStateMachineArn": {
+      "Value": {
+        "Ref": "taskhandlerstatemachineA6256F18",
       },
     },
   },
@@ -91,7 +96,7 @@ exports[`snapshot test for InfraStack 1`] = `
           },
           {
             "Key": "name",
-            "Value": "cdk-test-deploy",
+            "Value": "task-sfn-interation-map",
           },
         ],
         "Timeout": 120,
@@ -133,7 +138,7 @@ exports[`snapshot test for InfraStack 1`] = `
           },
           {
             "Key": "name",
-            "Value": "cdk-test-deploy",
+            "Value": "task-sfn-interation-map",
           },
         ],
       },
@@ -141,8 +146,8 @@ exports[`snapshot test for InfraStack 1`] = `
     },
     "AppSyncCnameRecord408D9525": {
       "Properties": {
-        "HostedZoneId": "Z083753814XLAICIY5OHU",
-        "Name": "dev-appsync-cdk.mbc-cqrs-serverless.mbc-net.com.",
+        "HostedZoneId": "Z07014542L73WTE1YO27B",
+        "Name": "task-sfn-infra-appsync.developer-pionero.mbc-dev.com.",
         "ResourceRecords": [
           {
             "Fn::GetAtt": [
@@ -165,10 +170,10 @@ exports[`snapshot test for InfraStack 1`] = `
           },
           {
             "Key": "name",
-            "Value": "cdk-test-deploy",
+            "Value": "task-sfn-interation-map",
           },
         ],
-        "TopicName": "dev-cdk-test-deploy-alarm-sns",
+        "TopicName": "dev-task-sfn-interation-map-alarm-sns",
       },
       "Type": "AWS::SNS::Topic",
     },
@@ -197,14 +202,14 @@ exports[`snapshot test for InfraStack 1`] = `
         "SupportedIdentityProviders": [
           "COGNITO",
         ],
-        "UserPoolId": "ap-northeast-1_xlQVMPxtx",
+        "UserPoolId": "ap-northeast-1_NfyqKTjPS",
       },
       "Type": "AWS::Cognito::UserPoolClient",
     },
     "commandhandlersfnlog9072E963": {
       "DeletionPolicy": "Delete",
       "Properties": {
-        "LogGroupName": "/aws/vendedlogs/states/dev-cdk-test-deploy--command-handler-state-machine-Logs",
+        "LogGroupName": "/aws/vendedlogs/states/dev-task-sfn-interation-map--command-handler-state-machine-Logs",
         "RetentionInDays": 180,
         "Tags": [
           {
@@ -213,7 +218,7 @@ exports[`snapshot test for InfraStack 1`] = `
           },
           {
             "Key": "name",
-            "Value": "cdk-test-deploy",
+            "Value": "task-sfn-interation-map",
           },
         ],
       },
@@ -333,7 +338,7 @@ exports[`snapshot test for InfraStack 1`] = `
             "Arn",
           ],
         },
-        "StateMachineName": "dev-cdk-test-deploy-command-handler",
+        "StateMachineName": "dev-task-sfn-interation-map-command-handler",
         "Tags": [
           {
             "Key": "env",
@@ -341,7 +346,7 @@ exports[`snapshot test for InfraStack 1`] = `
           },
           {
             "Key": "name",
-            "Value": "cdk-test-deploy",
+            "Value": "task-sfn-interation-map",
           },
         ],
         "TracingConfiguration": {
@@ -372,7 +377,7 @@ exports[`snapshot test for InfraStack 1`] = `
           },
           {
             "Key": "name",
-            "Value": "cdk-test-deploy",
+            "Value": "task-sfn-interation-map",
           },
         ],
       },
@@ -447,7 +452,7 @@ exports[`snapshot test for InfraStack 1`] = `
     "ddbattributes95C63151": {
       "DeletionPolicy": "Delete",
       "Properties": {
-        "BucketName": "dev-cdk-test-deploy-ddb-attributes",
+        "BucketName": "dev-task-sfn-interation-map-ddb-attributes",
         "CorsConfiguration": {
           "CorsRules": [
             {
@@ -479,7 +484,7 @@ exports[`snapshot test for InfraStack 1`] = `
           },
           {
             "Key": "name",
-            "Value": "cdk-test-deploy",
+            "Value": "task-sfn-interation-map",
           },
         ],
       },
@@ -497,7 +502,7 @@ exports[`snapshot test for InfraStack 1`] = `
           },
           {
             "Key": "name",
-            "Value": "cdk-test-deploy",
+            "Value": "task-sfn-interation-map",
           },
         ],
       },
@@ -508,7 +513,7 @@ exports[`snapshot test for InfraStack 1`] = `
       "Properties": {
         "DistributionConfig": {
           "Aliases": [
-            "dev-api-cdk.mbc-cqrs-serverless.mbc-net.com",
+            "task-sfn-infra.developer-pionero.mbc-dev.com",
           ],
           "DefaultCacheBehavior": {
             "AllowedMethods": [
@@ -553,7 +558,7 @@ exports[`snapshot test for InfraStack 1`] = `
               "OriginCustomHeaders": [
                 {
                   "HeaderName": "X-Origin-Verify",
-                  "HeaderValue": "dev-cdk-test-deploy-653338303031343731376464613638663933303936316338666463646537",
+                  "HeaderValue": "dev-task-sfn-interation-map-653338303031343731376464613638663933303936316338666463646537",
                 },
               ],
             },
@@ -569,7 +574,7 @@ exports[`snapshot test for InfraStack 1`] = `
             },
           },
           "ViewerCertificate": {
-            "AcmCertificateArn": "arn:aws:acm:us-east-1:058264278704:certificate/668eb08d-b92f-488c-9e32-56854d487315",
+            "AcmCertificateArn": "arn:aws:acm:us-east-1:465316005105:certificate/495946ea-1231-47cb-b09d-0ae7305866fb",
             "MinimumProtocolVersion": "TLSv1.2_2021",
             "SslSupportMethod": "sni-only",
           },
@@ -581,7 +586,7 @@ exports[`snapshot test for InfraStack 1`] = `
           },
           {
             "Key": "name",
-            "Value": "cdk-test-deploy",
+            "Value": "task-sfn-interation-map",
           },
         ],
       },
@@ -589,8 +594,8 @@ exports[`snapshot test for InfraStack 1`] = `
     },
     "httpdistributionarecord0FBAAC08": {
       "Properties": {
-        "HostedZoneId": "Z083753814XLAICIY5OHU",
-        "Name": "dev-api-cdk.mbc-cqrs-serverless.mbc-net.com.",
+        "HostedZoneId": "Z07014542L73WTE1YO27B",
+        "Name": "task-sfn-infra.developer-pionero.mbc-dev.com.",
         "ResourceRecords": [
           {
             "Fn::GetAtt": [
@@ -625,12 +630,12 @@ exports[`snapshot test for InfraStack 1`] = `
                 "GraphQLUrl",
               ],
             },
-            "APP_NAME": "cdk-test-deploy",
+            "APP_NAME": "task-sfn-interation-map",
             "ATTRIBUTE_LIMIT_SIZE": "389120",
-            "COGNITO_USER_POOL_ID": "ap-northeast-1_xlQVMPxtx",
-            "DATABASE_URL": "postgresql:///mbc/cqrs/rds-account@http://db.mbc-net.com/dev_cdk_infra?schema=public",
+            "COGNITO_USER_POOL_ID": "ap-northeast-1_NfyqKTjPS",
+            "DATABASE_URL": "postgresql:///mbc/cqrs/rds-account@db.mbc-net.com/dev_cdk_infra?schema=public",
             "EVENT_SOURCE_DISABLED": "false",
-            "FRONT_BASE_URL": "https://dev-front.mbc-cqrs-serverless.mbc-net.com",
+            "FRONT_BASE_URL": "test-cqrs.developer-pionero.mbc-dev.com",
             "LOG_LEVEL": "verbose",
             "NODE_ENV": "dev",
             "NODE_OPTIONS": "--enable-source-maps",
@@ -640,8 +645,9 @@ exports[`snapshot test for InfraStack 1`] = `
             "S3_PUBLIC_BUCKET_NAME": {
               "Ref": "publicbucket0D82CFFB",
             },
-            "SES_FROM_EMAIL": "noreply@mbc-cqrs-serverless.mbc-net.com",
-            "SFN_COMMAND_ARN": "arn:aws:states:ap-northeast-1:101010101010:stateMachine:dev-cdk-test-deploy-command-handler",
+            "SES_FROM_EMAIL": "noreply@developer-pionero.mbc-dev.com",
+            "SFN_COMMAND_ARN": "arn:aws:states:ap-northeast-1:101010101010:stateMachine:dev-task-sfn-interation-map-command-handler",
+            "SFN_TASK_ARN": "arn:aws:states:ap-northeast-1:101010101010:stateMachine:dev-task-sfn-interation-map-sfn-task-handler",
             "SNS_ALARM_TOPIC_ARN": {
               "Ref": "alarmsnsFB7BBC3B",
             },
@@ -651,7 +657,7 @@ exports[`snapshot test for InfraStack 1`] = `
             "TZ": "Asia/Tokyo",
           },
         },
-        "FunctionName": "dev-cdk-test-deploy-lambda-api",
+        "FunctionName": "dev-task-sfn-interation-map-lambda-api",
         "Handler": "main.handler",
         "Layers": [
           {
@@ -678,7 +684,7 @@ exports[`snapshot test for InfraStack 1`] = `
           },
           {
             "Key": "name",
-            "Value": "cdk-test-deploy",
+            "Value": "task-sfn-interation-map",
           },
         ],
         "Timeout": 31536000,
@@ -687,19 +693,19 @@ exports[`snapshot test for InfraStack 1`] = `
         },
         "VpcConfig": {
           "SecurityGroupIds": [
-            "sg-0913ccd0827f688f4",
+            "sg-06d0f5fc2d4225f50",
           ],
           "SubnetIds": [],
         },
       },
       "Type": "AWS::Lambda::Function",
     },
-    "lambdaapiDynamoDBEventSourceTestInfraStackmastercommandtableE6C83C78574B619C": {
+    "lambdaapiDynamoDBEventSourceTestInfraStacksamplecommandtable0EA54DEAC580030B": {
       "Properties": {
         "BatchSize": 1,
         "EventSourceArn": {
           "Fn::GetAtt": [
-            "mastercommanddecsC637D29D",
+            "samplecommanddecs4793A4CC",
             "Table.LatestStreamArn",
           ],
         },
@@ -721,7 +727,7 @@ exports[`snapshot test for InfraStack 1`] = `
           },
           {
             "Key": "name",
-            "Value": "cdk-test-deploy",
+            "Value": "task-sfn-interation-map",
           },
         ],
       },
@@ -754,7 +760,7 @@ exports[`snapshot test for InfraStack 1`] = `
           },
           {
             "Key": "name",
-            "Value": "cdk-test-deploy",
+            "Value": "task-sfn-interation-map",
           },
         ],
       },
@@ -807,7 +813,7 @@ exports[`snapshot test for InfraStack 1`] = `
           },
           {
             "Key": "name",
-            "Value": "cdk-test-deploy",
+            "Value": "task-sfn-interation-map",
           },
         ],
       },
@@ -858,6 +864,22 @@ exports[`snapshot test for InfraStack 1`] = `
               },
             },
             {
+              "Action": [
+                "sqs:ReceiveMessage",
+                "sqs:ChangeMessageVisibility",
+                "sqs:GetQueueUrl",
+                "sqs:DeleteMessage",
+                "sqs:GetQueueAttributes",
+              ],
+              "Effect": "Allow",
+              "Resource": {
+                "Fn::GetAtt": [
+                  "subtaskstatussqs337C4C1A",
+                  "Arn",
+                ],
+              },
+            },
+            {
               "Action": "dynamodb:ListStreams",
               "Effect": "Allow",
               "Resource": "*",
@@ -885,7 +907,7 @@ exports[`snapshot test for InfraStack 1`] = `
               "Effect": "Allow",
               "Resource": {
                 "Fn::GetAtt": [
-                  "mastercommanddecsC637D29D",
+                  "samplecommanddecs4793A4CC",
                   "Table.LatestStreamArn",
                 ],
               },
@@ -911,7 +933,7 @@ exports[`snapshot test for InfraStack 1`] = `
                     {
                       "Ref": "AWS::Partition",
                     },
-                    ":cognito-idp:ap-northeast-1:101010101010:userpool/ap-northeast-1_xlQVMPxtx",
+                    ":cognito-idp:ap-northeast-1:101010101010:userpool/ap-northeast-1_NfyqKTjPS",
                   ],
                 ],
               },
@@ -1086,7 +1108,32 @@ exports[`snapshot test for InfraStack 1`] = `
           },
           {
             "Key": "name",
-            "Value": "cdk-test-deploy",
+            "Value": "task-sfn-interation-map",
+          },
+        ],
+      },
+      "Type": "AWS::Lambda::EventSourceMapping",
+    },
+    "lambdaapiSqsEventSourceTestInfraStacksubtaskstatussqs6A461140CF17FDD8": {
+      "Properties": {
+        "BatchSize": 1,
+        "EventSourceArn": {
+          "Fn::GetAtt": [
+            "subtaskstatussqs337C4C1A",
+            "Arn",
+          ],
+        },
+        "FunctionName": {
+          "Ref": "lambdaapi893CD94E",
+        },
+        "Tags": [
+          {
+            "Key": "env",
+            "Value": "dev",
+          },
+          {
+            "Key": "name",
+            "Value": "task-sfn-interation-map",
           },
         ],
       },
@@ -1111,7 +1158,7 @@ exports[`snapshot test for InfraStack 1`] = `
           },
           {
             "Key": "name",
-            "Value": "cdk-test-deploy",
+            "Value": "task-sfn-interation-map",
           },
         ],
       },
@@ -1129,7 +1176,7 @@ exports[`snapshot test for InfraStack 1`] = `
                 "dynamodb:Query",
               ],
               "Effect": "Allow",
-              "Resource": "arn:aws:dynamodb:ap-northeast-1:101010101010:table/dev-cdk-test-deploy-*",
+              "Resource": "arn:aws:dynamodb:ap-northeast-1:101010101010:table/dev-task-sfn-interation-map-*",
             },
           ],
           "Version": "2012-10-17",
@@ -1178,7 +1225,7 @@ exports[`snapshot test for InfraStack 1`] = `
                 "states:DescribeExecution",
               ],
               "Effect": "Allow",
-              "Resource": "arn:aws:states:ap-northeast-1:101010101010:stateMachine:dev-cdk-test-deploy-command-handler",
+              "Resource": "arn:aws:states:ap-northeast-1:101010101010:stateMachine:dev-task-sfn-interation-map-command-handler",
             },
           ],
           "Version": "2012-10-17",
@@ -1205,6 +1252,27 @@ exports[`snapshot test for InfraStack 1`] = `
           "Version": "2012-10-17",
         },
         "PolicyName": "lambdasespolicyC6CB28C8",
+        "Roles": [
+          {
+            "Ref": "lambdaapiServiceRole7E4263EE",
+          },
+        ],
+      },
+      "Type": "AWS::IAM::Policy",
+    },
+    "lambdatasksfnstepfunctionpolicy762E8B6E": {
+      "Properties": {
+        "PolicyDocument": {
+          "Statement": [
+            {
+              "Action": "states:*",
+              "Effect": "Allow",
+              "Resource": "arn:aws:states:ap-northeast-1:101010101010:stateMachine:dev-task-sfn-interation-map-sfn-task-handler",
+            },
+          ],
+          "Version": "2012-10-17",
+        },
+        "PolicyName": "lambdatasksfnstepfunctionpolicy762E8B6E",
         "Roles": [
           {
             "Ref": "lambdaapiServiceRole7E4263EE",
@@ -1295,11 +1363,11 @@ exports[`snapshot test for InfraStack 1`] = `
           "MaxAge": 31536000,
         },
         "Description": "HTTP API for Lambda integration",
-        "Name": "dev-cdk-test-deploy-api",
+        "Name": "dev-task-sfn-interation-map-api",
         "ProtocolType": "HTTP",
         "Tags": {
           "env": "dev",
-          "name": "cdk-test-deploy",
+          "name": "task-sfn-interation-map",
         },
       },
       "Type": "AWS::ApiGatewayV2::Api",
@@ -1319,7 +1387,7 @@ exports[`snapshot test for InfraStack 1`] = `
               "Ref": "apigwclientE7D084A5",
             },
           ],
-          "Issuer": "https://cognito-idp.ap-northeast-1.amazonaws.com/ap-northeast-1_xlQVMPxtx",
+          "Issuer": "https://cognito-idp.ap-northeast-1.amazonaws.com/ap-northeast-1_NfyqKTjPS",
         },
         "Name": "CognitoAuthorizer",
       },
@@ -1399,7 +1467,7 @@ exports[`snapshot test for InfraStack 1`] = `
         "StageName": "$default",
         "Tags": {
           "env": "dev",
-          "name": "cdk-test-deploy",
+          "name": "task-sfn-interation-map",
         },
       },
       "Type": "AWS::ApiGatewayV2::Stage",
@@ -1731,7 +1799,7 @@ exports[`snapshot test for InfraStack 1`] = `
           "S3Bucket": "cdk-hnb659fds-assets-101010101010-ap-northeast-1",
           "S3Key": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx.zip",
         },
-        "LayerName": "dev-cdk-test-deploy-main-layer",
+        "LayerName": "dev-task-sfn-interation-map-main-layer",
       },
       "Type": "AWS::Lambda::LayerVersion",
     },
@@ -1744,56 +1812,17 @@ exports[`snapshot test for InfraStack 1`] = `
           },
           {
             "Key": "name",
-            "Value": "cdk-test-deploy",
+            "Value": "task-sfn-interation-map",
           },
         ],
-        "TopicName": "dev-cdk-test-deploy-main-sns",
+        "TopicName": "dev-task-sfn-interation-map-main-sns",
       },
       "Type": "AWS::SNS::Topic",
-    },
-    "mastercommanddecsC637D29D": {
-      "DeletionPolicy": "Delete",
-      "DependsOn": [
-        "mastercommanddecsCustomResourcePolicyE2063016",
-      ],
-      "Properties": {
-        "Create": "{"service":"DynamoDB","action":"describeTable","parameters":{"TableName":"dev-cdk-test-deploy-master-command"},"physicalResourceId":{"responsePath":"Table.TableArn"}}",
-        "InstallLatestAwsSdk": true,
-        "ServiceToken": {
-          "Fn::GetAtt": [
-            "AWS679f53fac002430cb0da5b7982bd22872D164C4C",
-            "Arn",
-          ],
-        },
-      },
-      "Type": "Custom::AWS",
-      "UpdateReplacePolicy": "Delete",
-    },
-    "mastercommanddecsCustomResourcePolicyE2063016": {
-      "Properties": {
-        "PolicyDocument": {
-          "Statement": [
-            {
-              "Action": "dynamodb:DescribeTable",
-              "Effect": "Allow",
-              "Resource": "*",
-            },
-          ],
-          "Version": "2012-10-17",
-        },
-        "PolicyName": "mastercommanddecsCustomResourcePolicyE2063016",
-        "Roles": [
-          {
-            "Ref": "AWS679f53fac002430cb0da5b7982bd2287ServiceRoleC1EA0FF2",
-          },
-        ],
-      },
-      "Type": "AWS::IAM::Policy",
     },
     "notifysqsEC095A61": {
       "DeletionPolicy": "Delete",
       "Properties": {
-        "QueueName": "dev-cdk-test-deploy-notification-queue",
+        "QueueName": "dev-task-sfn-interation-map-notification-queue",
         "Tags": [
           {
             "Key": "env",
@@ -1801,7 +1830,7 @@ exports[`snapshot test for InfraStack 1`] = `
           },
           {
             "Key": "name",
-            "Value": "cdk-test-deploy",
+            "Value": "task-sfn-interation-map",
           },
         ],
       },
@@ -1871,7 +1900,7 @@ exports[`snapshot test for InfraStack 1`] = `
     "publicbucket0D82CFFB": {
       "DeletionPolicy": "Delete",
       "Properties": {
-        "BucketName": "dev-cdk-test-deploy-public",
+        "BucketName": "dev-task-sfn-interation-map-public",
         "CorsConfiguration": {
           "CorsRules": [
             {
@@ -1903,7 +1932,7 @@ exports[`snapshot test for InfraStack 1`] = `
           },
           {
             "Key": "name",
-            "Value": "cdk-test-deploy",
+            "Value": "task-sfn-interation-map",
           },
         ],
       },
@@ -2019,7 +2048,7 @@ exports[`snapshot test for InfraStack 1`] = `
           },
           {
             "Key": "name",
-            "Value": "cdk-test-deploy",
+            "Value": "task-sfn-interation-map",
           },
         ],
       },
@@ -2035,12 +2064,12 @@ exports[`snapshot test for InfraStack 1`] = `
             "AuthenticationType": "AMAZON_COGNITO_USER_POOLS",
             "UserPoolConfig": {
               "AwsRegion": "ap-northeast-1",
-              "UserPoolId": "ap-northeast-1_xlQVMPxtx",
+              "UserPoolId": "ap-northeast-1_NfyqKTjPS",
             },
           },
         ],
         "AuthenticationType": "API_KEY",
-        "Name": "dev-cdk-test-deploy-realtime",
+        "Name": "dev-task-sfn-interation-map-realtime",
         "Tags": [
           {
             "Key": "env",
@@ -2048,7 +2077,7 @@ exports[`snapshot test for InfraStack 1`] = `
           },
           {
             "Key": "name",
-            "Value": "cdk-test-deploy",
+            "Value": "task-sfn-interation-map",
           },
         ],
         "XrayEnabled": true,
@@ -2081,18 +2110,18 @@ exports[`snapshot test for InfraStack 1`] = `
             "ApiId",
           ],
         },
-        "DomainName": "dev-appsync-cdk.mbc-cqrs-serverless.mbc-net.com",
+        "DomainName": "task-sfn-infra-appsync.developer-pionero.mbc-dev.com",
       },
       "Type": "AWS::AppSync::DomainNameApiAssociation",
     },
     "realtimeDomainName01674B94": {
       "Properties": {
-        "CertificateArn": "arn:aws:acm:us-east-1:058264278704:certificate/668eb08d-b92f-488c-9e32-56854d487315",
+        "CertificateArn": "arn:aws:acm:us-east-1:465316005105:certificate/495946ea-1231-47cb-b09d-0ae7305866fb",
         "Description": {
           "Fn::Join": [
             "",
             [
-              "domain for dev-cdk-test-deploy-realtime at ",
+              "domain for dev-task-sfn-interation-map-realtime at ",
               {
                 "Fn::GetAtt": [
                   "realtime0CF38FF2",
@@ -2102,7 +2131,7 @@ exports[`snapshot test for InfraStack 1`] = `
             ],
           ],
         },
-        "DomainName": "dev-appsync-cdk.mbc-cqrs-serverless.mbc-net.com",
+        "DomainName": "task-sfn-infra-appsync.developer-pionero.mbc-dev.com",
       },
       "Type": "AWS::AppSync::DomainName",
     },
@@ -2184,10 +2213,49 @@ schema {
       },
       "Type": "AWS::AppSync::Resolver",
     },
-    "taskdeadlettersqs91D16094": {
+    "samplecommanddecs4793A4CC": {
+      "DeletionPolicy": "Delete",
+      "DependsOn": [
+        "samplecommanddecsCustomResourcePolicyE6F75ED3",
+      ],
+      "Properties": {
+        "Create": "{"service":"DynamoDB","action":"describeTable","parameters":{"TableName":"dev-task-sfn-interation-map-sample-command"},"physicalResourceId":{"responsePath":"Table.TableArn"}}",
+        "InstallLatestAwsSdk": true,
+        "ServiceToken": {
+          "Fn::GetAtt": [
+            "AWS679f53fac002430cb0da5b7982bd22872D164C4C",
+            "Arn",
+          ],
+        },
+      },
+      "Type": "Custom::AWS",
+      "UpdateReplacePolicy": "Delete",
+    },
+    "samplecommanddecsCustomResourcePolicyE6F75ED3": {
+      "Properties": {
+        "PolicyDocument": {
+          "Statement": [
+            {
+              "Action": "dynamodb:DescribeTable",
+              "Effect": "Allow",
+              "Resource": "*",
+            },
+          ],
+          "Version": "2012-10-17",
+        },
+        "PolicyName": "samplecommanddecsCustomResourcePolicyE6F75ED3",
+        "Roles": [
+          {
+            "Ref": "AWS679f53fac002430cb0da5b7982bd2287ServiceRoleC1EA0FF2",
+          },
+        ],
+      },
+      "Type": "AWS::IAM::Policy",
+    },
+    "subtaskstatussqs337C4C1A": {
       "DeletionPolicy": "Delete",
       "Properties": {
-        "QueueName": "dev-cdk-test-deploy-task-dead-letter-queue",
+        "QueueName": "dev-task-sfn-interation-map-sub-task-status-queue",
         "Tags": [
           {
             "Key": "env",
@@ -2195,7 +2263,84 @@ schema {
           },
           {
             "Key": "name",
-            "Value": "cdk-test-deploy",
+            "Value": "task-sfn-interation-map",
+          },
+        ],
+      },
+      "Type": "AWS::SQS::Queue",
+      "UpdateReplacePolicy": "Delete",
+    },
+    "subtaskstatussqsPolicy727EA743": {
+      "Properties": {
+        "PolicyDocument": {
+          "Statement": [
+            {
+              "Action": "sqs:SendMessage",
+              "Condition": {
+                "ArnEquals": {
+                  "aws:SourceArn": {
+                    "Ref": "mainsnsC0381B34",
+                  },
+                },
+              },
+              "Effect": "Allow",
+              "Principal": {
+                "Service": "sns.amazonaws.com",
+              },
+              "Resource": {
+                "Fn::GetAtt": [
+                  "subtaskstatussqs337C4C1A",
+                  "Arn",
+                ],
+              },
+            },
+          ],
+          "Version": "2012-10-17",
+        },
+        "Queues": [
+          {
+            "Ref": "subtaskstatussqs337C4C1A",
+          },
+        ],
+      },
+      "Type": "AWS::SQS::QueuePolicy",
+    },
+    "subtaskstatussqsTestInfraStackmainsnsA010224C101218D4": {
+      "DependsOn": [
+        "subtaskstatussqsPolicy727EA743",
+      ],
+      "Properties": {
+        "Endpoint": {
+          "Fn::GetAtt": [
+            "subtaskstatussqs337C4C1A",
+            "Arn",
+          ],
+        },
+        "FilterPolicy": {
+          "action": [
+            "sub-task-status",
+          ],
+        },
+        "Protocol": "sqs",
+        "RawMessageDelivery": true,
+        "TopicArn": {
+          "Ref": "mainsnsC0381B34",
+        },
+      },
+      "Type": "AWS::SNS::Subscription",
+    },
+    "taskdeadlettersqs91D16094": {
+      "DeletionPolicy": "Delete",
+      "Properties": {
+        "QueueName": "dev-task-sfn-interation-map-task-dead-letter-queue",
+        "Tags": [
+          {
+            "Key": "env",
+            "Value": "dev",
+          },
+          {
+            "Key": "name",
+            "Value": "task-sfn-interation-map",
           },
         ],
       },
@@ -2256,13 +2401,190 @@ schema {
       },
       "Type": "AWS::SNS::Subscription",
     },
+    "taskhandlersfnlogB2666A7A": {
+      "DeletionPolicy": "Delete",
+      "Properties": {
+        "LogGroupName": "/aws/vendedlogs/states/dev-task-sfn-interation-map-task-handler-state-machine-Logs",
+        "RetentionInDays": 180,
+        "Tags": [
+          {
+            "Key": "env",
+            "Value": "dev",
+          },
+          {
+            "Key": "name",
+            "Value": "task-sfn-interation-map",
+          },
+        ],
+      },
+      "Type": "AWS::Logs::LogGroup",
+      "UpdateReplacePolicy": "Delete",
+    },
+    "taskhandlerstatemachineA6256F18": {
+      "DeletionPolicy": "Delete",
+      "DependsOn": [
+        "taskhandlerstatemachineRoleDefaultPolicy2FC1F09A",
+        "taskhandlerstatemachineRole2CA8BAB5",
+      ],
+      "Properties": {
+        "DefinitionString": {
+          "Fn::Join": [
+            "",
+            [
+              "{"StartAt":"map_state","States":{"map_state":{"Type":"Map","End":true,"InputPath":"$","ItemsPath":"$","ItemProcessor":{"ProcessorConfig":{"Mode":"INLINE"},"StartAt":"iterator","States":{"iterator":{"End":true,"Retry":[{"ErrorEquals":["Lambda.ClientExecutionTimeoutException","Lambda.ServiceException","Lambda.AWSLambdaException","Lambda.SdkClientException"],"IntervalSeconds":2,"MaxAttempts":6,"BackoffRate":2}],"Type":"Task","OutputPath":"$.Payload[0][0]","Resource":"arn:",
+              {
+                "Ref": "AWS::Partition",
+              },
+              ":states:::lambda:invoke","Parameters":{"FunctionName":"",
+              {
+                "Fn::GetAtt": [
+                  "lambdaapi893CD94E",
+                  "Arn",
+                ],
+              },
+              "","Payload":{"input.$":"$","context.$":"$$"}}}}},"MaxConcurrency":2}},"TimeoutSeconds":525600,"Comment":"A state machine for task handler"}",
+            ],
+          ],
+        },
+        "LoggingConfiguration": {
+          "Destinations": [
+            {
+              "CloudWatchLogsLogGroup": {
+                "LogGroupArn": {
+                  "Fn::GetAtt": [
+                    "taskhandlersfnlogB2666A7A",
+                    "Arn",
+                  ],
+                },
+              },
+            },
+          ],
+          "Level": "ALL",
+        },
+        "RoleArn": {
+          "Fn::GetAtt": [
+            "taskhandlerstatemachineRole2CA8BAB5",
+            "Arn",
+          ],
+        },
+        "StateMachineName": "dev-task-sfn-interation-map-sfn-task-handler",
+        "Tags": [
+          {
+            "Key": "env",
+            "Value": "dev",
+          },
+          {
+            "Key": "name",
+            "Value": "task-sfn-interation-map",
+          },
+        ],
+        "TracingConfiguration": {
+          "Enabled": true,
+        },
+      },
+      "Type": "AWS::StepFunctions::StateMachine",
+      "UpdateReplacePolicy": "Delete",
+    },
+    "taskhandlerstatemachineRole2CA8BAB5": {
+      "Properties": {
+        "AssumeRolePolicyDocument": {
+          "Statement": [
+            {
+              "Action": "sts:AssumeRole",
+              "Effect": "Allow",
+              "Principal": {
+                "Service": "states.amazonaws.com",
+              },
+            },
+          ],
+          "Version": "2012-10-17",
+        },
+        "Tags": [
+          {
+            "Key": "env",
+            "Value": "dev",
+          },
+          {
+            "Key": "name",
+            "Value": "task-sfn-interation-map",
+          },
+        ],
+      },
+      "Type": "AWS::IAM::Role",
+    },
+    "taskhandlerstatemachineRoleDefaultPolicy2FC1F09A": {
+      "Properties": {
+        "PolicyDocument": {
+          "Statement": [
+            {
+              "Action": "lambda:InvokeFunction",
+              "Effect": "Allow",
+              "Resource": [
+                {
+                  "Fn::GetAtt": [
+                    "lambdaapi893CD94E",
+                    "Arn",
+                  ],
+                },
+                {
+                  "Fn::Join": [
+                    "",
+                    [
+                      {
+                        "Fn::GetAtt": [
+                          "lambdaapi893CD94E",
+                          "Arn",
+                        ],
+                      },
+                      ":*",
+                    ],
+                  ],
+                },
+              ],
+            },
+            {
+              "Action": [
+                "logs:CreateLogDelivery",
+                "logs:GetLogDelivery",
+                "logs:UpdateLogDelivery",
+                "logs:DeleteLogDelivery",
+                "logs:ListLogDeliveries",
+                "logs:PutResourcePolicy",
+                "logs:DescribeResourcePolicies",
+                "logs:DescribeLogGroups",
+              ],
+              "Effect": "Allow",
+              "Resource": "*",
+            },
+            {
+              "Action": [
+                "xray:PutTraceSegments",
+                "xray:PutTelemetryRecords",
+                "xray:GetSamplingRules",
+                "xray:GetSamplingTargets",
+              ],
+              "Effect": "Allow",
+              "Resource": "*",
+            },
+          ],
+          "Version": "2012-10-17",
+        },
+        "PolicyName": "taskhandlerstatemachineRoleDefaultPolicy2FC1F09A",
+        "Roles": [
+          {
+            "Ref": "taskhandlerstatemachineRole2CA8BAB5",
+          },
+        ],
+      },
+      "Type": "AWS::IAM::Policy",
+    },
     "tasksdecs1B0120D7": {
       "DeletionPolicy": "Delete",
       "DependsOn": [
         "tasksdecsCustomResourcePolicy766680A1",
       ],
       "Properties": {
-        "Create": "{"service":"DynamoDB","action":"describeTable","parameters":{"TableName":"dev-cdk-test-deploy-tasks"},"physicalResourceId":{"responsePath":"Table.TableArn"}}",
+        "Create": "{"service":"DynamoDB","action":"describeTable","parameters":{"TableName":"dev-task-sfn-interation-map-tasks"},"physicalResourceId":{"responsePath":"Table.TableArn"}}",
         "InstallLatestAwsSdk": true,
         "ServiceToken": {
           "Fn::GetAtt": [
@@ -2298,7 +2620,7 @@ schema {
     "tasksqs12D9B615": {
       "DeletionPolicy": "Delete",
       "Properties": {
-        "QueueName": "dev-cdk-test-deploy-task-action-queue",
+        "QueueName": "dev-task-sfn-interation-map-task-action-queue",
         "RedrivePolicy": {
           "deadLetterTargetArn": {
             "Fn::GetAtt": [
@@ -2315,7 +2637,7 @@ schema {
           },
           {
             "Key": "name",
-            "Value": "cdk-test-deploy",
+            "Value": "task-sfn-interation-map",
           },
         ],
       },
