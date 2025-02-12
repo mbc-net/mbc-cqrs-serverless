@@ -92,7 +92,7 @@ export class TaskQueueEventHandler
       const subTasks = await this.taskService.createSubTask(event)
 
       await this.taskService.updateStepFunctionTask(
-        event.taskEvent.taskKey,
+        taskKey,
         {
           subTaskCount: subTasks.length,
           subTaskSucceedCount: 0,
