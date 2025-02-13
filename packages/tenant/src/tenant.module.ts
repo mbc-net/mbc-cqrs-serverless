@@ -14,13 +14,7 @@ import {
 } from './tenant.module-definition'
 
 @Module({
-  imports: [
-    CommandModule.register({
-      tableName: TABLE_NAME,
-    }),
-    DataStoreModule,
-    QueueModule,
-  ],
+  imports: [DataStoreModule, QueueModule],
   providers: [TenantService],
   exports: [TenantService],
 })
@@ -34,8 +28,18 @@ export class TenantModule extends ConfigurableModuleClass {
       }
       module.controllers.push(TenantController)
     }
+    const imports = [...(module.imports ?? [])]
+
+    imports.push(
+      CommandModule.register({
+        tableName: TABLE_NAME,
+        dataSyncHandlers: options?.dataSyncHandlers,
+      }),
+    )
+
     return {
       ...module,
+      imports,
     }
   }
 }

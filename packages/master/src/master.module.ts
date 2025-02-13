@@ -14,13 +14,7 @@ import {
 import { MasterDataService, MasterSettingService } from './services'
 
 @Module({
-  imports: [
-    CommandModule.register({
-      tableName: TABLE_NAME,
-    }),
-    DataStoreModule,
-    QueueModule,
-  ],
+  imports: [DataStoreModule, QueueModule],
   providers: [MasterDataService, MasterSettingService],
   exports: [MasterDataService, MasterSettingService],
 })
@@ -35,9 +29,18 @@ export class MasterModule extends ConfigurableModuleClass {
       module.controllers.push(MasterDataController)
       module.controllers.push(MasterSettingController)
     }
+    const imports = [...(module.imports ?? [])]
+
+    imports.push(
+      CommandModule.register({
+        tableName: TABLE_NAME,
+        dataSyncHandlers: options?.dataSyncHandlers,
+      }),
+    )
 
     return {
       ...module,
+      imports,
     }
   }
 }
