@@ -3,6 +3,10 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.1.54-beta.0](https://github.com/mbc-net/mbc-cqrs-serverless/compare/v0.1.53-beta.0...v0.1.54-beta.0) (2025-02-13)
+
+**Note:** Version bump only for package @mbc-cqrs-serverless/task
+
 ## [0.1.53-beta.0](https://github.com/mbc-net/mbc-cqrs-serverless/compare/v0.1.52-beta.0...v0.1.53-beta.0) (2025-02-12)
 
 ### Features
