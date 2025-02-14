@@ -3,6 +3,16 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.1.54-beta.0](https://github.com/mbc-net/mbc-cqrs-serverless/compare/v0.1.53-beta.0...v0.1.54-beta.0) (2025-02-13)
+
+**Note:** Version bump only for package @mbc-cqrs-serverless/cli
+
+## [0.1.53-beta.0](https://github.com/mbc-net/mbc-cqrs-serverless/compare/v0.1.52-beta.0...v0.1.53-beta.0) (2025-02-12)
+
+### Features
+
+- add queue and sfn for task ([5eb1ec9](https://github.com/mbc-net/mbc-cqrs-serverless/commit/5eb1ec978d3a6a87d6ad8d7cd6467fdc0200bc52))
+
 ## [0.1.52-beta.0](https://github.com/mbc-net/mbc-cqrs-serverless/compare/v0.1.51-beta.0...v0.1.52-beta.0) (2025-01-20)
 
 **Note:** Version bump only for package @mbc-cqrs-serverless/cli
