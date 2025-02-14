@@ -328,7 +328,7 @@ export class InfraStack extends cdk.Stack {
     const lambdaLayer = new cdk.aws_lambda.LayerVersion(this, 'main-layer', {
       layerVersionName: prefix + 'main-layer',
       code: cdk.aws_lambda.AssetCode.fromAsset(layerPath),
-      compatibleRuntimes: [cdk.aws_lambda.Runtime.NODEJS_18_X],
+      compatibleRuntimes: [cdk.aws_lambda.Runtime.NODEJS_20_X],
       compatibleArchitectures: [cdk.aws_lambda.Architecture.ARM_64],
     })
 
@@ -385,7 +385,7 @@ export class InfraStack extends cdk.Stack {
       layers: [lambdaLayer],
       code: cdk.aws_lambda.Code.fromAsset(appPath),
       handler: 'main.handler',
-      runtime: cdk.aws_lambda.Runtime.NODEJS_LATEST,
+      runtime: cdk.aws_lambda.Runtime.NODEJS_20_X,
       timeout: cdk.Duration.seconds(30),
       memorySize: 512,
       tracing: cdk.aws_lambda.Tracing.ACTIVE,
