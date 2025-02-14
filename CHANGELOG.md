@@ -3,6 +3,12 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.1.55-beta.0](https://github.com/mbc-net/mbc-cqrs-serverless/compare/v0.1.54-beta.0...v0.1.55-beta.0) (2025-02-14)
+
+### Features
+
+- update template to use node 20 runtime ([edeaf00](https://github.com/mbc-net/mbc-cqrs-serverless/commit/edeaf00459db3a9e41b57cae8f8a0cda00540c80))
+
 ## [0.1.54-beta.0](https://github.com/mbc-net/mbc-cqrs-serverless/compare/v0.1.53-beta.0...v0.1.54-beta.0) (2025-02-13)
 
 **Note:** Version bump only for package mbc-cqrs-serverless
