@@ -165,7 +165,7 @@ export class MasterSettingService implements IMasterSettingService {
     const pk = generateMasterPk(SettingTypeEnum.TENANT_COMMON)
     const sk = generateMasterSettingSk(code)
     const setting = await this.dataService.getItem({ pk, sk })
-    if (setting) {
+    if (setting && setting.isDeleted === false) {
       throw new BadRequestException(`Setting already exists: ${code}`)
     }
     const command: CommandDto = {
@@ -176,7 +176,7 @@ export class MasterSettingService implements IMasterSettingService {
       id: generateId(pk, sk),
       tenantCode: SettingTypeEnum.TENANT_COMMON,
       type: SettingTypeEnum.TENANT_COMMON,
-      version: VERSION_FIRST,
+      version: setting.version ?? VERSION_FIRST,
       isDeleted: false,
       attributes: settingValue,
     }
@@ -192,7 +192,7 @@ export class MasterSettingService implements IMasterSettingService {
     const sk = generateMasterSettingSk(code)
 
     const setting = await this.dataService.getItem({ pk, sk })
-    if (setting) {
+    if (setting && setting.isDeleted === false) {
       throw new BadRequestException(`Setting already exists: ${code}`)
     }
 
@@ -204,7 +204,7 @@ export class MasterSettingService implements IMasterSettingService {
       id: generateId(pk, sk),
       tenantCode: tenantCode,
       type: SettingTypeEnum.TENANT,
-      version: VERSION_FIRST,
+      version: setting.version ?? VERSION_FIRST,
       isDeleted: false,
       attributes: settingValue,
     }
@@ -222,7 +222,7 @@ export class MasterSettingService implements IMasterSettingService {
     const sk = `${SETTING_SK_PREFIX}${KEY_SEPARATOR}${SettingTypeEnum.TENANT_GROUP}${KEY_SEPARATOR}${groupId}${KEY_SEPARATOR}${code}`
 
     const setting = await this.dataService.getItem({ pk, sk })
-    if (setting) {
+    if (setting && setting.isDeleted === false) {
       throw new BadRequestException(`Setting already exists: ${code}`)
     }
 
@@ -234,7 +234,7 @@ export class MasterSettingService implements IMasterSettingService {
       id: generateId(pk, sk),
       tenantCode: tenantCode,
       type: SettingTypeEnum.TENANT_GROUP,
-      version: VERSION_FIRST,
+      version: setting.version ?? VERSION_FIRST,
       isDeleted: false,
       attributes: settingValue,
     }
@@ -251,7 +251,7 @@ export class MasterSettingService implements IMasterSettingService {
     const sk = `${SETTING_SK_PREFIX}${KEY_SEPARATOR}${SettingTypeEnum.TENANT_USER}${KEY_SEPARATOR}${userId}${KEY_SEPARATOR}${code}`
 
     const setting = await this.dataService.getItem({ pk, sk })
-    if (setting) {
+    if (setting && setting.isDeleted === false) {
       throw new BadRequestException(`Setting already exists: ${code}`)
     }
 
@@ -263,7 +263,7 @@ export class MasterSettingService implements IMasterSettingService {
       id: generateId(pk, sk),
       tenantCode: tenantCode,
       type: SettingTypeEnum.TENANT_USER,
-      version: VERSION_FIRST,
+      version: setting.version ?? VERSION_FIRST,
       isDeleted: false,
       attributes: settingValue,
     }
