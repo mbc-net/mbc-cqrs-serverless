@@ -49,7 +49,7 @@ export class TenantService implements ITenantService {
       pk,
       sk,
     })
-    if (tenant) {
+    if (tenant && tenant.isDeleted === false) {
       throw new BadRequestException(
         `Tenant already exist: ${SettingTypeEnum.TENANT_COMMON}`,
       )
@@ -80,7 +80,7 @@ export class TenantService implements ITenantService {
       pk,
       sk,
     })
-    if (tenant) {
+    if (tenant && tenant.isDeleted === false) {
       throw new BadRequestException(
         `Tenant already exist: ${SettingTypeEnum.TENANT_COMMON}`,
       )
