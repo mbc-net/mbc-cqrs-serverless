@@ -63,7 +63,7 @@ export class TenantService implements ITenantService {
       name: name,
       tenantCode: SettingTypeEnum.TENANT_COMMON,
       type: SettingTypeEnum.TENANT_COMMON,
-      version: VERSION_FIRST,
+      version: tenant?.version ?? VERSION_FIRST,
       attributes: attributes,
     }
     return await this.commandService.publishAsync(command, context)
@@ -94,7 +94,7 @@ export class TenantService implements ITenantService {
       name: name,
       tenantCode: code,
       type: code,
-      version: VERSION_FIRST,
+      version: tenant?.version ?? VERSION_FIRST,
       attributes: attributes,
     }
 
