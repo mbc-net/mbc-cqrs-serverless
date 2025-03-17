@@ -176,7 +176,7 @@ export class MasterSettingService implements IMasterSettingService {
       id: generateId(pk, sk),
       tenantCode: SettingTypeEnum.TENANT_COMMON,
       type: SettingTypeEnum.TENANT_COMMON,
-      version: setting.version ?? VERSION_FIRST,
+      version: setting?.version ?? VERSION_FIRST,
       isDeleted: false,
       attributes: settingValue,
     }
@@ -204,7 +204,7 @@ export class MasterSettingService implements IMasterSettingService {
       id: generateId(pk, sk),
       tenantCode: tenantCode,
       type: SettingTypeEnum.TENANT,
-      version: setting.version ?? VERSION_FIRST,
+      version: setting?.version ?? VERSION_FIRST,
       isDeleted: false,
       attributes: settingValue,
     }
@@ -234,7 +234,7 @@ export class MasterSettingService implements IMasterSettingService {
       id: generateId(pk, sk),
       tenantCode: tenantCode,
       type: SettingTypeEnum.TENANT_GROUP,
-      version: setting.version ?? VERSION_FIRST,
+      version: setting?.version ?? VERSION_FIRST,
       isDeleted: false,
       attributes: settingValue,
     }
@@ -263,7 +263,7 @@ export class MasterSettingService implements IMasterSettingService {
       id: generateId(pk, sk),
       tenantCode: tenantCode,
       type: SettingTypeEnum.TENANT_USER,
-      version: setting.version ?? VERSION_FIRST,
+      version: setting?.version ?? VERSION_FIRST,
       isDeleted: false,
       attributes: settingValue,
     }
