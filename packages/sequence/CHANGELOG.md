@@ -3,6 +3,12 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.1.58-beta.0](https://github.com/mbc-net/mbc-cqrs-serverless/compare/v0.1.57-beta.0...v0.1.58-beta.0) (2025-04-24)
+
+### Bug Fixes
+
+- get format sequence from master data item ([19ea7c6](https://github.com/mbc-net/mbc-cqrs-serverless/commit/19ea7c6137fcec83a8e3e24d016d640c75fecbb5))
+
 ## [0.1.57-beta.0](https://github.com/mbc-net/mbc-cqrs-serverless/compare/v0.1.56-beta.0...v0.1.57-beta.0) (2025-03-17)
 
 **Note:** Version bump only for package @mbc-cqrs-serverless/sequence
