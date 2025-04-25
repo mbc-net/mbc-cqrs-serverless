@@ -1,4 +1,10 @@
-import { IsBoolean, IsObject, IsOptional, IsString } from 'class-validator'
+import {
+  IsBoolean,
+  IsNumber,
+  IsObject,
+  IsOptional,
+  IsString,
+} from 'class-validator'
 
 export class UpdateDataSettingDto {
   @IsString()
@@ -8,6 +14,10 @@ export class UpdateDataSettingDto {
   @IsBoolean()
   @IsOptional()
   isDeleted?: boolean
+
+  @IsNumber()
+  @IsOptional()
+  seq?: number
 
   @IsObject()
   @IsOptional()
