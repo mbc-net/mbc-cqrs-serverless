@@ -120,6 +120,7 @@ export class MasterDataService implements IMasterDataService {
       version: data.version,
       code: data.code,
       name: updateDto.name ?? data.name,
+      seq: updateDto.seq,
       type: data.type,
       tenantCode: data.tenantCode,
       isDeleted: updateDto.isDeleted ?? data.isDeleted,
