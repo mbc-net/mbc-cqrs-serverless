@@ -1,4 +1,4 @@
-import { IsObject, IsOptional, IsString } from 'class-validator'
+import { IsNumber, IsObject, IsOptional, IsString } from 'class-validator'
 
 export class CreateMasterDataDto {
   @IsString()
@@ -12,6 +12,10 @@ export class CreateMasterDataDto {
 
   @IsString()
   code: string
+
+  @IsNumber()
+  @IsOptional()
+  seq?: number
 
   @IsObject()
   @IsOptional()
