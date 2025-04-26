@@ -95,20 +95,47 @@ export class GenerateFormattedSequenceDto {
    * Tenant code for identifying the organization.
    */
   @IsString()
+  @ApiProperty()
   tenantCode: string
 
+  /**
+   * Type code for specific sequence classification.
+   */
   @IsString()
+  @ApiProperty()
   typeCode: string
 
   /**
    * Type code for specific sequence classification.
    */
+  @IsOptional()
   @IsObject()
   @ApiProperty({
     type: SequenceParamsDto,
     description:
       'Parameters for generating the sequence. code1, code2,code3, code4, code5',
   })
-  @IsOptional()
   params?: SequenceParamsDto
+
+  /**
+   * Optional prefix to add before formatted sequence.
+   */
+  @IsOptional()
+  @IsString()
+  @ApiProperty({
+    required: false,
+    description: 'Optional prefix to prepend to the formatted sequence.',
+  })
+  prefix?: string
+
+  /**
+   * Optional postfix to add after formatted sequence.
+   */
+  @IsOptional()
+  @IsString()
+  @ApiProperty({
+    required: false,
+    description: 'Optional postfix to append to the formatted sequence.',
+  })
+  postfix?: string
 }

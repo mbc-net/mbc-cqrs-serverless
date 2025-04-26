@@ -117,12 +117,14 @@ export class SequencesService implements ISequenceService {
     dto: GenerateFormattedSequenceDto,
     options?: { invokeContext: IInvoke },
   ): Promise<SequenceEntity> {
-    const { date, rotateBy, tenantCode, params, typeCode } = dto
+    const { date, rotateBy, tenantCode, params, typeCode, prefix, postfix } =
+      dto
 
     const generalMasterPk = masterPk(tenantCode)
     const generalMasterSk = `MASTER_DATA${KEY_SEPARATOR}${typeCode}`
     this.logger.debug('general master pk: ', generalMasterPk)
     this.logger.debug('general master sk: ', generalMasterSk)
+
     const masterData = await this.masterDataProvider.getData({
       pk: generalMasterPk,
       sk: generalMasterSk,
@@ -186,11 +188,14 @@ export class SequencesService implements ISequenceService {
       date || now,
       { ...params },
     )
-    const formattedNo = this.createFormattedNo(format, formatDict)
+
+    const formatted = this.createFormattedNo(format, formatDict)
+    const formattedNo = `${prefix ?? ''}${formatted}${postfix ?? ''}`
+
     return new SequenceEntity({
       id: generateId(item.pk, item.sk),
       no: item.seq,
-      formattedNo: formattedNo,
+      formattedNo,
       issuedAt: new Date(issuedAt),
     })
   }
@@ -311,6 +316,7 @@ export class SequencesService implements ISequenceService {
       ...sequenceParams,
       fiscal_year: fiscalYear,
       no: fixNo,
+      year: now.getFullYear(),
       month: now.getMonth() + 1,
       day: now.getDate(),
       date: now,
