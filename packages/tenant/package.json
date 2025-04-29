@@ -1,6 +1,6 @@
 {
   "name": "@mbc-cqrs-serverless/tenant",
-  "version": "0.1.60-beta.0",
+  "version": "0.1.61-beta.0",
   "description": "Multiple tenant management",
   "keywords": [
     "mbc",
