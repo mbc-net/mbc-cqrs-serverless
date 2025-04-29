@@ -14,11 +14,11 @@ import { ulid } from 'ulid'
 import { CreateTaskDto } from './dto/create-task.dto'
 import { TaskEntity } from './entity/task.entity'
 import { TaskListEntity } from './entity/task-list.entity'
+import { TaskTypesEnum } from './enums'
 import { TaskStatusEnum } from './enums/status.enum'
 import { TaskQueueEvent } from './event'
 import { StepFunctionTaskEvent } from './event/task.sfn.event'
 import { ITaskService } from './interfaces/task-service.interface'
-import { TaskTypesEnum } from './enums'
 
 @Injectable()
 export class TaskService implements ITaskService {
@@ -156,18 +156,30 @@ export class TaskService implements ITaskService {
       .split(KEY_SEPARATOR)
       .slice(0, -1)
       .join(KEY_SEPARATOR)
-    const res = await this.dynamoDbService.listItemsByPk(
-      this.tableName,
-      subTask.pk,
-      {
-        skExpession: 'begins_with(sk, :typeCode)',
-        skAttributeValues: {
-          ':typeCode': `${parentKey}${KEY_SEPARATOR}`,
-        },
-      },
-    )
 
-    return (res?.items || []).map((item) => new TaskEntity(item))
+    this.logger.debug('TaskService getAllSubTask parentKey:', parentKey)
+    const allItems: TaskEntity[] = []
+    let lastSk: string | undefined = undefined
+
+    do {
+      const res = await this.dynamoDbService.listItemsByPk(
+        this.tableName,
+        subTask.pk,
+        {
+          skExpession: 'begins_with(sk, :typeCode)',
+          skAttributeValues: {
+            ':typeCode': `${parentKey}${KEY_SEPARATOR}`,
+          },
+        },
+        lastSk,
+      )
+
+      allItems.push(...(res?.items || []).map((item) => new TaskEntity(item)))
+      lastSk = res.lastSk
+      this.logger.debug('TaskService getAllSubTask lastSk:', lastSk)
+    } while (lastSk)
+
+    return allItems
   }
 
   async updateStepFunctionTask(
