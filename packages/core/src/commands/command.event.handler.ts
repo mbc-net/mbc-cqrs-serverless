@@ -7,7 +7,7 @@ import {
 } from '../command-events/data-sync.sfn.event'
 import { DataSyncCommandSfnName } from '../command-events/sfn-name.enum'
 import { S3Service } from '../data-store'
-import { removeSortKeyVersion } from '../helpers/key'
+import { addSortKeyVersion, removeSortKeyVersion } from '../helpers/key'
 import { CommandModuleOptions, INotification } from '../interfaces'
 import { SnsService } from '../queue'
 import { MODULE_OPTIONS_TOKEN } from './command.module-definition'
@@ -111,13 +111,18 @@ export class CommandEventHandler {
     event: DataSyncCommandSfnEvent,
   ): Promise<StepFunctionStateInput> {
     this.logger.debug('Checking version::', event.commandRecord)
+    const sk = removeSortKeyVersion(event.commandRecord.sk)
     const data = await this.dataService.getItem({
       pk: event.commandRecord.pk,
-      sk: removeSortKeyVersion(event.commandRecord.sk),
+      sk,
     })
     this.logger.debug('Checking version for data::', data)
     const commandVersion = event.commandRecord.version
     const nextVersion = 1 + (data?.version || 0)
+    const oldCommand = await this.commandService.getItem({
+      pk: event.commandRecord.pk,
+      sk: addSortKeyVersion(sk, commandVersion - 1),
+    })
 
     if (nextVersion === commandVersion) {
       return {
@@ -126,6 +131,11 @@ export class CommandEventHandler {
     }
 
     if (nextVersion < commandVersion) {
+      if (!oldCommand) {
+        return {
+          result: 0,
+        }
+      }
       // wait for previous version is stable
       return {
         result: 1,
