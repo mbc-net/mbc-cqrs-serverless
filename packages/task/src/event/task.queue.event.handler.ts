@@ -46,9 +46,9 @@ export class TaskQueueEventHandler
     this.logger.debug('task queue event executing::', event)
 
     if (event.taskEvent.taskKey.pk.startsWith(TaskTypesEnum.SFN_TASK)) {
-      this.handleStepFunctionTask(event)
+      await this.handleStepFunctionTask(event)
     } else {
-      this.handleTask(event)
+      await this.handleTask(event)
     }
   }
 
@@ -84,13 +84,20 @@ export class TaskQueueEventHandler
     this.logger.debug('step function task key: ', taskKey)
 
     try {
+      this.logger.debug('step function task update PROCESSING status')
       await this.taskService.updateStepFunctionTask(
         taskKey,
         {},
         TaskStatusEnum.PROCESSING,
       )
 
+      this.logger.debug('step function task create subtask')
+
       const subTasks = await this.taskService.createSubTask(event)
+
+      this.logger.debug('step function task has subtask = ', subTasks)
+
+      this.logger.debug('step function task update subtask attr in parent task')
 
       await this.taskService.updateStepFunctionTask(
         taskKey,
@@ -118,6 +125,8 @@ export class TaskQueueEventHandler
         )
 
       const sfnExecName = `${ddbRecordId}-${Date.now()}`
+
+      this.logger.debug('step function task sfn Exec Name', sfnExecName)
 
       await this.sfnService.startExecution(
         this.sfnTaskArn,
