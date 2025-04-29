@@ -279,7 +279,7 @@ describe('DataSyncCommandSfnEventHandler', () => {
 
       // Assert
       expect(dynamoDBMock).toHaveReceivedCommandTimes(UpdateItemCommand, 2)
-      expect(dynamoDBMock).toHaveReceivedCommandTimes(GetItemCommand, 1)
+      expect(dynamoDBMock).toHaveReceivedCommandTimes(GetItemCommand, 2)
       expect(snsMock).toHaveReceivedCommandTimes(PublishCommand, 2)
 
       expect(snsMock).toHaveReceivedCommandWith(PublishCommand, {
@@ -296,7 +296,7 @@ describe('DataSyncCommandSfnEventHandler', () => {
         TableName: 'env-app_name-table_name-data',
         Key: { pk: { S: 'tenantCode#test' }, sk: { S: '1726027976' } },
       })
-      expect(dynamoDBMock).toHaveReceivedNthCommandWith(3, UpdateItemCommand, {
+      expect(dynamoDBMock).toHaveReceivedNthCommandWith(4, UpdateItemCommand, {
         TableName: 'env-app_name-table_name-command',
         Key: { pk: { S: 'tenantCode#test' }, sk: { S: '1726027976@1' } },
         ExpressionAttributeValues: expect.objectContaining({
