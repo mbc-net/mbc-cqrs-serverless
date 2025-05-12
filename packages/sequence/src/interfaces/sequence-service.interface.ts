@@ -2,8 +2,9 @@ import { DataEntity, DetailKey, IInvoke } from '@mbc-cqrs-serverless/core'
 
 import {
   GenerateFormattedSequenceDto,
-  GenSequenceDto,
-} from '../dto/gen-sequence.dto'
+  GenerateFormattedSequenceWithProvidedSettingDto,
+  GenerateSequenceDto,
+} from '../dto'
 import { SequenceEntity } from '../entities/sequence.entity'
 
 export interface ISequenceService {
@@ -21,7 +22,7 @@ export interface ISequenceService {
    * @returns A promise that resolves to the newly generated sequence's data entity.
    */
   genNewSequence(
-    dto: GenSequenceDto,
+    dto: GenerateSequenceDto,
     options: {
       invokeContext: IInvoke
     },
@@ -38,5 +39,17 @@ export interface ISequenceService {
     options?: {
       invokeContext: IInvoke
     },
+  ): Promise<SequenceEntity>
+
+  /**
+   * Generates a new sequence based on the provided settings and format.
+   *
+   * @param dto - Data transfer object containing the configuration for sequence generation.
+   * @param options - Optional context information, such as invocation metadata.
+   * @returns A promise that resolves to the generated sequence entity.
+   */
+  generateSequenceItemWithProvideSetting(
+    dto: GenerateFormattedSequenceWithProvidedSettingDto,
+    options?: { invokeContext: IInvoke },
   ): Promise<SequenceEntity>
 }
