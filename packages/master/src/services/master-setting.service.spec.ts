@@ -181,7 +181,7 @@ describe('SettingService', () => {
         version: 1,
         tenantCode: 'COMMON',
         name: 'UserListSetting',
-        type: 'COMMON',
+        type: 'MASTER_SETTING',
       }
 
       const command: CommandDto = {
@@ -206,7 +206,7 @@ describe('SettingService', () => {
         version: 1,
         tenantCode: 'COMMON',
         name: 'UserListSetting',
-        type: 'COMMON',
+        type: 'MASTER_SETTING',
       })
       const result = await commandService.publishAsync(command, optionsMock)
 
@@ -222,7 +222,7 @@ describe('SettingService', () => {
         version: 1,
         tenantCode: 'COMMON',
         name: 'UserListSetting',
-        type: 'COMMON',
+        type: 'MASTER_SETTING',
       }
 
       const setting: CommonSettingDto = {
@@ -240,7 +240,7 @@ describe('SettingService', () => {
         version: 1,
         tenantCode: 'COMMON',
         name: 'UserListSetting',
-        type: 'COMMON',
+        type: 'MASTER_SETTING',
       })
       const result = await service.createCommonTenantSetting(
         setting,
@@ -259,7 +259,7 @@ describe('SettingService', () => {
         version: 3,
         tenantCode: 'COMMON',
         name: 'UserListSetting',
-        type: 'COMMON',
+        type: 'MASTER_SETTING',
       }
 
       const setting: CommonSettingDto = {
@@ -277,7 +277,7 @@ describe('SettingService', () => {
         version: 2,
         tenantCode: 'COMMON',
         name: 'UserListSetting',
-        type: 'COMMON',
+        type: 'MASTER_SETTING',
         isDeleted: true,
       })
 
@@ -290,7 +290,7 @@ describe('SettingService', () => {
         version: 3,
         tenantCode: 'COMMON',
         name: 'UserListSetting',
-        type: 'COMMON',
+        type: 'MASTER_SETTING',
       })
       const result = await service.createCommonTenantSetting(
         setting,
@@ -321,7 +321,7 @@ describe('SettingService', () => {
         version: 1,
         tenantCode: 'MBC',
         name: 'UserListSetting',
-        type: 'TENANT',
+        type: 'MASTER_SETTING',
       }
 
       const command: CommandDto = {
@@ -346,7 +346,7 @@ describe('SettingService', () => {
         version: 1,
         tenantCode: 'MBC',
         name: 'UserListSetting',
-        type: 'TENANT',
+        type: 'MASTER_SETTING',
       })
       const result = await commandService.publishAsync(command, optionsMock)
 
@@ -362,7 +362,7 @@ describe('SettingService', () => {
         version: 1,
         tenantCode: 'MBC',
         name: 'UserListSetting',
-        type: 'TENANT',
+        type: 'MASTER_SETTING',
       }
 
       const setting: TenantSettingDto = {
@@ -381,7 +381,7 @@ describe('SettingService', () => {
         version: 1,
         tenantCode: 'MBC',
         name: 'UserListSetting',
-        type: 'TENANT',
+        type: 'MASTER_SETTING',
       })
       const result = await service.createTenantSetting(setting, optionsMock)
 
@@ -397,7 +397,7 @@ describe('SettingService', () => {
         version: 3,
         tenantCode: 'MBC',
         name: 'UserListSetting',
-        type: 'TENANT',
+        type: 'MASTER_SETTING',
       }
 
       const setting: TenantSettingDto = {
@@ -416,7 +416,7 @@ describe('SettingService', () => {
         version: 2,
         tenantCode: 'MBC',
         name: 'UserListSetting',
-        type: 'TENANT',
+        type: 'MASTER_SETTING',
         isDeleted: true,
       })
 
@@ -429,7 +429,7 @@ describe('SettingService', () => {
         version: 3,
         tenantCode: 'MBC',
         name: 'UserListSetting',
-        type: 'TENANT',
+        type: 'MASTER_SETTING',
       })
       const result = await service.createCommonTenantSetting(
         setting,
@@ -461,7 +461,7 @@ describe('SettingService', () => {
         version: 1,
         tenantCode: 'MBC',
         name: 'UserListSetting',
-        type: 'GROUP',
+        type: 'MASTER_SETTING',
       }
 
       const commad: CommandDto = {
@@ -486,7 +486,7 @@ describe('SettingService', () => {
         version: 1,
         tenantCode: 'MBC',
         name: 'UserListSetting',
-        type: 'GROUP',
+        type: 'MASTER_SETTING',
       })
       const result = await commandService.publishAsync(commad, optionsMock)
 
@@ -502,7 +502,7 @@ describe('SettingService', () => {
         version: 1,
         tenantCode: 'MBC',
         name: 'UserListSetting',
-        type: 'GROUP',
+        type: 'MASTER_SETTING',
       }
 
       const setting: GroupSettingDto = {
@@ -522,7 +522,7 @@ describe('SettingService', () => {
         version: 1,
         tenantCode: 'MBC',
         name: 'UserListSetting',
-        type: 'GROUP',
+        type: 'MASTER_SETTING',
       })
       const result = await service.createGroupSetting(setting, optionsMock)
 
@@ -538,7 +538,7 @@ describe('SettingService', () => {
         version: 3,
         tenantCode: 'MBC',
         name: 'UserListSetting',
-        type: 'GROUP',
+        type: 'MASTER_SETTING',
       }
 
       const setting: GroupSettingDto = {
@@ -558,7 +558,7 @@ describe('SettingService', () => {
         version: 2,
         tenantCode: 'MBC',
         name: 'UserListSetting',
-        type: 'GROUP',
+        type: 'MASTER_SETTING',
         isDeleted: true,
       })
 
@@ -571,7 +571,7 @@ describe('SettingService', () => {
         version: 3,
         tenantCode: 'MBC',
         name: 'UserListSetting',
-        type: 'GROUP',
+        type: 'MASTER_SETTING',
       })
       const result = await service.createCommonTenantSetting(
         setting,
@@ -602,7 +602,7 @@ describe('SettingService', () => {
         version: 1,
         tenantCode: 'MBC',
         name: 'UserListSetting',
-        type: 'USER',
+        type: 'MASTER_SETTING',
       }
 
       const commad: CommandDto = {
@@ -627,7 +627,7 @@ describe('SettingService', () => {
         version: 1,
         tenantCode: 'MBC',
         name: 'UserListSetting',
-        type: 'USER',
+        type: 'MASTER_SETTING',
       })
       const result = await commandService.publishAsync(commad, optionsMock)
 
@@ -643,7 +643,7 @@ describe('SettingService', () => {
         version: 1,
         tenantCode: 'MBC',
         name: 'UserListSetting',
-        type: 'USER',
+        type: 'MASTER_SETTING',
       }
 
       const setting: UserSettingDto = {
@@ -663,7 +663,7 @@ describe('SettingService', () => {
         version: 1,
         tenantCode: 'MBC',
         name: 'UserListSetting',
-        type: 'USER',
+        type: 'MASTER_SETTING',
       })
       const result = await service.createUserSetting(setting, optionsMock)
 
@@ -679,7 +679,7 @@ describe('SettingService', () => {
         version: 3,
         tenantCode: 'MBC',
         name: 'UserListSetting',
-        type: 'USER',
+        type: 'MASTER_SETTING',
       }
 
       const setting: UserSettingDto = {
@@ -699,7 +699,7 @@ describe('SettingService', () => {
         version: 2,
         tenantCode: 'MBC',
         name: 'UserListSetting',
-        type: 'USER',
+        type: 'MASTER_SETTING',
         isDeleted: true,
       })
 
@@ -712,7 +712,7 @@ describe('SettingService', () => {
         version: 3,
         tenantCode: 'MBC',
         name: 'UserListSetting',
-        type: 'USER',
+        type: 'MASTER_SETTING',
       })
       const result = await service.createUserSetting(setting, optionsMock)
 
@@ -737,7 +737,7 @@ describe('SettingService', () => {
         version: 1,
         tenantCode: 'MBC',
         name: 'UserListSetting',
-        type: 'USER',
+        type: 'MASTER_SETTING',
       }
 
       const command: CommandDto = {
@@ -762,7 +762,7 @@ describe('SettingService', () => {
         version: 1,
         tenantCode: 'MBC',
         name: 'UserListSetting',
-        type: 'USER',
+        type: 'MASTER_SETTING',
       })
       const result = await commandService.publishAsync(command, optionsMock)
 

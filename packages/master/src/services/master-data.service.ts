@@ -14,7 +14,7 @@ import {
   NotFoundException,
 } from '@nestjs/common'
 
-import { DATA_SK_PREFIX, MASTER_PK_PREFIX } from '../constants'
+import { DATA_PK_PREFIX, DATA_SK_PREFIX } from '../constants'
 import {
   CreateMasterDataDto,
   MasterDataSearchDto,
@@ -89,7 +89,7 @@ export class MasterDataService implements IMasterDataService {
       pk,
       sk,
       version: dataSetting?.version ?? VERSION_FIRST,
-      type: MASTER_PK_PREFIX,
+      type: DATA_PK_PREFIX,
       tenantCode,
       isDeleted: false,
       ...createDto,
