@@ -2,8 +2,7 @@ import { IsOptional, IsString } from 'class-validator'
 
 export class MasterDataSearchDto {
   @IsString()
-  @IsOptional()
-  settingCode?: string
+  settingCode: string
 
   @IsString()
   @IsOptional()

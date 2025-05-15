@@ -14,7 +14,7 @@ import {
   NotFoundException,
 } from '@nestjs/common'
 
-import { DATA_PK_PREFIX, DATA_SK_PREFIX } from '../constants'
+import { MASTER_PK_PREFIX } from '../constants'
 import {
   CreateMasterDataDto,
   MasterDataSearchDto,
@@ -42,25 +42,14 @@ export class MasterDataService implements IMasterDataService {
       pk = generateMasterPk('COMMON')
     }
     const query = { sk: undefined }
-    if (searchDto.settingCode) {
-      query.sk = {
-        skExpession: 'begins_with(sk, :settingCode)',
-        skAttributeValues: {
-          ':settingCode': `${DATA_SK_PREFIX}${KEY_SEPARATOR}${settingCode}`,
-        },
-      }
-      const res = await this.dataService.listItemsByPk(pk, query)
-      return new MasterDataListEntity(res)
-    }
-    const res = (await this.dataService.listItemsByPk(pk, {
-      sk: {
-        skExpession: 'begins_with(sk, :settingCode)',
-        skAttributeValues: {
-          ':settingCode': `${DATA_SK_PREFIX}${KEY_SEPARATOR}`,
-        },
-      },
-    })) as MasterDataListEntity
 
+    query.sk = {
+      skExpession: 'begins_with(sk, :settingCode)',
+      skAttributeValues: {
+        ':settingCode': `${settingCode}${KEY_SEPARATOR}`,
+      },
+    }
+    const res = await this.dataService.listItemsByPk(pk, query)
     return new MasterDataListEntity(res)
   }
 
@@ -89,7 +78,7 @@ export class MasterDataService implements IMasterDataService {
       pk,
       sk,
       version: dataSetting?.version ?? VERSION_FIRST,
-      type: DATA_PK_PREFIX,
+      type: MASTER_PK_PREFIX,
       tenantCode,
       isDeleted: false,
       ...createDto,
