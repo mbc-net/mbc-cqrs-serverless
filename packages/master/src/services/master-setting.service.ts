@@ -15,6 +15,7 @@ import {
 import { BadRequestException, Injectable, Logger } from '@nestjs/common'
 
 import {
+  MASTER_PK_PREFIX,
   SETTING_SK_PREFIX,
   SETTING_TENANT_PREFIX,
   TENANT_SYSTEM_PREFIX,
@@ -175,7 +176,7 @@ export class MasterSettingService implements IMasterSettingService {
       name: name,
       id: generateId(pk, sk),
       tenantCode: SettingTypeEnum.TENANT_COMMON,
-      type: SETTING_SK_PREFIX,
+      type: MASTER_PK_PREFIX,
       version: setting?.version ?? VERSION_FIRST,
       isDeleted: false,
       attributes: settingValue,
@@ -203,7 +204,7 @@ export class MasterSettingService implements IMasterSettingService {
       name: name,
       id: generateId(pk, sk),
       tenantCode: tenantCode,
-      type: SETTING_SK_PREFIX,
+      type: MASTER_PK_PREFIX,
       version: setting?.version ?? VERSION_FIRST,
       isDeleted: false,
       attributes: settingValue,
@@ -233,7 +234,7 @@ export class MasterSettingService implements IMasterSettingService {
       name: name,
       id: generateId(pk, sk),
       tenantCode: tenantCode,
-      type: SETTING_SK_PREFIX,
+      type: MASTER_PK_PREFIX,
       version: setting?.version ?? VERSION_FIRST,
       isDeleted: false,
       attributes: settingValue,
@@ -262,7 +263,7 @@ export class MasterSettingService implements IMasterSettingService {
       name: name,
       id: generateId(pk, sk),
       tenantCode: tenantCode,
-      type: SETTING_SK_PREFIX,
+      type: MASTER_PK_PREFIX,
       version: setting?.version ?? VERSION_FIRST,
       isDeleted: false,
       attributes: settingValue,
