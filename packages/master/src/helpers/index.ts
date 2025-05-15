@@ -1,17 +1,13 @@
 import { KEY_SEPARATOR, removeSortKeyVersion } from '@mbc-cqrs-serverless/core'
 
-import {
-  DATA_SK_PREFIX,
-  MASTER_PK_PREFIX,
-  SETTING_SK_PREFIX,
-} from '../constants'
+import { MASTER_PK_PREFIX, SETTING_SK_PREFIX } from '../constants'
 
 export function generateMasterPk(tenantCode: string) {
   return `${MASTER_PK_PREFIX}${KEY_SEPARATOR}${tenantCode}`
 }
 
 export function generateMasterDataSk(settingCode: string, code: string) {
-  return `${DATA_SK_PREFIX}${KEY_SEPARATOR}${settingCode}${KEY_SEPARATOR}${code}`
+  return `${settingCode}${KEY_SEPARATOR}${code}`
 }
 
 export function generateMasterSettingSk(code: string) {
