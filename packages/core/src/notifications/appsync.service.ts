@@ -6,6 +6,10 @@ import { ConfigService } from '@nestjs/config'
 import fetch, { Response } from 'node-fetch'
 
 import { INotification } from '../interfaces'
+import {
+  AppsyncEndpoint,
+  AppsyncType,
+} from '../interfaces/appsync-endpoint.interface'
 
 const query = /* GraphQL */ `
   mutation SEND_MESSAGE($message: AWSJSON!) {
@@ -25,17 +29,28 @@ const query = /* GraphQL */ `
 export class AppSyncService {
   private readonly logger = new Logger(AppSyncService.name)
 
-  private readonly endpoint: string
-  private readonly hostname: string
-  private readonly apiKey: string
+  private readonly endpoints: Record<string, AppsyncEndpoint>
   private readonly region: string
   private readonly signer: SignatureV4
 
   constructor(private readonly config: ConfigService) {
-    this.endpoint = config.get<string>('APPSYNC_ENDPOINT')
-    this.apiKey = config.get<string>('APPSYNC_API_KEY')
+    this.endpoints = {
+      default: {
+        endpoint: config.get<string>('APPSYNC_ENDPOINT'),
+        apiKey: config.get<string>('APPSYNC_API_KEY'),
+        hostname: new URL(config.get<string>('APPSYNC_ENDPOINT')).hostname,
+      },
+    }
+    if (config.get<string>('APPSYNC_SECOND_ENDPOINT')) {
+      this.endpoints.second = {
+        endpoint: config.get<string>('APPSYNC_SECOND_ENDPOINT'),
+        hostname: new URL(config.get<string>('APPSYNC_SECOND_ENDPOINT'))
+          .hostname,
+        apiKey: config.get<string>('APPSYNC_SECOND_API_KEY'),
+      }
+    }
+
     this.region = 'ap-northeast-1'
-    this.hostname = new URL(this.endpoint).hostname
     this.signer = new SignatureV4({
       credentials: defaultProvider(),
       region: this.region,
@@ -44,10 +59,12 @@ export class AppSyncService {
     })
   }
 
-  async sendMessage(msg: INotification) {
+  async sendMessage(msg: INotification, target: AppsyncType = 'default') {
+    const { endpoint, hostname, apiKey } = this.endpoints[target]
+
     const headers = {
       'Content-Type': 'application/json',
-      host: this.hostname,
+      host: hostname,
     }
     const body = JSON.stringify({
       query,
@@ -57,9 +74,9 @@ export class AppSyncService {
     })
     const method = 'POST'
     let res: Response
-    if (this.apiKey) {
-      headers['x-api-key'] = this.apiKey
-      res = await fetch(this.endpoint, {
+    if (apiKey) {
+      headers['x-api-key'] = apiKey
+      res = await fetch(endpoint, {
         method,
         headers,
         body,
@@ -69,7 +86,7 @@ export class AppSyncService {
         method,
         headers,
         protocol: 'https:',
-        hostname: this.hostname,
+        hostname: hostname,
         path: '/graphql',
         body,
         region: this.region,
@@ -78,7 +95,7 @@ export class AppSyncService {
       const signedRequest = await this.signer.sign(request, {
         signingDate: new Date(),
       })
-      res = await fetch(this.endpoint, {
+      res = await fetch(endpoint, {
         method: signedRequest.method,
         headers: signedRequest.headers,
         body: signedRequest.body,

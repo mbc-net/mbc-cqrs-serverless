@@ -71,6 +71,10 @@ export class EnvironmentVariables {
 
   @IsString()
   @IsOptional()
+  APPSYNC_SECOND_ENDPOINT: string
+
+  @IsString()
+  @IsOptional()
   SES_ENDPOINT: string
   @IsString()
   @IsOptional()
