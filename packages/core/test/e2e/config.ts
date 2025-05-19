@@ -10,6 +10,6 @@ const config = {
   apiBaseUrl: process.env.API_BASE_URL || 'http://0.0.0.0:3000',
 }
 
-console.log(config)
+console.log('config', config)
 
 export { config }
