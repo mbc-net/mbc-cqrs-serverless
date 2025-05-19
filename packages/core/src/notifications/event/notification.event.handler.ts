@@ -25,7 +25,7 @@ export class NotificationEventHandler
     const secondAppsyncEndpoint = this.config.get<string>(
       'APPSYNC_SECOND_ENDPOINT',
     )
-    if (secondAppsyncEndpoint.length > 0) {
+    if (secondAppsyncEndpoint) {
       await this.appSyncService.sendMessage(body, 'second')
     }
 
