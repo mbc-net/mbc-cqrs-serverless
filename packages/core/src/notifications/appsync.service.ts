@@ -40,13 +40,16 @@ export class AppSyncService {
         apiKey: config.get<string>('APPSYNC_API_KEY'),
         hostname: new URL(config.get<string>('APPSYNC_ENDPOINT')).hostname,
       },
-      second: {
+    }
+    if (config.get<string>('APPSYNC_SECOND_ENDPOINT')) {
+      this.endpoints.second = {
         endpoint: config.get<string>('APPSYNC_SECOND_ENDPOINT'),
         hostname: new URL(config.get<string>('APPSYNC_SECOND_ENDPOINT'))
           .hostname,
         apiKey: config.get<string>('APPSYNC_SECOND_API_KEY'),
-      },
+      }
     }
+
     this.region = 'ap-northeast-1'
     this.signer = new SignatureV4({
       credentials: defaultProvider(),
