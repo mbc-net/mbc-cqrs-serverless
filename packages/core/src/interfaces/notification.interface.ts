@@ -15,4 +15,5 @@ export interface EmailNotification {
   bccAddrs?: string[]
   subject: string
   body: string // html
+  replyToAddrs?: string[]
 }

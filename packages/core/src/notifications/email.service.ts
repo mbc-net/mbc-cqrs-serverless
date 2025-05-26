@@ -33,6 +33,7 @@ export class EmailService {
             Body: { Html: { Data: msg.body } },
           },
         },
+        ReplyToAddresses: msg.replyToAddrs,
       }),
     )
   }
