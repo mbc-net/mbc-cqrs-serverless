@@ -3,17 +3,6 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
-## [0.1.68-beta.0](https://github.com/mbc-net/mbc-cqrs-serverless/compare/v0.1.67-beta.0...v0.1.68-beta.0) (2025-07-01)
-
-### Bug Fixes
-
-- build lib ci ([16dbe7c](https://github.com/mbc-net/mbc-cqrs-serverless/commit/16dbe7c0895cd17ef9e7f43ff29a4d53b811ad05))
-- update import template master data module ([2159d85](https://github.com/mbc-net/mbc-cqrs-serverless/commit/2159d85f94ba190c4bfb7d21c4bba16406deb16b))
-
-### Features
-
-- add template master api ([501468b](https://github.com/mbc-net/mbc-cqrs-serverless/commit/501468b6f658a3fc672f490b2cd36ecda55e7a77))
-
 ## [0.1.67-beta.0](https://github.com/mbc-net/mbc-cqrs-serverless/compare/v0.1.66-beta.0...v0.1.67-beta.0) (2025-06-10)
 
 **Note:** Version bump only for package @mbc-cqrs-serverless/master
