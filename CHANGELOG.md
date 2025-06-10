@@ -3,6 +3,25 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.1.66-beta.0](https://github.com/mbc-net/mbc-cqrs-serverless/compare/v0.1.65-beta.0...v0.1.66-beta.0) (2025-05-21)
+
+**Note:** Version bump only for package mbc-cqrs-serverless
+
+## [0.1.65-beta.0](https://github.com/mbc-net/mbc-cqrs-serverless/compare/v0.1.64-beta.0...v0.1.65-beta.0) (2025-05-19)
+
+### Bug Fixes
+
+- empty appsync url ([c413a64](https://github.com/mbc-net/mbc-cqrs-serverless/commit/c413a646235b8be7965dd65f9e3d423916fa0abe))
+- test appsync url ([1e37d6d](https://github.com/mbc-net/mbc-cqrs-serverless/commit/1e37d6df1bbec685ac61da9d5c79a1c82713f346))
+
+### Features
+
+- add second appsync ([5336b33](https://github.com/mbc-net/mbc-cqrs-serverless/commit/5336b33a0d8108817899e34cf9eb655ddae471da))
+
+## [0.1.64-beta.0](https://github.com/mbc-net/mbc-cqrs-serverless/compare/v0.1.63-beta.0...v0.1.64-beta.0) (2025-05-15)
+
+**Note:** Version bump only for package mbc-cqrs-serverless
+
 ## [0.1.63-beta.0](https://github.com/mbc-net/mbc-cqrs-serverless/compare/v0.1.62-beta.0...v0.1.63-beta.0) (2025-05-12)
 
 **Note:** Version bump only for package mbc-cqrs-serverless

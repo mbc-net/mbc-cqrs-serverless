@@ -3,6 +3,18 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.1.66-beta.0](https://github.com/mbc-net/mbc-cqrs-serverless/compare/v0.1.65-beta.0...v0.1.66-beta.0) (2025-05-21)
+
+**Note:** Version bump only for package @mbc-cqrs-serverless/tenant
+
+## [0.1.65-beta.0](https://github.com/mbc-net/mbc-cqrs-serverless/compare/v0.1.64-beta.0...v0.1.65-beta.0) (2025-05-19)
+
+**Note:** Version bump only for package @mbc-cqrs-serverless/tenant
+
+## [0.1.64-beta.0](https://github.com/mbc-net/mbc-cqrs-serverless/compare/v0.1.63-beta.0...v0.1.64-beta.0) (2025-05-15)
+
+**Note:** Version bump only for package @mbc-cqrs-serverless/tenant
+
 ## [0.1.63-beta.0](https://github.com/mbc-net/mbc-cqrs-serverless/compare/v0.1.62-beta.0...v0.1.63-beta.0) (2025-05-12)
 
 **Note:** Version bump only for package @mbc-cqrs-serverless/tenant

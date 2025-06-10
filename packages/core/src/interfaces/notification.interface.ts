@@ -8,6 +8,12 @@ export interface INotification {
   content?: object
 }
 
+export interface Attachment {
+  filename: string
+  content: Buffer
+  contentType?: string
+}
+
 export interface EmailNotification {
   fromAddr?: string
   toAddrs: string[]
@@ -15,4 +21,6 @@ export interface EmailNotification {
   bccAddrs?: string[]
   subject: string
   body: string // html
+  replyToAddrs?: string[]
+  attachments?: Attachment[]
 }
