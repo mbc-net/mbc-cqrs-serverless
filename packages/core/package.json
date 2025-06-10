@@ -62,10 +62,12 @@
     "class-validator": "^0.14.0",
     "jwt-decode": "^4.0.0",
     "node-fetch": "^2.7.0",
+    "nodemailer": "^7.0.3",
     "reflect-metadata": "^0.2.2",
     "ulid": "^2.3.0"
   },
   "devDependencies": {
+    "@types/nodemailer": "^6.4.17",
     "serverless": "^3.40.0",
     "serverless-dynamodb": "^0.2.47",
     "serverless-localstack": "^1.1.2",
