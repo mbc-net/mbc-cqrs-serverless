@@ -1,0 +1,37 @@
+version: '3.8'
+
+services:
+  mcp-server:
+    build:
+      context: .
+      dockerfile: Dockerfile.mcp-server
+    ports:
+      - "8000:8000"
+    environment:
+      - PORT=8000
+      - AWS_REGION=${AWS_REGION:-ap-northeast-1}
+      - DATABASE_URL=${DATABASE_URL}
+    volumes:
+      - ~/.aws:/root/.aws:ro
+    networks:
+      - mcp-network
+
+  mcp-host:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+    ports:
+      - "3000:3000"
+    environment:
+      - PORT=3000
+      - NODE_ENV=development
+      - CLAUDE_API_KEY=${CLAUDE_API_KEY}
+      - MCP_SERVER_URL=http://mcp-server:8000
+    depends_on:
+      - mcp-server
+    networks:
+      - mcp-network
+
+networks:
+  mcp-network:
+    driver: bridge

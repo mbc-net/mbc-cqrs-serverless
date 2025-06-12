@@ -1,0 +1,592 @@
+{
+  "version": "44.0.0",
+  "artifacts": {
+    "McpHostStack.assets": {
+      "type": "cdk:asset-manifest",
+      "properties": {
+        "file": "McpHostStack.assets.json",
+        "requiresBootstrapStackVersion": 6,
+        "bootstrapStackVersionSsmParameter": "/cdk-bootstrap/hnb659fds/version"
+      }
+    },
+    "McpHostStack": {
+      "type": "aws:cloudformation:stack",
+      "environment": "aws://unknown-account/us-east-1",
+      "properties": {
+        "templateFile": "McpHostStack.template.json",
+        "terminationProtection": false,
+        "validateOnSynth": false,
+        "assumeRoleArn": "arn:${AWS::Partition}:iam::${AWS::AccountId}:role/cdk-hnb659fds-deploy-role-${AWS::AccountId}-us-east-1",
+        "cloudFormationExecutionRoleArn": "arn:${AWS::Partition}:iam::${AWS::AccountId}:role/cdk-hnb659fds-cfn-exec-role-${AWS::AccountId}-us-east-1",
+        "stackTemplateAssetObjectUrl": "s3://cdk-hnb659fds-assets-${AWS::AccountId}-us-east-1/177117303b4eae0debd702d824eb806b44fa8ea3b56ebb006018ffcbc89af9b4.json",
+        "requiresBootstrapStackVersion": 6,
+        "bootstrapStackVersionSsmParameter": "/cdk-bootstrap/hnb659fds/version",
+        "additionalDependencies": [
+          "McpHostStack.assets"
+        ],
+        "lookupRole": {
+          "arn": "arn:${AWS::Partition}:iam::${AWS::AccountId}:role/cdk-hnb659fds-lookup-role-${AWS::AccountId}-us-east-1",
+          "requiresBootstrapStackVersion": 8,
+          "bootstrapStackVersionSsmParameter": "/cdk-bootstrap/hnb659fds/version"
+        }
+      },
+      "dependencies": [
+        "McpHostStack.assets"
+      ],
+      "metadata": {
+        "/McpHostStack/McpCluster/Resource": [
+          {
+            "type": "aws:cdk:logicalId",
+            "data": "McpCluster0CEA2FB6"
+          }
+        ],
+        "/McpHostStack/McpCluster/Vpc/Resource": [
+          {
+            "type": "aws:cdk:logicalId",
+            "data": "McpClusterVpc02532540"
+          }
+        ],
+        "/McpHostStack/McpCluster/Vpc/PublicSubnet1/Subnet": [
+          {
+            "type": "aws:cdk:logicalId",
+            "data": "McpClusterVpcPublicSubnet1Subnet8EC920C6"
+          }
+        ],
+        "/McpHostStack/McpCluster/Vpc/PublicSubnet1/RouteTable": [
+          {
+            "type": "aws:cdk:logicalId",
+            "data": "McpClusterVpcPublicSubnet1RouteTable8EE6734A"
+          }
+        ],
+        "/McpHostStack/McpCluster/Vpc/PublicSubnet1/RouteTableAssociation": [
+          {
+            "type": "aws:cdk:logicalId",
+            "data": "McpClusterVpcPublicSubnet1RouteTableAssociation26337F30"
+          }
+        ],
+        "/McpHostStack/McpCluster/Vpc/PublicSubnet1/DefaultRoute": [
+          {
+            "type": "aws:cdk:logicalId",
+            "data": "McpClusterVpcPublicSubnet1DefaultRoute80258347"
+          }
+        ],
+        "/McpHostStack/McpCluster/Vpc/PublicSubnet1/EIP": [
+          {
+            "type": "aws:cdk:logicalId",
+            "data": "McpClusterVpcPublicSubnet1EIP0E4FC36C"
+          }
+        ],
+        "/McpHostStack/McpCluster/Vpc/PublicSubnet1/NATGateway": [
+          {
+            "type": "aws:cdk:logicalId",
+            "data": "McpClusterVpcPublicSubnet1NATGateway92A0FF33"
+          }
+        ],
+        "/McpHostStack/McpCluster/Vpc/PublicSubnet2/Subnet": [
+          {
+            "type": "aws:cdk:logicalId",
+            "data": "McpClusterVpcPublicSubnet2Subnet60BEC3C0"
+          }
+        ],
+        "/McpHostStack/McpCluster/Vpc/PublicSubnet2/RouteTable": [
+          {
+            "type": "aws:cdk:logicalId",
+            "data": "McpClusterVpcPublicSubnet2RouteTable8DA64EAD"
+          }
+        ],
+        "/McpHostStack/McpCluster/Vpc/PublicSubnet2/RouteTableAssociation": [
+          {
+            "type": "aws:cdk:logicalId",
+            "data": "McpClusterVpcPublicSubnet2RouteTableAssociation733DBFCC"
+          }
+        ],
+        "/McpHostStack/McpCluster/Vpc/PublicSubnet2/DefaultRoute": [
+          {
+            "type": "aws:cdk:logicalId",
+            "data": "McpClusterVpcPublicSubnet2DefaultRouteF1EC8251"
+          }
+        ],
+        "/McpHostStack/McpCluster/Vpc/PublicSubnet2/EIP": [
+          {
+            "type": "aws:cdk:logicalId",
+            "data": "McpClusterVpcPublicSubnet2EIP3264D470"
+          }
+        ],
+        "/McpHostStack/McpCluster/Vpc/PublicSubnet2/NATGateway": [
+          {
+            "type": "aws:cdk:logicalId",
+            "data": "McpClusterVpcPublicSubnet2NATGateway4652FD10"
+          }
+        ],
+        "/McpHostStack/McpCluster/Vpc/PrivateSubnet1/Subnet": [
+          {
+            "type": "aws:cdk:logicalId",
+            "data": "McpClusterVpcPrivateSubnet1Subnet85846000"
+          }
+        ],
+        "/McpHostStack/McpCluster/Vpc/PrivateSubnet1/RouteTable": [
+          {
+            "type": "aws:cdk:logicalId",
+            "data": "McpClusterVpcPrivateSubnet1RouteTable31A88389"
+          }
+        ],
+        "/McpHostStack/McpCluster/Vpc/PrivateSubnet1/RouteTableAssociation": [
+          {
+            "type": "aws:cdk:logicalId",
+            "data": "McpClusterVpcPrivateSubnet1RouteTableAssociation271A7172"
+          }
+        ],
+        "/McpHostStack/McpCluster/Vpc/PrivateSubnet1/DefaultRoute": [
+          {
+            "type": "aws:cdk:logicalId",
+            "data": "McpClusterVpcPrivateSubnet1DefaultRouteB249D889"
+          }
+        ],
+        "/McpHostStack/McpCluster/Vpc/PrivateSubnet2/Subnet": [
+          {
+            "type": "aws:cdk:logicalId",
+            "data": "McpClusterVpcPrivateSubnet2Subnet608B7954"
+          }
+        ],
+        "/McpHostStack/McpCluster/Vpc/PrivateSubnet2/RouteTable": [
+          {
+            "type": "aws:cdk:logicalId",
+            "data": "McpClusterVpcPrivateSubnet2RouteTable2684471D"
+          }
+        ],
+        "/McpHostStack/McpCluster/Vpc/PrivateSubnet2/RouteTableAssociation": [
+          {
+            "type": "aws:cdk:logicalId",
+            "data": "McpClusterVpcPrivateSubnet2RouteTableAssociation5760B3AF"
+          }
+        ],
+        "/McpHostStack/McpCluster/Vpc/PrivateSubnet2/DefaultRoute": [
+          {
+            "type": "aws:cdk:logicalId",
+            "data": "McpClusterVpcPrivateSubnet2DefaultRoute6367E6C5"
+          }
+        ],
+        "/McpHostStack/McpCluster/Vpc/IGW": [
+          {
+            "type": "aws:cdk:logicalId",
+            "data": "McpClusterVpcIGW22FCE8E2"
+          }
+        ],
+        "/McpHostStack/McpCluster/Vpc/VPCGW": [
+          {
+            "type": "aws:cdk:logicalId",
+            "data": "McpClusterVpcVPCGW8D2E73A7"
+          }
+        ],
+        "/McpHostStack/McpCluster/Vpc/RestrictDefaultSecurityGroupCustomResource/Default": [
+          {
+            "type": "aws:cdk:logicalId",
+            "data": "McpClusterVpcRestrictDefaultSecurityGroupCustomResource570ABAE0"
+          }
+        ],
+        "/McpHostStack/Custom::VpcRestrictDefaultSGCustomResourceProvider": [
+          {
+            "type": "aws:cdk:is-custom-resource-handler-customResourceProvider",
+            "data": true
+          }
+        ],
+        "/McpHostStack/Custom::VpcRestrictDefaultSGCustomResourceProvider/Role": [
+          {
+            "type": "aws:cdk:logicalId",
+            "data": "CustomVpcRestrictDefaultSGCustomResourceProviderRole26592FE0"
+          }
+        ],
+        "/McpHostStack/Custom::VpcRestrictDefaultSGCustomResourceProvider/Handler": [
+          {
+            "type": "aws:cdk:logicalId",
+            "data": "CustomVpcRestrictDefaultSGCustomResourceProviderHandlerDC833E5E"
+          }
+        ],
+        "/McpHostStack/McpServerLogGroup/Resource": [
+          {
+            "type": "aws:cdk:logicalId",
+            "data": "McpServerLogGroup7FAD27A8"
+          }
+        ],
+        "/McpHostStack/McpHostLogGroup/Resource": [
+          {
+            "type": "aws:cdk:logicalId",
+            "data": "McpHostLogGroupB24D02B1"
+          }
+        ],
+        "/McpHostStack/McpServerTaskRole/Resource": [
+          {
+            "type": "aws:cdk:logicalId",
+            "data": "McpServerTaskRoleB19E5A08"
+          }
+        ],
+        "/McpHostStack/McpServerTaskRole/DefaultPolicy/Resource": [
+          {
+            "type": "aws:cdk:logicalId",
+            "data": "McpServerTaskRoleDefaultPolicy8E624EA6"
+          }
+        ],
+        "/McpHostStack/McpServerService/LB/Resource": [
+          {
+            "type": "aws:cdk:logicalId",
+            "data": "McpServerServiceLB8C38DADE"
+          }
+        ],
+        "/McpHostStack/McpServerService/LB/SecurityGroup/Resource": [
+          {
+            "type": "aws:cdk:logicalId",
+            "data": "McpServerServiceLBSecurityGroup3AEE1922"
+          }
+        ],
+        "/McpHostStack/McpServerService/LB/SecurityGroup/to McpHostStackMcpServerServiceSecurityGroup45F3E613:8000": [
+          {
+            "type": "aws:cdk:logicalId",
+            "data": "McpServerServiceLBSecurityGrouptoMcpHostStackMcpServerServiceSecurityGroup45F3E6138000F35AD661"
+          }
+        ],
+        "/McpHostStack/McpServerService/LB/PublicListener/Resource": [
+          {
+            "type": "aws:cdk:logicalId",
+            "data": "McpServerServiceLBPublicListener4C47FE0C"
+          }
+        ],
+        "/McpHostStack/McpServerService/LB/PublicListener/ECSGroup/Resource": [
+          {
+            "type": "aws:cdk:logicalId",
+            "data": "McpServerServiceLBPublicListenerECSGroupE6875F13"
+          }
+        ],
+        "/McpHostStack/McpServerService/LoadBalancerDNS": [
+          {
+            "type": "aws:cdk:logicalId",
+            "data": "McpServerServiceLoadBalancerDNSE4C9CCC6"
+          }
+        ],
+        "/McpHostStack/McpServerService/ServiceURL": [
+          {
+            "type": "aws:cdk:logicalId",
+            "data": "McpServerServiceServiceURLBD83E2EE"
+          }
+        ],
+        "/McpHostStack/McpServerService/TaskDef/Resource": [
+          {
+            "type": "aws:cdk:logicalId",
+            "data": "McpServerServiceTaskDefC29C887B"
+          }
+        ],
+        "/McpHostStack/McpServerService/TaskDef/ExecutionRole/Resource": [
+          {
+            "type": "aws:cdk:logicalId",
+            "data": "McpServerServiceTaskDefExecutionRole24832816"
+          }
+        ],
+        "/McpHostStack/McpServerService/TaskDef/ExecutionRole/DefaultPolicy/Resource": [
+          {
+            "type": "aws:cdk:logicalId",
+            "data": "McpServerServiceTaskDefExecutionRoleDefaultPolicy2DA2A901"
+          }
+        ],
+        "/McpHostStack/McpServerService/Service": [
+          {
+            "type": "aws:cdk:warning",
+            "data": "minHealthyPercent has not been configured so the default value of 50% is used. The number of running tasks will decrease below the desired count during deployments etc. See https://github.com/aws/aws-cdk/issues/31705 [ack: @aws-cdk/aws-ecs:minHealthyPercent]",
+            "trace": [
+              "Annotations.addMessage (/home/ubuntu/repos/mbc-cqrs-serverless/packages/mcp-host/node_modules/aws-cdk-lib/core/lib/annotations.js:1:1608)",
+              "Annotations.addWarningV2 (/home/ubuntu/repos/mbc-cqrs-serverless/packages/mcp-host/node_modules/aws-cdk-lib/core/lib/annotations.js:1:825)",
+              "new BaseService (/home/ubuntu/repos/mbc-cqrs-serverless/packages/mcp-host/node_modules/aws-cdk-lib/aws-ecs/lib/base/base-service.js:1:8201)",
+              "new FargateService2 (/home/ubuntu/repos/mbc-cqrs-serverless/packages/mcp-host/node_modules/aws-cdk-lib/aws-ecs/lib/fargate/fargate-service.js:1:3888)",
+              "new FargateService2 (/home/ubuntu/repos/mbc-cqrs-serverless/packages/mcp-host/node_modules/aws-cdk-lib/core/lib/prop-injectable.js:1:488)",
+              "new ApplicationLoadBalancedFargateService2 (/home/ubuntu/repos/mbc-cqrs-serverless/packages/mcp-host/node_modules/aws-cdk-lib/aws-ecs-patterns/lib/fargate/application-load-balanced-fargate-service.js:1:4035)",
+              "new ApplicationLoadBalancedFargateService2 (/home/ubuntu/repos/mbc-cqrs-serverless/packages/mcp-host/node_modules/aws-cdk-lib/core/lib/prop-injectable.js:1:488)",
+              "new McpHostStack (/home/ubuntu/repos/mbc-cqrs-serverless/packages/mcp-host/infra/mcp-host-stack.ts:113:30)",
+              "Object.<anonymous> (/home/ubuntu/repos/mbc-cqrs-serverless/packages/mcp-host/infra/app.ts:17:1)",
+              "Module._compile (node:internal/modules/cjs/loader:1546:14)",
+              "Module.m._compile (/home/ubuntu/repos/mbc-cqrs-serverless/packages/mcp-host/node_modules/ts-node/src/index.ts:1618:23)",
+              "node:internal/modules/cjs/loader:1689:10",
+              "Object.require.extensions.<computed> [as .ts] (/home/ubuntu/repos/mbc-cqrs-serverless/packages/mcp-host/node_modules/ts-node/src/index.ts:1621:12)",
+              "Module.load (node:internal/modules/cjs/loader:1318:32)",
+              "Function._load (node:internal/modules/cjs/loader:1128:12)",
+              "TracingChannel.traceSync (node:diagnostics_channel:315:14)",
+              "wrapModuleLoad (node:internal/modules/cjs/loader:218:24)",
+              "Function.executeUserEntryPoint [as runMain] (node:internal/modules/run_main:170:5)",
+              "phase4 (/home/ubuntu/repos/mbc-cqrs-serverless/packages/mcp-host/node_modules/ts-node/src/bin.ts:649:14)",
+              "bootstrap (/home/ubuntu/repos/mbc-cqrs-serverless/packages/mcp-host/node_modules/ts-node/src/bin.ts:95:10)",
+              "main (/home/ubuntu/repos/mbc-cqrs-serverless/packages/mcp-host/node_modules/ts-node/src/bin.ts:55:10)",
+              "Object.<anonymous> (/home/ubuntu/repos/mbc-cqrs-serverless/packages/mcp-host/node_modules/ts-node/src/bin.ts:800:3)",
+              "Module._compile (node:internal/modules/cjs/loader:1546:14)",
+              "Object.<anonymous> (node:internal/modules/cjs/loader:1689:10)",
+              "Module.load (node:internal/modules/cjs/loader:1318:32)",
+              "Function._load (node:internal/modules/cjs/loader:1128:12)",
+              "TracingChannel.traceSync (node:diagnostics_channel:315:14)",
+              "wrapModuleLoad (node:internal/modules/cjs/loader:218:24)",
+              "Function.executeUserEntryPoint [as runMain] (node:internal/modules/run_main:170:5)",
+              "node:internal/main/run_main_module:36:49"
+            ]
+          }
+        ],
+        "/McpHostStack/McpServerService/Service/Service": [
+          {
+            "type": "aws:cdk:logicalId",
+            "data": "McpServerServiceA23682C8"
+          }
+        ],
+        "/McpHostStack/McpServerService/Service/SecurityGroup/Resource": [
+          {
+            "type": "aws:cdk:logicalId",
+            "data": "McpServerServiceSecurityGroupCBA9C12E"
+          }
+        ],
+        "/McpHostStack/McpServerService/Service/SecurityGroup/from McpHostStackMcpServerServiceLBSecurityGroup269F51AB:8000": [
+          {
+            "type": "aws:cdk:logicalId",
+            "data": "McpServerServiceSecurityGroupfromMcpHostStackMcpServerServiceLBSecurityGroup269F51AB80008586DC21"
+          }
+        ],
+        "/McpHostStack/McpHostTaskRole/Resource": [
+          {
+            "type": "aws:cdk:logicalId",
+            "data": "McpHostTaskRoleF62D4C67"
+          }
+        ],
+        "/McpHostStack/ClaudeApiKeyParam.Parameter": [
+          {
+            "type": "aws:cdk:logicalId",
+            "data": "ClaudeApiKeyParamParameter"
+          }
+        ],
+        "/McpHostStack/McpHostService/LB/Resource": [
+          {
+            "type": "aws:cdk:logicalId",
+            "data": "McpHostServiceLB59748D70"
+          }
+        ],
+        "/McpHostStack/McpHostService/LB/SecurityGroup/Resource": [
+          {
+            "type": "aws:cdk:logicalId",
+            "data": "McpHostServiceLBSecurityGroupB5C58556"
+          }
+        ],
+        "/McpHostStack/McpHostService/LB/SecurityGroup/to McpHostStackMcpHostServiceSecurityGroup28304193:3000": [
+          {
+            "type": "aws:cdk:logicalId",
+            "data": "McpHostServiceLBSecurityGrouptoMcpHostStackMcpHostServiceSecurityGroup283041933000A9B2B604"
+          }
+        ],
+        "/McpHostStack/McpHostService/LB/PublicListener/Resource": [
+          {
+            "type": "aws:cdk:logicalId",
+            "data": "McpHostServiceLBPublicListenerBB2BCB3A"
+          }
+        ],
+        "/McpHostStack/McpHostService/LB/PublicListener/ECSGroup/Resource": [
+          {
+            "type": "aws:cdk:logicalId",
+            "data": "McpHostServiceLBPublicListenerECSGroupE0964117"
+          }
+        ],
+        "/McpHostStack/McpHostService/LoadBalancerDNS": [
+          {
+            "type": "aws:cdk:logicalId",
+            "data": "McpHostServiceLoadBalancerDNS45071CAE"
+          }
+        ],
+        "/McpHostStack/McpHostService/ServiceURL": [
+          {
+            "type": "aws:cdk:logicalId",
+            "data": "McpHostServiceServiceURL4EED784A"
+          }
+        ],
+        "/McpHostStack/McpHostService/TaskDef/Resource": [
+          {
+            "type": "aws:cdk:logicalId",
+            "data": "McpHostServiceTaskDef31158B03"
+          }
+        ],
+        "/McpHostStack/McpHostService/TaskDef/ExecutionRole/Resource": [
+          {
+            "type": "aws:cdk:logicalId",
+            "data": "McpHostServiceTaskDefExecutionRoleA4B39654"
+          }
+        ],
+        "/McpHostStack/McpHostService/TaskDef/ExecutionRole/DefaultPolicy/Resource": [
+          {
+            "type": "aws:cdk:logicalId",
+            "data": "McpHostServiceTaskDefExecutionRoleDefaultPolicy10888498"
+          }
+        ],
+        "/McpHostStack/McpHostService/Service": [
+          {
+            "type": "aws:cdk:warning",
+            "data": "minHealthyPercent has not been configured so the default value of 50% is used. The number of running tasks will decrease below the desired count during deployments etc. See https://github.com/aws/aws-cdk/issues/31705 [ack: @aws-cdk/aws-ecs:minHealthyPercent]",
+            "trace": [
+              "Annotations.addMessage (/home/ubuntu/repos/mbc-cqrs-serverless/packages/mcp-host/node_modules/aws-cdk-lib/core/lib/annotations.js:1:1608)",
+              "Annotations.addWarningV2 (/home/ubuntu/repos/mbc-cqrs-serverless/packages/mcp-host/node_modules/aws-cdk-lib/core/lib/annotations.js:1:825)",
+              "new BaseService (/home/ubuntu/repos/mbc-cqrs-serverless/packages/mcp-host/node_modules/aws-cdk-lib/aws-ecs/lib/base/base-service.js:1:8201)",
+              "new FargateService2 (/home/ubuntu/repos/mbc-cqrs-serverless/packages/mcp-host/node_modules/aws-cdk-lib/aws-ecs/lib/fargate/fargate-service.js:1:3888)",
+              "new FargateService2 (/home/ubuntu/repos/mbc-cqrs-serverless/packages/mcp-host/node_modules/aws-cdk-lib/core/lib/prop-injectable.js:1:488)",
+              "new ApplicationLoadBalancedFargateService2 (/home/ubuntu/repos/mbc-cqrs-serverless/packages/mcp-host/node_modules/aws-cdk-lib/aws-ecs-patterns/lib/fargate/application-load-balanced-fargate-service.js:1:4035)",
+              "new ApplicationLoadBalancedFargateService2 (/home/ubuntu/repos/mbc-cqrs-serverless/packages/mcp-host/node_modules/aws-cdk-lib/core/lib/prop-injectable.js:1:488)",
+              "new McpHostStack (/home/ubuntu/repos/mbc-cqrs-serverless/packages/mcp-host/infra/mcp-host-stack.ts:152:28)",
+              "Object.<anonymous> (/home/ubuntu/repos/mbc-cqrs-serverless/packages/mcp-host/infra/app.ts:17:1)",
+              "Module._compile (node:internal/modules/cjs/loader:1546:14)",
+              "Module.m._compile (/home/ubuntu/repos/mbc-cqrs-serverless/packages/mcp-host/node_modules/ts-node/src/index.ts:1618:23)",
+              "node:internal/modules/cjs/loader:1689:10",
+              "Object.require.extensions.<computed> [as .ts] (/home/ubuntu/repos/mbc-cqrs-serverless/packages/mcp-host/node_modules/ts-node/src/index.ts:1621:12)",
+              "Module.load (node:internal/modules/cjs/loader:1318:32)",
+              "Function._load (node:internal/modules/cjs/loader:1128:12)",
+              "TracingChannel.traceSync (node:diagnostics_channel:315:14)",
+              "wrapModuleLoad (node:internal/modules/cjs/loader:218:24)",
+              "Function.executeUserEntryPoint [as runMain] (node:internal/modules/run_main:170:5)",
+              "phase4 (/home/ubuntu/repos/mbc-cqrs-serverless/packages/mcp-host/node_modules/ts-node/src/bin.ts:649:14)",
+              "bootstrap (/home/ubuntu/repos/mbc-cqrs-serverless/packages/mcp-host/node_modules/ts-node/src/bin.ts:95:10)",
+              "main (/home/ubuntu/repos/mbc-cqrs-serverless/packages/mcp-host/node_modules/ts-node/src/bin.ts:55:10)",
+              "Object.<anonymous> (/home/ubuntu/repos/mbc-cqrs-serverless/packages/mcp-host/node_modules/ts-node/src/bin.ts:800:3)",
+              "Module._compile (node:internal/modules/cjs/loader:1546:14)",
+              "Object.<anonymous> (node:internal/modules/cjs/loader:1689:10)",
+              "Module.load (node:internal/modules/cjs/loader:1318:32)",
+              "Function._load (node:internal/modules/cjs/loader:1128:12)",
+              "TracingChannel.traceSync (node:diagnostics_channel:315:14)",
+              "wrapModuleLoad (node:internal/modules/cjs/loader:218:24)",
+              "Function.executeUserEntryPoint [as runMain] (node:internal/modules/run_main:170:5)",
+              "node:internal/main/run_main_module:36:49"
+            ]
+          }
+        ],
+        "/McpHostStack/McpHostService/Service/Service": [
+          {
+            "type": "aws:cdk:logicalId",
+            "data": "McpHostService14873DF2"
+          }
+        ],
+        "/McpHostStack/McpHostService/Service/SecurityGroup/Resource": [
+          {
+            "type": "aws:cdk:logicalId",
+            "data": "McpHostServiceSecurityGroup6D76FFA5"
+          }
+        ],
+        "/McpHostStack/McpHostService/Service/SecurityGroup/from McpHostStackMcpHostServiceLBSecurityGroup3DF266C0:3000": [
+          {
+            "type": "aws:cdk:logicalId",
+            "data": "McpHostServiceSecurityGroupfromMcpHostStackMcpHostServiceLBSecurityGroup3DF266C03000269CDD22"
+          }
+        ],
+        "/McpHostStack/McpHostApi/Resource": [
+          {
+            "type": "aws:cdk:logicalId",
+            "data": "McpHostApi8D35C069"
+          }
+        ],
+        "/McpHostStack/McpHostApi/DefaultStage/Resource": [
+          {
+            "type": "aws:cdk:logicalId",
+            "data": "McpHostApiDefaultStageC1C1A59E"
+          }
+        ],
+        "/McpHostStack/McpHostApi/ANY--{proxy+}/McpHostIntegration/Resource": [
+          {
+            "type": "aws:cdk:logicalId",
+            "data": "McpHostApiANYproxyMcpHostIntegration62F26456"
+          }
+        ],
+        "/McpHostStack/McpHostApi/ANY--{proxy+}/Resource": [
+          {
+            "type": "aws:cdk:logicalId",
+            "data": "McpHostApiANYproxy2BFF276D"
+          }
+        ],
+        "/McpHostStack/McpHostVpcLink/Resource": [
+          {
+            "type": "aws:cdk:logicalId",
+            "data": "McpHostVpcLink266D46FE"
+          }
+        ],
+        "/McpHostStack/ReportingLogGroup/Resource": [
+          {
+            "type": "aws:cdk:logicalId",
+            "data": "ReportingLogGroup2858B4B5"
+          }
+        ],
+        "/McpHostStack/ReportingStateMachine/Role/Resource": [
+          {
+            "type": "aws:cdk:logicalId",
+            "data": "ReportingStateMachineRole09FE2AD3"
+          }
+        ],
+        "/McpHostStack/ReportingStateMachine/Role/DefaultPolicy/Resource": [
+          {
+            "type": "aws:cdk:logicalId",
+            "data": "ReportingStateMachineRoleDefaultPolicyECFA7AE6"
+          }
+        ],
+        "/McpHostStack/ReportingStateMachine/Resource": [
+          {
+            "type": "aws:cdk:logicalId",
+            "data": "ReportingStateMachineB2BCC54B"
+          }
+        ],
+        "/McpHostStack/ReportingStateMachine/EventsRole/Resource": [
+          {
+            "type": "aws:cdk:logicalId",
+            "data": "ReportingStateMachineEventsRoleCF990DB9"
+          }
+        ],
+        "/McpHostStack/ReportingStateMachine/EventsRole/DefaultPolicy/Resource": [
+          {
+            "type": "aws:cdk:logicalId",
+            "data": "ReportingStateMachineEventsRoleDefaultPolicy298A0EC3"
+          }
+        ],
+        "/McpHostStack/ReportingSchedule/Resource": [
+          {
+            "type": "aws:cdk:logicalId",
+            "data": "ReportingSchedule396D416B"
+          }
+        ],
+        "/McpHostStack/McpHostApiUrl": [
+          {
+            "type": "aws:cdk:logicalId",
+            "data": "McpHostApiUrl"
+          }
+        ],
+        "/McpHostStack/McpServerUrl": [
+          {
+            "type": "aws:cdk:logicalId",
+            "data": "McpServerUrl"
+          }
+        ],
+        "/McpHostStack/ReportingStateMachineArn": [
+          {
+            "type": "aws:cdk:logicalId",
+            "data": "ReportingStateMachineArn"
+          }
+        ],
+        "/McpHostStack/CDKMetadata/Default": [
+          {
+            "type": "aws:cdk:logicalId",
+            "data": "CDKMetadata"
+          }
+        ],
+        "/McpHostStack/BootstrapVersion": [
+          {
+            "type": "aws:cdk:logicalId",
+            "data": "BootstrapVersion"
+          }
+        ],
+        "/McpHostStack/CheckBootstrapVersion": [
+          {
+            "type": "aws:cdk:logicalId",
+            "data": "CheckBootstrapVersion"
+          }
+        ]
+      },
+      "displayName": "McpHostStack"
+    },
+    "Tree": {
+      "type": "cdk:tree",
+      "properties": {
+        "file": "tree.json"
+      }
+    }
+  },
+  "minimumCliVersion": "2.1018.1"
+}

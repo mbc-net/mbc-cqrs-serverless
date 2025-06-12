@@ -1,0 +1,2039 @@
+{
+ "Resources": {
+  "McpCluster0CEA2FB6": {
+   "Type": "AWS::ECS::Cluster",
+   "Properties": {
+    "ClusterName": "dev-mcp-mcp-cluster",
+    "ClusterSettings": [
+     {
+      "Name": "containerInsights",
+      "Value": "enabled"
+     }
+    ]
+   },
+   "Metadata": {
+    "aws:cdk:path": "McpHostStack/McpCluster/Resource"
+   }
+  },
+  "McpClusterVpc02532540": {
+   "Type": "AWS::EC2::VPC",
+   "Properties": {
+    "CidrBlock": "10.0.0.0/16",
+    "EnableDnsHostnames": true,
+    "EnableDnsSupport": true,
+    "InstanceTenancy": "default",
+    "Tags": [
+     {
+      "Key": "Name",
+      "Value": "McpHostStack/McpCluster/Vpc"
+     }
+    ]
+   },
+   "Metadata": {
+    "aws:cdk:path": "McpHostStack/McpCluster/Vpc/Resource"
+   }
+  },
+  "McpClusterVpcPublicSubnet1Subnet8EC920C6": {
+   "Type": "AWS::EC2::Subnet",
+   "Properties": {
+    "AvailabilityZone": {
+     "Fn::Select": [
+      0,
+      {
+       "Fn::GetAZs": ""
+      }
+     ]
+    },
+    "CidrBlock": "10.0.0.0/18",
+    "MapPublicIpOnLaunch": true,
+    "Tags": [
+     {
+      "Key": "aws-cdk:subnet-name",
+      "Value": "Public"
+     },
+     {
+      "Key": "aws-cdk:subnet-type",
+      "Value": "Public"
+     },
+     {
+      "Key": "Name",
+      "Value": "McpHostStack/McpCluster/Vpc/PublicSubnet1"
+     }
+    ],
+    "VpcId": {
+     "Ref": "McpClusterVpc02532540"
+    }
+   },
+   "Metadata": {
+    "aws:cdk:path": "McpHostStack/McpCluster/Vpc/PublicSubnet1/Subnet"
+   }
+  },
+  "McpClusterVpcPublicSubnet1RouteTable8EE6734A": {
+   "Type": "AWS::EC2::RouteTable",
+   "Properties": {
+    "Tags": [
+     {
+      "Key": "Name",
+      "Value": "McpHostStack/McpCluster/Vpc/PublicSubnet1"
+     }
+    ],
+    "VpcId": {
+     "Ref": "McpClusterVpc02532540"
+    }
+   },
+   "Metadata": {
+    "aws:cdk:path": "McpHostStack/McpCluster/Vpc/PublicSubnet1/RouteTable"
+   }
+  },
+  "McpClusterVpcPublicSubnet1RouteTableAssociation26337F30": {
+   "Type": "AWS::EC2::SubnetRouteTableAssociation",
+   "Properties": {
+    "RouteTableId": {
+     "Ref": "McpClusterVpcPublicSubnet1RouteTable8EE6734A"
+    },
+    "SubnetId": {
+     "Ref": "McpClusterVpcPublicSubnet1Subnet8EC920C6"
+    }
+   },
+   "Metadata": {
+    "aws:cdk:path": "McpHostStack/McpCluster/Vpc/PublicSubnet1/RouteTableAssociation"
+   }
+  },
+  "McpClusterVpcPublicSubnet1DefaultRoute80258347": {
+   "Type": "AWS::EC2::Route",
+   "Properties": {
+    "DestinationCidrBlock": "0.0.0.0/0",
+    "GatewayId": {
+     "Ref": "McpClusterVpcIGW22FCE8E2"
+    },
+    "RouteTableId": {
+     "Ref": "McpClusterVpcPublicSubnet1RouteTable8EE6734A"
+    }
+   },
+   "DependsOn": [
+    "McpClusterVpcVPCGW8D2E73A7"
+   ],
+   "Metadata": {
+    "aws:cdk:path": "McpHostStack/McpCluster/Vpc/PublicSubnet1/DefaultRoute"
+   }
+  },
+  "McpClusterVpcPublicSubnet1EIP0E4FC36C": {
+   "Type": "AWS::EC2::EIP",
+   "Properties": {
+    "Domain": "vpc",
+    "Tags": [
+     {
+      "Key": "Name",
+      "Value": "McpHostStack/McpCluster/Vpc/PublicSubnet1"
+     }
+    ]
+   },
+   "Metadata": {
+    "aws:cdk:path": "McpHostStack/McpCluster/Vpc/PublicSubnet1/EIP"
+   }
+  },
+  "McpClusterVpcPublicSubnet1NATGateway92A0FF33": {
+   "Type": "AWS::EC2::NatGateway",
+   "Properties": {
+    "AllocationId": {
+     "Fn::GetAtt": [
+      "McpClusterVpcPublicSubnet1EIP0E4FC36C",
+      "AllocationId"
+     ]
+    },
+    "SubnetId": {
+     "Ref": "McpClusterVpcPublicSubnet1Subnet8EC920C6"
+    },
+    "Tags": [
+     {
+      "Key": "Name",
+      "Value": "McpHostStack/McpCluster/Vpc/PublicSubnet1"
+     }
+    ]
+   },
+   "DependsOn": [
+    "McpClusterVpcPublicSubnet1DefaultRoute80258347",
+    "McpClusterVpcPublicSubnet1RouteTableAssociation26337F30"
+   ],
+   "Metadata": {
+    "aws:cdk:path": "McpHostStack/McpCluster/Vpc/PublicSubnet1/NATGateway"
+   }
+  },
+  "McpClusterVpcPublicSubnet2Subnet60BEC3C0": {
+   "Type": "AWS::EC2::Subnet",
+   "Properties": {
+    "AvailabilityZone": {
+     "Fn::Select": [
+      1,
+      {
+       "Fn::GetAZs": ""
+      }
+     ]
+    },
+    "CidrBlock": "10.0.64.0/18",
+    "MapPublicIpOnLaunch": true,
+    "Tags": [
+     {
+      "Key": "aws-cdk:subnet-name",
+      "Value": "Public"
+     },
+     {
+      "Key": "aws-cdk:subnet-type",
+      "Value": "Public"
+     },
+     {
+      "Key": "Name",
+      "Value": "McpHostStack/McpCluster/Vpc/PublicSubnet2"
+     }
+    ],
+    "VpcId": {
+     "Ref": "McpClusterVpc02532540"
+    }
+   },
+   "Metadata": {
+    "aws:cdk:path": "McpHostStack/McpCluster/Vpc/PublicSubnet2/Subnet"
+   }
+  },
+  "McpClusterVpcPublicSubnet2RouteTable8DA64EAD": {
+   "Type": "AWS::EC2::RouteTable",
+   "Properties": {
+    "Tags": [
+     {
+      "Key": "Name",
+      "Value": "McpHostStack/McpCluster/Vpc/PublicSubnet2"
+     }
+    ],
+    "VpcId": {
+     "Ref": "McpClusterVpc02532540"
+    }
+   },
+   "Metadata": {
+    "aws:cdk:path": "McpHostStack/McpCluster/Vpc/PublicSubnet2/RouteTable"
+   }
+  },
+  "McpClusterVpcPublicSubnet2RouteTableAssociation733DBFCC": {
+   "Type": "AWS::EC2::SubnetRouteTableAssociation",
+   "Properties": {
+    "RouteTableId": {
+     "Ref": "McpClusterVpcPublicSubnet2RouteTable8DA64EAD"
+    },
+    "SubnetId": {
+     "Ref": "McpClusterVpcPublicSubnet2Subnet60BEC3C0"
+    }
+   },
+   "Metadata": {
+    "aws:cdk:path": "McpHostStack/McpCluster/Vpc/PublicSubnet2/RouteTableAssociation"
+   }
+  },
+  "McpClusterVpcPublicSubnet2DefaultRouteF1EC8251": {
+   "Type": "AWS::EC2::Route",
+   "Properties": {
+    "DestinationCidrBlock": "0.0.0.0/0",
+    "GatewayId": {
+     "Ref": "McpClusterVpcIGW22FCE8E2"
+    },
+    "RouteTableId": {
+     "Ref": "McpClusterVpcPublicSubnet2RouteTable8DA64EAD"
+    }
+   },
+   "DependsOn": [
+    "McpClusterVpcVPCGW8D2E73A7"
+   ],
+   "Metadata": {
+    "aws:cdk:path": "McpHostStack/McpCluster/Vpc/PublicSubnet2/DefaultRoute"
+   }
+  },
+  "McpClusterVpcPublicSubnet2EIP3264D470": {
+   "Type": "AWS::EC2::EIP",
+   "Properties": {
+    "Domain": "vpc",
+    "Tags": [
+     {
+      "Key": "Name",
+      "Value": "McpHostStack/McpCluster/Vpc/PublicSubnet2"
+     }
+    ]
+   },
+   "Metadata": {
+    "aws:cdk:path": "McpHostStack/McpCluster/Vpc/PublicSubnet2/EIP"
+   }
+  },
+  "McpClusterVpcPublicSubnet2NATGateway4652FD10": {
+   "Type": "AWS::EC2::NatGateway",
+   "Properties": {
+    "AllocationId": {
+     "Fn::GetAtt": [
+      "McpClusterVpcPublicSubnet2EIP3264D470",
+      "AllocationId"
+     ]
+    },
+    "SubnetId": {
+     "Ref": "McpClusterVpcPublicSubnet2Subnet60BEC3C0"
+    },
+    "Tags": [
+     {
+      "Key": "Name",
+      "Value": "McpHostStack/McpCluster/Vpc/PublicSubnet2"
+     }
+    ]
+   },
+   "DependsOn": [
+    "McpClusterVpcPublicSubnet2DefaultRouteF1EC8251",
+    "McpClusterVpcPublicSubnet2RouteTableAssociation733DBFCC"
+   ],
+   "Metadata": {
+    "aws:cdk:path": "McpHostStack/McpCluster/Vpc/PublicSubnet2/NATGateway"
+   }
+  },
+  "McpClusterVpcPrivateSubnet1Subnet85846000": {
+   "Type": "AWS::EC2::Subnet",
+   "Properties": {
+    "AvailabilityZone": {
+     "Fn::Select": [
+      0,
+      {
+       "Fn::GetAZs": ""
+      }
+     ]
+    },
+    "CidrBlock": "10.0.128.0/18",
+    "MapPublicIpOnLaunch": false,
+    "Tags": [
+     {
+      "Key": "aws-cdk:subnet-name",
+      "Value": "Private"
+     },
+     {
+      "Key": "aws-cdk:subnet-type",
+      "Value": "Private"
+     },
+     {
+      "Key": "Name",
+      "Value": "McpHostStack/McpCluster/Vpc/PrivateSubnet1"
+     }
+    ],
+    "VpcId": {
+     "Ref": "McpClusterVpc02532540"
+    }
+   },
+   "Metadata": {
+    "aws:cdk:path": "McpHostStack/McpCluster/Vpc/PrivateSubnet1/Subnet"
+   }
+  },
+  "McpClusterVpcPrivateSubnet1RouteTable31A88389": {
+   "Type": "AWS::EC2::RouteTable",
+   "Properties": {
+    "Tags": [
+     {
+      "Key": "Name",
+      "Value": "McpHostStack/McpCluster/Vpc/PrivateSubnet1"
+     }
+    ],
+    "VpcId": {
+     "Ref": "McpClusterVpc02532540"
+    }
+   },
+   "Metadata": {
+    "aws:cdk:path": "McpHostStack/McpCluster/Vpc/PrivateSubnet1/RouteTable"
+   }
+  },
+  "McpClusterVpcPrivateSubnet1RouteTableAssociation271A7172": {
+   "Type": "AWS::EC2::SubnetRouteTableAssociation",
+   "Properties": {
+    "RouteTableId": {
+     "Ref": "McpClusterVpcPrivateSubnet1RouteTable31A88389"
+    },
+    "SubnetId": {
+     "Ref": "McpClusterVpcPrivateSubnet1Subnet85846000"
+    }
+   },
+   "Metadata": {
+    "aws:cdk:path": "McpHostStack/McpCluster/Vpc/PrivateSubnet1/RouteTableAssociation"
+   }
+  },
+  "McpClusterVpcPrivateSubnet1DefaultRouteB249D889": {
+   "Type": "AWS::EC2::Route",
+   "Properties": {
+    "DestinationCidrBlock": "0.0.0.0/0",
+    "NatGatewayId": {
+     "Ref": "McpClusterVpcPublicSubnet1NATGateway92A0FF33"
+    },
+    "RouteTableId": {
+     "Ref": "McpClusterVpcPrivateSubnet1RouteTable31A88389"
+    }
+   },
+   "Metadata": {
+    "aws:cdk:path": "McpHostStack/McpCluster/Vpc/PrivateSubnet1/DefaultRoute"
+   }
+  },
+  "McpClusterVpcPrivateSubnet2Subnet608B7954": {
+   "Type": "AWS::EC2::Subnet",
+   "Properties": {
+    "AvailabilityZone": {
+     "Fn::Select": [
+      1,
+      {
+       "Fn::GetAZs": ""
+      }
+     ]
+    },
+    "CidrBlock": "10.0.192.0/18",
+    "MapPublicIpOnLaunch": false,
+    "Tags": [
+     {
+      "Key": "aws-cdk:subnet-name",
+      "Value": "Private"
+     },
+     {
+      "Key": "aws-cdk:subnet-type",
+      "Value": "Private"
+     },
+     {
+      "Key": "Name",
+      "Value": "McpHostStack/McpCluster/Vpc/PrivateSubnet2"
+     }
+    ],
+    "VpcId": {
+     "Ref": "McpClusterVpc02532540"
+    }
+   },
+   "Metadata": {
+    "aws:cdk:path": "McpHostStack/McpCluster/Vpc/PrivateSubnet2/Subnet"
+   }
+  },
+  "McpClusterVpcPrivateSubnet2RouteTable2684471D": {
+   "Type": "AWS::EC2::RouteTable",
+   "Properties": {
+    "Tags": [
+     {
+      "Key": "Name",
+      "Value": "McpHostStack/McpCluster/Vpc/PrivateSubnet2"
+     }
+    ],
+    "VpcId": {
+     "Ref": "McpClusterVpc02532540"
+    }
+   },
+   "Metadata": {
+    "aws:cdk:path": "McpHostStack/McpCluster/Vpc/PrivateSubnet2/RouteTable"
+   }
+  },
+  "McpClusterVpcPrivateSubnet2RouteTableAssociation5760B3AF": {
+   "Type": "AWS::EC2::SubnetRouteTableAssociation",
+   "Properties": {
+    "RouteTableId": {
+     "Ref": "McpClusterVpcPrivateSubnet2RouteTable2684471D"
+    },
+    "SubnetId": {
+     "Ref": "McpClusterVpcPrivateSubnet2Subnet608B7954"
+    }
+   },
+   "Metadata": {
+    "aws:cdk:path": "McpHostStack/McpCluster/Vpc/PrivateSubnet2/RouteTableAssociation"
+   }
+  },
+  "McpClusterVpcPrivateSubnet2DefaultRoute6367E6C5": {
+   "Type": "AWS::EC2::Route",
+   "Properties": {
+    "DestinationCidrBlock": "0.0.0.0/0",
+    "NatGatewayId": {
+     "Ref": "McpClusterVpcPublicSubnet2NATGateway4652FD10"
+    },
+    "RouteTableId": {
+     "Ref": "McpClusterVpcPrivateSubnet2RouteTable2684471D"
+    }
+   },
+   "Metadata": {
+    "aws:cdk:path": "McpHostStack/McpCluster/Vpc/PrivateSubnet2/DefaultRoute"
+   }
+  },
+  "McpClusterVpcIGW22FCE8E2": {
+   "Type": "AWS::EC2::InternetGateway",
+   "Properties": {
+    "Tags": [
+     {
+      "Key": "Name",
+      "Value": "McpHostStack/McpCluster/Vpc"
+     }
+    ]
+   },
+   "Metadata": {
+    "aws:cdk:path": "McpHostStack/McpCluster/Vpc/IGW"
+   }
+  },
+  "McpClusterVpcVPCGW8D2E73A7": {
+   "Type": "AWS::EC2::VPCGatewayAttachment",
+   "Properties": {
+    "InternetGatewayId": {
+     "Ref": "McpClusterVpcIGW22FCE8E2"
+    },
+    "VpcId": {
+     "Ref": "McpClusterVpc02532540"
+    }
+   },
+   "Metadata": {
+    "aws:cdk:path": "McpHostStack/McpCluster/Vpc/VPCGW"
+   }
+  },
+  "McpClusterVpcRestrictDefaultSecurityGroupCustomResource570ABAE0": {
+   "Type": "Custom::VpcRestrictDefaultSG",
+   "Properties": {
+    "ServiceToken": {
+     "Fn::GetAtt": [
+      "CustomVpcRestrictDefaultSGCustomResourceProviderHandlerDC833E5E",
+      "Arn"
+     ]
+    },
+    "DefaultSecurityGroupId": {
+     "Fn::GetAtt": [
+      "McpClusterVpc02532540",
+      "DefaultSecurityGroup"
+     ]
+    },
+    "Account": {
+     "Ref": "AWS::AccountId"
+    }
+   },
+   "UpdateReplacePolicy": "Delete",
+   "DeletionPolicy": "Delete",
+   "Metadata": {
+    "aws:cdk:path": "McpHostStack/McpCluster/Vpc/RestrictDefaultSecurityGroupCustomResource/Default"
+   }
+  },
+  "CustomVpcRestrictDefaultSGCustomResourceProviderRole26592FE0": {
+   "Type": "AWS::IAM::Role",
+   "Properties": {
+    "AssumeRolePolicyDocument": {
+     "Version": "2012-10-17",
+     "Statement": [
+      {
+       "Action": "sts:AssumeRole",
+       "Effect": "Allow",
+       "Principal": {
+        "Service": "lambda.amazonaws.com"
+       }
+      }
+     ]
+    },
+    "ManagedPolicyArns": [
+     {
+      "Fn::Sub": "arn:${AWS::Partition}:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
+     }
+    ],
+    "Policies": [
+     {
+      "PolicyName": "Inline",
+      "PolicyDocument": {
+       "Version": "2012-10-17",
+       "Statement": [
+        {
+         "Effect": "Allow",
+         "Action": [
+          "ec2:AuthorizeSecurityGroupIngress",
+          "ec2:AuthorizeSecurityGroupEgress",
+          "ec2:RevokeSecurityGroupIngress",
+          "ec2:RevokeSecurityGroupEgress"
+         ],
+         "Resource": [
+          {
+           "Fn::Join": [
+            "",
+            [
+             "arn:aws:ec2:us-east-1:",
+             {
+              "Ref": "AWS::AccountId"
+             },
+             ":security-group/",
+             {
+              "Fn::GetAtt": [
+               "McpClusterVpc02532540",
+               "DefaultSecurityGroup"
+              ]
+             }
+            ]
+           ]
+          }
+         ]
+        }
+       ]
+      }
+     }
+    ]
+   },
+   "Metadata": {
+    "aws:cdk:path": "McpHostStack/Custom::VpcRestrictDefaultSGCustomResourceProvider/Role"
+   }
+  },
+  "CustomVpcRestrictDefaultSGCustomResourceProviderHandlerDC833E5E": {
+   "Type": "AWS::Lambda::Function",
+   "Properties": {
+    "Code": {
+     "S3Bucket": {
+      "Fn::Sub": "cdk-hnb659fds-assets-${AWS::AccountId}-us-east-1"
+     },
+     "S3Key": "7fa1e366ee8a9ded01fc355f704cff92bfd179574e6f9cfee800a3541df1b200.zip"
+    },
+    "Timeout": 900,
+    "MemorySize": 128,
+    "Handler": "__entrypoint__.handler",
+    "Role": {
+     "Fn::GetAtt": [
+      "CustomVpcRestrictDefaultSGCustomResourceProviderRole26592FE0",
+      "Arn"
+     ]
+    },
+    "Runtime": "nodejs22.x",
+    "Description": "Lambda function for removing all inbound/outbound rules from the VPC default security group"
+   },
+   "DependsOn": [
+    "CustomVpcRestrictDefaultSGCustomResourceProviderRole26592FE0"
+   ],
+   "Metadata": {
+    "aws:cdk:path": "McpHostStack/Custom::VpcRestrictDefaultSGCustomResourceProvider/Handler",
+    "aws:asset:path": "asset.7fa1e366ee8a9ded01fc355f704cff92bfd179574e6f9cfee800a3541df1b200",
+    "aws:asset:property": "Code"
+   }
+  },
+  "McpServerLogGroup7FAD27A8": {
+   "Type": "AWS::Logs::LogGroup",
+   "Properties": {
+    "LogGroupName": "/aws/ecs/dev-mcp-mcp-server",
+    "RetentionInDays": 30
+   },
+   "UpdateReplacePolicy": "Delete",
+   "DeletionPolicy": "Delete",
+   "Metadata": {
+    "aws:cdk:path": "McpHostStack/McpServerLogGroup/Resource"
+   }
+  },
+  "McpHostLogGroupB24D02B1": {
+   "Type": "AWS::Logs::LogGroup",
+   "Properties": {
+    "LogGroupName": "/aws/ecs/dev-mcp-mcp-host",
+    "RetentionInDays": 30
+   },
+   "UpdateReplacePolicy": "Delete",
+   "DeletionPolicy": "Delete",
+   "Metadata": {
+    "aws:cdk:path": "McpHostStack/McpHostLogGroup/Resource"
+   }
+  },
+  "McpServerTaskRoleB19E5A08": {
+   "Type": "AWS::IAM::Role",
+   "Properties": {
+    "AssumeRolePolicyDocument": {
+     "Statement": [
+      {
+       "Action": "sts:AssumeRole",
+       "Effect": "Allow",
+       "Principal": {
+        "Service": "ecs-tasks.amazonaws.com"
+       }
+      }
+     ],
+     "Version": "2012-10-17"
+    },
+    "ManagedPolicyArns": [
+     {
+      "Fn::Join": [
+       "",
+       [
+        "arn:",
+        {
+         "Ref": "AWS::Partition"
+        },
+        ":iam::aws:policy/service-role/AmazonECSTaskExecutionRolePolicy"
+       ]
+      ]
+     }
+    ]
+   },
+   "Metadata": {
+    "aws:cdk:path": "McpHostStack/McpServerTaskRole/Resource"
+   }
+  },
+  "McpServerTaskRoleDefaultPolicy8E624EA6": {
+   "Type": "AWS::IAM::Policy",
+   "Properties": {
+    "PolicyDocument": {
+     "Statement": [
+      {
+       "Action": [
+        "cloudwatch:GetMetricStatistics",
+        "cloudwatch:ListMetrics",
+        "kms:Decrypt",
+        "logs:CreateLogGroup",
+        "logs:CreateLogStream",
+        "logs:DescribeLogGroups",
+        "logs:DescribeLogStreams",
+        "logs:GetQueryResults",
+        "logs:PutLogEvents",
+        "logs:StartQuery",
+        "rds:DescribeDBClusters",
+        "rds:DescribeDBInstances",
+        "ssm:GetParameter",
+        "ssm:GetParameters"
+       ],
+       "Effect": "Allow",
+       "Resource": "*"
+      },
+      {
+       "Action": [
+        "dynamodb:DeleteItem",
+        "dynamodb:DescribeTable",
+        "dynamodb:GetItem",
+        "dynamodb:PutItem",
+        "dynamodb:Query",
+        "dynamodb:Scan",
+        "dynamodb:UpdateItem"
+       ],
+       "Effect": "Allow",
+       "Resource": {
+        "Fn::Join": [
+         "",
+         [
+          "arn:aws:dynamodb:us-east-1:",
+          {
+           "Ref": "AWS::AccountId"
+          },
+          ":table/dev-mcp*"
+         ]
+        ]
+       }
+      }
+     ],
+     "Version": "2012-10-17"
+    },
+    "PolicyName": "McpServerTaskRoleDefaultPolicy8E624EA6",
+    "Roles": [
+     {
+      "Ref": "McpServerTaskRoleB19E5A08"
+     }
+    ]
+   },
+   "Metadata": {
+    "aws:cdk:path": "McpHostStack/McpServerTaskRole/DefaultPolicy/Resource"
+   }
+  },
+  "McpServerServiceLB8C38DADE": {
+   "Type": "AWS::ElasticLoadBalancingV2::LoadBalancer",
+   "Properties": {
+    "LoadBalancerAttributes": [
+     {
+      "Key": "deletion_protection.enabled",
+      "Value": "false"
+     }
+    ],
+    "Scheme": "internal",
+    "SecurityGroups": [
+     {
+      "Fn::GetAtt": [
+       "McpServerServiceLBSecurityGroup3AEE1922",
+       "GroupId"
+      ]
+     }
+    ],
+    "Subnets": [
+     {
+      "Ref": "McpClusterVpcPrivateSubnet1Subnet85846000"
+     },
+     {
+      "Ref": "McpClusterVpcPrivateSubnet2Subnet608B7954"
+     }
+    ],
+    "Type": "application"
+   },
+   "Metadata": {
+    "aws:cdk:path": "McpHostStack/McpServerService/LB/Resource"
+   }
+  },
+  "McpServerServiceLBSecurityGroup3AEE1922": {
+   "Type": "AWS::EC2::SecurityGroup",
+   "Properties": {
+    "GroupDescription": "Automatically created Security Group for ELB McpHostStackMcpServerServiceLBC84F322F",
+    "SecurityGroupIngress": [
+     {
+      "CidrIp": "0.0.0.0/0",
+      "Description": "Allow from anyone on port 8000",
+      "FromPort": 8000,
+      "IpProtocol": "tcp",
+      "ToPort": 8000
+     }
+    ],
+    "VpcId": {
+     "Ref": "McpClusterVpc02532540"
+    }
+   },
+   "Metadata": {
+    "aws:cdk:path": "McpHostStack/McpServerService/LB/SecurityGroup/Resource"
+   }
+  },
+  "McpServerServiceLBSecurityGrouptoMcpHostStackMcpServerServiceSecurityGroup45F3E6138000F35AD661": {
+   "Type": "AWS::EC2::SecurityGroupEgress",
+   "Properties": {
+    "Description": "Load balancer to target",
+    "DestinationSecurityGroupId": {
+     "Fn::GetAtt": [
+      "McpServerServiceSecurityGroupCBA9C12E",
+      "GroupId"
+     ]
+    },
+    "FromPort": 8000,
+    "GroupId": {
+     "Fn::GetAtt": [
+      "McpServerServiceLBSecurityGroup3AEE1922",
+      "GroupId"
+     ]
+    },
+    "IpProtocol": "tcp",
+    "ToPort": 8000
+   },
+   "Metadata": {
+    "aws:cdk:path": "McpHostStack/McpServerService/LB/SecurityGroup/to McpHostStackMcpServerServiceSecurityGroup45F3E613:8000"
+   }
+  },
+  "McpServerServiceLBPublicListener4C47FE0C": {
+   "Type": "AWS::ElasticLoadBalancingV2::Listener",
+   "Properties": {
+    "DefaultActions": [
+     {
+      "TargetGroupArn": {
+       "Ref": "McpServerServiceLBPublicListenerECSGroupE6875F13"
+      },
+      "Type": "forward"
+     }
+    ],
+    "LoadBalancerArn": {
+     "Ref": "McpServerServiceLB8C38DADE"
+    },
+    "Port": 8000,
+    "Protocol": "HTTP"
+   },
+   "Metadata": {
+    "aws:cdk:path": "McpHostStack/McpServerService/LB/PublicListener/Resource"
+   }
+  },
+  "McpServerServiceLBPublicListenerECSGroupE6875F13": {
+   "Type": "AWS::ElasticLoadBalancingV2::TargetGroup",
+   "Properties": {
+    "Port": 80,
+    "Protocol": "HTTP",
+    "TargetGroupAttributes": [
+     {
+      "Key": "stickiness.enabled",
+      "Value": "false"
+     }
+    ],
+    "TargetType": "ip",
+    "VpcId": {
+     "Ref": "McpClusterVpc02532540"
+    }
+   },
+   "Metadata": {
+    "aws:cdk:path": "McpHostStack/McpServerService/LB/PublicListener/ECSGroup/Resource"
+   }
+  },
+  "McpServerServiceTaskDefC29C887B": {
+   "Type": "AWS::ECS::TaskDefinition",
+   "Properties": {
+    "ContainerDefinitions": [
+     {
+      "Environment": [
+       {
+        "Name": "PORT",
+        "Value": "8000"
+       },
+       {
+        "Name": "AWS_REGION",
+        "Value": "us-east-1"
+       },
+       {
+        "Name": "NODE_ENV",
+        "Value": "production"
+       },
+       {
+        "Name": "APP_NAME",
+        "Value": "dev-mcp"
+       }
+      ],
+      "Essential": true,
+      "Image": {
+       "Fn::Sub": "${AWS::AccountId}.dkr.ecr.us-east-1.${AWS::URLSuffix}/cdk-hnb659fds-container-assets-${AWS::AccountId}-us-east-1:777d73f2803444ac7ffeab2f3f312152f3eb661e02b64e3d3af1fb4efd3a68ff"
+      },
+      "LogConfiguration": {
+       "LogDriver": "awslogs",
+       "Options": {
+        "awslogs-group": {
+         "Ref": "McpServerLogGroup7FAD27A8"
+        },
+        "awslogs-stream-prefix": "mcp-server",
+        "awslogs-region": "us-east-1"
+       }
+      },
+      "Name": "web",
+      "PortMappings": [
+       {
+        "ContainerPort": 8000,
+        "Protocol": "tcp"
+       }
+      ]
+     }
+    ],
+    "Cpu": "512",
+    "ExecutionRoleArn": {
+     "Fn::GetAtt": [
+      "McpServerServiceTaskDefExecutionRole24832816",
+      "Arn"
+     ]
+    },
+    "Family": "McpHostStackMcpServerServiceTaskDef44C7F193",
+    "Memory": "1024",
+    "NetworkMode": "awsvpc",
+    "RequiresCompatibilities": [
+     "FARGATE"
+    ],
+    "TaskRoleArn": {
+     "Fn::GetAtt": [
+      "McpServerTaskRoleB19E5A08",
+      "Arn"
+     ]
+    }
+   },
+   "Metadata": {
+    "aws:cdk:path": "McpHostStack/McpServerService/TaskDef/Resource"
+   }
+  },
+  "McpServerServiceTaskDefExecutionRole24832816": {
+   "Type": "AWS::IAM::Role",
+   "Properties": {
+    "AssumeRolePolicyDocument": {
+     "Statement": [
+      {
+       "Action": "sts:AssumeRole",
+       "Effect": "Allow",
+       "Principal": {
+        "Service": "ecs-tasks.amazonaws.com"
+       }
+      }
+     ],
+     "Version": "2012-10-17"
+    }
+   },
+   "Metadata": {
+    "aws:cdk:path": "McpHostStack/McpServerService/TaskDef/ExecutionRole/Resource"
+   }
+  },
+  "McpServerServiceTaskDefExecutionRoleDefaultPolicy2DA2A901": {
+   "Type": "AWS::IAM::Policy",
+   "Properties": {
+    "PolicyDocument": {
+     "Statement": [
+      {
+       "Action": [
+        "ecr:BatchCheckLayerAvailability",
+        "ecr:BatchGetImage",
+        "ecr:GetDownloadUrlForLayer"
+       ],
+       "Effect": "Allow",
+       "Resource": {
+        "Fn::Join": [
+         "",
+         [
+          "arn:aws:ecr:us-east-1:",
+          {
+           "Ref": "AWS::AccountId"
+          },
+          ":repository/",
+          {
+           "Fn::Sub": "cdk-hnb659fds-container-assets-${AWS::AccountId}-us-east-1"
+          }
+         ]
+        ]
+       }
+      },
+      {
+       "Action": "ecr:GetAuthorizationToken",
+       "Effect": "Allow",
+       "Resource": "*"
+      },
+      {
+       "Action": [
+        "logs:CreateLogStream",
+        "logs:PutLogEvents"
+       ],
+       "Effect": "Allow",
+       "Resource": {
+        "Fn::GetAtt": [
+         "McpServerLogGroup7FAD27A8",
+         "Arn"
+        ]
+       }
+      }
+     ],
+     "Version": "2012-10-17"
+    },
+    "PolicyName": "McpServerServiceTaskDefExecutionRoleDefaultPolicy2DA2A901",
+    "Roles": [
+     {
+      "Ref": "McpServerServiceTaskDefExecutionRole24832816"
+     }
+    ]
+   },
+   "Metadata": {
+    "aws:cdk:path": "McpHostStack/McpServerService/TaskDef/ExecutionRole/DefaultPolicy/Resource"
+   }
+  },
+  "McpServerServiceA23682C8": {
+   "Type": "AWS::ECS::Service",
+   "Properties": {
+    "Cluster": {
+     "Ref": "McpCluster0CEA2FB6"
+    },
+    "DeploymentConfiguration": {
+     "Alarms": {
+      "AlarmNames": [],
+      "Enable": false,
+      "Rollback": false
+     },
+     "MaximumPercent": 200,
+     "MinimumHealthyPercent": 50
+    },
+    "DesiredCount": 1,
+    "EnableECSManagedTags": false,
+    "HealthCheckGracePeriodSeconds": 60,
+    "LaunchType": "FARGATE",
+    "LoadBalancers": [
+     {
+      "ContainerName": "web",
+      "ContainerPort": 8000,
+      "TargetGroupArn": {
+       "Ref": "McpServerServiceLBPublicListenerECSGroupE6875F13"
+      }
+     }
+    ],
+    "NetworkConfiguration": {
+     "AwsvpcConfiguration": {
+      "AssignPublicIp": "DISABLED",
+      "SecurityGroups": [
+       {
+        "Fn::GetAtt": [
+         "McpServerServiceSecurityGroupCBA9C12E",
+         "GroupId"
+        ]
+       }
+      ],
+      "Subnets": [
+       {
+        "Ref": "McpClusterVpcPrivateSubnet1Subnet85846000"
+       },
+       {
+        "Ref": "McpClusterVpcPrivateSubnet2Subnet608B7954"
+       }
+      ]
+     }
+    },
+    "ServiceName": "dev-mcp-mcp-server",
+    "TaskDefinition": {
+     "Ref": "McpServerServiceTaskDefC29C887B"
+    }
+   },
+   "DependsOn": [
+    "McpServerServiceLBPublicListenerECSGroupE6875F13",
+    "McpServerServiceLBPublicListener4C47FE0C",
+    "McpServerTaskRoleDefaultPolicy8E624EA6",
+    "McpServerTaskRoleB19E5A08"
+   ],
+   "Metadata": {
+    "aws:cdk:path": "McpHostStack/McpServerService/Service/Service"
+   }
+  },
+  "McpServerServiceSecurityGroupCBA9C12E": {
+   "Type": "AWS::EC2::SecurityGroup",
+   "Properties": {
+    "GroupDescription": "McpHostStack/McpServerService/Service/SecurityGroup",
+    "SecurityGroupEgress": [
+     {
+      "CidrIp": "0.0.0.0/0",
+      "Description": "Allow all outbound traffic by default",
+      "IpProtocol": "-1"
+     }
+    ],
+    "VpcId": {
+     "Ref": "McpClusterVpc02532540"
+    }
+   },
+   "DependsOn": [
+    "McpServerTaskRoleDefaultPolicy8E624EA6",
+    "McpServerTaskRoleB19E5A08"
+   ],
+   "Metadata": {
+    "aws:cdk:path": "McpHostStack/McpServerService/Service/SecurityGroup/Resource"
+   }
+  },
+  "McpServerServiceSecurityGroupfromMcpHostStackMcpServerServiceLBSecurityGroup269F51AB80008586DC21": {
+   "Type": "AWS::EC2::SecurityGroupIngress",
+   "Properties": {
+    "Description": "Load balancer to target",
+    "FromPort": 8000,
+    "GroupId": {
+     "Fn::GetAtt": [
+      "McpServerServiceSecurityGroupCBA9C12E",
+      "GroupId"
+     ]
+    },
+    "IpProtocol": "tcp",
+    "SourceSecurityGroupId": {
+     "Fn::GetAtt": [
+      "McpServerServiceLBSecurityGroup3AEE1922",
+      "GroupId"
+     ]
+    },
+    "ToPort": 8000
+   },
+   "DependsOn": [
+    "McpServerTaskRoleDefaultPolicy8E624EA6",
+    "McpServerTaskRoleB19E5A08"
+   ],
+   "Metadata": {
+    "aws:cdk:path": "McpHostStack/McpServerService/Service/SecurityGroup/from McpHostStackMcpServerServiceLBSecurityGroup269F51AB:8000"
+   }
+  },
+  "McpHostTaskRoleF62D4C67": {
+   "Type": "AWS::IAM::Role",
+   "Properties": {
+    "AssumeRolePolicyDocument": {
+     "Statement": [
+      {
+       "Action": "sts:AssumeRole",
+       "Effect": "Allow",
+       "Principal": {
+        "Service": "ecs-tasks.amazonaws.com"
+       }
+      }
+     ],
+     "Version": "2012-10-17"
+    },
+    "ManagedPolicyArns": [
+     {
+      "Fn::Join": [
+       "",
+       [
+        "arn:",
+        {
+         "Ref": "AWS::Partition"
+        },
+        ":iam::aws:policy/service-role/AmazonECSTaskExecutionRolePolicy"
+       ]
+      ]
+     }
+    ]
+   },
+   "Metadata": {
+    "aws:cdk:path": "McpHostStack/McpHostTaskRole/Resource"
+   }
+  },
+  "McpHostServiceLB59748D70": {
+   "Type": "AWS::ElasticLoadBalancingV2::LoadBalancer",
+   "Properties": {
+    "LoadBalancerAttributes": [
+     {
+      "Key": "deletion_protection.enabled",
+      "Value": "false"
+     }
+    ],
+    "Scheme": "internet-facing",
+    "SecurityGroups": [
+     {
+      "Fn::GetAtt": [
+       "McpHostServiceLBSecurityGroupB5C58556",
+       "GroupId"
+      ]
+     }
+    ],
+    "Subnets": [
+     {
+      "Ref": "McpClusterVpcPublicSubnet1Subnet8EC920C6"
+     },
+     {
+      "Ref": "McpClusterVpcPublicSubnet2Subnet60BEC3C0"
+     }
+    ],
+    "Type": "application"
+   },
+   "DependsOn": [
+    "McpClusterVpcPublicSubnet1DefaultRoute80258347",
+    "McpClusterVpcPublicSubnet1RouteTableAssociation26337F30",
+    "McpClusterVpcPublicSubnet2DefaultRouteF1EC8251",
+    "McpClusterVpcPublicSubnet2RouteTableAssociation733DBFCC"
+   ],
+   "Metadata": {
+    "aws:cdk:path": "McpHostStack/McpHostService/LB/Resource"
+   }
+  },
+  "McpHostServiceLBSecurityGroupB5C58556": {
+   "Type": "AWS::EC2::SecurityGroup",
+   "Properties": {
+    "GroupDescription": "Automatically created Security Group for ELB McpHostStackMcpHostServiceLB0CEB8D3C",
+    "SecurityGroupIngress": [
+     {
+      "CidrIp": "0.0.0.0/0",
+      "Description": "Allow from anyone on port 80",
+      "FromPort": 80,
+      "IpProtocol": "tcp",
+      "ToPort": 80
+     }
+    ],
+    "VpcId": {
+     "Ref": "McpClusterVpc02532540"
+    }
+   },
+   "Metadata": {
+    "aws:cdk:path": "McpHostStack/McpHostService/LB/SecurityGroup/Resource"
+   }
+  },
+  "McpHostServiceLBSecurityGrouptoMcpHostStackMcpHostServiceSecurityGroup283041933000A9B2B604": {
+   "Type": "AWS::EC2::SecurityGroupEgress",
+   "Properties": {
+    "Description": "Load balancer to target",
+    "DestinationSecurityGroupId": {
+     "Fn::GetAtt": [
+      "McpHostServiceSecurityGroup6D76FFA5",
+      "GroupId"
+     ]
+    },
+    "FromPort": 3000,
+    "GroupId": {
+     "Fn::GetAtt": [
+      "McpHostServiceLBSecurityGroupB5C58556",
+      "GroupId"
+     ]
+    },
+    "IpProtocol": "tcp",
+    "ToPort": 3000
+   },
+   "Metadata": {
+    "aws:cdk:path": "McpHostStack/McpHostService/LB/SecurityGroup/to McpHostStackMcpHostServiceSecurityGroup28304193:3000"
+   }
+  },
+  "McpHostServiceLBPublicListenerBB2BCB3A": {
+   "Type": "AWS::ElasticLoadBalancingV2::Listener",
+   "Properties": {
+    "DefaultActions": [
+     {
+      "TargetGroupArn": {
+       "Ref": "McpHostServiceLBPublicListenerECSGroupE0964117"
+      },
+      "Type": "forward"
+     }
+    ],
+    "LoadBalancerArn": {
+     "Ref": "McpHostServiceLB59748D70"
+    },
+    "Port": 80,
+    "Protocol": "HTTP"
+   },
+   "Metadata": {
+    "aws:cdk:path": "McpHostStack/McpHostService/LB/PublicListener/Resource"
+   }
+  },
+  "McpHostServiceLBPublicListenerECSGroupE0964117": {
+   "Type": "AWS::ElasticLoadBalancingV2::TargetGroup",
+   "Properties": {
+    "Port": 80,
+    "Protocol": "HTTP",
+    "TargetGroupAttributes": [
+     {
+      "Key": "stickiness.enabled",
+      "Value": "false"
+     }
+    ],
+    "TargetType": "ip",
+    "VpcId": {
+     "Ref": "McpClusterVpc02532540"
+    }
+   },
+   "Metadata": {
+    "aws:cdk:path": "McpHostStack/McpHostService/LB/PublicListener/ECSGroup/Resource"
+   }
+  },
+  "McpHostServiceTaskDef31158B03": {
+   "Type": "AWS::ECS::TaskDefinition",
+   "Properties": {
+    "ContainerDefinitions": [
+     {
+      "Environment": [
+       {
+        "Name": "PORT",
+        "Value": "3000"
+       },
+       {
+        "Name": "NODE_ENV",
+        "Value": "production"
+       },
+       {
+        "Name": "MCP_SERVER_URL",
+        "Value": {
+         "Fn::Join": [
+          "",
+          [
+           "http://",
+           {
+            "Fn::GetAtt": [
+             "McpServerServiceLB8C38DADE",
+             "DNSName"
+            ]
+           },
+           ":8000"
+          ]
+         ]
+        }
+       }
+      ],
+      "Essential": true,
+      "Image": {
+       "Fn::Sub": "${AWS::AccountId}.dkr.ecr.us-east-1.${AWS::URLSuffix}/cdk-hnb659fds-container-assets-${AWS::AccountId}-us-east-1:81a9fb7b5e6a8ce58cf4725bb3545f5fb77dd4c7018135e225299b154dfd3a06"
+      },
+      "LogConfiguration": {
+       "LogDriver": "awslogs",
+       "Options": {
+        "awslogs-group": {
+         "Ref": "McpHostLogGroupB24D02B1"
+        },
+        "awslogs-stream-prefix": "mcp-host",
+        "awslogs-region": "us-east-1"
+       }
+      },
+      "Name": "web",
+      "PortMappings": [
+       {
+        "ContainerPort": 3000,
+        "Protocol": "tcp"
+       }
+      ],
+      "Secrets": [
+       {
+        "Name": "CLAUDE_API_KEY",
+        "ValueFrom": {
+         "Fn::Join": [
+          "",
+          [
+           "arn:aws:ssm:us-east-1:",
+           {
+            "Ref": "AWS::AccountId"
+           },
+           ":parameter/mcp/claude-api-key"
+          ]
+         ]
+        }
+       }
+      ]
+     }
+    ],
+    "Cpu": "512",
+    "ExecutionRoleArn": {
+     "Fn::GetAtt": [
+      "McpHostServiceTaskDefExecutionRoleA4B39654",
+      "Arn"
+     ]
+    },
+    "Family": "McpHostStackMcpHostServiceTaskDef26105505",
+    "Memory": "1024",
+    "NetworkMode": "awsvpc",
+    "RequiresCompatibilities": [
+     "FARGATE"
+    ],
+    "TaskRoleArn": {
+     "Fn::GetAtt": [
+      "McpHostTaskRoleF62D4C67",
+      "Arn"
+     ]
+    }
+   },
+   "Metadata": {
+    "aws:cdk:path": "McpHostStack/McpHostService/TaskDef/Resource"
+   }
+  },
+  "McpHostServiceTaskDefExecutionRoleA4B39654": {
+   "Type": "AWS::IAM::Role",
+   "Properties": {
+    "AssumeRolePolicyDocument": {
+     "Statement": [
+      {
+       "Action": "sts:AssumeRole",
+       "Effect": "Allow",
+       "Principal": {
+        "Service": "ecs-tasks.amazonaws.com"
+       }
+      }
+     ],
+     "Version": "2012-10-17"
+    }
+   },
+   "Metadata": {
+    "aws:cdk:path": "McpHostStack/McpHostService/TaskDef/ExecutionRole/Resource"
+   }
+  },
+  "McpHostServiceTaskDefExecutionRoleDefaultPolicy10888498": {
+   "Type": "AWS::IAM::Policy",
+   "Properties": {
+    "PolicyDocument": {
+     "Statement": [
+      {
+       "Action": [
+        "ecr:BatchCheckLayerAvailability",
+        "ecr:BatchGetImage",
+        "ecr:GetDownloadUrlForLayer"
+       ],
+       "Effect": "Allow",
+       "Resource": {
+        "Fn::Join": [
+         "",
+         [
+          "arn:aws:ecr:us-east-1:",
+          {
+           "Ref": "AWS::AccountId"
+          },
+          ":repository/",
+          {
+           "Fn::Sub": "cdk-hnb659fds-container-assets-${AWS::AccountId}-us-east-1"
+          }
+         ]
+        ]
+       }
+      },
+      {
+       "Action": "ecr:GetAuthorizationToken",
+       "Effect": "Allow",
+       "Resource": "*"
+      },
+      {
+       "Action": [
+        "logs:CreateLogStream",
+        "logs:PutLogEvents"
+       ],
+       "Effect": "Allow",
+       "Resource": {
+        "Fn::GetAtt": [
+         "McpHostLogGroupB24D02B1",
+         "Arn"
+        ]
+       }
+      },
+      {
+       "Action": [
+        "ssm:DescribeParameters",
+        "ssm:GetParameter",
+        "ssm:GetParameterHistory",
+        "ssm:GetParameters"
+       ],
+       "Effect": "Allow",
+       "Resource": {
+        "Fn::Join": [
+         "",
+         [
+          "arn:aws:ssm:us-east-1:",
+          {
+           "Ref": "AWS::AccountId"
+          },
+          ":parameter/mcp/claude-api-key"
+         ]
+        ]
+       }
+      }
+     ],
+     "Version": "2012-10-17"
+    },
+    "PolicyName": "McpHostServiceTaskDefExecutionRoleDefaultPolicy10888498",
+    "Roles": [
+     {
+      "Ref": "McpHostServiceTaskDefExecutionRoleA4B39654"
+     }
+    ]
+   },
+   "Metadata": {
+    "aws:cdk:path": "McpHostStack/McpHostService/TaskDef/ExecutionRole/DefaultPolicy/Resource"
+   }
+  },
+  "McpHostService14873DF2": {
+   "Type": "AWS::ECS::Service",
+   "Properties": {
+    "Cluster": {
+     "Ref": "McpCluster0CEA2FB6"
+    },
+    "DeploymentConfiguration": {
+     "Alarms": {
+      "AlarmNames": [],
+      "Enable": false,
+      "Rollback": false
+     },
+     "MaximumPercent": 200,
+     "MinimumHealthyPercent": 50
+    },
+    "DesiredCount": 1,
+    "EnableECSManagedTags": false,
+    "HealthCheckGracePeriodSeconds": 60,
+    "LaunchType": "FARGATE",
+    "LoadBalancers": [
+     {
+      "ContainerName": "web",
+      "ContainerPort": 3000,
+      "TargetGroupArn": {
+       "Ref": "McpHostServiceLBPublicListenerECSGroupE0964117"
+      }
+     }
+    ],
+    "NetworkConfiguration": {
+     "AwsvpcConfiguration": {
+      "AssignPublicIp": "DISABLED",
+      "SecurityGroups": [
+       {
+        "Fn::GetAtt": [
+         "McpHostServiceSecurityGroup6D76FFA5",
+         "GroupId"
+        ]
+       }
+      ],
+      "Subnets": [
+       {
+        "Ref": "McpClusterVpcPrivateSubnet1Subnet85846000"
+       },
+       {
+        "Ref": "McpClusterVpcPrivateSubnet2Subnet608B7954"
+       }
+      ]
+     }
+    },
+    "ServiceName": "dev-mcp-mcp-host",
+    "TaskDefinition": {
+     "Ref": "McpHostServiceTaskDef31158B03"
+    }
+   },
+   "DependsOn": [
+    "McpHostServiceLBPublicListenerECSGroupE0964117",
+    "McpHostServiceLBPublicListenerBB2BCB3A",
+    "McpHostTaskRoleF62D4C67"
+   ],
+   "Metadata": {
+    "aws:cdk:path": "McpHostStack/McpHostService/Service/Service"
+   }
+  },
+  "McpHostServiceSecurityGroup6D76FFA5": {
+   "Type": "AWS::EC2::SecurityGroup",
+   "Properties": {
+    "GroupDescription": "McpHostStack/McpHostService/Service/SecurityGroup",
+    "SecurityGroupEgress": [
+     {
+      "CidrIp": "0.0.0.0/0",
+      "Description": "Allow all outbound traffic by default",
+      "IpProtocol": "-1"
+     }
+    ],
+    "VpcId": {
+     "Ref": "McpClusterVpc02532540"
+    }
+   },
+   "DependsOn": [
+    "McpHostTaskRoleF62D4C67"
+   ],
+   "Metadata": {
+    "aws:cdk:path": "McpHostStack/McpHostService/Service/SecurityGroup/Resource"
+   }
+  },
+  "McpHostServiceSecurityGroupfromMcpHostStackMcpHostServiceLBSecurityGroup3DF266C03000269CDD22": {
+   "Type": "AWS::EC2::SecurityGroupIngress",
+   "Properties": {
+    "Description": "Load balancer to target",
+    "FromPort": 3000,
+    "GroupId": {
+     "Fn::GetAtt": [
+      "McpHostServiceSecurityGroup6D76FFA5",
+      "GroupId"
+     ]
+    },
+    "IpProtocol": "tcp",
+    "SourceSecurityGroupId": {
+     "Fn::GetAtt": [
+      "McpHostServiceLBSecurityGroupB5C58556",
+      "GroupId"
+     ]
+    },
+    "ToPort": 3000
+   },
+   "DependsOn": [
+    "McpHostTaskRoleF62D4C67"
+   ],
+   "Metadata": {
+    "aws:cdk:path": "McpHostStack/McpHostService/Service/SecurityGroup/from McpHostStackMcpHostServiceLBSecurityGroup3DF266C0:3000"
+   }
+  },
+  "McpHostApi8D35C069": {
+   "Type": "AWS::ApiGatewayV2::Api",
+   "Properties": {
+    "CorsConfiguration": {
+     "AllowHeaders": [
+      "*"
+     ],
+     "AllowMethods": [
+      "*"
+     ],
+     "AllowOrigins": [
+      "*"
+     ]
+    },
+    "Description": "MCP Host API for Claude AI integration",
+    "Name": "dev-mcp-mcp-host-api",
+    "ProtocolType": "HTTP"
+   },
+   "Metadata": {
+    "aws:cdk:path": "McpHostStack/McpHostApi/Resource"
+   }
+  },
+  "McpHostApiDefaultStageC1C1A59E": {
+   "Type": "AWS::ApiGatewayV2::Stage",
+   "Properties": {
+    "ApiId": {
+     "Ref": "McpHostApi8D35C069"
+    },
+    "AutoDeploy": true,
+    "StageName": "$default"
+   },
+   "Metadata": {
+    "aws:cdk:path": "McpHostStack/McpHostApi/DefaultStage/Resource"
+   }
+  },
+  "McpHostApiANYproxyMcpHostIntegration62F26456": {
+   "Type": "AWS::ApiGatewayV2::Integration",
+   "Properties": {
+    "ApiId": {
+     "Ref": "McpHostApi8D35C069"
+    },
+    "ConnectionId": {
+     "Ref": "McpHostVpcLink266D46FE"
+    },
+    "ConnectionType": "VPC_LINK",
+    "IntegrationMethod": "ANY",
+    "IntegrationType": "HTTP_PROXY",
+    "IntegrationUri": {
+     "Ref": "McpHostServiceLBPublicListenerBB2BCB3A"
+    },
+    "PayloadFormatVersion": "1.0"
+   },
+   "Metadata": {
+    "aws:cdk:path": "McpHostStack/McpHostApi/ANY--{proxy+}/McpHostIntegration/Resource"
+   }
+  },
+  "McpHostApiANYproxy2BFF276D": {
+   "Type": "AWS::ApiGatewayV2::Route",
+   "Properties": {
+    "ApiId": {
+     "Ref": "McpHostApi8D35C069"
+    },
+    "AuthorizationType": "NONE",
+    "RouteKey": "ANY /{proxy+}",
+    "Target": {
+     "Fn::Join": [
+      "",
+      [
+       "integrations/",
+       {
+        "Ref": "McpHostApiANYproxyMcpHostIntegration62F26456"
+       }
+      ]
+     ]
+    }
+   },
+   "Metadata": {
+    "aws:cdk:path": "McpHostStack/McpHostApi/ANY--{proxy+}/Resource"
+   }
+  },
+  "McpHostVpcLink266D46FE": {
+   "Type": "AWS::ApiGatewayV2::VpcLink",
+   "Properties": {
+    "Name": "McpHostStackMcpHostVpcLink9C6E2340",
+    "SecurityGroupIds": [],
+    "SubnetIds": [
+     {
+      "Ref": "McpClusterVpcPrivateSubnet1Subnet85846000"
+     },
+     {
+      "Ref": "McpClusterVpcPrivateSubnet2Subnet608B7954"
+     }
+    ]
+   },
+   "Metadata": {
+    "aws:cdk:path": "McpHostStack/McpHostVpcLink/Resource"
+   }
+  },
+  "ReportingLogGroup2858B4B5": {
+   "Type": "AWS::Logs::LogGroup",
+   "Properties": {
+    "LogGroupName": "/aws/stepfunctions/dev-mcp-reporting",
+    "RetentionInDays": 30
+   },
+   "UpdateReplacePolicy": "Delete",
+   "DeletionPolicy": "Delete",
+   "Metadata": {
+    "aws:cdk:path": "McpHostStack/ReportingLogGroup/Resource"
+   }
+  },
+  "ReportingStateMachineRole09FE2AD3": {
+   "Type": "AWS::IAM::Role",
+   "Properties": {
+    "AssumeRolePolicyDocument": {
+     "Statement": [
+      {
+       "Action": "sts:AssumeRole",
+       "Effect": "Allow",
+       "Principal": {
+        "Service": "states.amazonaws.com"
+       }
+      }
+     ],
+     "Version": "2012-10-17"
+    }
+   },
+   "Metadata": {
+    "aws:cdk:path": "McpHostStack/ReportingStateMachine/Role/Resource"
+   }
+  },
+  "ReportingStateMachineRoleDefaultPolicyECFA7AE6": {
+   "Type": "AWS::IAM::Policy",
+   "Properties": {
+    "PolicyDocument": {
+     "Statement": [
+      {
+       "Action": "apigatewayv2:getApi",
+       "Effect": "Allow",
+       "Resource": {
+        "Fn::Join": [
+         "",
+         [
+          "arn:aws:apigateway:us-east-1::/apis/",
+          {
+           "Ref": "McpHostApi8D35C069"
+          }
+         ]
+        ]
+       }
+      },
+      {
+       "Action": "sns:Publish",
+       "Effect": "Allow",
+       "Resource": {
+        "Fn::Join": [
+         "",
+         [
+          "arn:aws:sns:us-east-1:",
+          {
+           "Ref": "AWS::AccountId"
+          },
+          ":dev-mcp-main-sns"
+         ]
+        ]
+       }
+      },
+      {
+       "Action": [
+        "logs:CreateLogDelivery",
+        "logs:DeleteLogDelivery",
+        "logs:DescribeLogGroups",
+        "logs:DescribeResourcePolicies",
+        "logs:GetLogDelivery",
+        "logs:ListLogDeliveries",
+        "logs:PutResourcePolicy",
+        "logs:UpdateLogDelivery",
+        "xray:GetSamplingRules",
+        "xray:GetSamplingTargets",
+        "xray:PutTelemetryRecords",
+        "xray:PutTraceSegments"
+       ],
+       "Effect": "Allow",
+       "Resource": "*"
+      }
+     ],
+     "Version": "2012-10-17"
+    },
+    "PolicyName": "ReportingStateMachineRoleDefaultPolicyECFA7AE6",
+    "Roles": [
+     {
+      "Ref": "ReportingStateMachineRole09FE2AD3"
+     }
+    ]
+   },
+   "Metadata": {
+    "aws:cdk:path": "McpHostStack/ReportingStateMachine/Role/DefaultPolicy/Resource"
+   }
+  },
+  "ReportingStateMachineB2BCC54B": {
+   "Type": "AWS::StepFunctions::StateMachine",
+   "Properties": {
+    "DefinitionString": {
+     "Fn::Join": [
+      "",
+      [
+       "{\"StartAt\":\"GenerateReport\",\"States\":{\"GenerateReport\":{\"Next\":\"NotifyReport\",\"Type\":\"Task\",\"ResultPath\":\"$.reportData\",\"Resource\":\"arn:",
+       {
+        "Ref": "AWS::Partition"
+       },
+       ":states:::aws-sdk:apigatewayv2:getApi\",\"Parameters\":{\"ApiId\":\"",
+       {
+        "Ref": "McpHostApi8D35C069"
+       },
+       "\"}},\"NotifyReport\":{\"End\":true,\"Type\":\"Task\",\"Resource\":\"arn:",
+       {
+        "Ref": "AWS::Partition"
+       },
+       ":states:::sns:publish\",\"Parameters\":{\"TopicArn\":\"arn:aws:sns:us-east-1:",
+       {
+        "Ref": "AWS::AccountId"
+       },
+       ":dev-mcp-main-sns\",\"Message.$\":\"$.reportData\",\"Subject\":\"dev-mcp システム稼働状況レポート\"}}}}"
+      ]
+     ]
+    },
+    "LoggingConfiguration": {
+     "Destinations": [
+      {
+       "CloudWatchLogsLogGroup": {
+        "LogGroupArn": {
+         "Fn::GetAtt": [
+          "ReportingLogGroup2858B4B5",
+          "Arn"
+         ]
+        }
+       }
+      }
+     ],
+     "Level": "ALL"
+    },
+    "RoleArn": {
+     "Fn::GetAtt": [
+      "ReportingStateMachineRole09FE2AD3",
+      "Arn"
+     ]
+    },
+    "StateMachineName": "dev-mcp-mcp-reporting",
+    "TracingConfiguration": {
+     "Enabled": true
+    }
+   },
+   "DependsOn": [
+    "ReportingStateMachineRoleDefaultPolicyECFA7AE6",
+    "ReportingStateMachineRole09FE2AD3"
+   ],
+   "UpdateReplacePolicy": "Delete",
+   "DeletionPolicy": "Delete",
+   "Metadata": {
+    "aws:cdk:path": "McpHostStack/ReportingStateMachine/Resource"
+   }
+  },
+  "ReportingStateMachineEventsRoleCF990DB9": {
+   "Type": "AWS::IAM::Role",
+   "Properties": {
+    "AssumeRolePolicyDocument": {
+     "Statement": [
+      {
+       "Action": "sts:AssumeRole",
+       "Effect": "Allow",
+       "Principal": {
+        "Service": "events.amazonaws.com"
+       }
+      }
+     ],
+     "Version": "2012-10-17"
+    }
+   },
+   "Metadata": {
+    "aws:cdk:path": "McpHostStack/ReportingStateMachine/EventsRole/Resource"
+   }
+  },
+  "ReportingStateMachineEventsRoleDefaultPolicy298A0EC3": {
+   "Type": "AWS::IAM::Policy",
+   "Properties": {
+    "PolicyDocument": {
+     "Statement": [
+      {
+       "Action": "states:StartExecution",
+       "Effect": "Allow",
+       "Resource": {
+        "Ref": "ReportingStateMachineB2BCC54B"
+       }
+      }
+     ],
+     "Version": "2012-10-17"
+    },
+    "PolicyName": "ReportingStateMachineEventsRoleDefaultPolicy298A0EC3",
+    "Roles": [
+     {
+      "Ref": "ReportingStateMachineEventsRoleCF990DB9"
+     }
+    ]
+   },
+   "Metadata": {
+    "aws:cdk:path": "McpHostStack/ReportingStateMachine/EventsRole/DefaultPolicy/Resource"
+   }
+  },
+  "ReportingSchedule396D416B": {
+   "Type": "AWS::Events::Rule",
+   "Properties": {
+    "Description": "Daily system metrics reporting",
+    "Name": "dev-mcp-daily-reporting",
+    "ScheduleExpression": "cron(0 0 * * ? *)",
+    "State": "ENABLED",
+    "Targets": [
+     {
+      "Arn": {
+       "Ref": "ReportingStateMachineB2BCC54B"
+      },
+      "Id": "Target0",
+      "RoleArn": {
+       "Fn::GetAtt": [
+        "ReportingStateMachineEventsRoleCF990DB9",
+        "Arn"
+       ]
+      }
+     }
+    ]
+   },
+   "Metadata": {
+    "aws:cdk:path": "McpHostStack/ReportingSchedule/Resource"
+   }
+  },
+  "CDKMetadata": {
+   "Type": "AWS::CDK::Metadata",
+   "Properties": {
+    "Analytics": "v2:deflate64:H4sIAAAAAAAA/31T244aMQz9ln3Ppgt/wLLbLRJtR4B4RSaYwUtIotgBodH8e5UMDJRennx8bM8cXzLUw5cXPXiCEz+bzf7Z0lo3cwGzV3DiVYOGdTO2iQWjGm/dFX6FWIPgAnj/hltyJORdTnhkvBMgh/GOu9TOMR7JYC66wFahGepmGUwml9VYVWltyczT2qGUxB7NfMq/X1u88TduxOwNwVVUCWTwPqmy+QHyAYInOKsq0jGL6T88cYLRYZ/QKbl4IxEwuwM6UXM0KZKcP6JPoWvif8R7HZH5D3riCt8q62vWzdTXffkVt4rgoJuZ71ottvKWTNHWoTw5XgWQrJ31KARLprQ/9bB5BQvO4OZh8GiBhYz1sFmXDHL1caibv1fHTtOdf59HLOguOVd8F19ArFH61u7crDyugBmF9Zs3e4yTA9R5gyg5pmcYPJP4eH4FRgWB6m4ZWes3kTAKlD+aTXbnAnV3FAVkqtt/Rnm7dewP48Ht8pbBTMnty+Y72CoWDNvkTM7klQDv87sAa0cnvs5z7rjcK+9axY71wgcyRfNv1eV9CX4HsyN3Fdr7rcIjOmHdzNJl4cli26oZsk8xv5fE4g83d+v+EaqiP9IGY5FQ5pknQq7ONT+ThFQOvoIIBxSMrXJ+g/qTvxyHQz0Y6JenTyZ6jskJHVDPOvsLGoc+ijMEAAA="
+   },
+   "Metadata": {
+    "aws:cdk:path": "McpHostStack/CDKMetadata/Default"
+   }
+  }
+ },
+ "Outputs": {
+  "McpServerServiceLoadBalancerDNSE4C9CCC6": {
+   "Value": {
+    "Fn::GetAtt": [
+     "McpServerServiceLB8C38DADE",
+     "DNSName"
+    ]
+   }
+  },
+  "McpServerServiceServiceURLBD83E2EE": {
+   "Value": {
+    "Fn::Join": [
+     "",
+     [
+      "http://",
+      {
+       "Fn::GetAtt": [
+        "McpServerServiceLB8C38DADE",
+        "DNSName"
+       ]
+      }
+     ]
+    ]
+   }
+  },
+  "McpHostServiceLoadBalancerDNS45071CAE": {
+   "Value": {
+    "Fn::GetAtt": [
+     "McpHostServiceLB59748D70",
+     "DNSName"
+    ]
+   }
+  },
+  "McpHostServiceServiceURL4EED784A": {
+   "Value": {
+    "Fn::Join": [
+     "",
+     [
+      "http://",
+      {
+       "Fn::GetAtt": [
+        "McpHostServiceLB59748D70",
+        "DNSName"
+       ]
+      }
+     ]
+    ]
+   }
+  },
+  "McpHostApiUrl": {
+   "Description": "MCP Host API URL",
+   "Value": {
+    "Fn::Join": [
+     "",
+     [
+      "https://",
+      {
+       "Ref": "McpHostApi8D35C069"
+      },
+      ".execute-api.us-east-1.amazonaws.com"
+     ]
+    ]
+   }
+  },
+  "McpServerUrl": {
+   "Description": "MCP Server URL (internal)",
+   "Value": {
+    "Fn::Join": [
+     "",
+     [
+      "http://",
+      {
+       "Fn::GetAtt": [
+        "McpServerServiceLB8C38DADE",
+        "DNSName"
+       ]
+      },
+      ":8000"
+     ]
+    ]
+   }
+  },
+  "ReportingStateMachineArn": {
+   "Description": "Reporting State Machine ARN",
+   "Value": {
+    "Ref": "ReportingStateMachineB2BCC54B"
+   }
+  }
+ },
+ "Parameters": {
+  "ClaudeApiKeyParamParameter": {
+   "Type": "AWS::SSM::Parameter::Value<String>",
+   "Default": "/mcp/claude-api-key"
+  },
+  "BootstrapVersion": {
+   "Type": "AWS::SSM::Parameter::Value<String>",
+   "Default": "/cdk-bootstrap/hnb659fds/version",
+   "Description": "Version of the CDK Bootstrap resources in this environment, automatically retrieved from SSM Parameter Store. [cdk:skip]"
+  }
+ },
+ "Rules": {
+  "CheckBootstrapVersion": {
+   "Assertions": [
+    {
+     "Assert": {
+      "Fn::Not": [
+       {
+        "Fn::Contains": [
+         [
+          "1",
+          "2",
+          "3",
+          "4",
+          "5"
+         ],
+         {
+          "Ref": "BootstrapVersion"
+         }
+        ]
+       }
+      ]
+     },
+     "AssertDescription": "CDK bootstrap stack version 6 required. Please run 'cdk bootstrap' with a recent version of the CDK CLI."
+    }
+   ]
+  }
+ }
+}

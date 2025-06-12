@@ -1,0 +1,67 @@
+{
+  "version": "44.0.0",
+  "files": {
+    "7fa1e366ee8a9ded01fc355f704cff92bfd179574e6f9cfee800a3541df1b200": {
+      "displayName": "McpHostStack/Custom::VpcRestrictDefaultSGCustomResourceProvider Code",
+      "source": {
+        "path": "asset.7fa1e366ee8a9ded01fc355f704cff92bfd179574e6f9cfee800a3541df1b200",
+        "packaging": "zip"
+      },
+      "destinations": {
+        "current_account-us-east-1": {
+          "bucketName": "cdk-hnb659fds-assets-${AWS::AccountId}-us-east-1",
+          "objectKey": "7fa1e366ee8a9ded01fc355f704cff92bfd179574e6f9cfee800a3541df1b200.zip",
+          "region": "us-east-1",
+          "assumeRoleArn": "arn:${AWS::Partition}:iam::${AWS::AccountId}:role/cdk-hnb659fds-file-publishing-role-${AWS::AccountId}-us-east-1"
+        }
+      }
+    },
+    "177117303b4eae0debd702d824eb806b44fa8ea3b56ebb006018ffcbc89af9b4": {
+      "displayName": "McpHostStack Template",
+      "source": {
+        "path": "McpHostStack.template.json",
+        "packaging": "file"
+      },
+      "destinations": {
+        "current_account-us-east-1": {
+          "bucketName": "cdk-hnb659fds-assets-${AWS::AccountId}-us-east-1",
+          "objectKey": "177117303b4eae0debd702d824eb806b44fa8ea3b56ebb006018ffcbc89af9b4.json",
+          "region": "us-east-1",
+          "assumeRoleArn": "arn:${AWS::Partition}:iam::${AWS::AccountId}:role/cdk-hnb659fds-file-publishing-role-${AWS::AccountId}-us-east-1"
+        }
+      }
+    }
+  },
+  "dockerImages": {
+    "777d73f2803444ac7ffeab2f3f312152f3eb661e02b64e3d3af1fb4efd3a68ff": {
+      "displayName": "McpServerService/TaskDef/web/AssetImage",
+      "source": {
+        "directory": "asset.777d73f2803444ac7ffeab2f3f312152f3eb661e02b64e3d3af1fb4efd3a68ff",
+        "dockerFile": "Dockerfile.mcp-server"
+      },
+      "destinations": {
+        "current_account-us-east-1": {
+          "repositoryName": "cdk-hnb659fds-container-assets-${AWS::AccountId}-us-east-1",
+          "imageTag": "777d73f2803444ac7ffeab2f3f312152f3eb661e02b64e3d3af1fb4efd3a68ff",
+          "region": "us-east-1",
+          "assumeRoleArn": "arn:${AWS::Partition}:iam::${AWS::AccountId}:role/cdk-hnb659fds-image-publishing-role-${AWS::AccountId}-us-east-1"
+        }
+      }
+    },
+    "81a9fb7b5e6a8ce58cf4725bb3545f5fb77dd4c7018135e225299b154dfd3a06": {
+      "displayName": "McpHostService/TaskDef/web/AssetImage",
+      "source": {
+        "directory": "asset.81a9fb7b5e6a8ce58cf4725bb3545f5fb77dd4c7018135e225299b154dfd3a06",
+        "dockerFile": "Dockerfile"
+      },
+      "destinations": {
+        "current_account-us-east-1": {
+          "repositoryName": "cdk-hnb659fds-container-assets-${AWS::AccountId}-us-east-1",
+          "imageTag": "81a9fb7b5e6a8ce58cf4725bb3545f5fb77dd4c7018135e225299b154dfd3a06",
+          "region": "us-east-1",
+          "assumeRoleArn": "arn:${AWS::Partition}:iam::${AWS::AccountId}:role/cdk-hnb659fds-image-publishing-role-${AWS::AccountId}-us-east-1"
+        }
+      }
+    }
+  }
+}
