@@ -8,6 +8,8 @@ import {
 import { MasterDataEntity, MasterDataListEntity } from '../entities'
 
 export interface IMasterDataService {
+  listByRds(searchDto: MasterDataSearchDto, context: { invokeContext: IInvoke })
+
   list(searchDto: MasterDataSearchDto): Promise<MasterDataListEntity>
 
   get(key: DetailDto): Promise<MasterDataEntity>
