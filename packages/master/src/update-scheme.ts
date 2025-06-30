@@ -11,7 +11,7 @@ const jsonFilePath = resolve(
   __dirname,
   '../../../../prisma/dynamodbs/cqrs.json',
 ) // Replace with your actual file name
-const formatDynamo = () => {
+const formatDynamo = async () => {
   try {
     // Read the JSON file
     const rawData = readFileSync(jsonFilePath, 'utf-8')
@@ -52,7 +52,7 @@ const transformDynamodbStreamFunction = `
     return [...curEvents, ...taskEvents]
   }
 `
-const formatEventFactory = () => {
+const formatEventFactory = async () => {
   try {
     let rawData: string = readFileSync(eventFilePath, 'utf-8')
 
@@ -229,29 +229,59 @@ const formatTemplate = () => {
 
   const mainPath = resolve(__dirname, '../../../../src/main.module.ts')
   let rawData: string = readFileSync(mainPath, 'utf-8')
-  if (rawData.includes('MasterModule')) {
-    return
+  let needsWrite = false
+
+  if (!rawData.includes('CustomEventFactory')) {
+    const eventImportLine =
+      "import { CustomEventFactory } from './event-factory'"
+    rawData = eventImportLine + '\n' + rawData
+    const module = ['CustomEventFactory']
+    rawData = appendToProviders(rawData, module)
+    needsWrite = true
   }
 
-  if (!rawData.includes('master.module')) {
-    const awsLambdaImportLine =
-      "import { MasterModule } from './master/master.module'"
-    rawData = awsLambdaImportLine + '\n' + rawData
+  if (!rawData.includes('MasterModule')) {
+    if (!rawData.includes('./master/master.module')) {
+      const awsLambdaImportLine =
+        "import { MasterModule } from './master/master.module'"
+      rawData = awsLambdaImportLine + '\n' + rawData
+      needsWrite = true
+    }
 
-    const customTaskLine = `import { CustomTaskModule } from './custom-task/custom-task.module'`
-    rawData = customTaskLine + '\n' + rawData
-    writeFileSync(mainPath, rawData, 'utf-8')
+    if (!rawData.includes('./custom-task/custom-task.module')) {
+      const customTaskLine = `import { CustomTaskModule } from './custom-task/custom-task.module'`
+      rawData = customTaskLine + '\n' + rawData
+      needsWrite = true
+    }
 
     const modulesToAdd: string[] = ['MasterModule', 'CustomTaskModule']
-    const result = appendModulesAfterOpeningBracket(rawData, modulesToAdd)
-    writeFileSync(mainPath, result, 'utf-8')
+    rawData = appendModulesAfterOpeningBracket(rawData, modulesToAdd)
+    needsWrite = true
   }
+
+  if (needsWrite) {
+    writeFileSync(mainPath, rawData, 'utf-8')
+  }
+}
+
+function appendToProviders(
+  codeString: string,
+  modulesToAppend: string[],
+): string {
+  const importsRegex = /(providers:\s*\[\s*)/s
+  const formattedModules = modulesToAppend.join(',\n    ')
+  const replacement = `$1\n    ${formattedModules},\n    `
+
+  const newCodeString = codeString.replace(importsRegex, replacement)
+
+  return newCodeString
 }
 
 function appendModulesAfterOpeningBracket(codeString, modulesToAppend) {
   const importsRegex = /(imports:\s*\[\s*)/s
   const formattedModules = modulesToAppend.join(',\n    ')
   const replacement = `$1\n    ${formattedModules},\n    `
+
   const newCodeString = codeString.replace(importsRegex, replacement)
 
   return newCodeString
