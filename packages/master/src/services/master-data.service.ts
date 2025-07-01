@@ -33,6 +33,20 @@ export class MasterDataService implements IMasterDataService {
     private readonly dataService: DataService,
   ) {}
 
+  /**
+   * List master data by RDS
+   * @param searchDto - Search criteria for master data
+   * @param context - Context containing invoke information
+   * @returns A promise that resolves to the search results
+   */
+  async listByRds(
+    searchDto: MasterDataSearchDto,
+    context: { invokeContext: IInvoke },
+  ) {
+    // TODO: Implement RDS logic here
+    return { searchDto, context }
+  }
+
   async list(searchDto: MasterDataSearchDto) {
     const { tenantCode, settingCode } = searchDto
     let pk

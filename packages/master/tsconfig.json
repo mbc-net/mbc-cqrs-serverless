@@ -3,5 +3,7 @@
   "compilerOptions": {
     "outDir": "./dist"
   },
+
+  "exclude": ["./src/templates"],
   "include": ["./src", "master.module-definition.ts"]
 }

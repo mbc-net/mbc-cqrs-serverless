@@ -3,6 +3,12 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.1.67-beta.0](https://github.com/mbc-net/mbc-cqrs-serverless/compare/v0.1.66-beta.0...v0.1.67-beta.0) (2025-06-10)
+
+### Features
+
+- enhance EmailService to support attachments ([1795adb](https://github.com/mbc-net/mbc-cqrs-serverless/commit/1795adbd467130a4b44b96878da574af0e02396c))
+
 ## [0.1.66-beta.0](https://github.com/mbc-net/mbc-cqrs-serverless/compare/v0.1.65-beta.0...v0.1.66-beta.0) (2025-05-21)
 
 **Note:** Version bump only for package @mbc-cqrs-serverless/core

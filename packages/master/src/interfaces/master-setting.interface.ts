@@ -1,4 +1,9 @@
-import { CommandModel, DetailKey, IInvoke } from '@mbc-cqrs-serverless/core'
+import {
+  CommandModel,
+  DetailKey,
+  IInvoke,
+  SearchDto,
+} from '@mbc-cqrs-serverless/core'
 
 import {
   CommonSettingDto,
@@ -79,4 +84,6 @@ export interface IMasterSettingService {
       invokeContext: IInvoke
     },
   ): Promise<CommandModel>
+
+  listSettingByRds(searchDto: SearchDto, context: { invokeContext: IInvoke })
 }
