@@ -9,6 +9,7 @@ import {
   getUserContext,
   IInvoke,
   KEY_SEPARATOR,
+  SearchDto,
   TableType,
   VERSION_FIRST,
 } from '@mbc-cqrs-serverless/core'
@@ -71,6 +72,20 @@ export class MasterSettingService implements IMasterSettingService {
       if (result) return result
     }
     return null
+  }
+
+  /**
+   * List master setting by RDS
+   * @param searchDto - Search criteria for master data
+   * @param context - Context containing invoke information
+   * @returns A promise that resolves to the search results
+   */
+  async listSettingByRds(
+    searchDto: SearchDto,
+    context: { invokeContext: IInvoke },
+  ) {
+    // TODO: Implement RDS logic here
+    return { searchDto, context }
   }
 
   async getSetting(
