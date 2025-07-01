@@ -331,7 +331,9 @@ const formatPrisma = () => {
   writeFileSync(mainPath, schemaData, 'utf-8')
 }
 
-formatDynamo()
-formatEventFactory()
-formatTemplate()
-formatPrisma()
+try {
+  formatDynamo()
+  formatEventFactory()
+  formatTemplate()
+  formatPrisma()
+} catch (e) {}
