@@ -2,13 +2,17 @@ import { DetailDto, IInvoke } from '@mbc-cqrs-serverless/core'
 
 import {
   CreateMasterDataDto,
+  CustomMasterDataSearchDto,
   MasterDataSearchDto,
   UpdateDataSettingDto,
 } from '../dto'
 import { MasterDataEntity, MasterDataListEntity } from '../entities'
 
 export interface IMasterDataService {
-  listByRds(searchDto: MasterDataSearchDto, context: { invokeContext: IInvoke })
+  listByRds(
+    searchDto: CustomMasterDataSearchDto,
+    context: { invokeContext: IInvoke },
+  )
 
   list(searchDto: MasterDataSearchDto): Promise<MasterDataListEntity>
 

@@ -2,7 +2,7 @@ import { SearchDto } from '@mbc-cqrs-serverless/core'
 import { Transform } from 'class-transformer'
 import { IsBoolean, IsOptional, IsString } from 'class-validator'
 
-export class MasterDataSearchDto extends SearchDto {
+export class CustomMasterDataSearchDto extends SearchDto {
   @IsOptional()
   @IsString()
   settingCode?: string

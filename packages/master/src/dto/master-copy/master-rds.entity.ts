@@ -1,5 +1,4 @@
 import { ApiProperty } from '@nestjs/swagger'
-import { Master } from '@prisma/client'
 
 export class MasterRdsEntity {
   @ApiProperty()
@@ -71,7 +70,7 @@ export class MasterRdsEntity {
   @ApiProperty({ type: 'object', required: false })
   attributes?: Record<string, any>
 
-  constructor(data: Partial<Master>) {
+  constructor(data) {
     Object.assign(this, data)
   }
 }

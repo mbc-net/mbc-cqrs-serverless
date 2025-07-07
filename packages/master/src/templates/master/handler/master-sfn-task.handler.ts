@@ -9,6 +9,10 @@ import {
   KEY_SEPARATOR,
 } from '@mbc-cqrs-serverless/core'
 import {
+  CopyType,
+  DataCopyMode,
+  DataCopyOptionDto,
+  MasterCopyDto,
   MasterDataService,
   MasterSettingService,
 } from '@mbc-cqrs-serverless/master'
@@ -26,12 +30,6 @@ import {
 } from 'src/helpers/id'
 import { PrismaService } from 'src/prisma'
 
-import {
-  CopyType,
-  DataCopyMode,
-  DataCopyOptionDto,
-  MasterCopyDto,
-} from '../dto/master-copy.dto'
 import { MasterSfnTaskEvent } from './master-sfn-task.event'
 
 const BATCH_SIZE = 100
