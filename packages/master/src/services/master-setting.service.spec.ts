@@ -20,6 +20,7 @@ import {
   TenantSettingDto,
   UserSettingDto,
 } from '../dto'
+import { PRISMA_SERVICE } from '../master.module-definition'
 
 const optionsMock = {
   invokeContext: {
@@ -57,6 +58,16 @@ describe('SettingService', () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         MasterSettingService,
+        {
+          provide: PRISMA_SERVICE,
+          useValue: {},
+        },
+        {
+          provide: CommandService,
+          useValue: {
+            publishAsync: jest.fn(),
+          },
+        },
         {
           provide: CommandService,
           useValue: {

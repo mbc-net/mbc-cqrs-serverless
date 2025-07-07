@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-unused-vars */
 import { cpSync, readFileSync, writeFileSync } from 'fs'
 import fs from 'fs'
 import { resolve } from 'path'

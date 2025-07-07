@@ -44,7 +44,8 @@
     "access": "public"
   },
   "dependencies": {
-    "@mbc-cqrs-serverless/core": "^0.1.66-beta.0",
-    "@mbc-cqrs-serverless/task": "^0.1.66-beta.0"
+    "ulid": "^2.3.0",
+    "@mbc-cqrs-serverless/core": "^0.1.68-beta.0",
+    "@mbc-cqrs-serverless/task": "^0.1.68-beta.0"
   }
 }
