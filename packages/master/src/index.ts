@@ -1,3 +1,5 @@
 export * from './controllers'
+export * from './decorators'
+export * from './dto'
 export * from './master.module'
 export * from './services'

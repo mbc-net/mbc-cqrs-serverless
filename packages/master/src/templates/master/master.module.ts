@@ -3,12 +3,11 @@ import { MasterModule as CoreMasterModule } from '@mbc-cqrs-serverless/master'
 import { SequencesModule } from '@mbc-cqrs-serverless/sequence'
 import { Module } from '@nestjs/common'
 import { CustomTaskModule } from 'src/custom-task/custom-task.module'
+import { PrismaService } from 'src/prisma'
 
 import { MasterDataSyncRdsHandler } from './handler/master-rds.handler'
 import { MasterSfnTaskEventHandler } from './handler/master-sfn-task.handler'
-import { MasterDataController } from './master-data.controller'
-import { CustomMasterDataService } from './master-data.service'
-import { MasterSettingController } from './master-setting.controller'
+import { CustomMasterSettingController } from './master-setting.controller'
 import { CustomMasterSettingService } from './master-setting.service'
 
 @Module({
@@ -17,20 +16,16 @@ import { CustomMasterSettingService } from './master-setting.service'
       tableName: 'master',
       dataSyncHandlers: [MasterDataSyncRdsHandler],
     }),
-
     CoreMasterModule.register({
-      enableController: false,
+      enableController: true,
+      prismaService: PrismaService,
       dataSyncHandlers: [MasterDataSyncRdsHandler],
     }),
     CustomTaskModule,
     SequencesModule,
   ],
-  controllers: [MasterDataController, MasterSettingController],
-  providers: [
-    CustomMasterDataService,
-    CustomMasterSettingService,
-    MasterSfnTaskEventHandler,
-  ],
-  exports: [CustomMasterSettingService, CoreMasterModule],
+  controllers: [CustomMasterSettingController],
+  providers: [CustomMasterSettingService, MasterSfnTaskEventHandler],
+  exports: [],
 })
 export class MasterModule {}

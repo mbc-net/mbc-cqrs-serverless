@@ -5,6 +5,7 @@ import {
   INVOKE_CONTEXT,
 } from '@mbc-cqrs-serverless/core'
 import {
+  BadRequestException,
   //   BadRequestException,
   Body,
   Controller,
@@ -18,9 +19,16 @@ import {
 } from '@nestjs/common'
 import { ApiTags } from '@nestjs/swagger'
 
+import { DetailKeys } from '../decorators'
+import {
+  CustomMasterDataSearchDto,
+  MasterDataCreateDto,
+  MasterDataUpdateDto,
+} from '../dto'
 import { CreateMasterDataDto } from '../dto/master-data/data-create.dto'
 import { MasterDataSearchDto } from '../dto/master-data/data-search.dto'
 import { UpdateDataSettingDto } from '../dto/master-data/data-update.dto'
+import { parsePk } from '../helpers'
 import { MasterDataService } from '../services/master-data.service'
 
 @Controller('api/master-data')
@@ -36,6 +44,11 @@ export class MasterDataController {
     @Query() searchDto: MasterDataSearchDto,
   ) {
     return await this.masterDataService.list(searchDto)
+  }
+
+  @Get('/detail/:id')
+  async getDetailById(@DetailKeys() key: DetailDto) {
+    return this.masterDataService.getDetail(key)
   }
 
   @Get('/:pk/:sk')
@@ -82,5 +95,53 @@ export class MasterDataController {
       settingCode,
       code,
     )
+  }
+
+  @Get('/list')
+  async list(
+    @Query() searchDto: CustomMasterDataSearchDto,
+    @INVOKE_CONTEXT() invokeContext: IInvoke,
+  ) {
+    return this.masterDataService.listByRds(searchDto, { invokeContext })
+  }
+
+  @Post('/create')
+  async create(
+    @Body() createDto: MasterDataCreateDto,
+    @INVOKE_CONTEXT() invokeContext: IInvoke,
+  ) {
+    return this.masterDataService.createSetting(createDto, invokeContext)
+  }
+
+  @Put('/:id')
+  async update(
+    @DetailKeys() key: DetailDto,
+    @Body() updateDto: MasterDataUpdateDto,
+    @INVOKE_CONTEXT() invokeContext: IInvoke,
+  ) {
+    const userContext = getUserContext(invokeContext)
+
+    const { tenantCode } = parsePk(key.pk)
+
+    if (userContext.tenantCode !== tenantCode) {
+      throw new BadRequestException('Invalid tenant code')
+    }
+    return this.masterDataService.updateSetting(key, updateDto, invokeContext)
+  }
+
+  @Delete('/:id')
+  async delete(
+    @DetailKeys() key: DetailDto,
+    @INVOKE_CONTEXT() invokeContext: IInvoke,
+  ) {
+    const userContext = getUserContext(invokeContext)
+
+    const { tenantCode } = parsePk(key.pk)
+
+    if (userContext.tenantCode !== tenantCode) {
+      throw new BadRequestException('Invalid tenant code')
+    }
+
+    return this.masterDataService.deleteSetting(key, invokeContext)
   }
 }

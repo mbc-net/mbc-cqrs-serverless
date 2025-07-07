@@ -3,6 +3,7 @@ import {
   CommandModel,
   CommandService,
   DataService,
+  DetailDto,
   DetailKey,
   DynamoDbService,
   generateId,
@@ -11,9 +12,16 @@ import {
   KEY_SEPARATOR,
   SearchDto,
   TableType,
+  UserContext,
   VERSION_FIRST,
 } from '@mbc-cqrs-serverless/core'
-import { BadRequestException, Injectable, Logger } from '@nestjs/common'
+import {
+  BadRequestException,
+  Inject,
+  Injectable,
+  Logger,
+  NotFoundException,
+} from '@nestjs/common'
 
 import {
   MASTER_PK_PREFIX,
@@ -25,6 +33,10 @@ import {
   CommonSettingDto,
   GetSettingDto,
   GroupSettingDto,
+  MasterRdsEntity,
+  MasterRdsListEntity,
+  MasterSettingSearchDto,
+  MasterSettingUpdateDto,
   TenantSettingDto,
   UpdateSettingDto,
   UserSettingDto,
@@ -32,7 +44,9 @@ import {
 import { MasterSettingEntity } from '../entities'
 import { SettingTypeEnum } from '../enums'
 import { generateMasterPk, generateMasterSettingSk } from '../helpers'
+import { getOrderBys } from '../helpers/rds'
 import { IMasterSettingService } from '../interfaces'
+import { PRISMA_SERVICE } from '../master.module-definition'
 
 @Injectable()
 export class MasterSettingService implements IMasterSettingService {
@@ -40,6 +54,8 @@ export class MasterSettingService implements IMasterSettingService {
   private tenantTableName: string
 
   constructor(
+    @Inject(PRISMA_SERVICE)
+    private readonly prismaService: any,
     private readonly commandService: CommandService,
     private readonly dataService: DataService,
     private readonly dynamoDbService: DynamoDbService,
@@ -329,5 +345,125 @@ export class MasterSettingService implements IMasterSettingService {
     )
 
     return item
+  }
+
+  async getDetail(key: DetailDto) {
+    const data = await this.dataService.getItem(key)
+
+    if (!data) throw new NotFoundException()
+
+    return new MasterRdsEntity(data)
+  }
+
+  async create(createDto: CommonSettingDto, invokeContext: IInvoke) {
+    const userContext = getUserContext(invokeContext)
+    return await this.createTenantSetting(
+      {
+        ...createDto,
+        tenantCode: userContext.tenantCode,
+      },
+      { invokeContext },
+    )
+  }
+
+  async update(
+    key: DetailDto,
+    updateDto: MasterSettingUpdateDto,
+    invokeContext: IInvoke,
+  ) {
+    const code = key.sk.split('#')[1]
+    const userContext = getUserContext(invokeContext)
+
+    return await this.updateSetting(
+      key,
+      {
+        code,
+        tenantCode: userContext.tenantCode,
+        name: updateDto.name,
+        settingValue: updateDto.attributes,
+      },
+      {
+        invokeContext,
+      },
+    )
+  }
+
+  async delete(key: DetailDto, invokeContext: IInvoke) {
+    return this.deleteSetting(key, { invokeContext })
+  }
+
+  async checkExistCode(code: string, invokeContext: IInvoke) {
+    const userContext = getUserContext(invokeContext)
+
+    const item = await this.prismaService.master.findFirst({
+      where: {
+        tenantCode: userContext.tenantCode,
+        masterType: SETTING_SK_PREFIX,
+        masterCode: code,
+      },
+    })
+
+    return !!item && !item.isDeleted
+  }
+
+  async list(searchDto: MasterSettingSearchDto, invokeContext: IInvoke) {
+    const userContext = getUserContext(invokeContext)
+
+    const where: any = {
+      tenantCode: this.getUserTenantCode(userContext),
+      masterType: SETTING_SK_PREFIX,
+    }
+
+    if (searchDto.isDeleted === false || searchDto.isDeleted === undefined) {
+      where.isDeleted = false
+    }
+
+    const andConditions = []
+
+    if (searchDto.name?.trim()) {
+      andConditions.push({
+        name: { contains: searchDto.name.trim() },
+      })
+    }
+
+    if (searchDto.keyword?.trim()) {
+      andConditions.push({
+        attributes: {
+          path: 'description',
+          string_contains: searchDto.keyword.trim(),
+        },
+      })
+    }
+
+    if (searchDto.code?.trim()) {
+      andConditions.push({
+        masterCode: { contains: searchDto.code.trim() },
+      })
+    }
+
+    if (andConditions.length) {
+      where.AND = andConditions
+    }
+
+    const { pageSize = 10, page = 1, orderBys = ['-createdAt'] } = searchDto
+
+    const [total, items] = await Promise.all([
+      this.prismaService.master.count({ where }),
+      this.prismaService.master.findMany({
+        where,
+        take: pageSize,
+        skip: pageSize * (page - 1),
+        orderBy: getOrderBys(orderBys),
+      }),
+    ])
+
+    return new MasterRdsListEntity({
+      total,
+      items: items.map((item) => new MasterRdsEntity(item)),
+    })
+  }
+
+  private getUserTenantCode(userContext: UserContext): string {
+    return userContext.tenantCode
   }
 }
