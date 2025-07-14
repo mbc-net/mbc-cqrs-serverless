@@ -1,8 +1,9 @@
 import { DetailDto, IInvoke, INVOKE_CONTEXT } from '@mbc-cqrs-serverless/core'
 import { TaskEntity } from '@mbc-cqrs-serverless/task'
-import { Controller, Get, Param, Query } from '@nestjs/common'
+import { Controller, Get, Query } from '@nestjs/common'
 import { ApiTags } from '@nestjs/swagger'
 
+import { DetailKeys } from '../decorators'
 import { MyTaskService } from './my-task.service'
 
 @Controller('api/tasks')
@@ -21,8 +22,8 @@ export class MyTaskController {
     )
   }
 
-  @Get('/:pk/:sk')
-  async getSfnChildTask(@Param() key: DetailDto): Promise<TaskEntity[]> {
+  @Get('/:id')
+  async getSfnChildTask(@DetailKeys() key: DetailDto): Promise<TaskEntity[]> {
     return this.myTaskService.getSfnChildTask(key)
   }
 }

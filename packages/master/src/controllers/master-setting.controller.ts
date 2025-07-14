@@ -19,7 +19,11 @@ import {
 import { ApiTags } from '@nestjs/swagger'
 
 import { DetailKeys } from '../decorators'
-import { MasterSettingSearchDto, MasterSettingUpdateDto } from '../dto'
+import {
+  MasterCopyDto,
+  MasterSettingSearchDto,
+  MasterSettingUpdateDto,
+} from '../dto'
 import { CommonSettingDto } from '../dto/master-setting/common-setting-create.dto'
 import { GroupSettingDto } from '../dto/master-setting/group-setting-create.dto'
 import { GetSettingDto } from '../dto/master-setting/setting-get.dto'
@@ -157,5 +161,13 @@ export class MasterSettingController {
     @INVOKE_CONTEXT() invokeContext: IInvoke,
   ) {
     return this.masterSettingService.checkExistCode(code, invokeContext)
+  }
+
+  @Post('/copy')
+  async copyMaster(
+    @INVOKE_CONTEXT() invokeContext: IInvoke,
+    @Body() masterCopyDto: MasterCopyDto,
+  ): Promise<any> {
+    return this.masterSettingService.copy(masterCopyDto, { invokeContext })
   }
 }

@@ -15,11 +15,7 @@ export class MasterDataSyncRdsHandler implements IDataSyncHandler {
   private readonly logger = new Logger(MasterDataSyncRdsHandler.name)
 
   constructor(private readonly prismaService: PrismaService) {}
-  // MASTER#9999
-  // MASTER_SETTING#ABC
 
-  // MASTER#9999
-  // ABC#1
   async up(cmd: MasterCommandEntity): Promise<any> {
     const sk = removeSortKeyVersion(cmd.sk)
     const skSplit = sk.split(KEY_SEPARATOR)

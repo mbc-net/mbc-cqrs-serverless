@@ -15,6 +15,7 @@ import {
   UserContext,
   VERSION_FIRST,
 } from '@mbc-cqrs-serverless/core'
+import { TaskService } from '@mbc-cqrs-serverless/task'
 import {
   BadRequestException,
   Inject,
@@ -24,6 +25,7 @@ import {
 } from '@nestjs/common'
 
 import {
+  MASTER_COPY_SK_PREFIX,
   MASTER_PK_PREFIX,
   SETTING_SK_PREFIX,
   SETTING_TENANT_PREFIX,
@@ -31,8 +33,10 @@ import {
 } from '../constants'
 import {
   CommonSettingDto,
+  DataCopyMode,
   GetSettingDto,
   GroupSettingDto,
+  MasterCopyDto,
   MasterRdsEntity,
   MasterRdsListEntity,
   MasterSettingSearchDto,
@@ -43,11 +47,10 @@ import {
 } from '../dto'
 import { MasterSettingEntity } from '../entities'
 import { SettingTypeEnum } from '../enums'
-import { generateMasterPk, generateMasterSettingSk } from '../helpers'
+import { generateMasterPk, generateMasterSettingSk, parseId } from '../helpers'
 import { getOrderBys } from '../helpers/rds'
 import { IMasterSettingService } from '../interfaces'
 import { PRISMA_SERVICE } from '../master.module-definition'
-
 @Injectable()
 export class MasterSettingService implements IMasterSettingService {
   private readonly logger = new Logger(MasterSettingService.name)
@@ -59,6 +62,7 @@ export class MasterSettingService implements IMasterSettingService {
     private readonly commandService: CommandService,
     private readonly dataService: DataService,
     private readonly dynamoDbService: DynamoDbService,
+    private readonly taskService: TaskService,
   ) {
     this.tenantTableName = dynamoDbService.getTableName(
       'tenant',
@@ -461,6 +465,45 @@ export class MasterSettingService implements IMasterSettingService {
       total,
       items: items.map((item) => new MasterRdsEntity(item)),
     })
+  }
+
+  async copy(
+    masterCopyDto: MasterCopyDto,
+    opts: { invokeContext: IInvoke },
+  ): Promise<any> {
+    this.logger.debug('cmd:', JSON.stringify(masterCopyDto))
+
+    const userContext = getUserContext(opts.invokeContext)
+
+    const { masterSettingId, targetTenants, dataCopyOption } = masterCopyDto
+
+    if (dataCopyOption?.mode === DataCopyMode.PARTIAL) {
+      if (!dataCopyOption.id?.length) {
+        throw new BadRequestException('Must provide ID when mode is PARTIAL.')
+      }
+    }
+
+    const setting = await this.dataService.getItem(parseId(masterSettingId))
+
+    if (!setting || setting.isDeleted) {
+      throw new BadRequestException('Master setting does not exist')
+    }
+
+    const item = targetTenants.map((tenant) => ({
+      ...masterCopyDto,
+      targetTenants: [tenant],
+    }))
+
+    const taskItem = await this.taskService.createStepFunctionTask(
+      {
+        input: item,
+        taskType: `${MASTER_COPY_SK_PREFIX}_${masterSettingId.split('#').at(-1)}`,
+        tenantCode: userContext.tenantCode,
+      },
+      opts,
+    )
+
+    return taskItem
   }
 
   private getUserTenantCode(userContext: UserContext): string {
