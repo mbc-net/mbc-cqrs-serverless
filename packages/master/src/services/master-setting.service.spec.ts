@@ -21,6 +21,7 @@ import {
   UserSettingDto,
 } from '../dto'
 import { PRISMA_SERVICE } from '../master.module-definition'
+import { TaskService } from '@mbc-cqrs-serverless/task'
 
 const optionsMock = {
   invokeContext: {
@@ -58,6 +59,10 @@ describe('SettingService', () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         MasterSettingService,
+        {
+          provide: TaskService,
+          useValue: { createStepFunctionTask: jest.fn() },
+        },
         {
           provide: PRISMA_SERVICE,
           useValue: {},

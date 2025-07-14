@@ -8,28 +8,20 @@ import {
   IInvoke,
   KEY_SEPARATOR,
 } from '@mbc-cqrs-serverless/core'
-import {
-  CopyType,
-  DataCopyMode,
-  DataCopyOptionDto,
-  MasterCopyDto,
-  MasterDataService,
-  MasterSettingService,
-} from '@mbc-cqrs-serverless/master'
 import { RotateByEnum, SequencesService } from '@mbc-cqrs-serverless/sequence'
-import { Logger } from '@nestjs/common'
-import { Prisma } from '@prisma/client'
+import { Inject, Logger } from '@nestjs/common'
 import { chunk } from 'lodash'
+
+import { DATA_SK_PREFIX } from '../constants'
+import { CopyType, DataCopyMode, DataCopyOptionDto } from '../dto'
 import {
-  DATA_SK_PREFIX,
-  DEFAULT_TENANT_CODE,
   generateMasterPk,
   genSequenceSk,
   parseId,
   sequencePk,
-} from 'src/helpers/id'
-import { PrismaService } from 'src/prisma'
-
+} from '../helpers'
+import { PRISMA_SERVICE } from '../master.module-definition'
+import { MasterDataService, MasterSettingService } from '../services'
 import { MasterSfnTaskEvent } from './master-sfn-task.event'
 
 const BATCH_SIZE = 100
@@ -43,8 +35,8 @@ export class MasterSfnTaskEventHandler
 
   constructor(
     private readonly dynamoDbService: DynamoDbService,
-
-    private readonly prismaService: PrismaService,
+    @Inject(PRISMA_SERVICE)
+    private readonly prismaService: any,
     private readonly masterSettingService: MasterSettingService,
     private readonly masterDataService: MasterDataService,
     private readonly dataService: DataService,
@@ -55,7 +47,7 @@ export class MasterSfnTaskEventHandler
 
   async execute(event: MasterSfnTaskEvent): Promise<any> {
     const invokeContext = extractInvokeContext()
-    const masterCopyDto = event.input?.input as unknown as MasterCopyDto
+    const masterCopyDto = event.input?.input
 
     this.logger.debug('sfn-event:masterCopyDto:', masterCopyDto)
 
@@ -96,9 +88,9 @@ export class MasterSfnTaskEventHandler
   private async fetchMasterData(
     masterCode: string,
     dataCopyOption?: DataCopyOptionDto,
-    tenant: string = DEFAULT_TENANT_CODE,
-  ): Promise<Prisma.MasterUncheckedCreateInput[]> {
-    const where: Prisma.MasterWhereInput = {
+    tenant: string = 'meltec',
+  ): Promise<any[]> {
+    const where: any = {
       masterType: DATA_SK_PREFIX,
       masterTypeCode: masterCode,
       pk: `MASTER${KEY_SEPARATOR}${tenant}`,
@@ -167,14 +159,14 @@ export class MasterSfnTaskEventHandler
   }
 
   private async copyDataToTenant(
-    dataToCopy: Prisma.MasterUncheckedCreateInput[],
+    dataToCopy,
     tenantCode: string,
     invokeContext: IInvoke,
   ) {
     const chunks = chunk(dataToCopy, BATCH_SIZE)
     for (const batch of chunks) {
       await Promise.all(
-        batch.map(async (data) => {
+        batch.map(async (data: any) => {
           const parts = data.sk.split(KEY_SEPARATOR)
           const sk =
             parts.length > 1 && parts[1].trim() === ''

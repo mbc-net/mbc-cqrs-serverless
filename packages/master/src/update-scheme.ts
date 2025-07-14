@@ -179,11 +179,6 @@ function modifyImportString(importString, itemsToAdd = [], itemsToRemove = []) {
 
 // [main module]
 const formatTemplate = () => {
-  const destDir = resolve(__dirname, '../../../../src/custom-task')
-  cpSync(path.join(__dirname, '../src/templates/custom-task'), destDir, {
-    recursive: true,
-  })
-
   function mergeDirectories(source, destination) {
     // 1. Read all the items (files and directories) in the source folder.
     const sourceItems = fs.readdirSync(source, { withFileTypes: true })
@@ -249,13 +244,7 @@ const formatTemplate = () => {
       needsWrite = true
     }
 
-    if (!rawData.includes('./custom-task/custom-task.module')) {
-      const customTaskLine = `import { CustomTaskModule } from './custom-task/custom-task.module'`
-      rawData = customTaskLine + '\n' + rawData
-      needsWrite = true
-    }
-
-    const modulesToAdd: string[] = ['MasterModule', 'CustomTaskModule']
+    const modulesToAdd: string[] = ['MasterModule']
     rawData = appendModulesAfterOpeningBracket(rawData, modulesToAdd)
     needsWrite = true
   }
