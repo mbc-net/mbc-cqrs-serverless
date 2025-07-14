@@ -1,13 +1,15 @@
 import {
   CommandModule,
-  DataService,
   DataStoreModule,
   QueueModule,
 } from '@mbc-cqrs-serverless/core'
+import { SequencesModule } from '@mbc-cqrs-serverless/sequence'
 import { DynamicModule, Module } from '@nestjs/common'
 
 import { TABLE_NAME } from './constants'
 import { MasterDataController, MasterSettingController } from './controllers'
+import { CustomTaskModule } from './custom-task/custom-task.module'
+import { MasterSfnTaskEventHandler } from './handler/master-sfn-task.handler'
 import {
   ConfigurableModuleClass,
   OPTIONS_TYPE,
@@ -44,6 +46,13 @@ export class MasterModule extends ConfigurableModuleClass {
         provide: PRISMA_SERVICE,
         useClass: options.prismaService,
       })
+      module.providers.push(MasterSfnTaskEventHandler)
+
+      if (!module.imports) {
+        module.imports = []
+      }
+      module.imports.push(CustomTaskModule)
+      module.imports.push(SequencesModule)
     }
     const imports = [...(module.imports ?? [])]
 

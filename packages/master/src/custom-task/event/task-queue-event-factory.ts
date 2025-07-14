@@ -2,7 +2,7 @@ import { ITaskQueueEventFactory } from '@mbc-cqrs-serverless/task'
 import { StepFunctionTaskEvent } from '@mbc-cqrs-serverless/task'
 import { Logger } from '@nestjs/common'
 
-import { MasterSfnTaskEvent } from '../../master/handler/master-sfn-task.event'
+import { MasterSfnTaskEvent } from '../../handler/master-sfn-task.event'
 
 export class TaskQueueEventFactory implements ITaskQueueEventFactory {
   private readonly logger = new Logger(TaskQueueEventFactory.name)

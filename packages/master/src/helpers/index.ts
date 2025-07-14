@@ -1,4 +1,5 @@
 import { KEY_SEPARATOR, removeSortKeyVersion } from '@mbc-cqrs-serverless/core'
+import { RotateByEnum } from '@mbc-cqrs-serverless/sequence/dist'
 
 import { MASTER_PK_PREFIX, SETTING_SK_PREFIX } from '../constants'
 
@@ -35,3 +36,26 @@ export function parsePk(pk: string): { type: string; tenantCode: string } {
     tenantCode,
   }
 }
+
+export function parseId(masterId: string): { pk: string; sk: string } {
+  const parts = masterId.split('#')
+
+  if (parts.length < 4 || parts[0] !== 'MASTER') {
+    throw new Error('Invalid masterId format')
+  }
+
+  const pk = `${parts[0]}#${parts[1]}`
+  const sk = `${parts[2]}#${parts[3]}`
+
+  return { pk, sk }
+}
+
+export const genSequenceSk = (
+  seqSettingCode: string,
+  settingCode: string,
+  rotateBy: RotateByEnum,
+) =>
+  `${seqSettingCode}${KEY_SEPARATOR}${settingCode}${KEY_SEPARATOR}${rotateBy}`
+
+export const sequencePk = (tenantCode: string) =>
+  `SEQ${KEY_SEPARATOR}${tenantCode}`
