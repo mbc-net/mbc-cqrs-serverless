@@ -113,187 +113,170 @@ describe('SequencesService', () => {
     })
   })
 
-  // Case 1: Default start month (April) and reference year 1953
-  // describe('getFiscalYear', () => {
-  //   it('should calculate the fiscal year using default start month (April) and reference year 1953', () => {
-  //     const options: FiscalYearOptions = { now: new Date('2024-03-15') }; // Before the fiscal year starts (April 1)
-  //     const result = service.getFiscalYear(options);
-  //     expect(result).toBe(71); // 2023 fiscal year, since 2024-2023 = 1, starting from 1953
-  //   });
+  describe('getFiscalYear', () => {
+    it('should calculate the fiscal year using default start month (April) and reference year 1953', () => {
+      const options: FiscalYearOptions = { now: new Date('2024-03-15') }
+      const result = service['getFiscalYear'](options)
+      expect(result).toBe(71)
+    })
 
-  //   // Case 2: Custom start month (e.g., July)
-  //   it('should calculate the fiscal year using a custom start month (July)', () => {
-  //     const options: FiscalYearOptions = { now: new Date('2024-03-15'), startMonth: 7 };
-  //     const result = service.getFiscalYear(options);
-  //     expect(result).toBe(71); // The fiscal year 2023 ends on June 30, 2024
-  //   });
+    it('should calculate the fiscal year using a custom start month (July)', () => {
+      const options: FiscalYearOptions = { now: new Date('2024-03-15'), startMonth: 7 }
+      const result = service['getFiscalYear'](options)
+      expect(result).toBe(71)
+    })
 
-  //   // Case 3: Custom register time (e.g., starting from 2020)
-  //   it('should calculate the fiscal year using a custom register time (2020)', () => {
-  //     const options: FiscalYearOptions = {
-  //       now: new Date('2024-03-15'),
-  //       registerTime: new Date('2020-05-01'),
-  //     };
-  //     const result = service.getFiscalYear(options);
-  //     expect(result).toBe(4);
-  //   });
+    it('should calculate the fiscal year using a custom register time (2020)', () => {
+      const options: FiscalYearOptions = {
+        now: new Date('2024-03-15'),
+        registerTime: new Date('2020-05-01'),
+      }
+      const result = service['getFiscalYear'](options)
+      expect(result).toBe(4)
+    })
 
-  //   // Case 4: Custom register time and custom start month (e.g., July)
-  //   it('should calculate the fiscal year using a custom register time and start month (July)', () => {
-  //     const options: FiscalYearOptions = {
-  //       now: new Date('2024-03-15'),
-  //       registerTime: new Date('2020-05-01'),
-  //       startMonth: 7,
-  //     };
-  //     const result = service.getFiscalYear(options);
-  //     expect(result).toBe(4);
-  //   });
+    it('should calculate the fiscal year using a custom register time and start month (July)', () => {
+      const options: FiscalYearOptions = {
+        now: new Date('2024-03-15'),
+        registerTime: new Date('2020-05-01'),
+        startMonth: 7,
+      }
+      const result = service['getFiscalYear'](options)
+      expect(result).toBe(4)
+    })
 
-  //   // Case 5: `now` exactly matches the start of the fiscal year (April 1)
-  //   it('should handle the case where now is exactly the start of the fiscal year', () => {
-  //     const options: FiscalYearOptions = { now: new Date('2024-04-01') }; // First day of fiscal year
-  //     const result = service.getFiscalYear(options);
-  //     expect(result).toBe(72); // 2024 fiscal year (72nd fiscal year since 1953)
-  //   });
+    it('should handle the case where now is exactly the start of the fiscal year', () => {
+      const options: FiscalYearOptions = { now: new Date('2024-04-01') }
+      const result = service['getFiscalYear'](options)
+      expect(result).toBe(72)
+    })
 
-  //   // Case 6: `now` is just before the start of the fiscal year (March 31)
-  //   it('should handle the case where now is just before the fiscal year starts', () => {
-  //     const options: FiscalYearOptions = { now: new Date('2024-03-31') }; // Day before fiscal year starts
-  //     const result = service.getFiscalYear(options);
-  //     expect(result).toBe(71); // Fiscal year 2023 (71st fiscal year since 1953)
-  //   });
+    it('should handle the case where now is just before the fiscal year starts', () => {
+      const options: FiscalYearOptions = { now: new Date('2024-03-31') }
+      const result = service['getFiscalYear'](options)
+      expect(result).toBe(71)
+    })
 
-  //   // Case 7: `now` is in the next fiscal year, but before the start month
-  //   it('should calculate the fiscal year when now is after the fiscal year start, but before the start month', () => {
-  //     const options: FiscalYearOptions = {
-  //       now: new Date('2024-06-01'), // After fiscal year start (April) but before custom start month (July)
-  //       startMonth: 7,
-  //       registerTime: new Date('2019-01-01'),
-  //     };
-  //     const result = service.getFiscalYear(options);
-  //     expect(result).toBe(6); // Fiscal year 2024, counting from 2019 + 1 = 6
-  //   });
+    it('should calculate the fiscal year when now is after the fiscal year start, but before the start month', () => {
+      const options: FiscalYearOptions = {
+        now: new Date('2024-06-01'),
+        startMonth: 7,
+        registerTime: new Date('2019-01-01'),
+      }
+      const result = service['getFiscalYear'](options)
+      expect(result).toBe(6)
+    })
 
-  //   // Case 8: Handle future registerTime (later than now)
-  //   it('should return a negative fiscal year when registerTime is in the future', () => {
-  //     const options: FiscalYearOptions = {
-  //       now: new Date('2024-11-18'),
-  //       registerTime: new Date('2025-05-01'), // Future register date
-  //     };
-  //     const result = service.getFiscalYear(options);
-  //     expect(result).toBe(0); // 2024 fiscal year is negative compared to future registerTime
-  //   });
+    it('should return a negative fiscal year when registerTime is in the future', () => {
+      const options: FiscalYearOptions = {
+        now: new Date('2024-11-18'),
+        registerTime: new Date('2025-05-01'),
+      }
+      const result = service['getFiscalYear'](options)
+      expect(result).toBe(0)
+    })
 
-  //   // Case 9: `now` and `registerTime` in the same fiscal year
-  //   it('should return fiscal year 1 when now and registerTime fall within the same fiscal year', () => {
-  //     const options: FiscalYearOptions = {
-  //       now: new Date('2024-10-01'),
-  //       registerTime: new Date('2024-05-01'),
-  //     };
-  //     const result = service.getFiscalYear(options);
-  //     expect(result).toBe(1); // Same fiscal year (2024) as registerTime
-  //   });
+    it('should return fiscal year 1 when now and registerTime fall within the same fiscal year', () => {
+      const options: FiscalYearOptions = {
+        now: new Date('2024-10-01'),
+        registerTime: new Date('2024-05-01'),
+      }
+      const result = service['getFiscalYear'](options)
+      expect(result).toBe(1)
+    })
 
-  //   // Case 10: No startMonth or registerTime, using defaults (1953)
-  //   it('should return the fiscal year using defaults (starting from 1953)', () => {
-  //     const options: FiscalYearOptions = { now: new Date('2024-11-18') }; // No startMonth or registerTime
-  //     const result = service.getFiscalYear(options);
-  //     expect(result).toBe(72); // 2023 fiscal year, starting from 1953
-  //   });
+    it('should return the fiscal year using defaults (starting from 1953)', () => {
+      const options: FiscalYearOptions = { now: new Date('2024-11-18') }
+      const result = service['getFiscalYear'](options)
+      expect(result).toBe(72)
+    })
 
-  //   // Case 11: Very early registerTime and no startMonth
-  //   it('should return a high fiscal year number when registerTime is very early (e.g., 1900)', () => {
-  //     const options: FiscalYearOptions = {
-  //       now: new Date('2024-11-18'),
-  //       registerTime: new Date('1900-01-01'), // Register date far in the past
-  //     };
-  //     const result = service.getFiscalYear(options);
-  //     expect(result).toBe(125);
-  //   });
+    it('should return a high fiscal year number when registerTime is very early (e.g., 1900)', () => {
+      const options: FiscalYearOptions = {
+        now: new Date('2024-11-18'),
+        registerTime: new Date('1900-01-01'),
+      }
+      const result = service['getFiscalYear'](options)
+      expect(result).toBe(125)
+    })
+  })
 
-  // })
+  describe('getRotateValue', () => {
+    it('should return fiscal year when rotateBy is FISCAL_YEARLY', () => {
+      const testDate = new Date('2024-02-15')
+      expect(service['getRotateValue'](RotateByEnum.FISCAL_YEARLY, testDate)).toBe('2023')
 
-  // describe('getRotateBy', () => {
-  //   it('should return fiscal year when rotateBy is FISCAL_YEARLY', () => {
-  //     const testDate = new Date('2024-02-15'); // February (before April)
-  //     expect(service.getRotateValue(RotateByEnum.FISCAL_YEARLY, testDate)).toBe('2023');
+      const testDate2 = new Date('2024-04-15')
+      expect(service['getRotateValue'](RotateByEnum.FISCAL_YEARLY, testDate2)).toBe('2024')
+    })
 
-  //     const testDate2 = new Date('2024-04-15'); // April (new fiscal year)
-  //     expect(service.getRotateValue(RotateByEnum.FISCAL_YEARLY, testDate2)).toBe('2024');
-  //   });
+    it('should return year when rotateBy is YEARLY', () => {
+      const testDate = new Date('2024-06-15')
+      expect(service['getRotateValue'](RotateByEnum.YEARLY, testDate)).toBe('2024')
+    })
 
-  //   it('should return year when rotateBy is YEARLY', () => {
-  //     const testDate = new Date('2024-06-15');
-  //     expect(service.getRotateValue(RotateByEnum.YEARLY, testDate)).toBe('2024');
-  //   });
+    it('should return year and month when rotateBy is MONTHLY', () => {
+      const testDate = new Date('2024-06-15')
+      expect(service['getRotateValue'](RotateByEnum.MONTHLY, testDate)).toBe('202406')
 
-  //   it('should return year and month when rotateBy is MONTHLY', () => {
-  //     const testDate = new Date('2024-06-15');
-  //     expect(service.getRotateValue(RotateByEnum.MONTHLY, testDate)).toBe('202406');
+      const testDate2 = new Date('2024-01-15')
+      expect(service['getRotateValue'](RotateByEnum.MONTHLY, testDate2)).toBe('202401')
+    })
 
-  //     const testDate2 = new Date('2024-01-15');
-  //     expect(service.getRotateValue(RotateByEnum.MONTHLY, testDate2)).toBe('202401');
-  //   });
+    it('should return year, month, and day when rotateBy is DAILY', () => {
+      const testDate = new Date('2024-06-15')
+      expect(service['getRotateValue'](RotateByEnum.DAILY, testDate)).toBe('20240615')
 
-  //   it('should return year, month, and day when rotateBy is DAILY', () => {
-  //     const testDate = new Date('2024-06-15');
-  //     expect(service.getRotateValue(RotateByEnum.DAILY, testDate)).toBe('20240615');
+      const testDate2 = new Date('2024-01-05')
+      expect(service['getRotateValue'](RotateByEnum.DAILY, testDate2)).toBe('20240105')
+    })
 
-  //     const testDate2 = new Date('2024-01-05');
-  //     expect(service.getRotateValue(RotateByEnum.DAILY, testDate2)).toBe('20240105');
-  //   });
+    it('should return RotateByEnum.NONE for undefined or unhandled rotateBy', () => {
+      expect(service['getRotateValue']()).toBe(RotateByEnum.NONE)
+      expect(service['getRotateValue'](undefined, new Date('2024-06-15'))).toBe(RotateByEnum.NONE)
+    })
+  })
 
-  //   it('should return RotateByEnum.NONE for undefined or unhandled rotateBy', () => {
-  //     expect(service.getRotateValue()).toBe(RotateByEnum.NONE);
-  //     expect(service.getRotateValue(undefined, new Date('2024-06-15'))).toBe(RotateByEnum.NONE);
-  //   });
+  describe('isIncrementNo', () => {
+    it('should return true if rotateBy is not provided', () => {
+      const result = service['isIncrementNo'](undefined, 2024, 2024, new Date())
+      expect(result).toBe(true)
+    })
 
-  //   it('should return true if rotateBy is not provided', () => {
-  //     const result = service.isIncrementNo(undefined, 2024, 2024, new Date());
-  //     expect(result).toBe(true);
-  //   });
+    it('should return true if rotateBy is FISCAL_YEARLY and fiscal year matches', () => {
+      const result = service['isIncrementNo'](RotateByEnum.FISCAL_YEARLY, 2024, 2024, new Date())
+      expect(result).toBe(true)
+    })
 
-  //   it('should return true if rotateBy is FISCAL_YEARLY and fiscal year matches', () => {
-  //     const result = service.isIncrementNo(RotateByEnum.FISCAL_YEARLY, 2024, 2024, new Date());
-  //     expect(result).toBe(true);
-  //   });
+    it('should return false if rotateBy is FISCAL_YEARLY and fiscal year does not match', () => {
+      const result = service['isIncrementNo'](RotateByEnum.FISCAL_YEARLY, 2024, 2023, new Date())
+      expect(result).toBe(false)
+    })
 
-  //   it('should return false if rotateBy is FISCAL_YEARLY and fiscal year does not match', () => {
-  //     const result = service.isIncrementNo(RotateByEnum.FISCAL_YEARLY, 2024, 2023, new Date());
-  //     expect(result).toBe(false);
-  //   });
-  //   it('should return false if rotateBy is MONTHLY and issued year does not match current year', () => {
-  //     const issuedAt = new Date('2023-06-15');
-  //     // jest.spyOn(global, 'Date').mockImplementation(() => currentDate);
+    it('should return false if rotateBy is MONTHLY and issued year does not match current year', () => {
+      const issuedAt = new Date('2023-06-15')
+      const result = service['isIncrementNo'](RotateByEnum.MONTHLY, 2024, 2024, issuedAt)
+      expect(result).toBe(false)
+    })
 
-  //     const result = service.isIncrementNo(RotateByEnum.MONTHLY, 2024, 2024, issuedAt);
-  //     expect(result).toBe(false);
-  //   });
+    it('should return false if rotateBy is MONTHLY and issued month does not match current month but matches year', () => {
+      const issuedAt = new Date('2024-05-01')
+      const result = service['isIncrementNo'](RotateByEnum.MONTHLY, 2024, 2024, issuedAt)
+      expect(result).toBe(false)
+    })
 
-  //   it('should return false if rotateBy is MONTHLY and issued month does not match current month but matches year', () => {
-  //     const issuedAt = new Date('2024-05-01');
-  //     const result = service.isIncrementNo(RotateByEnum.MONTHLY, 2024, 2024, issuedAt);
-  //     expect(result).toBe(false);
-  //   });
-  //   it('should return false if rotateBy is YEARLY and issued year does not match current year', () => {
-  //     const issuedAt = new Date('2023-01-15');
-  //     const result = service.isIncrementNo(RotateByEnum.YEARLY, 2024, 2024, issuedAt);
-  //     expect(result).toBe(false);
-  //   });
-  //   // it('should return true if rotateBy is YEARLY and issued year matches current year', () => {
-  //   //   const issuedAt = new Date('2024-01-15');
-  //   //   const currentDate = new Date('2024-06-15');
-  //   //   jest.spyOn(global, 'Date').mockImplementation(() => currentDate); // Mock current date
+    it('should return false if rotateBy is YEARLY and issued year does not match current year', () => {
+      const issuedAt = new Date('2023-01-15')
+      const result = service['isIncrementNo'](RotateByEnum.YEARLY, 2024, 2024, issuedAt)
+      expect(result).toBe(false)
+    })
 
-  //   //   const result = service.isIncrementNo(RotateByEnum.YEARLY, 2024, 2024, issuedAt);
-  //   //   expect(result).toBe(true);
-  //   // });
-  //   it('should return true if rotateBy is MONTHLY and issued month matches current month and year', () => {
-  //     const issuedAt = new Date();
-  //     const result = service.isIncrementNo(RotateByEnum.MONTHLY, 2024, 2024, issuedAt);
-  //     expect(result).toBe(true);
-  //   });
-  // })
+    it('should return true if rotateBy is MONTHLY and issued month matches current month and year', () => {
+      const issuedAt = new Date()
+      const result = service['isIncrementNo'](RotateByEnum.MONTHLY, 2024, 2024, issuedAt)
+      expect(result).toBe(true)
+    })
+  })
 
   describe('generateSequenceItem', () => {
     it('should call generateSequenceItem with none rotation', async () => {
@@ -1221,6 +1204,209 @@ describe('SequencesService', () => {
         },
         optionsMock,
       )
+      expect(result).toEqual(mockSequenceResponse)
+    })
+  })
+
+  describe('generateSequenceItemWithProvideSetting', () => {
+    it('should generate sequence item with provided settings and none rotation', async () => {
+      const mockUpdate = {
+        'code': 'sequence#TODO#none',
+        'updatedBy': '92ca4f68-9ac6-4080-9ae2-2f02a86206a4',
+        'createdIp': '127.0.0.1',
+        'tenantCode': 'MBC',
+        'type': 'sequence',
+        'createdAt': '2024-11-27T13:44:15+07:00',
+        'updatedIp': '127.0.0.1',
+        'createdBy': '92ca4f68-9ac6-4080-9ae2-2f02a86206a4',
+        'requestId': '7724a67e-ded6-4ebb-9c88-c14070e24012',
+        'name': 'none',
+        'sk': 'sequence#TODO#none',
+        'pk': 'SEQ#MBC',
+        'seq': 1,
+        'updatedAt': '2024-11-27T13:44:16+07:00',
+      }
+      jest.spyOn(dynamoDbService, 'updateItem').mockResolvedValue(mockUpdate)
+      const mockSequenceResponse = new SequenceEntity({
+        id: 'SEQ#MBC#sequence#TODO#none',
+        no: 1,
+        formattedNo: '1',
+        issuedAt: new Date('2024-11-27T13:44:15+07:00'),
+      })
+
+      const result = await service.generateSequenceItemWithProvideSetting(
+        {
+          tenantCode: tenantCode,
+          typeCode: 'sequence',
+          date: new Date('2024-11-27T13:44:15+07:00'),
+          format: '%%no%%',
+          registerDate: '2020-01-01',
+          startMonth: 4,
+        },
+        optionsMock,
+      )
+      expect(result).toEqual(mockSequenceResponse)
+    })
+
+    it('should generate sequence item with provided settings and fiscal yearly rotation', async () => {
+      const mockUpdate = {
+        'code': 'sequence#TODO#2024',
+        'updatedBy': '92ca4f68-9ac6-4080-9ae2-2f02a86206a4',
+        'createdIp': '127.0.0.1',
+        'tenantCode': 'MBC',
+        'type': 'sequence',
+        'createdAt': '2024-11-27T13:44:15+07:00',
+        'updatedIp': '127.0.0.1',
+        'createdBy': '92ca4f68-9ac6-4080-9ae2-2f02a86206a4',
+        'requestId': '7724a67e-ded6-4ebb-9c88-c14070e24012',
+        'name': 'fiscal_yearly',
+        'sk': 'sequence#TODO#2024',
+        'pk': 'SEQ#MBC',
+        'seq': 1,
+        'updatedAt': '2024-11-27T13:44:16+07:00',
+      }
+      jest.spyOn(dynamoDbService, 'updateItem').mockResolvedValue(mockUpdate)
+      const mockSequenceResponse = new SequenceEntity({
+        id: 'SEQ#MBC#sequence#TODO#2024',
+        no: 1,
+        formattedNo: '5-1',
+        issuedAt: new Date('2024-11-27T13:44:15+07:00'),
+      })
+
+      const result = await service.generateSequenceItemWithProvideSetting(
+        {
+          tenantCode: tenantCode,
+          typeCode: 'sequence',
+          date: new Date('2024-11-27T13:44:15+07:00'),
+          rotateBy: RotateByEnum.FISCAL_YEARLY,
+          format: '%%fiscal_year%%-%%no%%',
+          registerDate: '2020-01-01',
+          startMonth: 4,
+        },
+        optionsMock,
+      )
+      expect(result).toEqual(mockSequenceResponse)
+    })
+
+    it('should generate sequence item with provided settings and custom format', async () => {
+      const mockUpdate = {
+        'code': 'sequence#code1#code2#2024',
+        'updatedBy': '92ca4f68-9ac6-4080-9ae2-2f02a86206a4',
+        'createdIp': '127.0.0.1',
+        'tenantCode': 'MBC',
+        'type': 'sequence',
+        'createdAt': '2024-11-27T13:44:15+07:00',
+        'updatedIp': '127.0.0.1',
+        'createdBy': '92ca4f68-9ac6-4080-9ae2-2f02a86206a4',
+        'requestId': '7724a67e-ded6-4ebb-9c88-c14070e24012',
+        'name': 'fiscal_yearly',
+        'sk': 'sequence#code1#code2#2024',
+        'pk': 'SEQ#MBC',
+        'seq': 1,
+        'updatedAt': '2024-11-27T13:44:16+07:00',
+      }
+      jest.spyOn(dynamoDbService, 'updateItem').mockResolvedValue(mockUpdate)
+      const mockSequenceResponse = new SequenceEntity({
+        id: 'SEQ#MBC#sequence#code1#code2#2024',
+        no: 1,
+        formattedNo: 'PREcode1-code2-5-1POST',
+        issuedAt: new Date('2024-11-27T13:44:15+07:00'),
+      })
+
+      const result = await service.generateSequenceItemWithProvideSetting(
+        {
+          tenantCode: tenantCode,
+          typeCode: 'sequence',
+          date: new Date('2024-11-27T13:44:15+07:00'),
+          rotateBy: RotateByEnum.FISCAL_YEARLY,
+          params: {
+            code1: 'code1',
+            code2: 'code2',
+          },
+          format: '%%code1%%-%%code2%%-%%fiscal_year%%-%%no%%',
+          prefix: 'PRE',
+          postfix: 'POST',
+          registerDate: '2020-01-01',
+          startMonth: 4,
+        },
+        optionsMock,
+      )
+      expect(result).toEqual(mockSequenceResponse)
+    })
+
+    it('should generate sequence item with provided settings and monthly rotation', async () => {
+      const mockUpdate = {
+        'code': 'sequence#TODO#202411',
+        'updatedBy': '92ca4f68-9ac6-4080-9ae2-2f02a86206a4',
+        'createdIp': '127.0.0.1',
+        'tenantCode': 'MBC',
+        'type': 'sequence',
+        'createdAt': '2024-11-27T13:44:15+07:00',
+        'updatedIp': '127.0.0.1',
+        'createdBy': '92ca4f68-9ac6-4080-9ae2-2f02a86206a4',
+        'requestId': '7724a67e-ded6-4ebb-9c88-c14070e24012',
+        'name': 'monthly',
+        'sk': 'sequence#TODO#202411',
+        'pk': 'SEQ#MBC',
+        'seq': 1,
+        'updatedAt': '2024-11-27T13:44:16+07:00',
+      }
+      jest.spyOn(dynamoDbService, 'updateItem').mockResolvedValue(mockUpdate)
+      const mockSequenceResponse = new SequenceEntity({
+        id: 'SEQ#MBC#sequence#TODO#202411',
+        no: 1,
+        formattedNo: '2024-11-1',
+        issuedAt: new Date('2024-11-27T13:44:15+07:00'),
+      })
+
+      const result = await service.generateSequenceItemWithProvideSetting(
+        {
+          tenantCode: tenantCode,
+          typeCode: 'sequence',
+          date: new Date('2024-11-27T13:44:15+07:00'),
+          rotateBy: RotateByEnum.MONTHLY,
+          format: '%%year%%-%%month%%-%%no%%',
+          registerDate: '2020-01-01',
+          startMonth: 4,
+        },
+        optionsMock,
+      )
+      expect(result).toEqual(mockSequenceResponse)
+    })
+
+    it('should generate sequence item with provided settings without options', async () => {
+      const mockUpdate = {
+        'code': 'sequence#TODO#none',
+        'updatedBy': 'system',
+        'createdIp': undefined,
+        'tenantCode': 'MBC',
+        'type': 'sequence',
+        'createdAt': '2024-11-27T13:44:15+07:00',
+        'updatedIp': undefined,
+        'createdBy': 'system',
+        'requestId': undefined,
+        'name': 'none',
+        'sk': 'sequence#TODO#none',
+        'pk': 'SEQ#MBC',
+        'seq': 1,
+        'updatedAt': '2024-11-27T13:44:16+07:00',
+      }
+      jest.spyOn(dynamoDbService, 'updateItem').mockResolvedValue(mockUpdate)
+      const mockSequenceResponse = new SequenceEntity({
+        id: 'SEQ#MBC#sequence#TODO#none',
+        no: 1,
+        formattedNo: '1',
+        issuedAt: new Date('2024-11-27T13:44:15+07:00'),
+      })
+
+      const result = await service.generateSequenceItemWithProvideSetting({
+        tenantCode: tenantCode,
+        typeCode: 'sequence',
+        date: new Date('2024-11-27T13:44:15+07:00'),
+        format: '%%no%%',
+        registerDate: '2020-01-01',
+        startMonth: 4,
+      })
       expect(result).toEqual(mockSequenceResponse)
     })
   })
