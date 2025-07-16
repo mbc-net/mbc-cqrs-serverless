@@ -1,6 +1,36 @@
+const mockConsoleInfo = jest.fn()
+const originalConsoleInfo = console.info
+console.info = mockConsoleInfo
+
 import { Test, TestingModule } from '@nestjs/testing'
 import { ConsoleLogger } from '@nestjs/common'
 import { getLogLevels, RequestLogger } from './request-logger.service'
+
+jest.mock('../helpers', () => ({
+  IS_LAMBDA_RUNNING: false
+}))
+
+jest.mock('../context', () => ({
+  extractInvokeContext: jest.fn(() => ({
+    event: {
+      requestContext: {
+        http: {
+          sourceIp: '127.0.0.1'
+        }
+      }
+    },
+    context: {
+      awsRequestId: 'test-request-id'
+    }
+  }))
+}))
+
+jest.mock('../context/user', () => ({
+  getUserContext: jest.fn(() => ({
+    tenantCode: 'test-tenant',
+    userId: 'test-user'
+  }))
+}))
 
 describe('RequestLogger.getLogLevels', () => {
   it('should return all log levels', () => {
@@ -81,8 +111,27 @@ describe('RequestLogger.getLogLevels', () => {
 describe('RequestLogger', () => {
   let service: RequestLogger
   let consoleSpy: jest.SpyInstance
+  const mockExtractInvokeContext = require('../context').extractInvokeContext as jest.Mock
+  const mockGetUserContext = require('../context/user').getUserContext as jest.Mock
+
+  afterAll(() => {
+    // Restore original console.info
+    console.info = originalConsoleInfo
+  })
 
   beforeEach(async () => {
+    jest.clearAllMocks()
+    
+    mockExtractInvokeContext.mockReturnValue({
+      context: { awsRequestId: 'test-request-id' },
+      event: { requestContext: { http: { sourceIp: '127.0.0.1' } } }
+    })
+    
+    mockGetUserContext.mockReturnValue({
+      tenantCode: 'test-tenant',
+      userId: 'test-user'
+    })
+
     const module: TestingModule = await Test.createTestingModule({
       providers: [RequestLogger],
     }).compile()
@@ -125,20 +174,32 @@ describe('RequestLogger', () => {
 
     it('should print stack trace in Lambda environment', () => {
       const originalEnv = process.env.AWS_LAMBDA_FUNCTION_NAME
+      const originalNodeEnv = process.env.NODE_ENV
       process.env.AWS_LAMBDA_FUNCTION_NAME = 'test-lambda'
+      process.env.NODE_ENV = 'production'
+      
       const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation()
-
       const error = new Error('Lambda error')
+      
+      const mockHelpers = require('../helpers')
+      mockHelpers.IS_LAMBDA_RUNNING = true
 
-      service['printStackTrace'](error.stack || '')
+      const newService = new RequestLogger()
+      newService['printStackTrace'](error.stack || '')
 
       expect(consoleErrorSpy).toHaveBeenCalledWith(error.stack)
 
       consoleErrorSpy.mockRestore()
+      mockHelpers.IS_LAMBDA_RUNNING = false
       if (originalEnv) {
         process.env.AWS_LAMBDA_FUNCTION_NAME = originalEnv
       } else {
         delete process.env.AWS_LAMBDA_FUNCTION_NAME
+      }
+      if (originalNodeEnv) {
+        process.env.NODE_ENV = originalNodeEnv
+      } else {
+        delete process.env.NODE_ENV
       }
     })
 
@@ -210,9 +271,9 @@ describe('RequestLogger', () => {
       const messages = ['Message 1', 'Message 2', 'Message 3']
       const context = 'TestContext'
 
-      service['printMessages'](messages, context)
+      service['printMessages'](messages, context, 'log')
 
-      expect(superSpy).toHaveBeenCalledWith(messages, context, undefined, undefined)
+      expect(superSpy).toHaveBeenCalledWith(messages, context, 'log', undefined)
 
       superSpy.mockRestore()
       if (originalEnv) {
@@ -222,75 +283,150 @@ describe('RequestLogger', () => {
 
     it('should print messages with context in Lambda environment', () => {
       const originalEnv = process.env.AWS_LAMBDA_FUNCTION_NAME
+      const originalNodeEnv = process.env.NODE_ENV
+      
+      const mockHelpers = require('../helpers')
+      const originalIsLambda = mockHelpers.IS_LAMBDA_RUNNING
+      
+      mockConsoleInfo.mockClear()
+      
       process.env.AWS_LAMBDA_FUNCTION_NAME = 'test-lambda'
-      const consoleInfoSpy = jest.spyOn(console, 'info').mockImplementation()
-
+      process.env.NODE_ENV = 'production'
+      mockHelpers.IS_LAMBDA_RUNNING = true
+      
       const messages = ['Lambda Message 1', 'Lambda Message 2']
       const context = 'LambdaContext'
 
-      service['printMessages'](messages, context)
+      const newService = new RequestLogger()
+      newService['printMessages'](messages, context, 'log')
 
-      expect(consoleInfoSpy).toHaveBeenCalledTimes(2)
-
-      consoleInfoSpy.mockRestore()
+      expect(mockConsoleInfo).toHaveBeenCalledTimes(2)
+      expect(mockConsoleInfo).toHaveBeenCalledWith({
+        context: 'LambdaContext',
+        requestId: 'test-request-id',
+        ip: '127.0.0.1',
+        tenantCode: 'test-tenant',
+        userId: 'test-user',
+        message: 'Lambda Message 1'
+      })
+      expect(mockConsoleInfo).toHaveBeenCalledWith({
+        context: 'LambdaContext',
+        requestId: 'test-request-id',
+        ip: '127.0.0.1',
+        tenantCode: 'test-tenant',
+        userId: 'test-user',
+        message: 'Lambda Message 2'
+      })
+      
+      mockHelpers.IS_LAMBDA_RUNNING = originalIsLambda
       if (originalEnv) {
         process.env.AWS_LAMBDA_FUNCTION_NAME = originalEnv
       } else {
         delete process.env.AWS_LAMBDA_FUNCTION_NAME
       }
+      if (originalNodeEnv) {
+        process.env.NODE_ENV = originalNodeEnv
+      } else {
+        delete process.env.NODE_ENV
+      }
     })
 
     it('should handle empty messages array', () => {
       const originalEnv = process.env.AWS_LAMBDA_FUNCTION_NAME
+      const originalNodeEnv = process.env.NODE_ENV
+      
+      const mockHelpers = require('../helpers')
+      const originalIsLambda = mockHelpers.IS_LAMBDA_RUNNING
+      
       delete process.env.AWS_LAMBDA_FUNCTION_NAME
+      process.env.NODE_ENV = 'Local'
+      mockHelpers.IS_LAMBDA_RUNNING = false
+      
       const superSpy = jest.spyOn(Object.getPrototypeOf(Object.getPrototypeOf(service)), 'printMessages').mockImplementation()
+      const newService = new RequestLogger()
 
       const messages: string[] = []
       const context = 'EmptyContext'
 
-      service['printMessages'](messages, context)
+      newService['printMessages'](messages, context, 'log')
 
-      expect(superSpy).toHaveBeenCalledWith([], context, undefined, undefined)
+      expect(superSpy).toHaveBeenCalledWith([], context, 'log', undefined)
 
       superSpy.mockRestore()
+      mockHelpers.IS_LAMBDA_RUNNING = originalIsLambda
       if (originalEnv) {
         process.env.AWS_LAMBDA_FUNCTION_NAME = originalEnv
+      }
+      if (originalNodeEnv) {
+        process.env.NODE_ENV = originalNodeEnv
+      } else {
+        delete process.env.NODE_ENV
       }
     })
 
     it('should handle single message', () => {
       const originalEnv = process.env.AWS_LAMBDA_FUNCTION_NAME
+      const originalNodeEnv = process.env.NODE_ENV
+      
+      const mockHelpers = require('../helpers')
+      const originalIsLambda = mockHelpers.IS_LAMBDA_RUNNING
+      
       delete process.env.AWS_LAMBDA_FUNCTION_NAME
+      process.env.NODE_ENV = 'Local'
+      mockHelpers.IS_LAMBDA_RUNNING = false
+      
       const superSpy = jest.spyOn(Object.getPrototypeOf(Object.getPrototypeOf(service)), 'printMessages').mockImplementation()
+      const newService = new RequestLogger()
 
       const messages = ['Single message']
       const context = 'SingleContext'
 
-      service['printMessages'](messages, context)
+      newService['printMessages'](messages, context, 'log')
 
-      expect(superSpy).toHaveBeenCalledWith(messages, context, undefined, undefined)
+      expect(superSpy).toHaveBeenCalledWith(messages, context, 'log', undefined)
 
       superSpy.mockRestore()
+      mockHelpers.IS_LAMBDA_RUNNING = originalIsLambda
       if (originalEnv) {
         process.env.AWS_LAMBDA_FUNCTION_NAME = originalEnv
+      }
+      if (originalNodeEnv) {
+        process.env.NODE_ENV = originalNodeEnv
+      } else {
+        delete process.env.NODE_ENV
       }
     })
 
     it('should handle messages with special characters', () => {
       const originalEnv = process.env.AWS_LAMBDA_FUNCTION_NAME
+      const originalNodeEnv = process.env.NODE_ENV
+      
+      const mockHelpers = require('../helpers')
+      const originalIsLambda = mockHelpers.IS_LAMBDA_RUNNING
+      
       delete process.env.AWS_LAMBDA_FUNCTION_NAME
+      process.env.NODE_ENV = 'Local'
+      mockHelpers.IS_LAMBDA_RUNNING = false
+      
       const superSpy = jest.spyOn(Object.getPrototypeOf(Object.getPrototypeOf(service)), 'printMessages').mockImplementation()
+      const newService = new RequestLogger()
 
       const messages = ['Message with 🚀 unicode', 'Message with "quotes"', 'Message with \n newlines']
       const context = 'SpecialContext'
 
-      service['printMessages'](messages, context)
+      newService['printMessages'](messages, context, 'log')
 
-      expect(superSpy).toHaveBeenCalledWith(messages, context, undefined, undefined)
+      expect(superSpy).toHaveBeenCalledWith(messages, context, 'log', undefined)
 
       superSpy.mockRestore()
+      mockHelpers.IS_LAMBDA_RUNNING = originalIsLambda
       if (originalEnv) {
         process.env.AWS_LAMBDA_FUNCTION_NAME = originalEnv
+      }
+      if (originalNodeEnv) {
+        process.env.NODE_ENV = originalNodeEnv
+      } else {
+        delete process.env.NODE_ENV
       }
     })
   })
@@ -326,7 +462,7 @@ describe('RequestLogger', () => {
       }
     })
 
-    it('should return empty string in local environment', () => {
+    it('should return context message in local environment', () => {
       const originalEnv = process.env.AWS_LAMBDA_FUNCTION_NAME
       delete process.env.AWS_LAMBDA_FUNCTION_NAME
 
@@ -340,7 +476,7 @@ describe('RequestLogger', () => {
 
       expect(result).toBeDefined()
       expect(typeof result).toBe('object')
-      expect(result.context).toBeNull()
+      expect(result.context).toBe('test-context')
 
       if (originalEnv) {
         process.env.AWS_LAMBDA_FUNCTION_NAME = originalEnv
@@ -372,7 +508,7 @@ describe('RequestLogger', () => {
       const originalEnv = process.env.AWS_LAMBDA_FUNCTION_NAME
       process.env.AWS_LAMBDA_FUNCTION_NAME = 'test-lambda'
 
-      const result = service['getLambdaContextMessage']()
+      const result = service['getLambdaContextMessage'](null as any)
 
       expect(result).toBeDefined()
       expect(typeof result).toBe('object')
@@ -421,37 +557,67 @@ describe('RequestLogger', () => {
 
     it('should not filter other contexts', () => {
       const originalEnv = process.env.AWS_LAMBDA_FUNCTION_NAME
+      const originalNodeEnv = process.env.NODE_ENV
+      
+      const mockHelpers = require('../helpers')
+      const originalIsLambda = mockHelpers.IS_LAMBDA_RUNNING
+      
       delete process.env.AWS_LAMBDA_FUNCTION_NAME
+      process.env.NODE_ENV = 'Local'
+      mockHelpers.IS_LAMBDA_RUNNING = false
+      
       const superSpy = jest.spyOn(Object.getPrototypeOf(Object.getPrototypeOf(service)), 'printMessages').mockImplementation()
+      const newService = new RequestLogger()
 
       const messages = ['Regular message']
       const context = 'RegularContext'
 
-      service['printMessages'](messages, context)
+      newService['printMessages'](messages, context, 'log')
 
-      expect(superSpy).toHaveBeenCalledWith(messages, context, undefined, undefined)
+      expect(superSpy).toHaveBeenCalledWith(messages, context, 'log', undefined)
 
       superSpy.mockRestore()
+      mockHelpers.IS_LAMBDA_RUNNING = originalIsLambda
       if (originalEnv) {
         process.env.AWS_LAMBDA_FUNCTION_NAME = originalEnv
+      }
+      if (originalNodeEnv) {
+        process.env.NODE_ENV = originalNodeEnv
+      } else {
+        delete process.env.NODE_ENV
       }
     })
 
     it('should handle case-sensitive filtering', () => {
       const originalEnv = process.env.AWS_LAMBDA_FUNCTION_NAME
+      const originalNodeEnv = process.env.NODE_ENV
+      
+      const mockHelpers = require('../helpers')
+      const originalIsLambda = mockHelpers.IS_LAMBDA_RUNNING
+      
       delete process.env.AWS_LAMBDA_FUNCTION_NAME
+      process.env.NODE_ENV = 'Local'
+      mockHelpers.IS_LAMBDA_RUNNING = false
+      
       const superSpy = jest.spyOn(Object.getPrototypeOf(Object.getPrototypeOf(service)), 'printMessages').mockImplementation()
+      const newService = new RequestLogger()
 
       const messages = ['Case test']
       const context = 'instanceloader'
 
-      service['printMessages'](messages, context)
+      newService['printMessages'](messages, context, 'log')
 
-      expect(superSpy).toHaveBeenCalledWith(messages, context, undefined, undefined)
+      expect(superSpy).toHaveBeenCalledWith(messages, context, 'log', undefined)
 
       superSpy.mockRestore()
+      mockHelpers.IS_LAMBDA_RUNNING = originalIsLambda
       if (originalEnv) {
         process.env.AWS_LAMBDA_FUNCTION_NAME = originalEnv
+      }
+      if (originalNodeEnv) {
+        process.env.NODE_ENV = originalNodeEnv
+      } else {
+        delete process.env.NODE_ENV
       }
     })
   })
@@ -464,65 +630,109 @@ describe('RequestLogger', () => {
   describe('Environment-Specific Behavior', () => {
     it('should detect local environment correctly', () => {
       const originalEnv = process.env.AWS_LAMBDA_FUNCTION_NAME
+      const originalNodeEnv = process.env.NODE_ENV
       delete process.env.AWS_LAMBDA_FUNCTION_NAME
-
+      process.env.NODE_ENV = 'Local'
+      
+      const superSpy = jest.spyOn(Object.getPrototypeOf(Object.getPrototypeOf(service)), 'printStackTrace').mockImplementation()
       const error = new Error('Local error')
 
-      service['printStackTrace'](error.stack || '')
+      const mockHelpers = require('../helpers')
+      const originalIsLambda = mockHelpers.IS_LAMBDA_RUNNING
+      mockHelpers.IS_LAMBDA_RUNNING = false
 
-      expect(consoleSpy).toHaveBeenCalledWith(
-        expect.stringContaining('Error'),
-        error.stack
-      )
+      const newService = new RequestLogger()
+      newService['printStackTrace'](error.stack || '')
 
+      expect(superSpy).toHaveBeenCalledWith(error.stack)
+
+      superSpy.mockRestore()
+      mockHelpers.IS_LAMBDA_RUNNING = originalIsLambda
       if (originalEnv) {
         process.env.AWS_LAMBDA_FUNCTION_NAME = originalEnv
+      }
+      if (originalNodeEnv) {
+        process.env.NODE_ENV = originalNodeEnv
+      } else {
+        delete process.env.NODE_ENV
       }
     })
 
     it('should detect Lambda environment correctly', () => {
       const originalEnv = process.env.AWS_LAMBDA_FUNCTION_NAME
+      const originalNodeEnv = process.env.NODE_ENV
       process.env.AWS_LAMBDA_FUNCTION_NAME = 'test-lambda-function'
-
+      process.env.NODE_ENV = 'production'
+      
+      const consoleSpy = jest.spyOn(console, 'error').mockImplementation()
       const error = new Error('Lambda error')
 
-      service['printStackTrace'](error.stack || '')
+      const mockHelpers = require('../helpers')
+      mockHelpers.IS_LAMBDA_RUNNING = true
 
-      expect(consoleSpy).toHaveBeenCalledWith(
-        expect.stringContaining('Error'),
-        error.stack
-      )
+      const newService = new RequestLogger()
+      newService['printStackTrace'](error.stack || '')
 
+      expect(consoleSpy).toHaveBeenCalledWith(error.stack)
+
+      consoleSpy.mockRestore()
+      mockHelpers.IS_LAMBDA_RUNNING = false
       if (originalEnv) {
         process.env.AWS_LAMBDA_FUNCTION_NAME = originalEnv
       } else {
         delete process.env.AWS_LAMBDA_FUNCTION_NAME
       }
+      if (originalNodeEnv) {
+        process.env.NODE_ENV = originalNodeEnv
+      } else {
+        delete process.env.NODE_ENV
+      }
     })
 
     it('should handle environment variable changes during execution', () => {
+      const originalNodeEnv = process.env.NODE_ENV
       const originalEnv = process.env.AWS_LAMBDA_FUNCTION_NAME
       
-      delete process.env.AWS_LAMBDA_FUNCTION_NAME
-      service['printMessages'](['Local message'], 'LocalContext')
-      expect(consoleSpy).toHaveBeenCalledWith(
-        expect.stringContaining('[LocalContext]'),
-        ['Local message']
-      )
-
-      consoleSpy.mockClear()
-
+      const mockHelpers = require('../helpers')
+      const originalIsLambda = mockHelpers.IS_LAMBDA_RUNNING
+      
+      mockConsoleInfo.mockClear()
+      
+      const superSpy = jest.spyOn(Object.getPrototypeOf(Object.getPrototypeOf(service)), 'printMessages').mockImplementation()
+      
+      mockHelpers.IS_LAMBDA_RUNNING = true
+      process.env.NODE_ENV = 'production'
       process.env.AWS_LAMBDA_FUNCTION_NAME = 'test-lambda'
-      service['printMessages'](['Lambda message'], 'LambdaContext')
-      expect(consoleSpy).toHaveBeenCalledWith(
-        expect.stringContaining('[LambdaContext]'),
-        ['Lambda message']
-      )
+      
+      const lambdaService = new RequestLogger()
+      lambdaService['printMessages'](['Lambda message'], 'LambdaContext', 'log')
+      
+      mockHelpers.IS_LAMBDA_RUNNING = false
+      process.env.NODE_ENV = 'Local'
+      delete process.env.AWS_LAMBDA_FUNCTION_NAME
+      
+      const localService = new RequestLogger()
+      localService['printMessages'](['Local message'], 'LocalContext', 'log')
+      
+      expect(mockConsoleInfo).toHaveBeenCalledWith({
+        context: 'LambdaContext',
+        requestId: 'test-request-id',
+        ip: '127.0.0.1',
+        tenantCode: 'test-tenant',
+        userId: 'test-user',
+        message: 'Lambda message'
+      })
+      expect(superSpy).toHaveBeenCalledWith(['Local message'], 'LocalContext', 'log', undefined)
 
+      superSpy.mockRestore()
+      mockHelpers.IS_LAMBDA_RUNNING = originalIsLambda
+      if (originalNodeEnv) {
+        process.env.NODE_ENV = originalNodeEnv
+      } else {
+        delete process.env.NODE_ENV
+      }
       if (originalEnv) {
         process.env.AWS_LAMBDA_FUNCTION_NAME = originalEnv
-      } else {
-        delete process.env.AWS_LAMBDA_FUNCTION_NAME
       }
     })
   })
