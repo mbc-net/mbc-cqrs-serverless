@@ -1410,4 +1410,605 @@ describe('SequencesService', () => {
       expect(result).toEqual(mockSequenceResponse)
     })
   })
+
+  describe('Error Handling', () => {
+    describe('DynamoDB operation failures', () => {
+      it('should propagate error when updateItem fails in generateSequenceItem', async () => {
+        const mockMasterData = {
+          format: '%%no%%',
+          registerDate: '2020-01-01',
+          startMonth: 4,
+        }
+        jest.spyOn(masterService, 'getData').mockResolvedValue(mockMasterData)
+        
+        const dbError = new Error('DynamoDB connection failed')
+        jest.spyOn(dynamoDbService, 'updateItem').mockRejectedValue(dbError)
+
+        await expect(
+          service.generateSequenceItem({
+            tenantCode: tenantCode,
+            typeCode: 'sequence',
+            date: new Date('2024-11-27T13:44:15+07:00'),
+          }, optionsMock)
+        ).rejects.toThrow('DynamoDB connection failed')
+      })
+
+      it('should propagate error when updateItem fails in generateSequenceItemWithProvideSetting', async () => {
+        const dbError = new Error('DynamoDB timeout')
+        jest.spyOn(dynamoDbService, 'updateItem').mockRejectedValue(dbError)
+
+        await expect(
+          service.generateSequenceItemWithProvideSetting({
+            tenantCode: tenantCode,
+            typeCode: 'sequence',
+            date: new Date('2024-11-27T13:44:15+07:00'),
+            format: '%%no%%',
+            registerDate: '2020-01-01',
+            startMonth: 4,
+          }, optionsMock)
+        ).rejects.toThrow('DynamoDB timeout')
+      })
+
+      it('should propagate error when getItem fails in getCurrentSequence', async () => {
+        const dbError = new Error('Table not found')
+        jest.spyOn(dynamoDbService, 'getItem').mockRejectedValue(dbError)
+
+        const key = { pk: 'SEQ#MBC', sk: 'sequence#test' }
+        await expect(service.getCurrentSequence(key)).rejects.toThrow('Table not found')
+      })
+    })
+
+    describe('Master data provider failures', () => {
+      it('should handle master data provider errors gracefully', async () => {
+        const masterDataError = new Error('Master data service unavailable')
+        jest.spyOn(masterService, 'getData').mockRejectedValue(masterDataError)
+
+        await expect(
+          service.generateSequenceItem({
+            tenantCode: tenantCode,
+            typeCode: 'sequence',
+            date: new Date('2024-11-27T13:44:15+07:00'),
+          }, optionsMock)
+        ).rejects.toThrow('Master data service unavailable')
+      })
+
+      it('should handle null master data response', async () => {
+        jest.spyOn(masterService, 'getData').mockResolvedValue(null)
+
+        await expect(
+          service.generateSequenceItem({
+            tenantCode: tenantCode,
+            typeCode: 'sequence',
+            date: new Date('2024-11-27T13:44:15+07:00'),
+          }, optionsMock)
+        ).rejects.toThrow()
+      })
+    })
+  })
+
+  describe('Format Processing Edge Cases', () => {
+    describe('Complex format string processing', () => {
+      it('should handle format strings with padding syntax', async () => {
+        const mockMasterData = {
+          format: '%%no#:0>4%%',
+          registerDate: '2020-01-01',
+          startMonth: 4,
+        }
+        jest.spyOn(masterService, 'getData').mockResolvedValue(mockMasterData)
+        
+        const mockUpdate = {
+          'code': 'sequence#TODO#none',
+          'updatedBy': '92ca4f68-9ac6-4080-9ae2-2f02a86206a4',
+          'createdIp': '127.0.0.1',
+          'tenantCode': 'MBC',
+          'type': 'sequence',
+          'createdAt': '2024-11-27T13:44:15+07:00',
+          'updatedIp': '127.0.0.1',
+          'createdBy': '92ca4f68-9ac6-4080-9ae2-2f02a86206a4',
+          'requestId': '7724a67e-ded6-4ebb-9c88-c14070e24012',
+          'name': 'none',
+          'sk': 'sequence#TODO#none',
+          'pk': 'SEQ#MBC',
+          'seq': 5,
+          'updatedAt': '2024-11-27T13:44:16+07:00',
+        }
+        jest.spyOn(dynamoDbService, 'updateItem').mockResolvedValue(mockUpdate)
+
+        const result = await service.generateSequenceItem({
+          tenantCode: tenantCode,
+          typeCode: 'sequence',
+          date: new Date('2024-11-27T13:44:15+07:00'),
+        }, optionsMock)
+
+        expect(result.formattedNo).toBe('0005')
+      })
+
+      it('should handle format strings with multiple padding patterns', async () => {
+        const mockMasterData = {
+          format: '%%fiscal_year#:0>2%%-%%no#:0>6%%',
+          registerDate: '2020-01-01',
+          startMonth: 4,
+        }
+        jest.spyOn(masterService, 'getData').mockResolvedValue(mockMasterData)
+        
+        const mockUpdate = {
+          'code': 'sequence#TODO#none',
+          'updatedBy': '92ca4f68-9ac6-4080-9ae2-2f02a86206a4',
+          'createdIp': '127.0.0.1',
+          'tenantCode': 'MBC',
+          'type': 'sequence',
+          'createdAt': '2024-11-27T13:44:15+07:00',
+          'updatedIp': '127.0.0.1',
+          'createdBy': '92ca4f68-9ac6-4080-9ae2-2f02a86206a4',
+          'requestId': '7724a67e-ded6-4ebb-9c88-c14070e24012',
+          'name': 'none',
+          'sk': 'sequence#TODO#none',
+          'pk': 'SEQ#MBC',
+          'seq': 123,
+          'updatedAt': '2024-11-27T13:44:16+07:00',
+        }
+        jest.spyOn(dynamoDbService, 'updateItem').mockResolvedValue(mockUpdate)
+
+        const result = await service.generateSequenceItem({
+          tenantCode: tenantCode,
+          typeCode: 'sequence',
+          date: new Date('2024-11-27T13:44:15+07:00'),
+        }, optionsMock)
+
+        expect(result.formattedNo).toBe('05-000123')
+      })
+
+      it('should handle format strings with undefined values in formatDict', async () => {
+        const mockMasterData = {
+          format: '%%undefined_key%%-%%no%%',
+          registerDate: '2020-01-01',
+          startMonth: 4,
+        }
+        jest.spyOn(masterService, 'getData').mockResolvedValue(mockMasterData)
+        
+        const mockUpdate = {
+          'code': 'sequence#TODO#none',
+          'updatedBy': '92ca4f68-9ac6-4080-9ae2-2f02a86206a4',
+          'createdIp': '127.0.0.1',
+          'tenantCode': 'MBC',
+          'type': 'sequence',
+          'createdAt': '2024-11-27T13:44:15+07:00',
+          'updatedIp': '127.0.0.1',
+          'createdBy': '92ca4f68-9ac6-4080-9ae2-2f02a86206a4',
+          'requestId': '7724a67e-ded6-4ebb-9c88-c14070e24012',
+          'name': 'none',
+          'sk': 'sequence#TODO#none',
+          'pk': 'SEQ#MBC',
+          'seq': 1,
+          'updatedAt': '2024-11-27T13:44:16+07:00',
+        }
+        jest.spyOn(dynamoDbService, 'updateItem').mockResolvedValue(mockUpdate)
+
+        const result = await service.generateSequenceItem({
+          tenantCode: tenantCode,
+          typeCode: 'sequence',
+          date: new Date('2024-11-27T13:44:15+07:00'),
+        }, optionsMock)
+
+        expect(result.formattedNo).toBe('undefined_key-1')
+      })
+
+      it('should handle format strings with special characters', async () => {
+        const mockMasterData = {
+          format: 'PREFIX_%%no%%_SUFFIX',
+          registerDate: '2020-01-01',
+          startMonth: 4,
+        }
+        jest.spyOn(masterService, 'getData').mockResolvedValue(mockMasterData)
+        
+        const mockUpdate = {
+          'code': 'sequence#TODO#none',
+          'updatedBy': '92ca4f68-9ac6-4080-9ae2-2f02a86206a4',
+          'createdIp': '127.0.0.1',
+          'tenantCode': 'MBC',
+          'type': 'sequence',
+          'createdAt': '2024-11-27T13:44:15+07:00',
+          'updatedIp': '127.0.0.1',
+          'createdBy': '92ca4f68-9ac6-4080-9ae2-2f02a86206a4',
+          'requestId': '7724a67e-ded6-4ebb-9c88-c14070e24012',
+          'name': 'none',
+          'sk': 'sequence#TODO#none',
+          'pk': 'SEQ#MBC',
+          'seq': 42,
+          'updatedAt': '2024-11-27T13:44:16+07:00',
+        }
+        jest.spyOn(dynamoDbService, 'updateItem').mockResolvedValue(mockUpdate)
+
+        const result = await service.generateSequenceItem({
+          tenantCode: tenantCode,
+          typeCode: 'sequence',
+          date: new Date('2024-11-27T13:44:15+07:00'),
+        }, optionsMock)
+
+        expect(result.formattedNo).toBe('PREFIX_42_SUFFIX')
+      })
+
+      it('should handle empty format string', async () => {
+        const mockMasterData = {
+          format: '',
+          registerDate: '2020-01-01',
+          startMonth: 4,
+        }
+        jest.spyOn(masterService, 'getData').mockResolvedValue(mockMasterData)
+        
+        const mockUpdate = {
+          'code': 'sequence#TODO#none',
+          'updatedBy': '92ca4f68-9ac6-4080-9ae2-2f02a86206a4',
+          'createdIp': '127.0.0.1',
+          'tenantCode': 'MBC',
+          'type': 'sequence',
+          'createdAt': '2024-11-27T13:44:15+07:00',
+          'updatedIp': '127.0.0.1',
+          'createdBy': '92ca4f68-9ac6-4080-9ae2-2f02a86206a4',
+          'requestId': '7724a67e-ded6-4ebb-9c88-c14070e24012',
+          'name': 'none',
+          'sk': 'sequence#TODO#none',
+          'pk': 'SEQ#MBC',
+          'seq': 1,
+          'updatedAt': '2024-11-27T13:44:16+07:00',
+        }
+        jest.spyOn(dynamoDbService, 'updateItem').mockResolvedValue(mockUpdate)
+
+        const result = await service.generateSequenceItem({
+          tenantCode: tenantCode,
+          typeCode: 'sequence',
+          date: new Date('2024-11-27T13:44:15+07:00'),
+        }, optionsMock)
+
+        expect(result.formattedNo).toBe('')
+      })
+    })
+
+    describe('Padding extraction edge cases', () => {
+      it('should handle format with malformed padding syntax', async () => {
+        const mockMasterData = {
+          format: '%%no#invalid_padding%%',
+          registerDate: '2020-01-01',
+          startMonth: 4,
+        }
+        jest.spyOn(masterService, 'getData').mockResolvedValue(mockMasterData)
+        
+        const mockUpdate = {
+          'code': 'sequence#TODO#none',
+          'updatedBy': '92ca4f68-9ac6-4080-9ae2-2f02a86206a4',
+          'createdIp': '127.0.0.1',
+          'tenantCode': 'MBC',
+          'type': 'sequence',
+          'createdAt': '2024-11-27T13:44:15+07:00',
+          'updatedIp': '127.0.0.1',
+          'createdBy': '92ca4f68-9ac6-4080-9ae2-2f02a86206a4',
+          'requestId': '7724a67e-ded6-4ebb-9c88-c14070e24012',
+          'name': 'none',
+          'sk': 'sequence#TODO#none',
+          'pk': 'SEQ#MBC',
+          'seq': 1,
+          'updatedAt': '2024-11-27T13:44:16+07:00',
+        }
+        jest.spyOn(dynamoDbService, 'updateItem').mockResolvedValue(mockUpdate)
+
+        await expect(
+          service.generateSequenceItem({
+            tenantCode: tenantCode,
+            typeCode: 'sequence',
+            date: new Date('2024-11-27T13:44:15+07:00'),
+          }, optionsMock)
+        ).rejects.toThrow()
+      })
+    })
+  })
+
+  describe('Input Validation', () => {
+    describe('Fiscal year calculation edge cases', () => {
+      it('should handle invalid register date in generateSequenceItem', async () => {
+        const mockMasterData = {
+          format: '%%fiscal_year%%-%%no%%',
+          registerDate: 'invalid-date',
+          startMonth: 4,
+        }
+        jest.spyOn(masterService, 'getData').mockResolvedValue(mockMasterData)
+        
+        const mockUpdate = {
+          'code': 'sequence#TODO#none',
+          'updatedBy': '92ca4f68-9ac6-4080-9ae2-2f02a86206a4',
+          'createdIp': '127.0.0.1',
+          'tenantCode': 'MBC',
+          'type': 'sequence',
+          'createdAt': '2024-11-27T13:44:15+07:00',
+          'updatedIp': '127.0.0.1',
+          'createdBy': '92ca4f68-9ac6-4080-9ae2-2f02a86206a4',
+          'requestId': '7724a67e-ded6-4ebb-9c88-c14070e24012',
+          'name': 'none',
+          'sk': 'sequence#TODO#none',
+          'pk': 'SEQ#MBC',
+          'seq': 1,
+          'updatedAt': '2024-11-27T13:44:16+07:00',
+        }
+        jest.spyOn(dynamoDbService, 'updateItem').mockResolvedValue(mockUpdate)
+
+        const result = await service.generateSequenceItem({
+          tenantCode: tenantCode,
+          typeCode: 'sequence',
+          date: new Date('2024-11-27T13:44:15+07:00'),
+        }, optionsMock)
+
+        expect(result.formattedNo).toBe('fiscal_year-1')
+      })
+
+      it('should handle extreme future dates', async () => {
+        const mockMasterData = {
+          format: '%%fiscal_year%%-%%no%%',
+          registerDate: '2020-01-01',
+          startMonth: 4,
+        }
+        jest.spyOn(masterService, 'getData').mockResolvedValue(mockMasterData)
+        
+        const mockUpdate = {
+          'code': 'sequence#TODO#20991231',
+          'updatedBy': '92ca4f68-9ac6-4080-9ae2-2f02a86206a4',
+          'createdIp': '127.0.0.1',
+          'tenantCode': 'MBC',
+          'type': 'sequence',
+          'createdAt': '2099-12-31T23:59:59+07:00',
+          'updatedIp': '127.0.0.1',
+          'createdBy': '92ca4f68-9ac6-4080-9ae2-2f02a86206a4',
+          'requestId': '7724a67e-ded6-4ebb-9c88-c14070e24012',
+          'name': 'daily',
+          'sk': 'sequence#TODO#20991231',
+          'pk': 'SEQ#MBC',
+          'seq': 1,
+          'updatedAt': '2099-12-31T23:59:59+07:00',
+        }
+        jest.spyOn(dynamoDbService, 'updateItem').mockResolvedValue(mockUpdate)
+
+        const futureDate = new Date('2099-12-31T23:59:59+07:00')
+        const result = await service.generateSequenceItem({
+          tenantCode: tenantCode,
+          typeCode: 'sequence',
+          date: futureDate,
+          rotateBy: RotateByEnum.DAILY,
+        }, optionsMock)
+
+        expect(result.formattedNo).toBe('80-1')
+      })
+
+      it('should handle extreme past dates', async () => {
+        const mockMasterData = {
+          format: '%%fiscal_year%%-%%no%%',
+          registerDate: '2020-01-01',
+          startMonth: 4,
+        }
+        jest.spyOn(masterService, 'getData').mockResolvedValue(mockMasterData)
+        
+        const mockUpdate = {
+          'code': 'sequence#TODO#19000101',
+          'updatedBy': '92ca4f68-9ac6-4080-9ae2-2f02a86206a4',
+          'createdIp': '127.0.0.1',
+          'tenantCode': 'MBC',
+          'type': 'sequence',
+          'createdAt': '1900-01-01T00:00:00+07:00',
+          'updatedIp': '127.0.0.1',
+          'createdBy': '92ca4f68-9ac6-4080-9ae2-2f02a86206a4',
+          'requestId': '7724a67e-ded6-4ebb-9c88-c14070e24012',
+          'name': 'daily',
+          'sk': 'sequence#TODO#19000101',
+          'pk': 'SEQ#MBC',
+          'seq': 1,
+          'updatedAt': '1900-01-01T00:00:00+07:00',
+        }
+        jest.spyOn(dynamoDbService, 'updateItem').mockResolvedValue(mockUpdate)
+
+        const pastDate = new Date('1900-01-01T00:00:00+07:00')
+        const result = await service.generateSequenceItem({
+          tenantCode: tenantCode,
+          typeCode: 'sequence',
+          date: pastDate,
+          rotateBy: RotateByEnum.DAILY,
+        }, optionsMock)
+
+        expect(result.formattedNo).toBe('-120-1')
+      })
+    })
+
+    describe('Parameter validation', () => {
+      it('should handle missing tenantCode gracefully', async () => {
+        await expect(
+          service.generateSequenceItem({
+            tenantCode: '',
+            typeCode: 'sequence',
+            date: new Date('2024-11-27T13:44:15+07:00'),
+          }, optionsMock)
+        ).rejects.toThrow()
+      })
+
+      it('should handle missing typeCode gracefully', async () => {
+        await expect(
+          service.generateSequenceItem({
+            tenantCode: tenantCode,
+            typeCode: '',
+            date: new Date('2024-11-27T13:44:15+07:00'),
+          }, optionsMock)
+        ).rejects.toThrow()
+      })
+
+      it('should handle null date parameter', async () => {
+        const mockMasterData = {
+          format: '%%no%%',
+          registerDate: '2020-01-01',
+          startMonth: 4,
+        }
+        jest.spyOn(masterService, 'getData').mockResolvedValue(mockMasterData)
+        
+        const mockUpdate = {
+          'code': 'sequence#TODO#none',
+          'updatedBy': '92ca4f68-9ac6-4080-9ae2-2f02a86206a4',
+          'createdIp': '127.0.0.1',
+          'tenantCode': 'MBC',
+          'type': 'sequence',
+          'createdAt': expect.any(String),
+          'updatedIp': '127.0.0.1',
+          'createdBy': '92ca4f68-9ac6-4080-9ae2-2f02a86206a4',
+          'requestId': '7724a67e-ded6-4ebb-9c88-c14070e24012',
+          'name': 'none',
+          'sk': 'sequence#TODO#none',
+          'pk': 'SEQ#MBC',
+          'seq': 1,
+          'updatedAt': expect.any(String),
+        }
+        jest.spyOn(dynamoDbService, 'updateItem').mockResolvedValue(mockUpdate)
+
+        const result = await service.generateSequenceItem({
+          tenantCode: tenantCode,
+          typeCode: 'sequence',
+          date: undefined,
+        }, optionsMock)
+
+        expect(result.no).toBe(1)
+        expect(result.formattedNo).toBe('1')
+      })
+    })
+  })
+
+  describe('Concurrent Access Scenarios', () => {
+    it('should handle concurrent sequence generation requests', async () => {
+      const mockMasterData = {
+        format: '%%no%%',
+        registerDate: '2020-01-01',
+        startMonth: 4,
+      }
+      jest.spyOn(masterService, 'getData').mockResolvedValue(mockMasterData)
+      
+      const mockUpdate1 = {
+        'code': 'sequence#TODO#none',
+        'updatedBy': '92ca4f68-9ac6-4080-9ae2-2f02a86206a4',
+        'createdIp': '127.0.0.1',
+        'tenantCode': 'MBC',
+        'type': 'sequence',
+        'createdAt': '2024-11-27T13:44:15+07:00',
+        'updatedIp': '127.0.0.1',
+        'createdBy': '92ca4f68-9ac6-4080-9ae2-2f02a86206a4',
+        'requestId': '7724a67e-ded6-4ebb-9c88-c14070e24012',
+        'name': 'none',
+        'sk': 'sequence#TODO#none',
+        'pk': 'SEQ#MBC',
+        'seq': 1,
+        'updatedAt': '2024-11-27T13:44:16+07:00',
+      }
+      
+      const mockUpdate2 = {
+        ...mockUpdate1,
+        seq: 2,
+      }
+      
+      const mockUpdate3 = {
+        ...mockUpdate1,
+        seq: 3,
+      }
+
+      jest.spyOn(dynamoDbService, 'updateItem')
+        .mockResolvedValueOnce(mockUpdate1)
+        .mockResolvedValueOnce(mockUpdate2)
+        .mockResolvedValueOnce(mockUpdate3)
+
+      const promises = [
+        service.generateSequenceItem({
+          tenantCode: tenantCode,
+          typeCode: 'sequence',
+          date: new Date('2024-11-27T13:44:15+07:00'),
+        }, optionsMock),
+        service.generateSequenceItem({
+          tenantCode: tenantCode,
+          typeCode: 'sequence',
+          date: new Date('2024-11-27T13:44:15+07:00'),
+        }, optionsMock),
+        service.generateSequenceItem({
+          tenantCode: tenantCode,
+          typeCode: 'sequence',
+          date: new Date('2024-11-27T13:44:15+07:00'),
+        }, optionsMock),
+      ]
+
+      const results = await Promise.all(promises)
+
+      expect(results[0].no).toBe(1)
+      expect(results[1].no).toBe(2)
+      expect(results[2].no).toBe(3)
+      expect(results[0].formattedNo).toBe('1')
+      expect(results[1].formattedNo).toBe('2')
+      expect(results[2].formattedNo).toBe('3')
+    })
+
+    it('should handle mixed rotation strategies in concurrent requests', async () => {
+      const mockMasterData = {
+        format: '%%rotateBy%%-%%no%%',
+        registerDate: '2020-01-01',
+        startMonth: 4,
+      }
+      jest.spyOn(masterService, 'getData').mockResolvedValue(mockMasterData)
+      
+      const mockUpdateNone = {
+        'code': 'sequence#TODO#none',
+        'updatedBy': '92ca4f68-9ac6-4080-9ae2-2f02a86206a4',
+        'createdIp': '127.0.0.1',
+        'tenantCode': 'MBC',
+        'type': 'sequence',
+        'createdAt': '2024-11-27T13:44:15+07:00',
+        'updatedIp': '127.0.0.1',
+        'createdBy': '92ca4f68-9ac6-4080-9ae2-2f02a86206a4',
+        'requestId': '7724a67e-ded6-4ebb-9c88-c14070e24012',
+        'name': 'none',
+        'sk': 'sequence#TODO#none',
+        'pk': 'SEQ#MBC',
+        'seq': 1,
+        'updatedAt': '2024-11-27T13:44:16+07:00',
+      }
+      
+      const mockUpdateDaily = {
+        'code': 'sequence#TODO#20241127',
+        'updatedBy': '92ca4f68-9ac6-4080-9ae2-2f02a86206a4',
+        'createdIp': '127.0.0.1',
+        'tenantCode': 'MBC',
+        'type': 'sequence',
+        'createdAt': '2024-11-27T13:44:15+07:00',
+        'updatedIp': '127.0.0.1',
+        'createdBy': '92ca4f68-9ac6-4080-9ae2-2f02a86206a4',
+        'requestId': '7724a67e-ded6-4ebb-9c88-c14070e24012',
+        'name': 'daily',
+        'sk': 'sequence#TODO#20241127',
+        'pk': 'SEQ#MBC',
+        'seq': 1,
+        'updatedAt': '2024-11-27T13:44:16+07:00',
+      }
+
+      jest.spyOn(dynamoDbService, 'updateItem')
+        .mockResolvedValueOnce(mockUpdateNone)
+        .mockResolvedValueOnce(mockUpdateDaily)
+
+      const promises = [
+        service.generateSequenceItem({
+          tenantCode: tenantCode,
+          typeCode: 'sequence',
+          date: new Date('2024-11-27T13:44:15+07:00'),
+          rotateBy: RotateByEnum.NONE,
+        }, optionsMock),
+        service.generateSequenceItem({
+          tenantCode: tenantCode,
+          typeCode: 'sequence',
+          date: new Date('2024-11-27T13:44:15+07:00'),
+          rotateBy: RotateByEnum.DAILY,
+        }, optionsMock),
+      ]
+
+      const results = await Promise.all(promises)
+
+      expect(results[0].no).toBe(1)
+      expect(results[1].no).toBe(1)
+      expect(results[0].formattedNo).toBe('rotateBy-1')
+      expect(results[1].formattedNo).toBe('rotateBy-1')
+    })
+  })
 })
