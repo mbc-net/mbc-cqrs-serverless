@@ -11,28 +11,43 @@ The issue was caused by npm's `prepare` scripts running during `npm ci` before w
 - **Core packages**: `core`, `sequence`, `task` (base dependencies)
 - **Dependent packages**: `master`, `tenant`, `cli`, `ui-setting` (depend on core packages)
 
-The `master` and `tenant` packages have `prepare` scripts that run `npm run build` during dependency installation. According to npm documentation, `prepare` scripts run even with the `--ignore-scripts` flag, causing TypeScript compilation failures when these packages try to build before their workspace dependencies are available.
+The `master` and `tenant` packages have `prepare` scripts that run `npm run build` during dependency installation. According to npm documentation and the Japanese blog post (https://egashira.dev/blog/npm-install-option-ignore-scripts), `prepare` scripts run even with the `--ignore-scripts` flag, causing TypeScript compilation failures when these packages try to build before their workspace dependencies are available.
 
 ### Solution
 
-Modified the GitHub Actions workflow to:
+Modified the GitHub Actions workflow to use a **temporary package.json modification approach**:
 
-1. **Add `--ignore-scripts` flag** to prevent `prepare` scripts from running during dependency installation
-2. **Use modern lerna v8 commands** to ensure packages are built in correct dependency order:
-   - **First**: Build core dependencies (`core`, `sequence`, `task`) using `npx lerna run build --scope`
-   - **Second**: Build dependent packages (`master`, `tenant`, `cli`, `ui-setting`) using `npx lerna run build --scope`
-   - **For publishing**: Use `npx lerna run build` to build all packages in dependency order
+1. **Backup original package.json files** before dependency installation
+2. **Temporarily remove `prepare` scripts** using sed commands to prevent premature builds
+3. **Install dependencies** with `npm ci --ignore-scripts` (now effective since prepare scripts are removed)
+4. **Restore original package.json files** to maintain proper package configuration
+5. **Build packages in dependency order** using modern lerna v8 scoped commands
 
-This approach leverages modern lerna v8 capabilities while preventing npm's `prepare` scripts from running before workspace dependencies are available, eliminating the TypeScript compilation errors.
+This approach completely eliminates the npm `prepare` script execution during dependency installation while preserving the original package configuration for subsequent builds and publishing.
 
 ### Changes Made
 
 Updated `.github/workflows/run-test-and-publish-main.yaml`:
-- Added `--ignore-scripts` flag to all `npm ci` commands
-- Replaced individual package builds with modern `npx lerna run build` commands using package scoping
-- Applied the fix to all three jobs: unit test, e2e test, and publish
-- Used lerna's scoped build functionality to ensure proper dependency resolution order
-- Simplified the publish job to use `npx lerna run build` which automatically handles dependency order
+- **Unit Tests Job**: Added temporary package.json modification with backup/restore mechanism
+- **E2E Tests Job**: Applied the same temporary modification approach
+- **Publish Job**: Implemented the same approach to ensure consistent behavior
+- **Build Commands**: Used modern `npx lerna run build --scope` commands for proper dependency ordering
+- **Sed Commands**: `sed -i '/"prepare":/d'` safely removes only the prepare script lines
+- **File Operations**: `cp` for backup, `mv` for restoration ensures no data loss
+
+### Technical Details
+
+The sed command `sed -i '/"prepare":/d'` removes lines containing `"prepare":` from package.json files:
+- Targets only the specific script lines that cause issues
+- Preserves all other package.json content
+- Works reliably across different package.json formats
+- Safe operation with backup/restore mechanism
+
+The backup/restore mechanism ensures:
+- Original package.json files are preserved
+- No permanent modifications to source code
+- Proper package configuration for builds and publishing
+- Clean separation between dependency installation and building phases
 
 ## 問題の説明 (Japanese for Slack)
 
