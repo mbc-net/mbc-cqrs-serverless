@@ -26,19 +26,21 @@ jobs:
           node-version: ${{ matrix.node-version }}
           cache: npm
 
-      - name: Remove prepare scripts to prevent premature builds
+      - name: Install dependencies without workspaces
+        run: npm ci --ignore-scripts --workspaces=false
+
+      - name: Install and build core dependencies first
         run: |
-          sed -i '/"prepare":/d' packages/master/package.json
-          sed -i '/"prepare":/d' packages/tenant/package.json
+          cd packages/core && npm ci --ignore-scripts && npm run build
+          cd ../sequence && npm ci --ignore-scripts && npm run build  
+          cd ../task && npm ci --ignore-scripts && npm run build
 
-      - name: Install dependencies
-        run: npm ci --ignore-scripts
-
-      - name: Build core dependencies first
-        run: npx lerna run build --scope=@mbc-cqrs-serverless/core --scope=@mbc-cqrs-serverless/sequence --scope=@mbc-cqrs-serverless/task
-
-      - name: Build remaining packages
-        run: npx lerna run build --scope=@mbc-cqrs-serverless/tenant --scope=@mbc-cqrs-serverless/master --scope=@mbc-cqrs-serverless/cli --scope=@mbc-cqrs-serverless/ui-setting
+      - name: Install and build remaining packages
+        run: |
+          cd packages/tenant && npm ci --ignore-scripts && npm run build
+          cd ../master && npm ci --ignore-scripts && npm run build
+          cd ../cli && npm ci --ignore-scripts && npm run build
+          cd ../ui-setting && npm ci --ignore-scripts && npm run build
 
       - name: Run Unit Tests
         run: npm run test
@@ -68,19 +70,17 @@ jobs:
           node-version: ${{ matrix.node-version }}
           cache: npm
 
-      - name: Remove prepare scripts to prevent premature builds
+      - name: Install dependencies without workspaces
+        run: npm ci --ignore-scripts --workspaces=false
+
+      - name: Install and build core dependencies for testing
         run: |
-          sed -i '/"prepare":/d' packages/master/package.json
-          sed -i '/"prepare":/d' packages/tenant/package.json
-
-      - name: Install dependencies
-        run: npm ci --ignore-scripts
-
-      - name: Build core dependencies for testing
-        run: npx lerna run build --scope=@mbc-cqrs-serverless/core --scope=@mbc-cqrs-serverless/sequence --scope=@mbc-cqrs-serverless/task
+          cd packages/core && npm ci --ignore-scripts && npm run build
+          cd ../sequence && npm ci --ignore-scripts && npm run build  
+          cd ../task && npm ci --ignore-scripts && npm run build
 
       - name: Build test packages
-        run: npx lerna run build:test --scope=@mbc-cqrs-serverless/core
+        run: cd packages/core && npm run build:test
 
       - name: Run e2e Tests
         run: npx lerna run test:e2e --scope=@mbc-cqrs-serverless/core
@@ -113,19 +113,21 @@ jobs:
         with:
           node-version: 18
           cache: npm
-      - name: Remove prepare scripts to prevent premature builds
+      - name: Install dependencies without workspaces
+        run: npm ci --ignore-scripts --workspaces=false
+
+      - name: Install and build core dependencies for publishing
         run: |
-          sed -i '/"prepare":/d' packages/master/package.json
-          sed -i '/"prepare":/d' packages/tenant/package.json
+          cd packages/core && npm ci --ignore-scripts && npm run build
+          cd ../sequence && npm ci --ignore-scripts && npm run build  
+          cd ../task && npm ci --ignore-scripts && npm run build
 
-      - name: Install dependencies
-        run: npm ci --ignore-scripts
-
-      - name: Build core dependencies for publishing
-        run: npx lerna run build --scope=@mbc-cqrs-serverless/core --scope=@mbc-cqrs-serverless/sequence --scope=@mbc-cqrs-serverless/task
-
-      - name: Build all packages for publishing
-        run: npx lerna run build --scope=@mbc-cqrs-serverless/tenant --scope=@mbc-cqrs-serverless/master --scope=@mbc-cqrs-serverless/cli --scope=@mbc-cqrs-serverless/ui-setting
+      - name: Install and build all packages for publishing
+        run: |
+          cd packages/tenant && npm ci --ignore-scripts && npm run build
+          cd ../master && npm ci --ignore-scripts && npm run build
+          cd ../cli && npm ci --ignore-scripts && npm run build
+          cd ../ui-setting && npm ci --ignore-scripts && npm run build
 
       - name: Authenticate with npm
         run: echo "//registry.npmjs.org/:_authToken=${{ secrets.NPM_TOKEN }}" > ~/.npmrc
