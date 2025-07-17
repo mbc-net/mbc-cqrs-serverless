@@ -17,20 +17,20 @@ The `master` and `tenant` packages have `prepare` scripts that run `npm run buil
 
 Modified the GitHub Actions workflow to:
 
-1. **Remove prepare scripts** temporarily during CI to prevent premature builds
-2. **Build packages in dependency order** after installation:
-   - **First**: Build core dependencies (`core`, `sequence`, `task`)
-   - **Second**: Build dependent packages (`master`, `tenant`, `cli`, `ui-setting`)
+1. **Disable npm workspaces** during CI using `--workspaces=false` flag to prevent automatic package linking
+2. **Install and build packages individually** in correct dependency order:
+   - **First**: Install and build core dependencies (`core`, `sequence`, `task`)
+   - **Second**: Install and build dependent packages (`master`, `tenant`, `cli`, `ui-setting`)
 
-This ensures that workspace dependencies are built and available before dependent packages attempt to compile.
+This prevents npm workspaces from automatically triggering prepare scripts before dependencies are available, eliminating the TypeScript compilation errors.
 
 ### Changes Made
 
 Updated `.github/workflows/run-test-and-publish-main.yaml`:
-- Added step to remove `prepare` scripts from master and tenant packages before `npm ci`
-- Replaced single "Build packages" steps with ordered build steps
+- Changed `npm ci --ignore-scripts` to `npm ci --ignore-scripts --workspaces=false`
+- Replaced lerna-based builds with individual package installation and builds
 - Applied the fix to all three jobs: unit test, e2e test, and publish
-- Used lerna scoped builds to control build order precisely
+- Each package is installed and built in its own directory to ensure proper dependency resolution
 
 ## 問題の説明 (Japanese for Slack)
 
@@ -49,20 +49,20 @@ mainブランチのCIでmasterパッケージのTypeScriptコンパイルエラ�
 
 GitHub Actionsワークフローを以下のように修正しました：
 
-1. **prepareスクリプトを一時的に削除**: CI中に早期ビルドを防ぐため
-2. **インストール後に依存関係順序でパッケージをビルド**：
-   - **最初**: コア依存関係をビルド（`core`、`sequence`、`task`）
-   - **次に**: 依存パッケージをビルド（`master`、`tenant`、`cli`、`ui-setting`）
+1. **npm workspacesを無効化**: CI中に`--workspaces=false`フラグを使用して自動パッケージリンクを防止
+2. **パッケージを個別にインストール・ビルド**：正しい依存関係順序で実行
+   - **最初**: コア依存関係をインストール・ビルド（`core`、`sequence`、`task`）
+   - **次に**: 依存パッケージをインストール・ビルド（`master`、`tenant`、`cli`、`ui-setting`）
 
-これにより、依存パッケージがコンパイルを試行する前にワークスペース依存関係がビルドされ利用可能になります。
+これにより、npm workspacesが依存関係が利用可能になる前にprepareスクリプトを自動実行することを防ぎ、TypeScriptコンパイルエラーを解消します。
 
 ### 実施した変更
 
 `.github/workflows/run-test-and-publish-main.yaml`を更新：
-- `npm ci`前にmasterとtenantパッケージから`prepare`スクリプトを削除するステップを追加
-- 単一の「Build packages」ステップを順序付きビルドステップに置き換え
+- `npm ci --ignore-scripts`を`npm ci --ignore-scripts --workspaces=false`に変更
+- lernaベースのビルドを個別パッケージのインストール・ビルドに置き換え
 - 3つのジョブすべて（ユニットテスト、e2eテスト、パブリッシュ）に修正を適用
-- lernaスコープビルドを使用してビルド順序を正確に制御
+- 各パッケージを独自のディレクトリでインストール・ビルドして適切な依存関係解決を保証
 
 ### メリット・デメリット
 
