@@ -26,21 +26,14 @@ jobs:
           node-version: ${{ matrix.node-version }}
           cache: npm
 
-      - name: Install dependencies without workspaces
-        run: npm ci --ignore-scripts --workspaces=false
+      - name: Install dependencies
+        run: npm ci --ignore-scripts
 
-      - name: Install and build core dependencies first
-        run: |
-          cd packages/core && npm ci --ignore-scripts && npm run build
-          cd ../sequence && npm ci --ignore-scripts && npm run build  
-          cd ../task && npm ci --ignore-scripts && npm run build
+      - name: Build core dependencies first
+        run: npx lerna run build --scope=@mbc-cqrs-serverless/core --scope=@mbc-cqrs-serverless/sequence --scope=@mbc-cqrs-serverless/task
 
-      - name: Install and build remaining packages
-        run: |
-          cd packages/tenant && npm ci --ignore-scripts && npm run build
-          cd ../master && npm ci --ignore-scripts && npm run build
-          cd ../cli && npm ci --ignore-scripts && npm run build
-          cd ../ui-setting && npm ci --ignore-scripts && npm run build
+      - name: Build remaining packages
+        run: npx lerna run build --scope=@mbc-cqrs-serverless/tenant --scope=@mbc-cqrs-serverless/master --scope=@mbc-cqrs-serverless/cli --scope=@mbc-cqrs-serverless/ui-setting
 
       - name: Run Unit Tests
         run: npm run test
@@ -70,17 +63,14 @@ jobs:
           node-version: ${{ matrix.node-version }}
           cache: npm
 
-      - name: Install dependencies without workspaces
-        run: npm ci --ignore-scripts --workspaces=false
+      - name: Install dependencies
+        run: npm ci --ignore-scripts
 
-      - name: Install and build core dependencies for testing
-        run: |
-          cd packages/core && npm ci --ignore-scripts && npm run build
-          cd ../sequence && npm ci --ignore-scripts && npm run build  
-          cd ../task && npm ci --ignore-scripts && npm run build
+      - name: Build core dependencies for testing
+        run: npx lerna run build --scope=@mbc-cqrs-serverless/core --scope=@mbc-cqrs-serverless/sequence --scope=@mbc-cqrs-serverless/task
 
-      - name: Build test packages
-        run: cd packages/core && npm run build:test
+      - name: Build test
+        run: npx lerna run build:test --scope=@mbc-cqrs-serverless/core
 
       - name: Run e2e Tests
         run: npx lerna run test:e2e --scope=@mbc-cqrs-serverless/core
@@ -113,21 +103,11 @@ jobs:
         with:
           node-version: 18
           cache: npm
-      - name: Install dependencies without workspaces
-        run: npm ci --ignore-scripts --workspaces=false
+      - name: Install dependencies
+        run: npm ci --ignore-scripts
 
-      - name: Install and build core dependencies for publishing
-        run: |
-          cd packages/core && npm ci --ignore-scripts && npm run build
-          cd ../sequence && npm ci --ignore-scripts && npm run build  
-          cd ../task && npm ci --ignore-scripts && npm run build
-
-      - name: Install and build all packages for publishing
-        run: |
-          cd packages/tenant && npm ci --ignore-scripts && npm run build
-          cd ../master && npm ci --ignore-scripts && npm run build
-          cd ../cli && npm ci --ignore-scripts && npm run build
-          cd ../ui-setting && npm ci --ignore-scripts && npm run build
+      - name: Build packages
+        run: npx lerna run build
 
       - name: Authenticate with npm
         run: echo "//registry.npmjs.org/:_authToken=${{ secrets.NPM_TOKEN }}" > ~/.npmrc
