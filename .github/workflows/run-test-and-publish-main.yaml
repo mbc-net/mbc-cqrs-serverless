@@ -28,6 +28,10 @@ jobs:
 
       - name: Install dependencies
         run: |
+          # 
+          #
+          #
+          
           cp packages/master/package.json packages/master/package.json.bak
           cp packages/tenant/package.json packages/tenant/package.json.bak
           
@@ -75,6 +79,10 @@ jobs:
 
       - name: Install dependencies
         run: |
+          # 
+          #
+          #
+          
           cp packages/master/package.json packages/master/package.json.bak
           cp packages/tenant/package.json packages/tenant/package.json.bak
           
@@ -125,6 +133,10 @@ jobs:
           cache: npm
       - name: Install dependencies
         run: |
+          # 
+          #
+          #
+          
           cp packages/master/package.json packages/master/package.json.bak
           cp packages/tenant/package.json packages/tenant/package.json.bak
           
