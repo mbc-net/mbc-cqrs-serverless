@@ -3,6 +3,14 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.1.71-beta.0](https://github.com/mbc-net/mbc-cqrs-serverless/compare/v0.1.70-beta.0...v0.1.71-beta.0) (2025-07-18)
+
+### Features
+
+- implement comprehensive unit tests for controllers ([9bef4b0](https://github.com/mbc-net/mbc-cqrs-serverless/commit/9bef4b02a93aae016655f6393836a0b519f33c8e))
+- Sequenceサービスのテスト強化 ([8eefb34](https://github.com/mbc-net/mbc-cqrs-serverless/commit/8eefb34ce829b15ecef04607b90faba7bd133571))
+- 高優先度パッケージのユニットテスト実装 ([1dc8494](https://github.com/mbc-net/mbc-cqrs-serverless/commit/1dc849452dafb4a628fa72fda32fe20af17316d5))
+
 ## [0.1.70-beta.0](https://github.com/mbc-net/mbc-cqrs-serverless/compare/v0.1.69-beta.0...v0.1.70-beta.0) (2025-07-14)
 
 **Note:** Version bump only for package @mbc-cqrs-serverless/sequence
