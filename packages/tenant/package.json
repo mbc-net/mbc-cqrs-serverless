@@ -1,6 +1,6 @@
 {
   "name": "@mbc-cqrs-serverless/tenant",
-  "version": "0.1.69-beta.0",
+  "version": "0.1.70-beta.0",
   "description": "Multiple tenant management",
   "keywords": [
     "mbc",
@@ -26,7 +26,6 @@
   "scripts": {
     "build": "rm -rf dist && nest build",
     "test": "echo \"Error: no test specified\" && exit 1",
-    "prepare": "npm run build",
     "postinstall": " node ./dist/update-scheme.js"
   },
   "repository": {

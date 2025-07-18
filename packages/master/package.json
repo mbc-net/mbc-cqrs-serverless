@@ -1,6 +1,6 @@
 {
   "name": "@mbc-cqrs-serverless/master",
-  "version": "0.1.69-beta.0",
+  "version": "0.1.70-beta.0",
   "description": " Master data management such as setting, sequence, etc.",
   "keywords": [
     "mbc",
@@ -27,7 +27,6 @@
   "scripts": {
     "build": "rm -rf dist && nest build",
     "test": "echo \"Error: no test specified\" && exit 1",
-    "prepare": "npm run build",
     "postinstall": "node ./dist/update-scheme.js"
   },
   "repository": {
@@ -44,9 +43,9 @@
     "access": "public"
   },
   "dependencies": {
-    "@mbc-cqrs-serverless/core": "^0.1.69-beta.0",
-    "@mbc-cqrs-serverless/sequence": "^0.1.69-beta.0",
-    "@mbc-cqrs-serverless/task": "^0.1.69-beta.0",
+    "@mbc-cqrs-serverless/core": "^0.1.70-beta.0",
+    "@mbc-cqrs-serverless/sequence": "^0.1.70-beta.0",
+    "@mbc-cqrs-serverless/task": "^0.1.70-beta.0",
     "ulid": "^2.3.0"
   }
 }
