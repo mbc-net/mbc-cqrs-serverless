@@ -3,6 +3,23 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.1.71-beta.0](https://github.com/mbc-net/mbc-cqrs-serverless/compare/v0.1.70-beta.0...v0.1.71-beta.0) (2025-07-18)
+
+### Bug Fixes
+
+- Core package test failures blocking CI ([1e02300](https://github.com/mbc-net/mbc-cqrs-serverless/commit/1e02300de5a98743f240e0d157200094151ca033))
+- handle step function name limit ([762ab9a](https://github.com/mbc-net/mbc-cqrs-serverless/commit/762ab9aa27baba62c1e8f5e3da8e19d2b32e8f46))
+- StepFunctionService execution name length validation ([86291ea](https://github.com/mbc-net/mbc-cqrs-serverless/commit/86291ea9defc1edad7b0439d4e34fbf378ea630e))
+- StepFunctionServiceテストの80文字制限バグ対応 ([cf188ae](https://github.com/mbc-net/mbc-cqrs-serverless/commit/cf188ae8aa07824134d0e6e8c17400e64f9cede3))
+
+### Features
+
+- Coreパッケージサービスのユニットテスト強化 ([a4d318e](https://github.com/mbc-net/mbc-cqrs-serverless/commit/a4d318ebd1aa5d01861c21ec2acfa0e8fa8cf8c9))
+- implement comprehensive unit tests for controllers ([9bef4b0](https://github.com/mbc-net/mbc-cqrs-serverless/commit/9bef4b02a93aae016655f6393836a0b519f33c8e))
+- Masterパッケージサービスのユニットテスト強化 ([90ca8a9](https://github.com/mbc-net/mbc-cqrs-serverless/commit/90ca8a9365a75b869118585c4cd6f84373b907bb))
+- 不足していたサービスのユニットテスト実装 ([2f762ff](https://github.com/mbc-net/mbc-cqrs-serverless/commit/2f762ff93968c678ceec7f7eeaf78db7e74db797))
+- 高優先度パッケージのユニットテスト実装 ([1dc8494](https://github.com/mbc-net/mbc-cqrs-serverless/commit/1dc849452dafb4a628fa72fda32fe20af17316d5))
+
 ## [0.1.70-beta.0](https://github.com/mbc-net/mbc-cqrs-serverless/compare/v0.1.69-beta.0...v0.1.70-beta.0) (2025-07-14)
 
 **Note:** Version bump only for package @mbc-cqrs-serverless/core
