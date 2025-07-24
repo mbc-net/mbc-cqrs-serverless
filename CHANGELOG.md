@@ -3,6 +3,12 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.1.72-beta.0](https://github.com/mbc-net/mbc-cqrs-serverless/compare/v0.1.71-beta.0...v0.1.72-beta.0) (2025-07-24)
+
+### Features
+
+- add case-insensitive search for master data and settings ([ee6b965](https://github.com/mbc-net/mbc-cqrs-serverless/commit/ee6b9657fa37cc251212e517c61cda4f7ee0be83))
+
 ## [0.1.71-beta.0](https://github.com/mbc-net/mbc-cqrs-serverless/compare/v0.1.70-beta.0...v0.1.71-beta.0) (2025-07-18)
 
 ### Bug Fixes
