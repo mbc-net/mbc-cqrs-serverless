@@ -426,7 +426,7 @@ export class MasterSettingService implements IMasterSettingService {
 
     if (searchDto.name?.trim()) {
       andConditions.push({
-        name: { contains: searchDto.name.trim() },
+        name: { contains: searchDto.name.trim(), mode: 'insensitive' }
       })
     }
 
@@ -441,7 +441,7 @@ export class MasterSettingService implements IMasterSettingService {
 
     if (searchDto.code?.trim()) {
       andConditions.push({
-        masterCode: { contains: searchDto.code.trim() },
+        masterCode: { contains: searchDto.code.trim(), mode: 'insensitive' },
       })
     }
 

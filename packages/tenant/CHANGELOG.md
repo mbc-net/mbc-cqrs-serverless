@@ -3,6 +3,20 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.1.72-beta.0](https://github.com/mbc-net/mbc-cqrs-serverless/compare/v0.1.71-beta.0...v0.1.72-beta.0) (2025-07-24)
+
+**Note:** Version bump only for package @mbc-cqrs-serverless/tenant
+
+## [0.1.71-beta.0](https://github.com/mbc-net/mbc-cqrs-serverless/compare/v0.1.70-beta.0...v0.1.71-beta.0) (2025-07-18)
+
+### Bug Fixes
+
+- github workflow ([2cd9d44](https://github.com/mbc-net/mbc-cqrs-serverless/commit/2cd9d44178f19c2c5d7b3f53e512723e99ffca8c))
+
+### Features
+
+- implement comprehensive unit tests for controllers ([9bef4b0](https://github.com/mbc-net/mbc-cqrs-serverless/commit/9bef4b02a93aae016655f6393836a0b519f33c8e))
+
 ## [0.1.70-beta.0](https://github.com/mbc-net/mbc-cqrs-serverless/compare/v0.1.69-beta.0...v0.1.70-beta.0) (2025-07-14)
 
 **Note:** Version bump only for package @mbc-cqrs-serverless/tenant

@@ -3,6 +3,25 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.1.72-beta.0](https://github.com/mbc-net/mbc-cqrs-serverless/compare/v0.1.71-beta.0...v0.1.72-beta.0) (2025-07-24)
+
+### Features
+
+- add case-insensitive search for master data and settings ([ee6b965](https://github.com/mbc-net/mbc-cqrs-serverless/commit/ee6b9657fa37cc251212e517c61cda4f7ee0be83))
+
+## [0.1.71-beta.0](https://github.com/mbc-net/mbc-cqrs-serverless/compare/v0.1.70-beta.0...v0.1.71-beta.0) (2025-07-18)
+
+### Bug Fixes
+
+- github workflow ([2cd9d44](https://github.com/mbc-net/mbc-cqrs-serverless/commit/2cd9d44178f19c2c5d7b3f53e512723e99ffca8c))
+
+### Features
+
+- implement comprehensive unit tests for controllers ([9bef4b0](https://github.com/mbc-net/mbc-cqrs-serverless/commit/9bef4b02a93aae016655f6393836a0b519f33c8e))
+- Masterパッケージサービスのユニットテスト強化 ([90ca8a9](https://github.com/mbc-net/mbc-cqrs-serverless/commit/90ca8a9365a75b869118585c4cd6f84373b907bb))
+- 不足していたサービスのユニットテスト実装 ([2f762ff](https://github.com/mbc-net/mbc-cqrs-serverless/commit/2f762ff93968c678ceec7f7eeaf78db7e74db797))
+- 高優先度パッケージのユニットテスト実装 ([1dc8494](https://github.com/mbc-net/mbc-cqrs-serverless/commit/1dc849452dafb4a628fa72fda32fe20af17316d5))
+
 ## [0.1.70-beta.0](https://github.com/mbc-net/mbc-cqrs-serverless/compare/v0.1.69-beta.0...v0.1.70-beta.0) (2025-07-14)
 
 ### Bug Fixes

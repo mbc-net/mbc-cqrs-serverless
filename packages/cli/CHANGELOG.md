@@ -3,6 +3,16 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.1.72-beta.0](https://github.com/mbc-net/mbc-cqrs-serverless/compare/v0.1.71-beta.0...v0.1.72-beta.0) (2025-07-24)
+
+**Note:** Version bump only for package @mbc-cqrs-serverless/cli
+
+## [0.1.71-beta.0](https://github.com/mbc-net/mbc-cqrs-serverless/compare/v0.1.70-beta.0...v0.1.71-beta.0) (2025-07-18)
+
+### Features
+
+- CLI package comprehensive test enhancement ([edd8426](https://github.com/mbc-net/mbc-cqrs-serverless/commit/edd842662d90f5c1609cde332456489cd6f80062))
+
 ## [0.1.70-beta.0](https://github.com/mbc-net/mbc-cqrs-serverless/compare/v0.1.69-beta.0...v0.1.70-beta.0) (2025-07-14)
 
 **Note:** Version bump only for package @mbc-cqrs-serverless/cli
