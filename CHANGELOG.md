@@ -3,6 +3,18 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.1.70-beta.0](https://github.com/mbc-net/mbc-cqrs-serverless/compare/v0.1.69-beta.0...v0.1.70-beta.0) (2025-07-14)
+
+### Bug Fixes
+
+- **master:** master-setting unit test ([c1d75af](https://github.com/mbc-net/mbc-cqrs-serverless/commit/c1d75af4ccb8438842be8ccfa244c288eefe36a1))
+- update package version ([fe43ed7](https://github.com/mbc-net/mbc-cqrs-serverless/commit/fe43ed7ad68f6142f830d19e1d7e92ac9ad41f20))
+- update package version ([4d1aa9a](https://github.com/mbc-net/mbc-cqrs-serverless/commit/4d1aa9ad7af95b709d6d4f4efc104b8391ac76f5))
+
+### Features
+
+- **master:** add copy to tenant ([bd7036d](https://github.com/mbc-net/mbc-cqrs-serverless/commit/bd7036d851dc92569b343de1c39ccb03ad7d11b9))
+
 ## [0.1.69-beta.0](https://github.com/mbc-net/mbc-cqrs-serverless/compare/v0.1.68-beta.0...v0.1.69-beta.0) (2025-07-07)
 
 ### Bug Fixes
