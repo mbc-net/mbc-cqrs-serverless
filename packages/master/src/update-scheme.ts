@@ -212,7 +212,7 @@ const formatTemplate = () => {
   const sourceDir = path.join(__dirname, '../src/templates/master')
   const destinationDir = path.resolve(__dirname, '../../../../src/master')
 
-  const fileName = 'handler/master-sfn-task.event.ts'
+  const fileName = 'handler/master-rds.handler.ts'
   const filePath = path.join(destinationDir, fileName)
 
   // Check if the file exists
