@@ -82,13 +82,7 @@
     "typescript": "^5.3.3"
   },
   "workspaces": [
-    "packages/core",
-    "packages/sequence",
-    "packages/task",
-    "packages/cli",
-    "packages/ui-setting",
-    "packages/tenant",
-    "packages/master"
+    "packages/*"
   ],
   "jest": {
     "moduleFileExtensions": [
