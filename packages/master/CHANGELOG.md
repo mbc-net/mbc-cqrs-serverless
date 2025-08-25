@@ -3,6 +3,12 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.1.73-beta.0](https://github.com/mbc-net/mbc-cqrs-serverless/compare/v0.1.72-beta.0...v0.1.73-beta.0) (2025-07-31)
+
+### Bug Fixes
+
+- **master:** install package ([288d779](https://github.com/mbc-net/mbc-cqrs-serverless/commit/288d779cc1a6bb5ea150d4388ad82221c4d24108))
+
 ## [0.1.72-beta.0](https://github.com/mbc-net/mbc-cqrs-serverless/compare/v0.1.71-beta.0...v0.1.72-beta.0) (2025-07-24)
 
 ### Features

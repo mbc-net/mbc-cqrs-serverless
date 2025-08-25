@@ -20,6 +20,7 @@ import {
 } from '../config'
 import { Config } from '../config/type'
 import { buildApp } from './build-app'
+import { DistributedMap } from './distributed-map'
 
 export interface InfraStackProps extends cdk.StackProps {
   config: Config
@@ -115,6 +116,10 @@ export class InfraStack extends cdk.Stack {
       },
     })
 
+    const importActionSqs = new cdk.aws_sqs.Queue(this, 'import-action-sqs', {
+      queueName: prefix + 'import-action-queue',
+    })
+
     const subTaskStatusSqs = new cdk.aws_sqs.Queue(
       this,
       'sub-task-status-sqs',
@@ -159,6 +164,17 @@ export class InfraStack extends cdk.Stack {
         filterPolicy: {
           action: cdk.aws_sns.SubscriptionFilter.stringFilter({
             allowlist: ['sub-task-status'],
+          }),
+        },
+      }),
+    )
+
+    mainSns.addSubscription(
+      new cdk.aws_sns_subscriptions.SqsSubscription(importActionSqs, {
+        rawMessageDelivery: true,
+        filterPolicy: {
+          action: cdk.aws_sns.SubscriptionFilter.stringFilter({
+            allowlist: ['import-execute'],
           }),
         },
       }),
@@ -353,6 +369,18 @@ export class InfraStack extends cdk.Stack {
       arnFormat: cdk.ArnFormat.COLON_RESOURCE_NAME,
     })
 
+    const importCsvStateMachineName = prefix + 'import-csv-handler'
+
+    const importCsvSfnArn = cdk.Arn.format({
+      partition: 'aws',
+      region: this.region,
+      account: this.account,
+      service: 'states',
+      resource: 'stateMachine',
+      resourceName: importCsvStateMachineName,
+      arnFormat: cdk.ArnFormat.COLON_RESOURCE_NAME,
+    })
+
     // Lambda api ( arm64 )
     const execEnv = {
       NODE_OPTIONS: '--enable-source-maps',
@@ -365,6 +393,7 @@ export class InfraStack extends cdk.Stack {
       S3_BUCKET_NAME: ddbBucket.bucketName,
       SFN_COMMAND_ARN: commandSfnArn,
       SFN_TASK_ARN: taskSfnArn,
+      SFN_IMPORT_CSV_ARN: importCsvSfnArn,
       SNS_TOPIC_ARN: mainSns.topicArn,
       SNS_ALARM_TOPIC_ARN: alarmSns.topicArn,
       COGNITO_USER_POOL_ID: userPool.userPoolId,
@@ -851,6 +880,65 @@ export class InfraStack extends cdk.Stack {
       },
     )
 
+    // Csv import
+    const csvRowsHandlerState = lambdaInvoke(
+      'csv_rows_handler',
+      null,
+      cdk.aws_stepfunctions.IntegrationPattern.REQUEST_RESPONSE,
+    )
+
+    const sfnImportCsvDefinition = new DistributedMap(this, 'import-csv', {
+      maxConcurrency: 50,
+    })
+      .setLabel('import-csv')
+      .setItemReader({
+        Resource: 'arn:aws:states:::s3:getObject',
+        ReaderConfig: {
+          InputType: 'CSV',
+          CSVHeaderLocation: 'FIRST_ROW',
+        },
+        Parameters: {
+          'Bucket.$': '$.bucket',
+          'Key.$': '$.key',
+        },
+      })
+      .setItemBatcher({
+        MaxInputBytesPerBatch: 10,
+        BatchInput: {
+          'Attributes.$': '$',
+        },
+      })
+      .itemProcessor(csvRowsHandlerState, {
+        executionType: cdk.aws_stepfunctions.ProcessorType.EXPRESS,
+      })
+
+    const sfnImportCsvLogGroup = new cdk.aws_logs.LogGroup(
+      this,
+      'import-csv-handler-sfn-log',
+      {
+        logGroupName: `/aws/vendedlogs/states/${prefix}-import-csv-handler-state-machine-logs`, // Specify a log group name
+        removalPolicy: cdk.RemovalPolicy.DESTROY, // Policy for log group removal
+        retention: cdk.aws_logs.RetentionDays.SIX_MONTHS,
+      },
+    )
+
+    const importCsvStateMachine = new cdk.aws_stepfunctions.StateMachine(
+      this,
+      'import-csv-state-machine',
+      {
+        stateMachineName: importCsvStateMachineName,
+        comment: 'A state machine for import-csv module handler',
+        definitionBody: cdk.aws_stepfunctions.DefinitionBody.fromChainable(
+          sfnImportCsvDefinition,
+        ),
+        tracingEnabled: true,
+        logs: {
+          destination: sfnImportCsvLogGroup,
+          level: cdk.aws_stepfunctions.LogLevel.ALL, // Log level (ALL, ERROR, or FATAL)
+        },
+      },
+    )
+
     // add event sources to lambda event
     lambdaApi.addEventSource(
       new cdk.aws_lambda_event_sources.SqsEventSource(taskSqs, {
@@ -867,8 +955,13 @@ export class InfraStack extends cdk.Stack {
         batchSize: 1,
       }),
     )
+    lambdaApi.addEventSource(
+      new cdk.aws_lambda_event_sources.SqsEventSource(importActionSqs, {
+        batchSize: 1,
+      }),
+    )
     // dynamodb event source
-    const tableNames = ['tasks', 'sample-command']
+    const tableNames = ['tasks', 'sample-command', 'import_tmp']
     for (const tableName of tableNames) {
       const tableDesc = new cdk.custom_resources.AwsCustomResource(
         this,
@@ -926,6 +1019,17 @@ export class InfraStack extends cdk.Stack {
       'cognito-idp:AdminUpdateUserAttributes',
     )
     ddbBucket.grantReadWrite(lambdaApi)
+    ddbBucket.grantRead(importCsvStateMachine)
+    importCsvStateMachine.role?.attachInlinePolicy(
+      new cdk.aws_iam.Policy(this, 'csv-import-map-policy', {
+        statements: [
+          new cdk.aws_iam.PolicyStatement({
+            actions: ['states:StartExecution'],
+            resources: [importCsvSfnArn],
+          }),
+        ],
+      }),
+    )
     publicBucket.grantReadWrite(lambdaApi)
     mainSns.grantPublish(lambdaApi)
     alarmSns.grantPublish(lambdaApi)
@@ -973,6 +1077,11 @@ export class InfraStack extends cdk.Stack {
       resources: [taskSfnArn], // Access to all resources
     })
 
+    const importCsvSfnPolicy = new cdk.aws_iam.PolicyStatement({
+      actions: ['states:*'],
+      resources: [importCsvSfnArn], // Access to all resources
+    })
+
     // Attach the policy to the Lambda function's execution role
     lambdaApi.role?.attachInlinePolicy(
       new cdk.aws_iam.Policy(this, 'lambda-event-sfn-policy', {
@@ -989,6 +1098,16 @@ export class InfraStack extends cdk.Stack {
       new cdk.aws_iam.Policy(this, 'lambda-task-sfn-step-function-policy', {
         statements: [taskSfnPolicy.copy()],
       }),
+    )
+
+    lambdaApi.role?.attachInlinePolicy(
+      new cdk.aws_iam.Policy(
+        this,
+        'lambda-import-csv-sfn-step-function-policy',
+        {
+          statements: [importCsvSfnPolicy.copy()],
+        },
+      ),
     )
 
     // Attach the policy to the Lambda function's execution role

@@ -46,6 +46,11 @@ custom:
           filterPolicy: { 'action': ['sub-task-status'] }
         queue: http://localhost:9324/101010101010/sub-task-status-queue
       - topic:
+          topicName: CqrsSnsTopic
+          rawMessageDelivery: 'true'
+          filterPolicy: { 'action': ['import-execute'] }
+        queue: http://localhost:9324/101010101010/import-action-queue
+      - topic:
           topicName: AlarmSnsTopic
           rawMessageDelivery: 'true'
         queue: http://localhost:9324/101010101010/alarm-queue
@@ -157,6 +162,11 @@ functions:
             Fn::GetAtt:
               - NotificationQueue
               - Arn
+      - sqs:
+          arn:
+            Fn::GetAtt:
+              - ImportActionQueue
+              - Arn
       - stream:
           type: dynamodb
           maximumRetryAttempts: 10
@@ -169,6 +179,13 @@ functions:
           arn: ${env:LOCAL_DDB_TASKS_STREAM}
           filterPatterns:
             - eventName: [INSERT]
+      - stream:
+          type: dynamodb
+          maximumRetryAttempts: 10
+          arn: ${env:LOCAL_DDB_IMPORT_TMP_STREAM}
+          filterPatterns:
+            - eventName:
+                - INSERT
 
 stepFunctions:
   # https://goessner.net/articles/JsonPath/index.html
@@ -366,6 +383,48 @@ stepFunctions:
                   End: true
             End: true
             # MaxConcurrency: 2
+    import-csv:
+      name: import-csv
+      definition:
+        Comment: import csv data
+        StartAt: csv_loader
+        States:
+          csv_loader:
+            Type: Task
+            Resource: arn:aws:states:::lambda:invoke
+            Parameters:
+              FunctionName: arn:aws:lambda:ap-northeast-1:101010101010:function:serverless-example-dev-main
+              Payload:
+                input.$: $
+                context.$: $$
+            Retry:
+              - ErrorEquals:
+                  - Lambda.ServiceException
+                  - Lambda.AWSLambdaException
+                  - Lambda.SdkClientException
+                IntervalSeconds: 2
+                MaxAttempts: 5
+                BackoffRate: 2
+            OutputPath: $.Payload[0][0]
+            Next: read_csv
+          read_csv:
+            Type: Task
+            Resource: arn:aws:states:::lambda:invoke
+            Parameters:
+              FunctionName: arn:aws:lambda:ap-northeast-1:101010101010:function:serverless-example-dev-main
+              Payload:
+                input.$: $
+                context.$: $$
+            Retry:
+              - ErrorEquals:
+                  - Lambda.ServiceException
+                  - Lambda.AWSLambdaException
+                  - Lambda.SdkClientException
+                IntervalSeconds: 2
+                MaxAttempts: 5
+                BackoffRate: 2
+            OutputPath: $.Payload[0][0]
+            End: true
 resources:
   Resources:
     TaskActionQueue:
@@ -380,3 +439,7 @@ resources:
       Type: AWS::SQS::Queue
       Properties:
         QueueName: notification-queue
+    ImportActionQueue:
+      Type: AWS::SQS::Queue
+      Properties:
+        QueueName: import-action-queue
