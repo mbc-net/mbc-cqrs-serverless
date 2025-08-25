@@ -83,19 +83,8 @@ export class ImportController {
     )
     // The service contains the routing logic to either process directly
     // or create the master job for the Step Function.
-    const result = await this.importService.handleCsvImport(
-      createCsvImportDto,
-      { invokeContext },
-    )
-
-    // Set the status code based on the result type
-    if (Array.isArray(result)) {
-      return result // Defaults to 200 OK
-    } else {
-      // It's a master job entity, so we should return 202 Accepted
-      // This requires a bit more setup with response objects, but for now,
-      // returning the entity is sufficient.
-      return result
-    }
+    return this.importService.handleCsvImport(createCsvImportDto, {
+      invokeContext,
+    })
   }
 }

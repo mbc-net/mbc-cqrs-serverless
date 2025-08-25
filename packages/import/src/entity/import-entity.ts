@@ -4,15 +4,15 @@ import { ImportStatusEnum } from '../enum/import-status.enum'
 
 /**
  * Import data structure
- * - pk: TASK#tenantCode
- * - sk: taskType#uuid
- * - code: taskType#uuid
- * - name: name || taskType
+ * - pk: {IMPORT|CSV_IMPORT}#tenantCode
+ * - sk: tableName#uuid
+ * - code: tableName#uuid
+ * - name: name || tableName
  * - tenant_code: tenantCode
- * - type: taskType
+ * - type: CSV_MASTER_JOB | tableName
  * - status: ImportStatusEnum
- * - input: taskInput
- * - attributes
+ * - attributes: ImportEntity attributes
+ * - result: ImportEntity result
  */
 export class ImportEntity extends CommandEntity {
   status?: ImportStatusEnum
