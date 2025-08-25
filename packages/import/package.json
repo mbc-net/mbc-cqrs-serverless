@@ -1,6 +1,6 @@
 {
   "name": "@mbc-cqrs-serverless/import",
-  "version": "0.1.73-beta.0",
+  "version": "0.1.74-beta.0",
   "description": "Import module",
   "keywords": [
     "mbc",
@@ -41,7 +41,7 @@
     "access": "public"
   },
   "dependencies": {
-    "@mbc-cqrs-serverless/core": "^0.1.73-beta.0",
+    "@mbc-cqrs-serverless/core": "^0.1.74-beta.0",
     "csv-parser": "^3.2.0"
   }
 }
