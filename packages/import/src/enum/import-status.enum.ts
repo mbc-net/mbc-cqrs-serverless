@@ -1,0 +1,7 @@
+export enum ImportStatusEnum {
+  CREATED = 'CREATED',
+  QUEUED = 'QUEUED',
+  PROCESSING = 'PROCESSING',
+  COMPLETED = 'COMPLETED',
+  FAILED = 'FAILED',
+}
