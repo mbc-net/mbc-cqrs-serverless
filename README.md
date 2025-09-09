@@ -43,8 +43,19 @@ Visit https://mbc-cqrs-serverless.mbc-net.com/ to view the full documentation.
 
 ## Installation
 
+### Latest Stable Release
 ```bash
 $ npm i -g @mbc-cqrs-serverless/cli
+```
+
+### Beta Release
+```bash
+$ npm i -g @mbc-cqrs-serverless/cli@beta
+```
+
+### Specific Version
+```bash
+$ npm i -g @mbc-cqrs-serverless/cli@1.0.0
 ```
 
 ## Usage
@@ -63,29 +74,93 @@ $ mbc new YOUR_PROJECT_NAME
 
 - TODO
 
+## Development & Release Process
+
+### Branch Strategy
+- `develop`: Development branch for new features and bug fixes
+- `beta`: Beta releases for testing and validation
+- `main`: Stable production releases
+
+### Release Workflow
+
+#### 1. Beta Release
+```bash
+# Merge develop to beta
+git checkout beta
+git merge develop
+
+# Create beta tag
+git tag v1.0.0-beta.1
+git push origin --tags
+```
+
+#### 2. Production Release
+```bash
+# Merge beta to main
+git checkout main
+git merge beta
+
+# Create release tag
+git tag v1.0.0
+git push origin --tags
+```
+
+### Versioning
+We follow [Semantic Versioning](https://semver.org/):
+- `v1.0.0` - Production release
+- `v1.0.0-beta.1` - Beta release
+- `v1.0.0-alpha.1` - Alpha release
+
+### Automated Publishing
+GitHub Actions automatically publishes packages to npm when tags are pushed:
+- Beta tags (`*-beta.*`) → `npm publish --tag beta`
+- Release tags (`v*.*.*`) → `npm publish --tag latest`
+
 ## How to guide
 
 - Japanese: https://www.mbc-net.com/tag/mbc-cqrs-serverless/
 
 ## Contributing
 
-- Add new packages by
+We welcome contributions! Please follow our development workflow:
 
+### Development Setup
+1. Fork the repository
+2. Create a feature branch from `develop`
+3. Make your changes
+4. Write tests and ensure they pass
+5. Submit a pull request to `develop`
+
+### Adding New Packages
 ```bash
 $ npm init --scope mbc-cqrs-serverless -w ./packages/{PACKAGE_NAME}
 ```
 
-- Build packages
-
+### Build and Test
 ```bash
+# Build all packages
 $ npm run build
+
+# Run tests
+$ npm test
+
+# Run linting
+$ npm run lint
 ```
 
-- Publish packages
-
+### Release Process
+- Releases are automated via GitHub Actions
+- Manual publishing (for maintainers only):
 ```bash
 $ npm run release
 ```
+
+### Pull Request Guidelines
+- Target the `develop` branch
+- Include tests for new features
+- Follow existing code style
+- Update documentation as needed
+- Ensure CI checks pass
 
 ## References
 

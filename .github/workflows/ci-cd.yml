@@ -1,9 +1,11 @@
-name: Run test and publish
+name: CI/CD Pipeline
 
 on:
   push:
-    branches:
-      - main
+    tags:
+      - 'v*'
+  pull_request:
+    branches: [develop, beta, main]
 
 permissions:
   contents: write
@@ -89,6 +91,7 @@ jobs:
     name: Publish
     needs: e2e_tests
     runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/')
     steps:
       - uses: actions/checkout@v4
         with:
@@ -106,11 +109,46 @@ jobs:
       - name: Authenticate with npm
         run: echo "//registry.npmjs.org/:_authToken=${{ secrets.NPM_TOKEN }}" > ~/.npmrc
 
-      - name: 'Version and publish beta version'
+      - name: Determine release type
+        id: release-type
         run: |
-          git config user.name "${{ github.actor }}"
-          git config user.email "${{ github.actor}}@users.noreply.github.com"
+          if [[ ${{ github.ref_name }} == *"beta"* ]]; then
+            echo "tag=beta" >> $GITHUB_OUTPUT
+            echo "prerelease=true" >> $GITHUB_OUTPUT
+          elif [[ ${{ github.ref_name }} == *"alpha"* ]]; then
+            echo "tag=alpha" >> $GITHUB_OUTPUT
+            echo "prerelease=true" >> $GITHUB_OUTPUT
+          else
+            echo "tag=latest" >> $GITHUB_OUTPUT
+            echo "prerelease=false" >> $GITHUB_OUTPUT
+          fi
 
-          npx lerna version prepatch --force-publish --yes
+      - name: Publish to npm (Beta/Alpha)
+        if: steps.release-type.outputs.prerelease == 'true'
+        run: npx lerna publish from-git --yes --dist-tag ${{ steps.release-type.outputs.tag }}
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
-          npx lerna publish from-git --yes
+      - name: Publish to npm (Production)
+        if: steps.release-type.outputs.prerelease == 'false'
+        run: npx lerna publish from-git --yes
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+      - name: Create GitHub Release
+        uses: actions/create-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: ${{ github.ref_name }}
+          release_name: Release ${{ github.ref_name }}
+          draft: false
+          prerelease: ${{ steps.release-type.outputs.prerelease }}
+          body: |
+            ## Changes
+            See the [CHANGELOG](./CHANGELOG.md) for details.
+            
+            ## Installation
+            ```bash
+            npm install @mbc-cqrs-serverless/cli@${{ steps.release-type.outputs.tag }}
+            ```
