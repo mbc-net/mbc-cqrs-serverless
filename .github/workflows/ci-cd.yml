@@ -208,26 +208,16 @@ jobs:
       - name: Publish to npm (Beta/Alpha)
         if: steps.release-type.outputs.prerelease == 'true' && steps.beta-changes.outputs.changed_count != '0'
         run: |
-          DIFF_BASE="${{ steps.beta-diff-base.outputs.diff_base }}"
-          if git rev-parse "$DIFF_BASE" >/dev/null 2>&1; then
-            npx lerna publish from-git --yes --dist-tag ${{ steps.release-type.outputs.tag }} --since="$DIFF_BASE"
-          else
-            # Force publish all packages for beta
-            npx lerna publish from-git --yes --dist-tag ${{ steps.release-type.outputs.tag }} --force-publish
-          fi
+          # For beta/alpha, always force publish to ensure version is published
+          npx lerna publish from-git --yes --dist-tag ${{ steps.release-type.outputs.tag }} --force-publish
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
       - name: Publish to npm (Production)
         if: steps.release-type.outputs.prerelease == 'false' && steps.prod-changes.outputs.changed_count != '0'
         run: |
-          DIFF_BASE="${{ steps.prod-diff-base.outputs.diff_base }}"
-          if git rev-parse "$DIFF_BASE" >/dev/null 2>&1; then
-            npx lerna publish from-git --yes --since="$DIFF_BASE"
-          else
-            # Force publish all packages for production
-            npx lerna publish from-git --yes --force-publish
-          fi
+          # For production, also force publish when changes are detected
+          npx lerna publish from-git --yes --force-publish
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
