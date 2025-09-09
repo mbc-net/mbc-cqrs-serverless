@@ -109,19 +109,35 @@ jobs:
       - name: Authenticate with npm
         run: echo "//registry.npmjs.org/:_authToken=${{ secrets.NPM_TOKEN }}" > ~/.npmrc
 
+      - name: Extract version from tag
+        id: version
+        run: |
+          TAG_NAME=${{ github.ref_name }}
+          VERSION=${TAG_NAME#v}  # Remove 'v' prefix
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "tag_name=$TAG_NAME" >> $GITHUB_OUTPUT
+
       - name: Determine release type
         id: release-type
         run: |
-          if [[ ${{ github.ref_name }} == *"beta"* ]]; then
+          if [[ ${{ steps.version.outputs.version }} == *"beta"* ]]; then
             echo "tag=beta" >> $GITHUB_OUTPUT
             echo "prerelease=true" >> $GITHUB_OUTPUT
-          elif [[ ${{ github.ref_name }} == *"alpha"* ]]; then
+          elif [[ ${{ steps.version.outputs.version }} == *"alpha"* ]]; then
             echo "tag=alpha" >> $GITHUB_OUTPUT
             echo "prerelease=true" >> $GITHUB_OUTPUT
           else
             echo "tag=latest" >> $GITHUB_OUTPUT
             echo "prerelease=false" >> $GITHUB_OUTPUT
           fi
+
+      - name: Update package versions
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          npx lerna version ${{ steps.version.outputs.version }} --exact --no-git-tag-version --yes --force-publish
+          git add .
+          git commit -m "chore: update package versions to ${{ steps.version.outputs.version }}" || echo "No changes to commit"
 
       - name: Publish to npm (Beta/Alpha)
         if: steps.release-type.outputs.prerelease == 'true'
