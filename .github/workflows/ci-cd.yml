@@ -11,6 +11,8 @@ permissions:
   contents: write
   actions: read
   checks: write
+  issues: write
+  pull-requests: write
 
 jobs:
   unit_tests:
@@ -96,6 +98,7 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
+          ref: develop  # Checkout develop branch instead of tag
       - uses: actions/setup-node@v4
         with:
           node-version: 18
@@ -109,13 +112,21 @@ jobs:
       - name: Authenticate with npm
         run: echo "//registry.npmjs.org/:_authToken=${{ secrets.NPM_TOKEN }}" > ~/.npmrc
 
+      - name: Extract version from tag
+        id: version
+        run: |
+          TAG_NAME=${{ github.ref_name }}
+          VERSION=${TAG_NAME#v}  # Remove 'v' prefix
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "tag_name=$TAG_NAME" >> $GITHUB_OUTPUT
+
       - name: Determine release type
         id: release-type
         run: |
-          if [[ ${{ github.ref_name }} == *"beta"* ]]; then
+          if [[ ${{ steps.version.outputs.version }} == *"beta"* ]]; then
             echo "tag=beta" >> $GITHUB_OUTPUT
             echo "prerelease=true" >> $GITHUB_OUTPUT
-          elif [[ ${{ github.ref_name }} == *"alpha"* ]]; then
+          elif [[ ${{ steps.version.outputs.version }} == *"alpha"* ]]; then
             echo "tag=alpha" >> $GITHUB_OUTPUT
             echo "prerelease=true" >> $GITHUB_OUTPUT
           else
@@ -123,25 +134,106 @@ jobs:
             echo "prerelease=false" >> $GITHUB_OUTPUT
           fi
 
-      - name: Publish to npm (Beta/Alpha)
+      - name: Update package versions
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          
+          # Create a temporary branch for version update
+          git checkout -b release-${{ steps.version.outputs.version }}
+          
+          # Update versions
+          npx lerna version ${{ steps.version.outputs.version }} --exact --no-git-tag-version --yes --force-publish
+          
+          # Commit changes
+          git add .
+          git commit -m "chore: update package versions to ${{ steps.version.outputs.version }}" || echo "No changes to commit"
+
+      - name: Determine diff base for beta/alpha
         if: steps.release-type.outputs.prerelease == 'true'
-        run: npx lerna publish from-git --yes --dist-tag ${{ steps.release-type.outputs.tag }}
+        id: beta-diff-base
+        run: |
+          # For beta: compare against last beta/alpha tag OR develop branch
+          LAST_BETA=$(git tag -l "v*-beta*" "v*-alpha*" | sort -V | tail -1)
+          if [ -z "$LAST_BETA" ]; then
+            echo "diff_base=develop" >> $GITHUB_OUTPUT
+            echo "No previous beta/alpha tag found, using develop branch"
+          else
+            echo "diff_base=$LAST_BETA" >> $GITHUB_OUTPUT
+            echo "Using last beta/alpha tag: $LAST_BETA"
+          fi
+
+      - name: Determine diff base for production
+        if: steps.release-type.outputs.prerelease == 'false'
+        id: prod-diff-base
+        run: |
+          # For production: compare against last production tag OR main branch
+          LAST_PROD=$(git tag -l "v*.*.*" | grep -v -E "(alpha|beta|rc)" | sort -V | tail -1)
+          if [ -z "$LAST_PROD" ]; then
+            echo "diff_base=main" >> $GITHUB_OUTPUT
+            echo "No previous production tag found, using main branch"
+          else
+            echo "diff_base=$LAST_PROD" >> $GITHUB_OUTPUT
+            echo "Using last production tag: $LAST_PROD"
+          fi
+
+      - name: Check for changes (Beta/Alpha)
+        if: steps.release-type.outputs.prerelease == 'true'
+        id: beta-changes
+        run: |
+          DIFF_BASE="${{ steps.beta-diff-base.outputs.diff_base }}"
+          if git rev-parse "$DIFF_BASE" >/dev/null 2>&1; then
+            CHANGED_PACKAGES=$(npx lerna list --since="$DIFF_BASE" --json | jq length)
+          else
+            # Fallback: force publish all packages for beta
+            CHANGED_PACKAGES=1
+          fi
+          echo "changed_count=$CHANGED_PACKAGES" >> $GITHUB_OUTPUT
+          echo "Found $CHANGED_PACKAGES changed packages since $DIFF_BASE"
+
+      - name: Check for changes (Production)
+        if: steps.release-type.outputs.prerelease == 'false'
+        id: prod-changes
+        run: |
+          DIFF_BASE="${{ steps.prod-diff-base.outputs.diff_base }}"
+          if git rev-parse "$DIFF_BASE" >/dev/null 2>&1; then
+            CHANGED_PACKAGES=$(npx lerna list --since="$DIFF_BASE" --json | jq length)
+          else
+            # Fallback: force publish all packages for production
+            CHANGED_PACKAGES=1
+          fi
+          echo "changed_count=$CHANGED_PACKAGES" >> $GITHUB_OUTPUT
+          echo "Found $CHANGED_PACKAGES changed packages since $DIFF_BASE"
+
+      - name: Publish to npm (Beta/Alpha)
+        if: steps.release-type.outputs.prerelease == 'true' && steps.beta-changes.outputs.changed_count != '0'
+        run: |
+          # For beta/alpha, always force publish to ensure version is published
+          npx lerna publish from-git --yes --dist-tag ${{ steps.release-type.outputs.tag }} --force-publish
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
       - name: Publish to npm (Production)
-        if: steps.release-type.outputs.prerelease == 'false'
-        run: npx lerna publish from-git --yes
+        if: steps.release-type.outputs.prerelease == 'false' && steps.prod-changes.outputs.changed_count != '0'
+        run: |
+          # For production, also force publish when changes are detected
+          npx lerna publish from-git --yes --force-publish
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
+      - name: Skip publish (no changes)
+        if: |
+          (steps.release-type.outputs.prerelease == 'true' && steps.beta-changes.outputs.changed_count == '0') ||
+          (steps.release-type.outputs.prerelease == 'false' && steps.prod-changes.outputs.changed_count == '0')
+        run: |
+          echo "No changes detected for this release type. Skipping npm publish."
+          echo "This is normal behavior - packages are only published when there are actual code changes."
+
       - name: Create GitHub Release
-        uses: actions/create-release@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        uses: softprops/action-gh-release@v1
         with:
           tag_name: ${{ github.ref_name }}
-          release_name: Release ${{ github.ref_name }}
+          name: Release ${{ github.ref_name }}
           draft: false
           prerelease: ${{ steps.release-type.outputs.prerelease }}
           body: |
@@ -152,3 +244,4 @@ jobs:
             ```bash
             npm install @mbc-cqrs-serverless/cli@${{ steps.release-type.outputs.tag }}
             ```
+          token: ${{ secrets.GITHUB_TOKEN }}
