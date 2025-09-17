@@ -229,6 +229,9 @@ jobs:
       - name: Publish to npm (Beta/Alpha)
         if: steps.release-type.outputs.prerelease == 'true' && steps.beta-changes.outputs.changed_count != '0'
         run: |
+          # Create a temporary branch to work around detached HEAD
+          git checkout -b temp-publish-${{ github.run_id }}
+
           # First update versions in changed packages
           DIFF_BASE="${{ steps.beta-diff-base.outputs.diff_base }}"
           npx lerna version ${{ steps.version.outputs.version }} --yes --no-git-tag-version --no-push --exact --force-publish --amend
@@ -241,6 +244,9 @@ jobs:
       - name: Publish to npm (Production)
         if: steps.release-type.outputs.prerelease == 'false' && steps.prod-changes.outputs.changed_count != '0'
         run: |
+          # Create a temporary branch to work around detached HEAD
+          git checkout -b temp-publish-${{ github.run_id }}
+
           # First update versions in changed packages
           DIFF_BASE="${{ steps.prod-diff-base.outputs.diff_base }}"
           npx lerna version ${{ steps.version.outputs.version }} --yes --no-git-tag-version --no-push --exact --force-publish --amend
