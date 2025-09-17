@@ -195,8 +195,9 @@ jobs:
             # Get list of changed packages
             CHANGED_PACKAGES_LIST=$(npx lerna list --since="$DIFF_BASE" --json 2>/dev/null || echo "[]")
             CHANGED_PACKAGES=$(echo "$CHANGED_PACKAGES_LIST" | jq length)
-            # Save the package list for later use
-            echo "packages=$CHANGED_PACKAGES_LIST" >> $GITHUB_OUTPUT
+            # Convert JSON to single line for GITHUB_OUTPUT
+            PACKAGES_JSON=$(echo "$CHANGED_PACKAGES_LIST" | jq -c '.' || echo "[]")
+            echo "packages=$PACKAGES_JSON" >> $GITHUB_OUTPUT
           else
             # Fallback: force publish all packages for beta
             CHANGED_PACKAGES=1
@@ -214,8 +215,9 @@ jobs:
             # Get list of changed packages
             CHANGED_PACKAGES_LIST=$(npx lerna list --since="$DIFF_BASE" --json 2>/dev/null || echo "[]")
             CHANGED_PACKAGES=$(echo "$CHANGED_PACKAGES_LIST" | jq length)
-            # Save the package list for later use
-            echo "packages=$CHANGED_PACKAGES_LIST" >> $GITHUB_OUTPUT
+            # Convert JSON to single line for GITHUB_OUTPUT
+            PACKAGES_JSON=$(echo "$CHANGED_PACKAGES_LIST" | jq -c '.' || echo "[]")
+            echo "packages=$PACKAGES_JSON" >> $GITHUB_OUTPUT
           else
             # Fallback: force publish all packages for production
             CHANGED_PACKAGES=1
