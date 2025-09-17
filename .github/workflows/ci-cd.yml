@@ -134,20 +134,10 @@ jobs:
             echo "prerelease=false" >> $GITHUB_OUTPUT
           fi
 
-      - name: Update package versions
+      - name: Configure git
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-
-          # Create a temporary branch for version update
-          git checkout -b release-${{ steps.version.outputs.version }}
-
-          # Update versions
-          npx lerna version ${{ steps.version.outputs.version }} --exact --no-git-tag-version --yes --force-publish
-
-          # Commit changes
-          git add .
-          git commit -m "chore: update package versions to ${{ steps.version.outputs.version }}" || echo "No changes to commit"
 
       - name: Determine diff base for beta/alpha
         if: steps.release-type.outputs.prerelease == 'true'
@@ -227,16 +217,18 @@ jobs:
       - name: Publish to npm (Beta/Alpha)
         if: steps.release-type.outputs.prerelease == 'true' && steps.beta-changes.outputs.changed_count != '0'
         run: |
-          # For beta/alpha, always force publish to ensure version is published
-          npx lerna publish from-git --yes --dist-tag ${{ steps.release-type.outputs.tag }} --force-publish
+          DIFF_BASE="${{ steps.beta-diff-base.outputs.diff_base }}"
+          # Publish only changed packages since the diff base
+          npx lerna publish ${{ steps.version.outputs.version }} --yes --dist-tag ${{ steps.release-type.outputs.tag }} --since="$DIFF_BASE" --no-git-tag-version --no-push --exact
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
       - name: Publish to npm (Production)
         if: steps.release-type.outputs.prerelease == 'false' && steps.prod-changes.outputs.changed_count != '0'
         run: |
-          # For production, also force publish when changes are detected
-          npx lerna publish from-git --yes --force-publish
+          DIFF_BASE="${{ steps.prod-diff-base.outputs.diff_base }}"
+          # Publish only changed packages since the diff base
+          npx lerna publish ${{ steps.version.outputs.version }} --yes --since="$DIFF_BASE" --no-git-tag-version --no-push --exact
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
