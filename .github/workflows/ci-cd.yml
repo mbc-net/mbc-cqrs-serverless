@@ -192,10 +192,15 @@ jobs:
         run: |
           DIFF_BASE="${{ steps.beta-diff-base.outputs.diff_base }}"
           if git rev-parse "$DIFF_BASE" >/dev/null 2>&1; then
-            CHANGED_PACKAGES=$(npx lerna list --since="$DIFF_BASE" --json | jq length)
+            # Get list of changed packages
+            CHANGED_PACKAGES_LIST=$(npx lerna list --since="$DIFF_BASE" --json 2>/dev/null || echo "[]")
+            CHANGED_PACKAGES=$(echo "$CHANGED_PACKAGES_LIST" | jq length)
+            # Save the package list for later use
+            echo "packages=$CHANGED_PACKAGES_LIST" >> $GITHUB_OUTPUT
           else
             # Fallback: force publish all packages for beta
             CHANGED_PACKAGES=1
+            echo "packages=[]" >> $GITHUB_OUTPUT
           fi
           echo "changed_count=$CHANGED_PACKAGES" >> $GITHUB_OUTPUT
           echo "Found $CHANGED_PACKAGES changed packages since $DIFF_BASE"
@@ -206,10 +211,15 @@ jobs:
         run: |
           DIFF_BASE="${{ steps.prod-diff-base.outputs.diff_base }}"
           if git rev-parse "$DIFF_BASE" >/dev/null 2>&1; then
-            CHANGED_PACKAGES=$(npx lerna list --since="$DIFF_BASE" --json | jq length)
+            # Get list of changed packages
+            CHANGED_PACKAGES_LIST=$(npx lerna list --since="$DIFF_BASE" --json 2>/dev/null || echo "[]")
+            CHANGED_PACKAGES=$(echo "$CHANGED_PACKAGES_LIST" | jq length)
+            # Save the package list for later use
+            echo "packages=$CHANGED_PACKAGES_LIST" >> $GITHUB_OUTPUT
           else
             # Fallback: force publish all packages for production
             CHANGED_PACKAGES=1
+            echo "packages=[]" >> $GITHUB_OUTPUT
           fi
           echo "changed_count=$CHANGED_PACKAGES" >> $GITHUB_OUTPUT
           echo "Found $CHANGED_PACKAGES changed packages since $DIFF_BASE"
@@ -217,18 +227,24 @@ jobs:
       - name: Publish to npm (Beta/Alpha)
         if: steps.release-type.outputs.prerelease == 'true' && steps.beta-changes.outputs.changed_count != '0'
         run: |
+          # First update versions in changed packages
           DIFF_BASE="${{ steps.beta-diff-base.outputs.diff_base }}"
-          # Publish only changed packages since the diff base
-          npx lerna publish ${{ steps.version.outputs.version }} --yes --dist-tag ${{ steps.release-type.outputs.tag }} --since="$DIFF_BASE" --no-git-tag-version --no-push --exact
+          npx lerna version ${{ steps.version.outputs.version }} --yes --no-git-tag-version --no-push --exact --force-publish --amend
+
+          # Then publish the versioned packages
+          npx lerna publish from-package --yes --dist-tag ${{ steps.release-type.outputs.tag }} --no-git-tag-version --no-push
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
       - name: Publish to npm (Production)
         if: steps.release-type.outputs.prerelease == 'false' && steps.prod-changes.outputs.changed_count != '0'
         run: |
+          # First update versions in changed packages
           DIFF_BASE="${{ steps.prod-diff-base.outputs.diff_base }}"
-          # Publish only changed packages since the diff base
-          npx lerna publish ${{ steps.version.outputs.version }} --yes --since="$DIFF_BASE" --no-git-tag-version --no-push --exact
+          npx lerna version ${{ steps.version.outputs.version }} --yes --no-git-tag-version --no-push --exact --force-publish --amend
+
+          # Then publish the versioned packages
+          npx lerna publish from-package --yes --no-git-tag-version --no-push
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
