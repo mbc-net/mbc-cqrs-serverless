@@ -236,6 +236,10 @@ jobs:
           DIFF_BASE="${{ steps.beta-diff-base.outputs.diff_base }}"
           npx lerna version ${{ steps.version.outputs.version }} --yes --no-git-tag-version --no-push --exact --force-publish --amend
 
+          # Commit the version changes to avoid uncommitted changes error
+          git add -A
+          git commit -m "chore: version packages for release" || echo "No changes to commit"
+
           # Then publish the versioned packages
           npx lerna publish from-package --yes --dist-tag ${{ steps.release-type.outputs.tag }} --no-git-tag-version --no-push
         env:
@@ -250,6 +254,10 @@ jobs:
           # First update versions in changed packages
           DIFF_BASE="${{ steps.prod-diff-base.outputs.diff_base }}"
           npx lerna version ${{ steps.version.outputs.version }} --yes --no-git-tag-version --no-push --exact --force-publish --amend
+
+          # Commit the version changes to avoid uncommitted changes error
+          git add -A
+          git commit -m "chore: version packages for release" || echo "No changes to commit"
 
           # Then publish the versioned packages
           npx lerna publish from-package --yes --no-git-tag-version --no-push
