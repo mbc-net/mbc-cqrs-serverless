@@ -44,7 +44,7 @@ export class MasterModule extends ConfigurableModuleClass {
 
       module.providers.push({
         provide: PRISMA_SERVICE,
-        useClass: options.prismaService,
+        useExisting: options.prismaService,
       })
       module.providers.push(MasterSfnTaskEventHandler)
 
