@@ -1,0 +1,290 @@
+name: CI/CD Pipeline
+
+on:
+  push:
+    tags:
+      - 'v*'
+  pull_request:
+    branches: [develop, beta, main]
+
+permissions:
+  contents: write
+  actions: read
+  checks: write
+  issues: write
+  pull-requests: write
+
+jobs:
+  unit_tests:
+    name: Unit Test
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        node-version: [18.x, 20.x, 22.x, 24.x]
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node-version }}
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci --ignore-scripts
+
+      - name: Build packages
+        run: npm run build
+
+      - name: Run Unit Tests
+        run: npm run test
+
+      - name: Unit Test Report
+        uses: dorny/test-reporter@v1
+        if: (success() || failure()) && github.event.pull_request.head.repo.full_name == github.repository
+        with:
+          name: Unit Tests Reporter-${{ matrix.node-version }}
+          path: report/unit.xml
+          reporter: jest-junit
+          fail-on-error: 'true'
+
+  e2e_tests:
+    name: E2e Test For Core package
+    needs: unit_tests
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        node-version: [18.x, 20.x, 22.x, 24.x]
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node-version }}
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci --ignore-scripts
+
+      - name: Build test
+        run: npx lerna run build:test --scope=@mbc-cqrs-serverless/core
+
+      - name: Run e2e Tests
+        run: npx lerna run test:e2e --scope=@mbc-cqrs-serverless/core
+
+      - uses: actions/upload-artifact@v4
+        name: 'upload artifact'
+        if: success() || failure()
+        with:
+          name: core-report-artifact-${{ matrix.node-version }}
+          path: ./packages/core/test/scripts/*.out.txt
+
+      - name: E2E Test Report
+        uses: dorny/test-reporter@v1
+        if: (success() || failure()) && github.event.pull_request.head.repo.full_name == github.repository
+        with:
+          name: E2E Core Tests Reporter-${{ matrix.node-version }}
+          path: report/e2e-core.xml
+          reporter: jest-junit
+          fail-on-error: 'true'
+
+  publish:
+    name: Publish
+    needs: e2e_tests
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/')
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          # Remove ref to checkout the tag itself, not develop branch
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 18
+          cache: npm
+      - name: Install dependencies
+        run: npm ci --ignore-scripts
+
+      - name: Build packages
+        run: npm run build
+
+      - name: Authenticate with npm
+        run: echo "//registry.npmjs.org/:_authToken=${{ secrets.NPM_TOKEN }}" > ~/.npmrc
+
+      - name: Extract version from tag
+        id: version
+        run: |
+          TAG_NAME=${{ github.ref_name }}
+          VERSION=${TAG_NAME#v}  # Remove 'v' prefix
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "tag_name=$TAG_NAME" >> $GITHUB_OUTPUT
+
+      - name: Determine release type
+        id: release-type
+        run: |
+          if [[ ${{ steps.version.outputs.version }} == *"beta"* ]]; then
+            echo "tag=beta" >> $GITHUB_OUTPUT
+            echo "prerelease=true" >> $GITHUB_OUTPUT
+          elif [[ ${{ steps.version.outputs.version }} == *"alpha"* ]]; then
+            echo "tag=alpha" >> $GITHUB_OUTPUT
+            echo "prerelease=true" >> $GITHUB_OUTPUT
+          else
+            echo "tag=latest" >> $GITHUB_OUTPUT
+            echo "prerelease=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Configure git
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+      - name: Determine diff base for beta/alpha
+        if: steps.release-type.outputs.prerelease == 'true'
+        id: beta-diff-base
+        run: |
+          CURRENT_TAG=${{ github.ref_name }}
+          RELEASE_TYPE=${{ steps.release-type.outputs.tag }}
+
+          # Determine which tags to search based on release type
+          if [ "$RELEASE_TYPE" = "beta" ]; then
+            # For beta: compare with previous beta tag only
+            PREVIOUS_TAG=$(git tag -l "v*-beta*" | grep -v "^${CURRENT_TAG}$" | sort -V | tail -1)
+            TAG_TYPE="beta"
+          elif [ "$RELEASE_TYPE" = "alpha" ]; then
+            # For alpha: compare with previous alpha tag only
+            PREVIOUS_TAG=$(git tag -l "v*-alpha*" | grep -v "^${CURRENT_TAG}$" | sort -V | tail -1)
+            TAG_TYPE="alpha"
+          fi
+
+          if [ -z "$PREVIOUS_TAG" ]; then
+            # No previous tag of same type found, use appropriate base branch
+            if [ "$RELEASE_TYPE" = "beta" ]; then
+              echo "diff_base=develop" >> $GITHUB_OUTPUT
+              echo "No previous beta tag found, using develop branch"
+            elif [ "$RELEASE_TYPE" = "alpha" ]; then
+              echo "diff_base=develop" >> $GITHUB_OUTPUT
+              echo "No previous alpha tag found, using develop branch"
+            fi
+          else
+            echo "diff_base=$PREVIOUS_TAG" >> $GITHUB_OUTPUT
+            echo "Using previous $TAG_TYPE tag: $PREVIOUS_TAG"
+          fi
+
+      - name: Determine diff base for production
+        if: steps.release-type.outputs.prerelease == 'false'
+        id: prod-diff-base
+        run: |
+          CURRENT_TAG=${{ github.ref_name }}
+          # For production: compare against last production tag (excluding pre-releases and current tag)
+          LAST_PROD=$(git tag -l "v*.*.*" | grep -v -E "(alpha|beta|rc)" | grep -v "^${CURRENT_TAG}$" | sort -V | tail -1)
+          if [ -z "$LAST_PROD" ]; then
+            echo "diff_base=main" >> $GITHUB_OUTPUT
+            echo "No previous production tag found, using main branch"
+          else
+            echo "diff_base=$LAST_PROD" >> $GITHUB_OUTPUT
+            echo "Using last production tag: $LAST_PROD"
+          fi
+
+      - name: Check for changes (Beta/Alpha)
+        if: steps.release-type.outputs.prerelease == 'true'
+        id: beta-changes
+        run: |
+          DIFF_BASE="${{ steps.beta-diff-base.outputs.diff_base }}"
+          if git rev-parse "$DIFF_BASE" >/dev/null 2>&1; then
+            # Get list of changed packages
+            CHANGED_PACKAGES_LIST=$(npx lerna list --since="$DIFF_BASE" --json 2>/dev/null || echo "[]")
+            CHANGED_PACKAGES=$(echo "$CHANGED_PACKAGES_LIST" | jq length)
+            # Convert JSON to single line for GITHUB_OUTPUT
+            PACKAGES_JSON=$(echo "$CHANGED_PACKAGES_LIST" | jq -c '.' || echo "[]")
+            echo "packages=$PACKAGES_JSON" >> $GITHUB_OUTPUT
+          else
+            # Fallback: force publish all packages for beta
+            CHANGED_PACKAGES=1
+            echo "packages=[]" >> $GITHUB_OUTPUT
+          fi
+          echo "changed_count=$CHANGED_PACKAGES" >> $GITHUB_OUTPUT
+          echo "Found $CHANGED_PACKAGES changed packages since $DIFF_BASE"
+
+      - name: Check for changes (Production)
+        if: steps.release-type.outputs.prerelease == 'false'
+        id: prod-changes
+        run: |
+          DIFF_BASE="${{ steps.prod-diff-base.outputs.diff_base }}"
+          if git rev-parse "$DIFF_BASE" >/dev/null 2>&1; then
+            # Get list of changed packages
+            CHANGED_PACKAGES_LIST=$(npx lerna list --since="$DIFF_BASE" --json 2>/dev/null || echo "[]")
+            CHANGED_PACKAGES=$(echo "$CHANGED_PACKAGES_LIST" | jq length)
+            # Convert JSON to single line for GITHUB_OUTPUT
+            PACKAGES_JSON=$(echo "$CHANGED_PACKAGES_LIST" | jq -c '.' || echo "[]")
+            echo "packages=$PACKAGES_JSON" >> $GITHUB_OUTPUT
+          else
+            # Fallback: force publish all packages for production
+            CHANGED_PACKAGES=1
+            echo "packages=[]" >> $GITHUB_OUTPUT
+          fi
+          echo "changed_count=$CHANGED_PACKAGES" >> $GITHUB_OUTPUT
+          echo "Found $CHANGED_PACKAGES changed packages since $DIFF_BASE"
+
+      - name: Publish to npm (Beta/Alpha)
+        if: steps.release-type.outputs.prerelease == 'true' && steps.beta-changes.outputs.changed_count != '0'
+        run: |
+          # Create a temporary branch to work around detached HEAD
+          git checkout -b temp-publish-${{ github.run_id }}
+
+          # First update versions in changed packages
+          DIFF_BASE="${{ steps.beta-diff-base.outputs.diff_base }}"
+          npx lerna version ${{ steps.version.outputs.version }} --yes --no-git-tag-version --no-push --exact --force-publish --amend
+
+          # Commit the version changes to avoid uncommitted changes error
+          git add -A
+          git commit -m "chore: version packages for release" || echo "No changes to commit"
+
+          # Then publish the versioned packages
+          npx lerna publish from-package --yes --dist-tag ${{ steps.release-type.outputs.tag }} --no-git-tag-version --no-push
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+      - name: Publish to npm (Production)
+        if: steps.release-type.outputs.prerelease == 'false' && steps.prod-changes.outputs.changed_count != '0'
+        run: |
+          # Create a temporary branch to work around detached HEAD
+          git checkout -b temp-publish-${{ github.run_id }}
+
+          # First update versions in changed packages
+          DIFF_BASE="${{ steps.prod-diff-base.outputs.diff_base }}"
+          npx lerna version ${{ steps.version.outputs.version }} --yes --no-git-tag-version --no-push --exact --force-publish --amend
+
+          # Commit the version changes to avoid uncommitted changes error
+          git add -A
+          git commit -m "chore: version packages for release" || echo "No changes to commit"
+
+          # Then publish the versioned packages
+          npx lerna publish from-package --yes --no-git-tag-version --no-push
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+      - name: Skip publish (no changes)
+        if: |
+          (steps.release-type.outputs.prerelease == 'true' && steps.beta-changes.outputs.changed_count == '0') ||
+          (steps.release-type.outputs.prerelease == 'false' && steps.prod-changes.outputs.changed_count == '0')
+        run: |
+          echo "No changes detected for this release type. Skipping npm publish."
+          echo "This is normal behavior - packages are only published when there are actual code changes."
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: ${{ github.ref_name }}
+          name: Release ${{ github.ref_name }}
+          draft: false
+          prerelease: ${{ steps.release-type.outputs.prerelease }}
+          body: |
+            ## Changes
+            See the [CHANGELOG](./CHANGELOG.md) for details.
+
+            ## Installation
+            ```bash
+            npm install @mbc-cqrs-serverless/cli@${{ steps.release-type.outputs.tag }}
+            ```
+          token: ${{ secrets.GITHUB_TOKEN }}

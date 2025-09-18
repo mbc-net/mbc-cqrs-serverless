@@ -58,3 +58,7 @@ report
 # dynamo local
 .dynamodb
 dynamodb-local-metadata.json
+
+# Claude Code files
+CLAUDE.md
+.claude/
