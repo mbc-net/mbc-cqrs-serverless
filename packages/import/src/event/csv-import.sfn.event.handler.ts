@@ -14,11 +14,16 @@ import { Readable } from 'stream'
 import { CreateCsvImportDto } from '../dto/create-csv-import.dto'
 import { CreateImportDto } from '../dto/create-import.dto'
 import { ICsvRowImport } from '../dto/csv-import-row.interface'
+import { ImportStatusEnum } from '../enum'
+import { parseId } from '../helpers'
 import { IMPORT_STRATEGY_MAP } from '../import.module-definition'
 import { ImportService } from '../import.service'
 import { IImportStrategy } from '../interface'
 import { CsvImportSfnEvent } from './csv-import.sfn.event'
 
+interface MapResultPayload {
+  MapResult: any[]
+}
 @EventHandler(CsvImportSfnEvent)
 export class CsvImportSfnEventHandler
   implements IEventHandler<CsvImportSfnEvent>
@@ -37,14 +42,9 @@ export class CsvImportSfnEventHandler
   }
 
   async execute(event: CsvImportSfnEvent): Promise<any> {
-    this.logger.log(
-      '🚀 ~ CsvImporaaatSfnEventHandler ~ execute ~ event:',
-      event,
-    )
     try {
       return await this.handleStepState(event)
     } catch (error) {
-      // await this.sendAlarm(event, error) // TODO:
       this.logger.error('import step execution failed', error)
       throw error
     }
@@ -53,8 +53,45 @@ export class CsvImportSfnEventHandler
   async handleStepState(event: CsvImportSfnEvent): Promise<any> {
     this.logger.debug('Processing event:::', JSON.stringify(event, null, 2))
     if (event.context.State.Name === 'csv_loader') {
-      return await this.loadCsv(event.input as CreateCsvImportDto)
+      const input = event.input as CreateCsvImportDto
+
+      // 1. Get the parent job's key from the sourceId
+      const parentKey = parseId(input.sourceId)
+
+      // 2. Count the total rows in the CSV
+      this.logger.log(`Counting rows for file: ${input.key}`)
+      const totalRows = await this.countCsvRows(input)
+      this.logger.log(`Found ${totalRows} rows. Updating parent job.`)
+
+      // 3. Update the parent job with the total count
+      const updatedEntity = await this.importService.updateImportJob(
+        parentKey,
+        {
+          set: { totalRows },
+        },
+      )
+
+      if (updatedEntity.processedRows >= totalRows) {
+        this.logger.log(
+          `Job ${input.sourceId} already finished. Setting final status.`,
+        )
+        const finalStatus =
+          updatedEntity.failedRows > 0
+            ? ImportStatusEnum.COMPLETED
+            : ImportStatusEnum.COMPLETED
+
+        await this.importService.updateStatus(parentKey, finalStatus)
+      }
+
+      // 4. Proceed to load the first batch of rows as before
+      return this.loadCsv(input)
     }
+
+    if (event.context.State.Name === 'finalize_parent_job') {
+      const finalizeEvent = event.input as CreateCsvImportDto & MapResultPayload
+      return this.finalizeParentJob(finalizeEvent)
+    }
+
     const input = event.input as ICsvRowImport
     const items = input.Items
     const attributes = input.BatchInput.Attributes
@@ -75,6 +112,7 @@ export class CsvImportSfnEventHandler
           tableName: attributes.tableName,
           tenantCode: attributes.tenantCode,
           attributes: transformedData,
+          sourceId: attributes.sourceId,
         }
         createImportDtos.push(createImport)
       } catch (error) {
@@ -159,5 +197,53 @@ export class CsvImportSfnEventHandler
           reject(error)
         })
     })
+  }
+
+  private async countCsvRows(input: CreateCsvImportDto): Promise<number> {
+    const { Body: s3Stream } = await this.s3Service.client.send(
+      new GetObjectCommand({ Bucket: input.bucket, Key: input.key }),
+    )
+
+    if (!(s3Stream instanceof Readable)) {
+      throw new Error('Failed to get a readable stream from S3 object.')
+    }
+
+    return new Promise((resolve, reject) => {
+      let count = 0
+      const parser = csv()
+
+      s3Stream
+        .pipe(parser)
+        .on('data', () => count++)
+        .on('end', () => resolve(count))
+        .on('error', (error) => reject(error))
+    })
+  }
+
+  private async finalizeParentJob(
+    event: CreateCsvImportDto & MapResultPayload,
+  ): Promise<void> {
+    const parentKey = parseId(event.sourceId)
+    const totalRows = event.MapResult.length
+
+    this.logger.log(
+      `Setting totalRows=${totalRows} for parent job ${event.sourceId}.`,
+    )
+
+    const updatedEntity = await this.importService.updateImportJob(parentKey, {
+      set: { totalRows },
+    })
+
+    if (updatedEntity.processedRows >= totalRows) {
+      this.logger.log(
+        `Job ${event.sourceId} already finished. Setting final status.`,
+      )
+      const finalStatus =
+        updatedEntity.failedRows > 0
+          ? ImportStatusEnum.COMPLETED
+          : ImportStatusEnum.COMPLETED
+
+      await this.importService.updateStatus(parentKey, finalStatus)
+    }
   }
 }

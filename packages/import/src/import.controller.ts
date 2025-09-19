@@ -13,6 +13,7 @@ import { ApiBody, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger'
 
 import { CreateCsvImportDto } from './dto/create-csv-import.dto'
 import { CreateImportDto } from './dto/create-import.dto'
+import { CreateZipImportDto } from './dto/create-zip-import.dto'
 import { ImportService } from './import.service'
 
 @ApiTags('Imports')
@@ -84,6 +85,32 @@ export class ImportController {
     // The service contains the routing logic to either process directly
     // or create the master job for the Step Function.
     return this.importService.handleCsvImport(createCsvImportDto, {
+      invokeContext,
+    })
+  }
+
+  @Post('zip')
+  @ApiOperation({
+    summary: 'Initiate a ZIP file import',
+    description:
+      'Accepts the S3 location of a ZIP file containing multiple CSVs. This will trigger a sequential, orchestrated import process.',
+  })
+  @ApiBody({ type: CreateZipImportDto })
+  @ApiResponse({
+    status: 202,
+    description:
+      'The zip import task has been accepted and queued for processing.',
+  })
+  @HttpCode(HttpStatus.ACCEPTED)
+  @UsePipes(new ValidationPipe({ transform: true, whitelist: true }))
+  async createZipImport(
+    @INVOKE_CONTEXT() invokeContext: IInvoke,
+    @Body() createZipImportDto: CreateZipImportDto,
+  ) {
+    this.logger.log(
+      `Received ZIP import request for key: ${createZipImportDto.key}`,
+    )
+    return this.importService.createZipJob(createZipImportDto, {
       invokeContext,
     })
   }

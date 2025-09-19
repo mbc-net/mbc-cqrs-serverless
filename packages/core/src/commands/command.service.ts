@@ -392,7 +392,7 @@ export class CommandService implements OnModuleInit, ICommandService {
   }
 
   async updateStatus(key: DetailKey, status: string, notifyId?: string) {
-    await this.dynamoDbService.updateItem(this.tableName, key, {
+    const item = await this.dynamoDbService.updateItem(this.tableName, key, {
       set: { status },
     })
 
@@ -403,7 +403,7 @@ export class CommandService implements OnModuleInit, ICommandService {
       table: this.tableName,
       id: notifyId || `${this.tableName}#${key.pk}#${key.sk}`,
       tenantCode: key.pk.substring(key.pk.indexOf('#') + 1),
-      content: { status },
+      content: { status, source: item?.source },
     })
   }
 
