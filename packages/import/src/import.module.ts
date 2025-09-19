@@ -1,10 +1,14 @@
 import { DataStoreModule, QueueModule } from '@mbc-cqrs-serverless/core'
 import { DynamicModule, Module, Provider, Type } from '@nestjs/common'
 
+import { CommandFinishedHandler } from './event/command-finished.queue.event.handler'
 import { CsvImportQueueEventHandler } from './event/csv-import.queue.event.handler'
 import { CsvImportSfnEventHandler } from './event/csv-import.sfn.event.handler'
 import { ImportEventHandler } from './event/import.event.handler'
 import { ImportQueueEventHandler } from './event/import.queue.event.handler'
+import { ImportStatusHandler } from './event/import-status.queue.event.handler'
+import { ZipImportQueueEventHandler } from './event/zip-import.queue.event.handler'
+import { ZipImportSfnEventHandler } from './event/zip-import.sfn.event.handler'
 import { ImportController } from './import.controller'
 import {
   ConfigurableModuleClass,
@@ -25,6 +29,10 @@ import { IProcessStrategy } from './interface/processing-strategy.interface'
     ImportQueueEventHandler,
     CsvImportQueueEventHandler,
     CsvImportSfnEventHandler,
+    CommandFinishedHandler,
+    ImportStatusHandler,
+    ZipImportQueueEventHandler,
+    ZipImportSfnEventHandler,
   ],
   exports: [ImportService],
 })
