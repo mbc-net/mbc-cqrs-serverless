@@ -1,0 +1,3 @@
+export const IMPORT_PK_PREFIX = 'IMPORT'
+export const CSV_IMPORT_PK_PREFIX = 'CSV_IMPORT'
+export const ZIP_IMPORT_PK_PREFIX = 'ZIP_IMPORT'

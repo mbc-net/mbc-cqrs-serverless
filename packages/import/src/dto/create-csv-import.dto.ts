@@ -1,8 +1,12 @@
-import { IsEnum, IsNotEmpty, IsString } from 'class-validator'
+import { IsEnum, IsNotEmpty, IsOptional, IsString } from 'class-validator'
 
 import { ProcessingMode } from '../enum'
 
 export class CreateCsvImportDto {
+  @IsString()
+  @IsOptional()
+  sourceId?: string
+
   @IsNotEmpty()
   @IsEnum(ProcessingMode)
   processingMode: ProcessingMode

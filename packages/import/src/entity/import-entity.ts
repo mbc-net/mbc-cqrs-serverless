@@ -19,6 +19,13 @@ export class ImportEntity extends CommandEntity {
   attributes: Record<string, any>
   result?: Record<string, any>
 
+  // --- ADDED FOR CSV JOB TRACKING ---
+  totalRows?: number
+  processedRows?: number
+  succeededRows?: number
+  failedRows?: number
+  // ------------------------------------
+
   constructor(partial: Partial<ImportEntity>) {
     super()
     Object.assign(this, partial)

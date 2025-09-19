@@ -11,11 +11,15 @@ import {
   extractInvokeContext,
   ICommandOptions,
   IEventHandler,
+  KEY_SEPARATOR,
 } from '@mbc-cqrs-serverless/core'
 import { Inject, Logger } from '@nestjs/common'
 
+import { CSV_IMPORT_PK_PREFIX, IMPORT_PK_PREFIX } from '../constant'
+import { ImportEntity } from '../entity'
 import { ComparisonStatus } from '../enum/comparison-status.enum'
 import { ImportStatusEnum } from '../enum/import-status.enum'
+import { parseId } from '../helpers'
 import { PROCESS_STRATEGY_MAP } from '../import.module-definition'
 import { ImportService } from '../import.service'
 import { IProcessStrategy } from '../interface/processing-strategy.interface'
@@ -36,11 +40,9 @@ export class ImportQueueEventHandler
   async execute(event: ImportQueueEvent): Promise<any> {
     const importEntity = event.importEvent.importEntity
 
-    // This handler processes individual records, so it must ignore the master CSV jobs.
-    // Master jobs are handled exclusively by the CsvImportQueueEventHandler.
-    if (importEntity.type === 'CSV_MASTER_JOB') {
+    if (!importEntity.id.startsWith(`${IMPORT_PK_PREFIX}${KEY_SEPARATOR}`)) {
       this.logger.debug(
-        `Skipping CSV_MASTER_JOB in main queue handler: ${importEntity.id}`,
+        `Skipping other type import job in main queue handler: ${importEntity.id}`,
       )
       return
     }
@@ -53,11 +55,9 @@ export class ImportQueueEventHandler
    */
   async handleImport(event: ImportQueueEvent): Promise<any> {
     const importKey = event.importEvent.importKey
-    const {
-      attributes,
-      tenantCode,
-      type: tableName,
-    } = event.importEvent.importEntity
+    const importEntity = event.importEvent.importEntity
+
+    const { attributes, tenantCode, type: tableName } = importEntity
     this.logger.debug(
       `Processing import job ${importKey.pk}#${importKey.sk} for table: ${tableName}`,
     )
@@ -85,21 +85,17 @@ export class ImportQueueEventHandler
       )
 
       // 3. Execute all registered strategies in sequence for this record
-      const result = await this.executeStrategy(
-        strategy,
-        attributes,
-        tenantCode,
-      )
+      await this.executeStrategy(strategy, attributes, tenantCode, importEntity)
 
-      // 4. Finalize the import status as COMPLETED
-      await this.importService.updateStatus(
-        importKey,
-        ImportStatusEnum.COMPLETED,
-        { result },
-      )
-      this.logger.log(
-        `Successfully completed import job: ${importKey.pk}#${importKey.sk}`,
-      )
+      // // 4. Finalize the import status as COMPLETED
+      // await this.importService.updateStatus(
+      //   importKey,
+      //   ImportStatusEnum.COMPLETED,
+      //   { result },
+      // )
+      // this.logger.log(
+      //   `Successfully completed import job: ${importKey.pk}#${importKey.sk}`,
+      // )
     } catch (error) {
       // 5. Handle any errors during processing
       this.logger.error(
@@ -127,12 +123,36 @@ export class ImportQueueEventHandler
     strategy: IProcessStrategy<any, any>,
     attributes: Record<string, any>,
     tenantCode: string,
-  ): Promise<any> {
+    importEntity: ImportEntity,
+  ): Promise<void> {
     // 1. Determine if there are changes
     const compareResult = await strategy.compare(attributes, tenantCode)
+    const importKey = {
+      pk: importEntity.pk,
+      sk: importEntity.sk,
+    }
 
     if (compareResult.status === ComparisonStatus.EQUAL) {
-      return { status: 'EQUAL', message: 'No changes detected.' }
+      this.logger.log(
+        `No changes for import job ${importEntity.id}, marking as completed.`,
+      )
+      await this.importService.updateStatus(
+        importKey,
+        ImportStatusEnum.COMPLETED,
+        { result: { status: 'EQUAL', message: 'No changes detected.' } },
+      )
+      const skParts = importEntity.sk.split(KEY_SEPARATOR)
+      const parentId = skParts.slice(0, -1).join(KEY_SEPARATOR)
+
+      if (parentId.startsWith(CSV_IMPORT_PK_PREFIX)) {
+        this.logger.debug(
+          `Updating parent job counter for EQUAL status child: ${importEntity.id}`,
+        )
+        const parentKey = parseId(parentId)
+        // Since the status is EQUAL, the child "succeeded" in its processing.
+        await this.importService.incrementParentJobCounters(parentKey, true)
+      }
+      return // Stop execution for this case
     }
 
     // 2. Map the attributes to the correct CommandService input model
@@ -145,25 +165,38 @@ export class ImportQueueEventHandler
     )
 
     const commandService = strategy.getCommandService()
-    let finalResult: any
+    let result: any
 
     // 3. Execute the appropriate command
     const invokeContext = extractInvokeContext()
     const options: ICommandOptions = {
       invokeContext,
+      source: importEntity.id,
     }
     if (compareResult.status === ComparisonStatus.NOT_EXIST) {
-      finalResult = await commandService.publishAsync(
+      result = await commandService.publishAsync(
         mappedData as CommandInputModel,
         options,
       )
+      // 4. Finalize the import status as COMPLETED
+      await this.importService.updateStatus(
+        importKey,
+        ImportStatusEnum.PROCESSING,
+        { result: result },
+      )
+      this.logger.log(
+        `Successfully completed import job: ${importKey.pk}#${importKey.sk}`,
+      )
     } else {
-      finalResult = await commandService.publishPartialUpdateAsync(
+      result = await commandService.publishPartialUpdateAsync(
         mappedData as CommandPartialInputModel,
         options,
       )
+      await this.importService.updateStatus(
+        importKey,
+        ImportStatusEnum.PROCESSING,
+        { result: result },
+      )
     }
-
-    return finalResult
   }
 }

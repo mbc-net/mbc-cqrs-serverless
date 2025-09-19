@@ -2,11 +2,13 @@
 import {
   EventHandler,
   IEventHandler,
+  KEY_SEPARATOR,
   StepFunctionService,
 } from '@mbc-cqrs-serverless/core'
 import { Inject, Logger } from '@nestjs/common'
 import { ConfigService } from '@nestjs/config'
 
+import { CSV_IMPORT_PK_PREFIX } from '../constant'
 import { CreateCsvImportDto } from '../dto/create-csv-import.dto'
 import { ImportStatusEnum } from '../enum/import-status.enum'
 import { IMPORT_STRATEGY_MAP } from '../import.module-definition'
@@ -34,8 +36,10 @@ export class CsvImportQueueEventHandler
   async execute(event: ImportQueueEvent): Promise<any> {
     const importEntity = event.importEvent.importEntity
 
-    // This handler ONLY acts on master jobs and ignores all other event types.
-    if (importEntity.type !== 'CSV_MASTER_JOB') {
+    // This handler ONLY acts on master csv jobs and ignores all other event types.
+    if (
+      !importEntity.id.startsWith(`${CSV_IMPORT_PK_PREFIX}${KEY_SEPARATOR}`)
+    ) {
       return
     }
 
@@ -60,7 +64,10 @@ export class CsvImportQueueEventHandler
 
       await this.sfnService.startExecution(
         this.csvImportArn,
-        importEntity.attributes,
+        {
+          ...importEntity.attributes,
+          sourceId: importEntity.id,
+        },
         `${tenantCode}-${tableName}-${Date.now()}`,
       )
 

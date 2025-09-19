@@ -1,5 +1,8 @@
+import { UpdateItemCommand } from '@aws-sdk/client-dynamodb'
 import { GetObjectCommand } from '@aws-sdk/client-s3'
+import { marshall, unmarshall } from '@aws-sdk/util-dynamodb'
 import {
+  DdbUpdateItem,
   DetailKey,
   DynamoDbService,
   getUserContext,
@@ -16,8 +19,14 @@ import csv from 'csv-parser'
 import { Readable } from 'stream'
 import { ulid } from 'ulid'
 
+import {
+  CSV_IMPORT_PK_PREFIX,
+  IMPORT_PK_PREFIX,
+  ZIP_IMPORT_PK_PREFIX,
+} from './constant'
 import { CreateCsvImportDto } from './dto/create-csv-import.dto'
 import { CreateImportDto } from './dto/create-import.dto'
+import { CreateZipImportDto } from './dto/create-zip-import.dto'
 import { ImportEntity } from './entity'
 import { ImportStatusEnum } from './enum'
 import { ImportQueueEvent } from './event'
@@ -98,7 +107,7 @@ export class ImportService {
     const userContext = getUserContext(options.invokeContext)
 
     const taskCode = ulid()
-    const pk = `CSV_IMPORT${KEY_SEPARATOR}${dto.tenantCode}`
+    const pk = `${CSV_IMPORT_PK_PREFIX}${KEY_SEPARATOR}${dto.tenantCode}`
     const sk = `${dto.tableName}#${taskCode}`
 
     const item = new ImportEntity({
@@ -110,6 +119,44 @@ export class ImportService {
       tenantCode: dto.tenantCode,
       type: 'CSV_MASTER_JOB',
       name: `CSV Import: ${dto.key.split('/').pop()}`,
+      status: ImportStatusEnum.CREATED,
+      attributes: dto,
+      requestId: options.invokeContext?.context?.awsRequestId,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+      createdBy: userContext.userId,
+      updatedBy: userContext.userId,
+      createdIp: sourceIp,
+      updatedIp: sourceIp,
+    })
+
+    await this.dynamoDbService.putItem(this.tableName, item)
+    return item
+  }
+
+  async createZipJob(
+    dto: CreateZipImportDto,
+    options: {
+      invokeContext: IInvoke
+    },
+  ): Promise<ImportEntity> {
+    const sourceIp =
+      options.invokeContext?.event?.requestContext?.http?.sourceIp
+    const userContext = getUserContext(options.invokeContext)
+
+    const taskCode = ulid()
+    const pk = `${ZIP_IMPORT_PK_PREFIX}${KEY_SEPARATOR}${dto.tenantCode}`
+    const sk = `ZIP#${taskCode}`
+
+    const item = new ImportEntity({
+      id: `${pk}#${sk}`,
+      pk,
+      sk,
+      version: 0,
+      code: taskCode,
+      tenantCode: dto.tenantCode,
+      type: 'ZIP_MASTER_JOB',
+      name: `ZIP Import: ${dto.key.split('/').pop()}`,
       status: ImportStatusEnum.CREATED,
       attributes: dto,
       requestId: options.invokeContext?.context?.awsRequestId,
@@ -137,8 +184,10 @@ export class ImportService {
     const userContext = getUserContext(options.invokeContext)
 
     const taskCode = ulid()
-    const pk = `IMPORT${KEY_SEPARATOR}${dto.tenantCode}`
-    const sk = `${dto.tableName}#${taskCode}`
+    const pk = `${IMPORT_PK_PREFIX}${KEY_SEPARATOR}${dto.tenantCode}`
+    const sk = dto.sourceId
+      ? `${dto.sourceId}#${taskCode}`
+      : `${dto.tableName}#${taskCode}`
 
     const item = {
       id: `${pk}${KEY_SEPARATOR}${sk}`,
@@ -163,6 +212,50 @@ export class ImportService {
     await this.dynamoDbService.putItem(this.tableName, item)
 
     return new ImportEntity(item)
+  }
+
+  /**
+   * Creates a CSV master job that is part of a larger ZIP orchestration.
+   * It stores the SFN Task Token needed to signal completion back to the orchestrator.
+   * @param dto The details of the CSV file to process.
+   * @param taskToken The task token from the waiting Step Function.
+   * @param sourceId The key of the parent ZIP_MASTER_JOB.
+   * @returns The created ImportEntity.
+   */
+  async createCsvJobWithTaskToken(
+    dto: CreateCsvImportDto,
+    taskToken: string,
+    sourceId: DetailKey,
+  ): Promise<ImportEntity> {
+    const taskCode = ulid()
+    const pk = `${CSV_IMPORT_PK_PREFIX}${KEY_SEPARATOR}${dto.tenantCode}`
+    const sk = `${dto.tableName}${KEY_SEPARATOR}${taskCode}`
+
+    const item = new ImportEntity({
+      id: `${pk}${KEY_SEPARATOR}${sk}`,
+      pk,
+      sk,
+      version: 0,
+      code: taskCode,
+      tenantCode: dto.tenantCode,
+      type: 'CSV_MASTER_JOB',
+      name: `CSV Import (from ZIP): ${dto.key.split('/').pop()}`,
+      status: ImportStatusEnum.CREATED,
+      // Store both the original DTO and the crucial task token
+      attributes: {
+        ...dto,
+        taskToken,
+      },
+      source: `${sourceId.pk}${KEY_SEPARATOR}${sourceId.sk}`, // Link back to the parent ZIP job
+      requestId: ulid(), // System-generated
+      createdAt: new Date(),
+      updatedAt: new Date(),
+      createdBy: 'system', // This job is created by the system, not a direct user action
+      updatedBy: 'system',
+    })
+
+    await this.dynamoDbService.putItem(this.tableName, item)
+    return item
   }
 
   /**
@@ -287,6 +380,111 @@ export class ImportService {
     })
   }
 
+  /**
+   * Atomically increments the progress counters for a parent CSV job.
+   * After incrementing, it checks if the job is complete and updates the
+   * final status if necessary.
+   * @param parentKey The key of the master CSV job entity.
+   * @param childSucceeded True if the child job was successful, false otherwise.
+   */
+  async incrementParentJobCounters(
+    parentKey: DetailKey,
+    childSucceeded: boolean,
+  ): Promise<ImportEntity> {
+    this.logger.debug(
+      `Incrementing counters for parent job (atomic workaround): ${parentKey.pk}#${parentKey.sk}`,
+    )
+
+    // 1. Define which counters to increment.
+    const countersToIncrement: { [key: string]: number } = {
+      processedRows: 1,
+    }
+    if (childSucceeded) {
+      countersToIncrement.succeededRows = 1
+    } else {
+      countersToIncrement.failedRows = 1
+    }
+
+    // 2. Use the local helper to build the command parts.
+    const {
+      UpdateExpression,
+      ExpressionAttributeNames,
+      ExpressionAttributeValues,
+    } = this._buildAtomicCounterUpdateExpression(countersToIncrement)
+
+    // 3. Manually create and send the UpdateItemCommand.
+    const command = new UpdateItemCommand({
+      TableName: this.tableName,
+      Key: marshall(parentKey),
+      UpdateExpression,
+      ExpressionAttributeNames,
+      ExpressionAttributeValues: marshall(ExpressionAttributeValues),
+      ReturnValues: 'ALL_NEW',
+    })
+
+    const response = await this.dynamoDbService.client.send(command)
+    const updatedEntity = unmarshall(response.Attributes) as ImportEntity
+
+    // 4. Check if the job is complete (this logic remains the same).
+    const { totalRows, processedRows, failedRows } = updatedEntity
+    if (totalRows > 0 && processedRows >= totalRows) {
+      this.logger.log(
+        `Finalizing parent CSV job ${parentKey.pk}#${parentKey.sk}`,
+      )
+      const finalStatus =
+        failedRows > 0 ? ImportStatusEnum.COMPLETED : ImportStatusEnum.COMPLETED
+
+      await this.updateStatus(parentKey, finalStatus, {
+        result: {
+          message: 'All child jobs have been processed.',
+          total: totalRows,
+          succeeded: updatedEntity.succeededRows || 0,
+          failed: failedRows || 0,
+        },
+      })
+    }
+
+    return updatedEntity
+  }
+
+  /**
+   * A private helper to build a valid DynamoDB UpdateExpression for atomic counters.
+   * @param counters A map of attribute names to the amount they should be incremented by.
+   * @returns An object with the UpdateExpression and its necessary parameter maps.
+   */
+  private _buildAtomicCounterUpdateExpression(counters: {
+    [key: string]: number
+  }) {
+    const setExpressions: string[] = []
+    const expressionAttributeNames: { [key: string]: string } = {}
+    const expressionAttributeValues: { [key: string]: any } = {}
+
+    for (const key in counters) {
+      const attrName = `#${key}`
+      const startValuePlaceholder = `:${key}Start`
+      const incValuePlaceholder = `:${key}Inc`
+
+      setExpressions.push(
+        `${attrName} = if_not_exists(${attrName}, ${startValuePlaceholder}) + ${incValuePlaceholder}`,
+      )
+
+      expressionAttributeNames[attrName] = key
+      expressionAttributeValues[startValuePlaceholder] = 0 // Always start from 0 if the attribute is new.
+      expressionAttributeValues[incValuePlaceholder] = counters[key] // The amount to increment by.
+    }
+
+    return {
+      UpdateExpression: `SET ${setExpressions.join(', ')}`,
+      ExpressionAttributeNames: expressionAttributeNames,
+      ExpressionAttributeValues: expressionAttributeValues,
+    }
+  }
+
+  // add a generic update method for setting totalRows
+  async updateImportJob(key: DetailKey, payload: DdbUpdateItem) {
+    return this.dynamoDbService.updateItem(this.tableName, key, payload)
+  }
+
   async publishAlarm(
     event: ImportQueueEvent,
     errorDetails: any,
@@ -311,5 +509,15 @@ export class ImportService {
 
     this.logger.error('alarm:::', alarm)
     await this.snsService.publish<INotification>(alarm, this.alarmTopicArn)
+  }
+
+  async getImportByKey(key: DetailKey): Promise<ImportEntity> {
+    const item = await this.dynamoDbService.getItem(this.tableName, key)
+    if (!item) {
+      throw new BadRequestException(
+        `Import item not found for key: ${key.pk}#${key.sk}`,
+      )
+    }
+    return new ImportEntity(item)
   }
 }
