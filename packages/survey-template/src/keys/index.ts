@@ -1,0 +1,1 @@
+export const SURVEY_TEMPLATE_SK_PREFIX = 'TEMPLATE'
