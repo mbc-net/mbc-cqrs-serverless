@@ -1,0 +1,9 @@
+{
+  "extends": "../../tsconfig.build.json",
+  "compilerOptions": {
+    "outDir": "./dist"
+  },
+
+  "exclude": ["./src/templates"],
+  "include": ["./src", "src/survey-template.module-definition.ts"]
+}

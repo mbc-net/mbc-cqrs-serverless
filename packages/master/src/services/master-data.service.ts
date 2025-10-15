@@ -96,19 +96,22 @@ export class MasterDataService implements IMasterDataService {
 
     if (searchDto.keyword?.trim()) {
       andConditions.push({
-        name: { contains: searchDto.keyword.trim(), mode: 'insensitive'  },
+        name: { contains: searchDto.keyword.trim(), mode: 'insensitive' },
       })
     }
 
     if (searchDto.code?.trim()) {
       andConditions.push({
-        masterCode: { contains: searchDto.code.trim(), mode: 'insensitive'  },
+        masterCode: { contains: searchDto.code.trim(), mode: 'insensitive' },
       })
     }
 
     if (searchDto.settingCode?.trim()) {
       andConditions.push({
-        masterTypeCode: { contains: searchDto.settingCode.trim(), mode: 'insensitive' },
+        masterTypeCode: {
+          contains: searchDto.settingCode.trim(),
+          mode: 'insensitive',
+        },
       })
     }
 

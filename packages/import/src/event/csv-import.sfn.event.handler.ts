@@ -234,16 +234,22 @@ export class CsvImportSfnEventHandler
       set: { totalRows },
     })
 
-    if (updatedEntity.processedRows >= totalRows) {
+    const { processedRows, failedRows } = updatedEntity
+    if (totalRows > 0 && processedRows >= totalRows) {
       this.logger.log(
-        `Job ${event.sourceId} already finished. Setting final status.`,
+        `Finalizing parent CSV job ${parentKey.pk}#${parentKey.sk}`,
       )
       const finalStatus =
-        updatedEntity.failedRows > 0
-          ? ImportStatusEnum.COMPLETED
-          : ImportStatusEnum.COMPLETED
+        failedRows > 0 ? ImportStatusEnum.COMPLETED : ImportStatusEnum.COMPLETED
 
-      await this.importService.updateStatus(parentKey, finalStatus)
+      await this.importService.updateStatus(parentKey, finalStatus, {
+        result: {
+          message: 'All child jobs have been processed.',
+          total: totalRows,
+          succeeded: updatedEntity.succeededRows || 0,
+          failed: failedRows || 0,
+        },
+      })
     }
   }
 }
