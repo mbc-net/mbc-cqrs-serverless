@@ -45,6 +45,7 @@ import {
   UpdateSettingDto,
   UserSettingDto,
 } from '../dto'
+import { CommonSettingBulkDto } from '../dto/master-setting/common-setting-create-bulk.dto'
 import { MasterSettingEntity } from '../entities'
 import { SettingTypeEnum } from '../enums'
 import { generateMasterPk, generateMasterSettingSk, parseId } from '../helpers'
@@ -370,6 +371,12 @@ export class MasterSettingService implements IMasterSettingService {
     )
   }
 
+  async createBulk(createDto: CommonSettingBulkDto, invokeContext: IInvoke) {
+    return Promise.all(
+      createDto.items.map((item) => this.create(item, invokeContext)),
+    )
+  }
+
   async update(
     key: DetailDto,
     updateDto: MasterSettingUpdateDto,
@@ -426,7 +433,7 @@ export class MasterSettingService implements IMasterSettingService {
 
     if (searchDto.name?.trim()) {
       andConditions.push({
-        name: { contains: searchDto.name.trim(), mode: 'insensitive' }
+        name: { contains: searchDto.name.trim(), mode: 'insensitive' },
       })
     }
 
