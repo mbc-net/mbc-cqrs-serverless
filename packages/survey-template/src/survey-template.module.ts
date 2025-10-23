@@ -61,7 +61,6 @@ export class SurveyTemplateModule extends ConfigurableModuleClass {
         provide: PRISMA_SERVICE,
         useExisting: options.prismaService,
       })
-      module.providers.push(SurveyTemplateDataSyncRdsHandler)
       if (!module.imports) {
         module.imports = []
       }
@@ -70,7 +69,9 @@ export class SurveyTemplateModule extends ConfigurableModuleClass {
       imports.push(
         CommandModule.register({
           tableName: 'survey',
-          dataSyncHandlers: options?.dataSyncHandlers,
+          dataSyncHandlers: options?.dataSyncHandlers ?? [
+            SurveyTemplateDataSyncRdsHandler,
+          ],
         }),
       )
       return {

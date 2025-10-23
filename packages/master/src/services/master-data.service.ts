@@ -33,6 +33,7 @@ import {
   MasterRdsListEntity,
   UpdateDataSettingDto,
 } from '../dto'
+import { MasterDataCreateBulkDto } from '../dto/master-copy/master-data-create-bulk.dto'
 import { MasterDataEntity, MasterDataListEntity } from '../entities'
 import { generateMasterDataSk, generateMasterPk } from '../helpers'
 import { getOrderBys } from '../helpers/rds'
@@ -311,6 +312,12 @@ export class MasterDataService implements IMasterDataService {
         seq,
       },
       { invokeContext },
+    )
+  }
+
+  async createBulk(createDto: MasterDataCreateBulkDto, invokeContext: IInvoke) {
+    return Promise.all(
+      createDto.items.map((item) => this.createSetting(item, invokeContext)),
     )
   }
 
