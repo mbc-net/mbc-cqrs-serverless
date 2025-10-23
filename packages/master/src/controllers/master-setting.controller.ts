@@ -32,6 +32,7 @@ import { UpdateSettingDto } from '../dto/master-setting/update.setting.dto'
 import { UserSettingDto } from '../dto/master-setting/user-setting-create.dto'
 import { parsePk } from '../helpers'
 import { MasterSettingService } from '../services/master-setting.service'
+import { CommonSettingBulkDto } from '../dto/master-setting/common-setting-create-bulk.dto'
 
 @Controller('api/master-setting')
 @ApiTags('master-settings')
@@ -122,6 +123,14 @@ export class MasterSettingController {
     @INVOKE_CONTEXT() invokeContext: IInvoke,
   ) {
     return this.masterSettingService.create(createDto, invokeContext)
+  }
+
+  @Post('/bulk')
+  async createBulk(
+    @Body() createDto: CommonSettingBulkDto,
+    @INVOKE_CONTEXT() invokeContext: IInvoke,
+  ) {
+    return this.masterSettingService.createBulk(createDto, invokeContext)
   }
 
   @Put('/:id')
