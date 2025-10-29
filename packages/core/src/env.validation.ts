@@ -77,6 +77,10 @@ export class EnvironmentVariables {
   SES_REGION: string
   @IsString()
   SES_FROM_EMAIL: string
+
+  @IsString()
+  @IsOptional()
+  REQUEST_BODY_SIZE_LIMIT: string
 }
 
 export function getValidateConfig<T extends EnvironmentVariables>(
