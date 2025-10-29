@@ -6,6 +6,7 @@ import { ClassSerializerInterceptor, ValidationPipe } from '@nestjs/common'
 import { ConfigService } from '@nestjs/config'
 import { HttpAdapterHost, NestFactory, Reflector } from '@nestjs/core'
 import { Callback, Context, Handler } from 'aws-lambda'
+import * as express from 'express'
 import { firstValueFrom, ReplaySubject } from 'rxjs'
 
 import { AppModule } from './app.module'
@@ -31,6 +32,13 @@ async function bootstrap(opts: AppModuleOptions) {
     logger,
   })
 
+  const configService = app.get(ConfigService)
+  const bodySizeLimit =
+    configService.get<string>('REQUEST_BODY_SIZE_LIMIT') || '100kb'
+
+  app.use(express.json({ limit: bodySizeLimit }))
+  app.use(express.urlencoded({ limit: bodySizeLimit, extended: true }))
+
   app.useGlobalPipes(
     new ValidationPipe({
       transform: true,
@@ -44,7 +52,6 @@ async function bootstrap(opts: AppModuleOptions) {
   app.useGlobalFilters(new DynamoDBExceptionFilter(httpAdapter))
 
   //swager init
-  const configService = app.get(ConfigService)
   if (configService.get<Environment>('NODE_ENV') === Environment.Local) {
     const { DocumentBuilder, SwaggerModule } = await import('@nestjs/swagger')
 
