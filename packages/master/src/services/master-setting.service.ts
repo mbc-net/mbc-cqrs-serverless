@@ -365,7 +365,7 @@ export class MasterSettingService implements IMasterSettingService {
     return await this.createTenantSetting(
       {
         ...createDto,
-        tenantCode: userContext.tenantCode,
+        tenantCode: createDto.tenantCode ?? userContext.tenantCode,
       },
       { invokeContext },
     )
@@ -389,7 +389,7 @@ export class MasterSettingService implements IMasterSettingService {
       key,
       {
         code,
-        tenantCode: userContext.tenantCode,
+        tenantCode: updateDto.tenantCode ?? userContext.tenantCode,
         name: updateDto.name,
         settingValue: updateDto.attributes,
       },
