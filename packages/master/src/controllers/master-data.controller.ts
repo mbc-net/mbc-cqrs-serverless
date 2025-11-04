@@ -6,12 +6,10 @@ import {
 } from '@mbc-cqrs-serverless/core'
 import {
   BadRequestException,
-  //   BadRequestException,
   Body,
   Controller,
   Delete,
   Get,
-  Logger,
   Param,
   Post,
   Put,
@@ -35,8 +33,6 @@ import { MasterDataService } from '../services/master-data.service'
 @Controller('api/master-data')
 @ApiTags('master-data')
 export class MasterDataController {
-  private readonly logger = new Logger(MasterDataController.name)
-
   constructor(private readonly masterDataService: MasterDataService) {}
 
   @Get('/')
