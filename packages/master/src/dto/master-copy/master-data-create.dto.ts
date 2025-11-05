@@ -4,6 +4,10 @@ export class MasterDataCreateDto {
   @IsString()
   settingCode: string
 
+  @IsOptional()
+  @IsString()
+  tenantCode?: string
+
   @IsString()
   name: string
 
