@@ -293,7 +293,7 @@ export class MasterDataService implements IMasterDataService {
           seq: true,
         },
         where: {
-          tenantCode: userContext.tenantCode,
+          tenantCode: createDto.tenantCode ?? userContext.tenantCode,
           masterType: DATA_SK_PREFIX,
           masterTypeCode: createDto.settingCode,
         },
@@ -305,7 +305,7 @@ export class MasterDataService implements IMasterDataService {
     return await this.create(
       {
         code: createDto.code ?? ulid(),
-        tenantCode: userContext.tenantCode,
+        tenantCode: createDto.tenantCode ?? userContext.tenantCode,
         name: createDto.name,
         settingCode: createDto.settingCode,
         attributes: createDto.attributes ?? {},
