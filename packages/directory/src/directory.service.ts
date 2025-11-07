@@ -46,12 +46,10 @@ export class DirectoryService {
   constructor(
     private readonly commandService: CommandService,
     private readonly dataService: DataService,
-
     private readonly s3Service: S3Service,
     private readonly customDynamoService: DynamoService,
   ) {}
 
-  // : Promise<DirectoryDataEntity>
   async create(
     createDto: DirectoryCreateDto,
     opts: { invokeContext: IInvoke },
@@ -609,7 +607,6 @@ export class DirectoryService {
       )
     }
 
-    // 4. === PUBLISH UPDATE ===
     const commandDto = new DirectoryCommandDto({
       pk: data.pk,
       sk: data.sk,

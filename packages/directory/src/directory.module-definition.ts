@@ -4,11 +4,11 @@ import { Type } from '@nestjs/common'
 
 export const PRISMA_SERVICE = 'PrismaServiceInjectToken'
 
-export interface SurveyTemplateModuleOptions {
+export interface DirectoryStorageModuleOptions {
   enableController?: boolean
   dataSyncHandlers?: Type<IDataSyncHandler>[]
   prismaService?: Type<any>
 }
 
 export const { ConfigurableModuleClass, MODULE_OPTIONS_TOKEN, OPTIONS_TYPE } =
-  new ConfigurableModuleBuilder<SurveyTemplateModuleOptions>().build()
+  new ConfigurableModuleBuilder<DirectoryStorageModuleOptions>().build()
