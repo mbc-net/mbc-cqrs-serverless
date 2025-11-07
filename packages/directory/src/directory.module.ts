@@ -20,7 +20,7 @@ import { DynamoService } from './dynamodb.service'
   providers: [DirectoryService, DirectoryFileService, DynamoService],
   exports: [DirectoryService, DirectoryFileService, DynamoService],
 })
-export class SurveyTemplateModule extends ConfigurableModuleClass {
+export class DirectoryStorageModule extends ConfigurableModuleClass {
   static register(options: typeof OPTIONS_TYPE): DynamicModule {
     const module = super.register(options)
 

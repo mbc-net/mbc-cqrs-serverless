@@ -69,7 +69,6 @@ export class DirectoryService {
     let newAncestors = []
 
     if (!isRoot) {
-      // check permission
       const parenDto = { pk, sk: parentId }
       const allowPermissions = [
         FileRole.WRITE,
@@ -106,8 +105,8 @@ export class DirectoryService {
       name: createDto.name,
       attributes: { ...createDto.attributes, ancestors: newAncestors },
     })
-
     const item = await this.commandService.publishAsync(directory, opts)
+
     return new DirectoryDataEntity(item as DirectoryDataEntity)
   }
 
@@ -118,7 +117,6 @@ export class DirectoryService {
   ) {
     const userContext = getUserContext(opts.invokeContext)
     const { tenantCode, userId } = userContext
-
     const { path, email, parentId } = copyDto
 
     const data = (await this.dataService.getItem(
@@ -131,13 +129,11 @@ export class DirectoryService {
 
     const pk = `DIRECTORY${KEY_SEPARATOR}${tenantCode}`
     const sk = ulid()
-
     const attrs = data.attributes as DirectoryAttributes
     let newAncestors = []
 
-    if (!parentId) {
+    if (parentId) {
       const parenDto = { pk, sk: parentId }
-
       const parentAttrs = await this.getItemAttributes(parenDto)
       const parentAncestors = parentAttrs.ancestors || []
       newAncestors = [...parentAncestors, parentId]
@@ -174,8 +170,8 @@ export class DirectoryService {
         owner: { email: email, ownerId: userId },
       },
     })
-
     const item = await this.commandService.publishAsync(directory, opts)
+
     return new DirectoryDataEntity(item as DirectoryDataEntity)
   }
 
@@ -186,7 +182,6 @@ export class DirectoryService {
   ) {
     const userContext = getUserContext(opts.invokeContext)
     const { tenantCode } = userContext
-
     const { parentId } = copyDto
 
     const data = (await this.dataService.getItem(
@@ -196,6 +191,7 @@ export class DirectoryService {
     if (!data) {
       throw new NotFoundException('Directory not found!')
     }
+
     const allowPermissions = [
       FileRole.WRITE,
       FileRole.CHANGE_PERMISSION,
@@ -203,7 +199,6 @@ export class DirectoryService {
     ]
     const itemDto = { pk: data.pk, sk: data.sk }
     const user = { email: copyDto.email, tenant: tenantCode }
-
     const canModify = await this.hasPermission(itemDto, allowPermissions, user)
 
     if (!canModify) {
@@ -214,13 +209,11 @@ export class DirectoryService {
 
     const pk = `DIRECTORY${KEY_SEPARATOR}${tenantCode}`
     const sk = ulid()
-
     const attrs = data.attributes as DirectoryAttributes
     let newAncestors = []
 
-    if (!parentId) {
+    if (parentId) {
       const parenDto = { pk, sk: parentId }
-
       const parentAttrs = await this.getItemAttributes(parenDto)
       const parentAncestors = parentAttrs.ancestors || []
       newAncestors = [...parentAncestors, parentId]
@@ -243,8 +236,8 @@ export class DirectoryService {
       name: data.name,
       attributes: { ...attrs, ancestors: newAncestors, parentId: parentId },
     })
-
     const item = await this.commandService.publishAsync(directory, opts)
+
     return new DirectoryDataEntity(item as DirectoryDataEntity)
   }
 
@@ -296,7 +289,6 @@ export class DirectoryService {
 
     const { permission, parentId, inheritance, expirationTime } = attributes
 
-    // 2. Check the permission object on THIS item
     if (permission) {
       const now = Date.now()
       const expirationDate = new Date(expirationTime)
@@ -308,12 +300,10 @@ export class DirectoryService {
 
       const role = this.checkPermissionObject(permission, item.tenantCode, user)
       if (role) {
-        return role // Found a direct permission, stop here.
+        return role
       }
     }
 
-    // 3. Check for inheritance
-    // If inheritance is explicitly false, stop.
     if (inheritance === false) {
       return null
     }
@@ -324,7 +314,6 @@ export class DirectoryService {
 
     const parentDto = { pk: itemId.pk, sk: parentId }
 
-    // 4. Recurse to the parent
     return this.getEffectiveRole(parentDto, user)
   }
 
@@ -335,15 +324,11 @@ export class DirectoryService {
   ): FileRole | null {
     switch (permission.type) {
       case FilePermission.GENERAL:
-        // "GENERAL" means anyone, so just return the role.
         return permission.role
 
       case FilePermission.DOMAIN:
-        // Check if the user's email domain matches the permission's domain
         const requiredDomain = permission.domain?.email
         const userDomain = user.email.split('@')[1]
-        // console.log('requiredDomain:', requiredDomain)
-        // console.log('userDomain:', userDomain)
         if (requiredDomain && userDomain === requiredDomain) {
           return permission.role
         }
@@ -353,26 +338,21 @@ export class DirectoryService {
         const permUser = permission.users.find(
           (item) => item.email === user.email,
         )
-        // console.log('permUser:', permUser)
         if (permUser) {
-          // console.log('permUser.role:', permUser.role)
           return permUser.role
         }
-
         break
+
       case FilePermission.TENANT:
-        // console.log('FilePermission.TENANT:', permission.tenant)
-        // console.log('user.tenant:', user.tenant)
         if (tenantCode === user.tenant) {
           return permission.role
         }
         break
     }
 
-    return null // No permission found in this object
+    return null
   }
 
-  // [CRUD]
   async findOne(
     detailDto: DetailDto,
     opts: { invokeContext: IInvoke },
@@ -390,7 +370,6 @@ export class DirectoryService {
     ]
 
     const user = { email: email, tenant: tenant }
-
     const canRead = await this.hasPermission(detailDto, allowPermissions, user)
 
     if (!canRead) {
@@ -403,8 +382,8 @@ export class DirectoryService {
     if (!item) {
       throw new NotFoundException('Directory not found!')
     }
-
     this.logger.debug('item:', item)
+
     return new DirectoryDataEntity(item as DirectoryDataEntity)
   }
 
@@ -425,7 +404,6 @@ export class DirectoryService {
     ]
 
     const user = { email: email, tenant: tenant }
-
     const canRead = await this.hasPermission(detailDto, allowPermissions, user)
 
     if (!canRead) {
@@ -484,7 +462,6 @@ export class DirectoryService {
 
     const userContext = getUserContext(opts.invokeContext)
     const { tenantCode: tenant } = userContext
-
     const { email } = queryDto
     const allowPermissions = [
       FileRole.WRITE,
@@ -493,7 +470,6 @@ export class DirectoryService {
     ]
 
     const user = { email: email, tenant: tenant }
-
     const canWrite = await this.hasPermission(detailDto, allowPermissions, user)
 
     if (!canWrite) {
@@ -519,9 +495,70 @@ export class DirectoryService {
         },
       },
     }
-
     const command = await this.commandService.publishAsync(cmdDto, opts)
+
     return new DirectoryDataEntity(command as DirectoryDataEntity)
+  }
+
+  async restoreTemporary(
+    detailDto: DetailDto,
+    queryDto: DirectoryDetailDto,
+    opts: { invokeContext: IInvoke },
+  ): Promise<DirectoryDataEntity> {
+    const data = (await this.dataService.getItem(
+      detailDto,
+    )) as DirectoryDataEntity
+
+    if (!data) {
+      throw new NotFoundException('Directory not found!')
+    }
+
+    if (!data.isDeleted) {
+      throw new BadRequestException('Directory is not deleted!')
+    }
+
+    const userContext = getUserContext(opts.invokeContext)
+    const { tenantCode: tenant } = userContext
+
+    const { email } = queryDto
+    const allowPermissions = [
+      FileRole.WRITE,
+      FileRole.CHANGE_PERMISSION,
+      FileRole.TAKE_OWNERSHIP,
+    ]
+
+    const user = {
+      email: email,
+      tenant: tenant,
+    }
+
+    const canWrite = await this.hasPermission(detailDto, allowPermissions, user)
+    if (!canWrite) {
+      throw new ForbiddenException(
+        'You do not have permission to write this item.',
+      )
+    }
+
+    const cmdDto = new DirectoryCommandDto({
+      pk: data.pk,
+      sk: data.sk,
+      version: data.version,
+      name: data.name,
+      isDeleted: false,
+      attributes: {
+        ...data.attributes,
+      },
+      code: data.code,
+      tenantCode: data.tenantCode,
+      type: data.type,
+    })
+
+    const item = await this.commandService.publishPartialUpdateAsync(
+      cmdDto,
+      opts,
+    )
+
+    return new DirectoryDataEntity(item as DirectoryDataEntity)
   }
 
   async update(
@@ -556,10 +593,8 @@ export class DirectoryService {
     }
 
     const itemDto = { pk: data.pk, sk: data.sk }
-
     const attrs = updateDto.attributes as DirectoryAttributes
     const user = { email: updateDto.email, tenant: tenant }
-
     const canModify = await this.hasPermission(itemDto, allowPermissions, user)
 
     if (!canModify) {
@@ -588,6 +623,7 @@ export class DirectoryService {
       commandDto,
       opts,
     )
+
     return new DirectoryDataEntity(item as DirectoryDataEntity)
   }
 
@@ -613,7 +649,6 @@ export class DirectoryService {
     ]
     const itemDto = { pk: data.pk, sk: data.sk }
     const user = { email: updateDto.email, tenant: tenant }
-
     const canModify = await this.hasPermission(itemDto, allowPermissions, user)
 
     if (!canModify) {
@@ -634,6 +669,7 @@ export class DirectoryService {
       commandDto,
       opts,
     )
+
     return new DirectoryDataEntity(item as DirectoryDataEntity)
   }
 
@@ -658,8 +694,8 @@ export class DirectoryService {
     const allowPermissions = [FileRole.DELETE, FileRole.TAKE_OWNERSHIP]
     const itemDto = { pk: data.pk, sk: data.sk }
     const user = { email: queryDto.email, tenant: tenant }
-
     const canModify = await this.hasPermission(itemDto, allowPermissions, user)
+
     if (!canModify) {
       throw new ForbiddenException(
         'You do not have permission to modify this item.',

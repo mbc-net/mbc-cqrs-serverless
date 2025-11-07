@@ -9,12 +9,14 @@ import {
   Param,
   Patch,
   Post,
+  Put,
   Query,
 } from '@nestjs/common'
 import { ApiTags } from '@nestjs/swagger'
 
 import { DirectoryService } from './directory.service'
 import { DirectoryFileService } from './directory-file.service'
+import { DirectoryMoveDto } from './dto'
 import { DirectoryCopyDto } from './dto/directory-copy.dto'
 import { DirectoryCreateDto } from './dto/directory-create.dto'
 import { DirectoryDetailDto } from './dto/directory-detail.dto'
@@ -72,7 +74,7 @@ export class DirectoryController {
   async restore(
     @INVOKE_CONTEXT() invokeContext: IInvoke,
     @DetailKeys() detailDto: DetailDto,
-    @Query() queryDto: DirectoryDetailDto,
+    @Body() queryDto: DirectoryDetailDto,
     @Param('version') version: string,
   ): Promise<DirectoryDataEntity> {
     return this.directoryService.restoreHistoryItem(
@@ -81,6 +83,17 @@ export class DirectoryController {
       queryDto,
       { invokeContext },
     )
+  }
+
+  @Put('/:id/restore')
+  async restoreTemporary(
+    @INVOKE_CONTEXT() invokeContext: IInvoke,
+    @DetailKeys() detailDto: DetailDto,
+    @Body() queryDto: DirectoryDetailDto,
+  ): Promise<DirectoryDataEntity> {
+    return this.directoryService.restoreTemporary(detailDto, queryDto, {
+      invokeContext,
+    })
   }
 
   @Patch('/:id')
@@ -109,8 +122,18 @@ export class DirectoryController {
     @DetailKeys() detailDto: DetailDto,
     @Body() updateDto: DirectoryCopyDto,
   ) {
-    this.logger.debug('renameDto:', updateDto)
+    this.logger.debug('copyDto:', updateDto)
     return this.directoryService.copy(detailDto, updateDto, { invokeContext })
+  }
+
+  @Patch('/:id/move')
+  async move(
+    @INVOKE_CONTEXT() invokeContext: IInvoke,
+    @DetailKeys() detailDto: DetailDto,
+    @Body() updateDto: DirectoryMoveDto,
+  ) {
+    this.logger.debug('moveDto:', updateDto)
+    return this.directoryService.move(detailDto, updateDto, { invokeContext })
   }
 
   @Delete('/:id')
