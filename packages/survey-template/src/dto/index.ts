@@ -1,3 +1,6 @@
+export * from './survey-answer-attributes.dto'
+export * from './survey-answer-command.dto'
+export * from './survey-answer-create.dto'
 export * from './survey-template-attributes.dto'
 export * from './survey-template-command.dto'
 export * from './survey-template-create.dto'
