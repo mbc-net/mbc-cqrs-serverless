@@ -1,4 +1,4 @@
-import { ApiProperty } from '@nestjs/swagger'
+import { ApiProperty, PartialType } from '@nestjs/swagger'
 import { Type } from 'class-transformer'
 import {
   IsBoolean,
@@ -8,6 +8,10 @@ import {
 } from 'class-validator'
 
 import { SurveyTemplateAttributes } from './survey-template-attributes.dto'
+
+export class UpdateSurveyTemplateAttributes extends PartialType(
+  SurveyTemplateAttributes,
+) {}
 
 export class SurveyTemplateUpdateDto {
   @ApiProperty({
@@ -33,10 +37,10 @@ export class SurveyTemplateUpdateDto {
       'Survey template attributes including description and survey template structure',
     required: true,
   })
-  @Type(() => SurveyTemplateAttributes)
+  @Type(() => UpdateSurveyTemplateAttributes)
   @ValidateNested()
   @IsOptional()
-  attributes?: SurveyTemplateAttributes
+  attributes?: UpdateSurveyTemplateAttributes
 
   constructor(partial: Partial<SurveyTemplateUpdateDto>) {
     Object.assign(this, partial)

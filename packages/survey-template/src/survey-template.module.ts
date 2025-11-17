@@ -1,23 +1,3 @@
-// import { CommandModule } from '@mbc-cqrs-serverless/core'
-// import { Module } from '@nestjs/common'
-
-// import { SurveyTemplateDataSyncRdsHandler } from './handler/survey-template-rds.handler'
-// import { SurveyTemplateController } from './survey-template.controller'
-// import { SurveyTemplateService } from './survey-template.service'
-
-// @Module({
-//   imports: [
-//     CommandModule.register({
-//       tableName: 'survey',
-//       dataSyncHandlers: [SurveyTemplateDataSyncRdsHandler],
-//     }),
-//   ],
-//   controllers: [SurveyTemplateController],
-//   providers: [SurveyTemplateService],
-//   exports: [SurveyTemplateService],
-// })
-// export class SurveyTemplateModule {}
-
 import {
   CommandModule,
   DataStoreModule,
@@ -25,7 +5,10 @@ import {
 } from '@mbc-cqrs-serverless/core'
 import { DynamicModule, Module } from '@nestjs/common'
 
+import { SurveyAnswerDataSyncRdsHandler } from './handler/survey-answer-rds.handler'
 import { SurveyTemplateDataSyncRdsHandler } from './handler/survey-template-rds.handler'
+import { SurveyAnswerController } from './survey-answer.controller'
+import { SurveyAnswerService } from './survey-answer.service'
 import { SurveyTemplateController } from './survey-template.controller'
 import {
   ConfigurableModuleClass,
@@ -36,8 +19,8 @@ import { SurveyTemplateService } from './survey-template.service'
 
 @Module({
   imports: [DataStoreModule, QueueModule],
-  providers: [SurveyTemplateService],
-  exports: [SurveyTemplateService],
+  providers: [SurveyTemplateService, SurveyAnswerService],
+  exports: [SurveyTemplateService, SurveyAnswerService],
 })
 export class SurveyTemplateModule extends ConfigurableModuleClass {
   static register(options: typeof OPTIONS_TYPE): DynamicModule {
@@ -52,7 +35,7 @@ export class SurveyTemplateModule extends ConfigurableModuleClass {
       if (!module.controllers) {
         module.controllers = []
       }
-      module.controllers.push(SurveyTemplateController)
+      module.controllers.push(SurveyTemplateController, SurveyAnswerController)
 
       if (!module.providers) {
         module.providers = []
@@ -71,6 +54,7 @@ export class SurveyTemplateModule extends ConfigurableModuleClass {
           tableName: 'survey',
           dataSyncHandlers: options?.dataSyncHandlers ?? [
             SurveyTemplateDataSyncRdsHandler,
+            SurveyAnswerDataSyncRdsHandler,
           ],
         }),
       )

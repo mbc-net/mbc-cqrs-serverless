@@ -1,16 +1,18 @@
 import {
   CommandModel,
   IDataSyncHandler,
+  KEY_SEPARATOR,
   removeSortKeyVersion,
 } from '@mbc-cqrs-serverless/core'
 import { Inject, Injectable, Logger } from '@nestjs/common'
 
-import { SURVEY_TEMPLATE_SK_PREFIX } from '../keys'
+import { SurveyAnswerAttributes } from '../dto/survey-answer-attributes.dto'
+import { SURVEY_ANSWER_SK_PREFIX } from '../keys'
 import { PRISMA_SERVICE } from '../survey-template.module-definition'
 
 @Injectable()
-export class SurveyTemplateDataSyncRdsHandler implements IDataSyncHandler {
-  private readonly logger = new Logger(SurveyTemplateDataSyncRdsHandler.name)
+export class SurveyAnswerDataSyncRdsHandler implements IDataSyncHandler {
+  private readonly logger = new Logger(SurveyAnswerDataSyncRdsHandler.name)
 
   constructor(
     @Inject(PRISMA_SERVICE)
@@ -19,9 +21,10 @@ export class SurveyTemplateDataSyncRdsHandler implements IDataSyncHandler {
 
   async up(cmd: CommandModel): Promise<any> {
     this.logger.debug(cmd)
-    if (!cmd.sk.startsWith(SURVEY_TEMPLATE_SK_PREFIX)) return
+    if (!cmd.sk.startsWith(`${SURVEY_ANSWER_SK_PREFIX}${KEY_SEPARATOR}`)) return
     const sk = removeSortKeyVersion(cmd.sk)
-    await this.prismaService.surveyTemplate.upsert({
+    const attrs = cmd.attributes as SurveyAnswerAttributes
+    await this.prismaService.surveyAnswer.upsert({
       where: {
         id: cmd.id,
       },
@@ -30,13 +33,12 @@ export class SurveyTemplateDataSyncRdsHandler implements IDataSyncHandler {
         name: cmd.name,
         version: cmd.version,
         seq: cmd.seq,
-        description: cmd.attributes?.description,
-        surveyTemplate: cmd.attributes?.surveyTemplate,
-        additionalProperties: cmd.attributes?.additionalProperties || {},
         isDeleted: cmd.isDeleted || false,
         updatedAt: cmd.updatedAt,
         updatedBy: cmd.updatedBy,
         updatedIp: cmd.updatedIp,
+        attributes: attrs.answer,
+        surveyId: attrs.surveyId,
       },
       create: {
         id: cmd.id,
@@ -49,15 +51,16 @@ export class SurveyTemplateDataSyncRdsHandler implements IDataSyncHandler {
         version: cmd.version,
         tenantCode: cmd.tenantCode,
         seq: cmd.seq,
-        description: cmd.attributes?.description,
-        surveyTemplate: cmd.attributes?.surveyTemplate,
-        additionalProperties: cmd.attributes?.additionalProperties || {},
         createdAt: cmd.createdAt,
         createdBy: cmd.createdBy,
         createdIp: cmd.createdIp,
         updatedAt: cmd.updatedAt,
         updatedBy: cmd.updatedBy,
         updatedIp: cmd.updatedIp,
+
+        attributes: attrs.answer,
+        surveyId: attrs.surveyId,
+        email: attrs.email,
       },
     })
   }

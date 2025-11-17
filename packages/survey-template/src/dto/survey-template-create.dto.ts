@@ -1,8 +1,13 @@
-import { ApiProperty } from '@nestjs/swagger'
+import { ApiProperty, PickType } from '@nestjs/swagger'
 import { Type } from 'class-transformer'
 import { IsNotEmpty, IsString, ValidateNested } from 'class-validator'
 
 import { SurveyTemplateAttributes } from './survey-template-attributes.dto'
+
+export class CreateSurveyTemplateAttributes extends PickType(
+  SurveyTemplateAttributes,
+  ['surveyTemplate', 'description'],
+) {}
 
 export class SurveyTemplateCreateDto {
   @ApiProperty({
@@ -19,10 +24,10 @@ export class SurveyTemplateCreateDto {
       'Survey template attributes including description and survey template structure',
     required: true,
   })
-  @Type(() => SurveyTemplateAttributes)
+  @Type(() => CreateSurveyTemplateAttributes)
   @ValidateNested()
   @IsNotEmpty()
-  attributes: SurveyTemplateAttributes
+  attributes: CreateSurveyTemplateAttributes
 
   constructor(partial: Partial<SurveyTemplateCreateDto>) {
     Object.assign(this, partial)
