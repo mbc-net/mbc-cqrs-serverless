@@ -113,7 +113,11 @@ export class SurveyTemplateService {
       type: SURVEY_TEMPLATE_SK_PREFIX,
       version: VERSION_FIRST,
       name: createDto.name,
-      attributes: createDto.attributes,
+      attributes: {
+        ...createDto.attributes,
+        description: '',
+        additionalProperties: undefined,
+      },
     }
 
     this.logger.debug('commandService:' + this.commandService.tableName)
