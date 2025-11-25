@@ -28,6 +28,8 @@ import { HistoryService } from './history.service'
 import { DataSyncCommandSfnName } from '../command-events/sfn-name.enum'
 import { TtlService } from './ttl.service'
 import { SnsClientFactory } from '../queue/sns-client-factory'
+import { SFNClient } from '@aws-sdk/client-sfn'
+import { StepFunctionService } from '../step-func/step-function.service'
 
 export class MockedHandler implements IDataSyncHandler {
   async up(cmd: CommandModel): Promise<any> {
@@ -137,6 +139,7 @@ describe('DataSyncCommandSfnEventHandler', () => {
     let commandEventHandler: CommandEventHandler
     const dynamoDBMock = mockClient(DynamoDBClient)
     const snsMock = mockClient(SNSClient)
+    const sfnMock = mockClient(SFNClient)
 
     beforeEach(async () => {
       const moduleRef = await Test.createTestingModule({
@@ -151,6 +154,11 @@ describe('DataSyncCommandSfnEventHandler', () => {
           MockedHandler,
           TtlService,
           SnsClientFactory,
+          StepFunctionService,
+          {
+            provide: SFNClient,
+            useValue: sfnMock,
+          },
           {
             provide: MODULE_OPTIONS_TOKEN,
             useValue: {
@@ -191,6 +199,7 @@ describe('DataSyncCommandSfnEventHandler', () => {
       jest.clearAllMocks()
       dynamoDBMock.reset()
       snsMock.reset()
+      sfnMock.reset()
     })
 
     it('should return result = 0 when executing the correct check version event', async () => {
@@ -592,7 +601,7 @@ describe('DataSyncCommandSfnEventHandler', () => {
         }),
       })
 
-      expect(dynamoDBMock).toHaveReceivedNthCommandWith(2, UpdateItemCommand, {
+      expect(dynamoDBMock).toHaveReceivedNthCommandWith(3, UpdateItemCommand, {
         TableName: 'env-app_name-table_name-command',
         Key: { pk: { S: 'tenantCode#test' }, sk: { S: '1726027976@1' } },
         ExpressionAttributeValues: expect.objectContaining({
