@@ -50,7 +50,7 @@
     "@aws-sdk/util-create-request": "^3.468.0",
     "@aws-sdk/util-dynamodb": "^3.360.0",
     "@golevelup/ts-jest": "^0.5.5",
-    "@nestjs/cli": "^10.2.1",
+    "@nestjs/cli": "^11.0.12",
     "@nestjs/schematics": "^10.0.3",
     "@nestjs/testing": "^10.3.0",
     "@smithy/util-stream": "^3.1.6",

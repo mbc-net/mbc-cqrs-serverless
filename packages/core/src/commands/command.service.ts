@@ -489,4 +489,27 @@ export class CommandService implements OnModuleInit, ICommandService {
     this.logger.debug('updateTtl::', command)
     return await this.dynamoDbService.putItem(this.tableName, command)
   }
+
+  async updateTaskToken(key: DetailKey, token: string) {
+    this.logger.debug(`Saving taskToken for ${key.pk}#${key.sk}`)
+
+    return await this.dynamoDbService.updateItem(this.tableName, key, {
+      set: { taskToken: token },
+    })
+  }
+
+  async getNextCommand(currentKey: DetailKey): Promise<CommandModel> {
+    this.logger.debug(
+      `Getting next command for ${currentKey.pk}#${currentKey.sk}`,
+    )
+
+    const nextKey = {
+      pk: currentKey.pk,
+      sk: addSortKeyVersion(
+        removeSortKeyVersion(currentKey.sk),
+        getSortKeyVersion(currentKey.sk) + 1,
+      ),
+    }
+    return await this.dynamoDbService.getItem(this.tableName, nextKey)
+  }
 }
