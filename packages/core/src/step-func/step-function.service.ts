@@ -40,10 +40,15 @@ export class StepFunctionService {
       this.logger.debug(
         `Resuming execution with token: ${taskToken.substring(0, 10)}...`,
       )
+
+      const wrappedOutput = {
+        Payload: [[output]],
+      }
+
       return await this.client.send(
         new SendTaskSuccessCommand({
           taskToken: taskToken,
-          output: JSON.stringify(output),
+          output: JSON.stringify(wrappedOutput),
         }),
       )
     } catch (error) {
