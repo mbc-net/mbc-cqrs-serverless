@@ -10,4 +10,5 @@ export interface CommandModel extends CommandInputModel {
   updatedBy?: string
   createdIp?: string
   updatedIp?: string
+  taskToken?: string
 }

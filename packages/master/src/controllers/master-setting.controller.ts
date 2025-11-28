@@ -38,6 +38,8 @@ import { MasterSettingService } from '../services/master-setting.service'
 @Controller('api/master-setting')
 @ApiTags('master-settings')
 export class MasterSettingController {
+  private readonly logger = new Logger(MasterSettingController.name)
+
   constructor(private readonly masterSettingService: MasterSettingService) {}
 
   @Get('/list')

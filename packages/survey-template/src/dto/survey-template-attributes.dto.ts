@@ -38,4 +38,18 @@ export class SurveyTemplateAttributes {
   })
   @IsObject()
   surveyTemplate: object
+
+  // additional properties: for example store question link with metabase
+  @ApiProperty({
+    description: 'Additional properties',
+    example: {
+      metabaseQuestion: {
+        questionId: '123',
+        questionName: 'Question Name',
+        questionSlug: 'text_question',
+      },
+    },
+  })
+  @IsObject()
+  additionalProperties: object
 }

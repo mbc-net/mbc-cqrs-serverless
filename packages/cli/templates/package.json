@@ -47,7 +47,7 @@
   "devDependencies": {
     "@golevelup/ts-jest": "^0.6.1",
     "@mbc-cqrs-serverless/cli": "",
-    "@nestjs/cli": "^11.0.10",
+    "@nestjs/cli": "^11.0.11",
     "@nestjs/common": "^10.3.0",
     "@nestjs/core": "^10.3.0",
     "@nestjs/schematics": "^10.0.3",
