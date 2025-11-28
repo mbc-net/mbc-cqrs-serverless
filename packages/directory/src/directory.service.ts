@@ -1,4 +1,4 @@
-import { CopyObjectCommand } from '@aws-sdk/client-s3'
+import { CopyObjectCommand, DeleteObjectCommand } from '@aws-sdk/client-s3'
 import {
   CommandPartialInputModel,
   CommandService,
@@ -35,7 +35,11 @@ import { DirectoryCreateDto } from './dto/directory-create.dto'
 import { DirectoryDetailDto } from './dto/directory-detail.dto'
 import { DirectoryMoveDto } from './dto/directory-move.dto'
 import { DirectoryRenameDto } from './dto/directory-rename.dto'
-import { DirectoryUpdateDto } from './dto/directory-update.dto'
+import {
+  DirectoryUpdateDto,
+  DirectoryUpdatePermissionAttributes,
+  DirectoryUpdatePermissionDto,
+} from './dto/directory-update.dto'
 import { DynamoService } from './dynamodb.service'
 import { DirectoryDataEntity } from './entity/directory-data.entity'
 import { DirectoryDataListEntity } from './entity/directory-data-list.entity'
@@ -650,6 +654,75 @@ export class DirectoryService {
     return new DirectoryDataEntity(item as DirectoryDataEntity)
   }
 
+  async updatePermission(
+    detailDto: DetailDto,
+    updateDto: DirectoryUpdatePermissionDto,
+    opts: { invokeContext: IInvoke },
+  ): Promise<DirectoryDataEntity> {
+    const userContext = getUserContext(opts.invokeContext)
+    const { tenantCode: tenant } = userContext
+
+    const { tenantCode } = parsePk(detailDto.pk)
+
+    if (userContext.tenantCode !== tenantCode) {
+      throw new BadRequestException('Invalid tenant code')
+    }
+
+    const data = (await this.dataService.getItem(
+      detailDto,
+    )) as DirectoryDataEntity
+
+    if (!data) {
+      throw new NotFoundException('Directory not found!')
+    }
+
+    const allowPermissions = [
+      FileRole.CHANGE_PERMISSION,
+      FileRole.TAKE_OWNERSHIP,
+    ]
+
+    if (!updateDto.attributes?.permission) {
+      allowPermissions.push(FileRole.WRITE)
+    }
+
+    const itemDto = {
+      pk: data.pk,
+      sk: data.sk,
+    }
+
+    const attrs = updateDto.attributes as DirectoryUpdatePermissionAttributes
+    const user = {
+      email: updateDto.email,
+      tenant: tenant,
+    }
+
+    const canModify = await this.hasPermission(itemDto, allowPermissions, user)
+
+    if (!canModify) {
+      throw new ForbiddenException(
+        'You do not have permission to modify this item.',
+      )
+    }
+
+    const commandDto = new DirectoryCommandDto({
+      pk: data.pk,
+      sk: data.sk,
+      version: data.version,
+      name: data.name,
+      attributes: {
+        ...data.attributes,
+        inheritance: attrs.inheritance,
+        permission: attrs.permission,
+      },
+    })
+
+    const item = await this.commandService.publishPartialUpdateAsync(
+      commandDto,
+      opts,
+    )
+    return new DirectoryDataEntity(item as DirectoryDataEntity)
+  }
+
   async rename(
     detailDto: DetailDto,
     updateDto: DirectoryRenameDto,
@@ -730,6 +803,67 @@ export class DirectoryService {
       sk: data.sk,
       version: data.version,
       isDeleted: true,
+    }
+    const item = await this.commandService.publishPartialUpdateAsync(
+      commandDto,
+      opts,
+    )
+
+    return new DirectoryDataEntity(item as any)
+  }
+
+  async removeFile(
+    key: DetailDto,
+    opts: { invokeContext: IInvoke },
+    queryDto: DirectoryDetailDto,
+  ) {
+    const userContext = getUserContext(opts.invokeContext)
+    const { tenantCode: tenant } = userContext
+    const { tenantCode } = parsePk(key.pk)
+
+    if (userContext.tenantCode !== tenantCode) {
+      throw new BadRequestException('Invalid tenant code')
+    }
+
+    const data = (await this.dataService.getItem(key)) as DirectoryDataEntity
+    if (!data) {
+      throw new NotFoundException()
+    }
+
+    const allowPermissions = [FileRole.DELETE, FileRole.TAKE_OWNERSHIP]
+    const itemDto = {
+      pk: data.pk,
+      sk: data.sk,
+    }
+    const user = {
+      email: queryDto.email,
+      tenant: tenant,
+    }
+
+    const canModify = await this.hasPermission(itemDto, allowPermissions, user)
+    if (!canModify) {
+      throw new ForbiddenException(
+        'You do not have permission to modify this item.',
+      )
+    }
+
+    if (data.attributes.s3Key) {
+      await this.s3Service.client.send(
+        new DeleteObjectCommand({
+          Bucket: this.s3Service.privateBucket,
+          Key: data.attributes.s3Key,
+        }),
+      )
+    }
+
+    const commandDto: CommandPartialInputModel = {
+      pk: data.pk,
+      sk: data.sk,
+      version: data.version,
+      isDeleted: true,
+      attributes: {
+        s3Key: null,
+      },
     }
     const item = await this.commandService.publishPartialUpdateAsync(
       commandDto,

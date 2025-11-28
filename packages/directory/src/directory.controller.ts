@@ -21,7 +21,10 @@ import { DirectoryCopyDto } from './dto/directory-copy.dto'
 import { DirectoryCreateDto } from './dto/directory-create.dto'
 import { DirectoryDetailDto } from './dto/directory-detail.dto'
 import { DirectoryRenameDto } from './dto/directory-rename.dto'
-import { DirectoryUpdateDto } from './dto/directory-update.dto'
+import {
+  DirectoryUpdateDto,
+  DirectoryUpdatePermissionDto,
+} from './dto/directory-update.dto'
 import { GenUploadFileDto } from './dto/upload-file.dto'
 import { GenViewFileDto } from './dto/view-file.dto'
 import { DirectoryDataEntity } from './entity/directory-data.entity'
@@ -111,6 +114,18 @@ export class DirectoryController {
     return this.directoryService.update(detailDto, updateDto, { invokeContext })
   }
 
+  @Patch('/:id/permission')
+  async updatePermission(
+    @INVOKE_CONTEXT() invokeContext: IInvoke,
+    @DetailKeys() detailDto: DetailDto,
+    @Body() updateDto: DirectoryUpdatePermissionDto,
+  ) {
+    this.logger.debug('updateDto:', updateDto)
+    return this.directoryService.updatePermission(detailDto, updateDto, {
+      invokeContext,
+    })
+  }
+
   @Patch('/:id/rename')
   async rename(
     @INVOKE_CONTEXT() invokeContext: IInvoke,
@@ -148,6 +163,19 @@ export class DirectoryController {
     @Query() queryDto: DirectoryDetailDto,
   ) {
     return this.directoryService.remove(detailDto, { invokeContext }, queryDto)
+  }
+
+  @Delete('/:id/bin')
+  async removeFile(
+    @INVOKE_CONTEXT() invokeContext: IInvoke,
+    @DetailKeys() detailDto: DetailDto,
+    @Query() queryDto: DirectoryDetailDto,
+  ) {
+    return this.directoryService.removeFile(
+      detailDto,
+      { invokeContext },
+      queryDto,
+    )
   }
 
   @Post('/file/view')
