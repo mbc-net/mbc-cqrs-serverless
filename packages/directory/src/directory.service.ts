@@ -15,12 +15,14 @@ import { KEY_SEPARATOR } from '@mbc-cqrs-serverless/core'
 import {
   BadRequestException,
   ForbiddenException,
+  Inject,
   Injectable,
   Logger,
   NotFoundException,
 } from '@nestjs/common'
 import { ulid } from 'ulid'
 
+import { PRISMA_SERVICE } from './directory.module-definition'
 import {
   DirectoryAttributes,
   FilePermission,
@@ -44,6 +46,8 @@ export class DirectoryService {
   private readonly logger = new Logger(DirectoryService.name)
 
   constructor(
+    @Inject(PRISMA_SERVICE)
+    private readonly prismaService: any,
     private readonly commandService: CommandService,
     private readonly dataService: DataService,
     private readonly s3Service: S3Service,
@@ -106,6 +110,28 @@ export class DirectoryService {
     const item = await this.commandService.publishAsync(directory, opts)
 
     return new DirectoryDataEntity(item as DirectoryDataEntity)
+  }
+
+  async getTenantFileSizeSummary() {
+    const fileSizeSummary = await this.prismaService.directory.groupBy({
+      by: ['tenantCode'],
+
+      _sum: {
+        fileSize: true,
+      },
+
+      _count: {
+        _all: true,
+      },
+
+      orderBy: {
+        _sum: {
+          fileSize: 'desc',
+        },
+      },
+    })
+
+    return fileSizeSummary
   }
 
   async copy(

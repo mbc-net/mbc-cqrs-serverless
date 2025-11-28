@@ -48,6 +48,11 @@ export class DirectoryController {
     return this.directoryService.create(createDto, { invokeContext })
   }
 
+  @Get('/summary')
+  async getTenantFileSizeSummary() {
+    return this.directoryService.getTenantFileSizeSummary()
+  }
+
   @Get('/:id')
   async findOne(
     @INVOKE_CONTEXT() invokeContext: IInvoke,
