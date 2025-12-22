@@ -5,7 +5,7 @@ import serverlessExpress from '@codegenie/serverless-express'
 import { ClassSerializerInterceptor, ValidationPipe } from '@nestjs/common'
 import { ConfigService } from '@nestjs/config'
 import { HttpAdapterHost, NestFactory, Reflector } from '@nestjs/core'
-import { Callback, Context, Handler } from 'aws-lambda'
+import { Context, Handler } from 'aws-lambda'
 import * as express from 'express'
 import { firstValueFrom, ReplaySubject } from 'rxjs'
 
@@ -125,13 +125,30 @@ async function bootstrap(opts: AppModuleOptions) {
   })
 }
 
+/**
+ * Async handler type for Node.js 24 compatibility
+ *
+ * Node.js 24 does not support callback-based handlers.
+ * This type represents an async handler that returns a Promise.
+ */
+type AsyncHandler = (event: any, context: Context) => Promise<any>
+
+/**
+ * Create Lambda handler
+ *
+ * Node.js 24 compatibility:
+ * - Handler signature is (event, context) only
+ * - callback parameter is not used (not supported in Node.js 24)
+ *
+ * @see https://docs.aws.amazon.com/lambda/latest/dg/nodejs-handler.html
+ */
 export function createHandler(opts: AppModuleOptions): Handler {
   // Do not wait for lambdaHandler to be called before bootstraping Nest.
   bootstrap(opts).then((server) => serverSubject.next(server))
 
-  return async (event: any, context: Context, callback: Callback) => {
+  return async (event: any, context: Context) => {
     // Wait for bootstrap to finish, then start handling requests.
-    const server = await firstValueFrom(serverSubject)
-    return server(event, context, callback)
+    const server = (await firstValueFrom(serverSubject)) as AsyncHandler
+    return server(event, context)
   }
 }
