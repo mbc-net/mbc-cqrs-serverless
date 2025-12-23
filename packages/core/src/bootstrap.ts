@@ -146,7 +146,7 @@ export function createHandler(opts: AppModuleOptions): Handler {
    */
   return async (event: any, context: Context) => {
     // Wait for bootstrap to finish, then start handling requests.
-    const server = await firstValueFrom(serverSubject)) as AsyncHandler
+    const server = await firstValueFrom(serverSubject)
     return server(event, context, null)
   }
 }
