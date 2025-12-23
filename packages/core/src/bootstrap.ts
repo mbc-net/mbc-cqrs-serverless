@@ -109,7 +109,7 @@ async function bootstrap(opts: AppModuleOptions) {
 
   return serverlessExpress({
     app: expressApp,
-    // resolutionMode: 'CALLBACK',
+    resolutionMode: 'PROMISE',
     eventSourceRoutes: {
       AWS_SNS: '/event/sns',
       AWS_SQS: '/event/sqs',
@@ -126,14 +126,6 @@ async function bootstrap(opts: AppModuleOptions) {
 }
 
 /**
- * Async handler type for Node.js 24 compatibility
- *
- * Node.js 24 does not support callback-based handlers.
- * This type represents an async handler that returns a Promise.
- */
-type AsyncHandler = (event: any, context: Context) => Promise<any>
-
-/**
  * Create Lambda handler
  *
  * Node.js 24 compatibility:
@@ -146,9 +138,15 @@ export function createHandler(opts: AppModuleOptions): Handler {
   // Do not wait for lambdaHandler to be called before bootstraping Nest.
   bootstrap(opts).then((server) => serverSubject.next(server))
 
+  /**
+   * Async handler type for Node.js 24 compatibility
+   *
+   * Node.js 24 does not support callback-based handlers.
+   * This type represents an async handler that returns a Promise.
+   */
   return async (event: any, context: Context) => {
     // Wait for bootstrap to finish, then start handling requests.
-    const server = (await firstValueFrom(serverSubject)) as AsyncHandler
-    return server(event, context)
+    const server = await firstValueFrom(serverSubject)) as AsyncHandler
+    return server(event, context, null)
   }
 }
