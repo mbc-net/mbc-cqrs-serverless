@@ -66,7 +66,7 @@ export class SequencesService implements ISequenceService {
     const sk = `${dto.typeCode}${KEY_SEPARATOR}${rotateVal}`
 
     const sourceIp =
-      options?.invokeContext?.event?.requestContext?.http?.sourceIp
+      options?.invokeContext?.event?.requestContext?.http?.sourceIp || 'unknown'
     const userContext = getUserContext(options.invokeContext)
     const userId = userContext.userId || 'system'
     const now = new Date()
@@ -153,7 +153,7 @@ export class SequencesService implements ISequenceService {
       startMonth,
     })
     const sourceIp =
-      options?.invokeContext?.event?.requestContext?.http?.sourceIp
+      options?.invokeContext?.event?.requestContext?.http?.sourceIp || 'unknown'
     const userContext = options
       ? getUserContext(options.invokeContext)
       : undefined
@@ -239,7 +239,7 @@ export class SequencesService implements ISequenceService {
       startMonth,
     })
     const sourceIp =
-      options?.invokeContext?.event?.requestContext?.http?.sourceIp
+      options?.invokeContext?.event?.requestContext?.http?.sourceIp || 'unknown'
     const userContext = options
       ? getUserContext(options.invokeContext)
       : undefined
