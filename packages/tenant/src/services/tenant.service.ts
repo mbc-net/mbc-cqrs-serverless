@@ -119,7 +119,10 @@ export class TenantService implements ITenantService {
         pk,
         sk,
         name: dto.name,
-        attributes: dto.attributes,
+        attributes: {
+          ...data.attributes,
+          ...dto.attributes,
+        },
         version: data.version,
       },
       context,
