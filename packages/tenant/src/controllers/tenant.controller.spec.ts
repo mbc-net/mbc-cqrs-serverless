@@ -1,3 +1,18 @@
+/**
+ * TenantController Test Suite
+ *
+ * Tests the REST API endpoints for tenant management.
+ * Verifies controller-service integration and error handling.
+ *
+ * Endpoints tested:
+ * - GET tenant: Retrieve tenant by key
+ * - POST common tenant: Create shared tenant
+ * - POST tenant: Create organization tenant
+ * - PUT tenant: Update tenant details
+ * - DELETE tenant: Soft delete tenant
+ * - POST group: Add user group to tenant
+ * - PUT groups: Customize tenant settings groups
+ */
 import { createMock } from '@golevelup/ts-jest'
 import { Test, TestingModule } from '@nestjs/testing'
 import { DetailDto, IInvoke } from '@mbc-cqrs-serverless/core'
@@ -58,7 +73,9 @@ describe('TenantController', () => {
     expect(controller).toBeDefined()
   })
 
+  /** Tests for GET /tenant endpoint */
   describe('getTenant', () => {
+    /** Successfully retrieves tenant data by pk/sk */
     it('should get tenant successfully', async () => {
       const dto: DetailDto = { pk: 'test-pk', sk: 'test-sk' }
       const expectedResult = {
@@ -76,6 +93,7 @@ describe('TenantController', () => {
       expect(result).toEqual(expectedResult)
     })
 
+    /** Propagates service errors (e.g., tenant not found) */
     it('should handle service errors', async () => {
       const dto: DetailDto = { pk: 'test-pk', sk: 'test-sk' }
       const error = new Error('Tenant not found')
@@ -86,7 +104,9 @@ describe('TenantController', () => {
     })
   })
 
+  /** Tests for POST /tenant/common endpoint */
   describe('createTenantCommon', () => {
+    /** Creates common tenant and returns created entity */
     it('should create common tenant successfully', async () => {
       const dto: CommonTenantCreateDto = {
         name: 'Common Tenant',
@@ -109,6 +129,7 @@ describe('TenantController', () => {
       expect(result).toEqual(expectedResult)
     })
 
+    /** Handles and propagates creation errors */
     it('should handle creation errors', async () => {
       const dto: CommonTenantCreateDto = {
         name: 'Common Tenant',
@@ -124,7 +145,9 @@ describe('TenantController', () => {
     })
   })
 
+  /** Tests for POST /tenant endpoint */
   describe('createTenant', () => {
+    /** Creates organization tenant with unique code */
     it('should create tenant successfully', async () => {
       const dto: TenantCreateDto = {
         name: 'New Tenant',
@@ -148,6 +171,7 @@ describe('TenantController', () => {
       expect(result).toEqual(expectedResult)
     })
 
+    /** Handles duplicate code or validation errors */
     it('should handle creation errors', async () => {
       const dto: TenantCreateDto = {
         name: 'New Tenant',
@@ -164,7 +188,9 @@ describe('TenantController', () => {
     })
   })
 
+  /** Tests for PUT /tenant endpoint */
   describe('updateTenant', () => {
+    /** Updates tenant and increments version */
     it('should update tenant successfully', async () => {
       const key: DetailDto = { pk: 'test-pk', sk: 'test-sk' }
       const dto: TenantUpdateDto = { name: 'Updated Tenant' }
@@ -185,6 +211,7 @@ describe('TenantController', () => {
       expect(result).toEqual(expectedResult)
     })
 
+    /** Handles version conflict or not found errors */
     it('should handle update errors', async () => {
       const key: DetailDto = { pk: 'test-pk', sk: 'test-sk' }
       const dto: TenantUpdateDto = { name: 'Updated Tenant' }
@@ -198,7 +225,9 @@ describe('TenantController', () => {
     })
   })
 
+  /** Tests for DELETE /tenant endpoint */
   describe('deleteTenant', () => {
+    /** Soft deletes tenant (sets isDeleted=true) */
     it('should delete tenant successfully', async () => {
       const dto: DetailDto = { pk: 'test-pk', sk: 'test-sk' }
       const expectedResult = {
@@ -218,6 +247,7 @@ describe('TenantController', () => {
       expect(result).toEqual(expectedResult)
     })
 
+    /** Handles not found or permission errors */
     it('should handle deletion errors', async () => {
       const dto: DetailDto = { pk: 'test-pk', sk: 'test-sk' }
       const error = new Error('Deletion failed')
@@ -230,7 +260,9 @@ describe('TenantController', () => {
     })
   })
 
+  /** Tests for POST /tenant/group endpoint */
   describe('addGroup', () => {
+    /** Adds user group with role to tenant */
     it('should add tenant group successfully', async () => {
       const dto: TenantGroupAddDto = {
         tenantCode: 'test-tenant',
@@ -254,6 +286,7 @@ describe('TenantController', () => {
       expect(result).toEqual(expectedResult)
     })
 
+    /** Handles invalid group or permission errors */
     it('should handle group addition errors', async () => {
       const dto: TenantGroupAddDto = {
         tenantCode: 'test-tenant',
@@ -270,7 +303,9 @@ describe('TenantController', () => {
     })
   })
 
+  /** Tests for PUT /tenant/groups endpoint */
   describe('customizeSettingGroups', () => {
+    /** Updates tenant's setting groups configuration */
     it('should customize setting groups successfully', async () => {
       const dto: TenantGroupUpdateDto = {
         tenantCode: 'test-tenant',
@@ -299,6 +334,7 @@ describe('TenantController', () => {
       expect(result).toEqual(expectedResult)
     })
 
+    /** Handles invalid settings or permission errors */
     it('should handle customization errors', async () => {
       const dto: TenantGroupUpdateDto = {
         tenantCode: 'test-tenant',
