@@ -3,6 +3,21 @@ import { IsBoolean, IsNumber, IsOptional, IsString } from 'class-validator'
 
 import { CommandInputModel } from './command-input-model.interface'
 
+/**
+ * Base DTO class for command input validation.
+ * Implements CommandInputModel with class-validator decorators.
+ *
+ * @example
+ * ```typescript
+ * class CreateOrderDto extends CommandDto {
+ *   @IsString()
+ *   customerId: string;
+ *
+ *   @IsNumber()
+ *   amount: number;
+ * }
+ * ```
+ */
 export class CommandDto implements CommandInputModel {
   @ApiProperty()
   @IsString()
