@@ -4,6 +4,13 @@ import { IsOptional, IsString } from 'class-validator'
 
 import { PaginateDto } from './paginate.dto'
 
+/**
+ * DTO for search operations with filtering and sorting.
+ * Extends PaginateDto with search-specific parameters.
+ *
+ * @example
+ * // GET /items?keyword=test&pk=ORDER&orderBys=createdAt:desc
+ */
 export class SearchDto extends PaginateDto {
   /**
    * search keyword
