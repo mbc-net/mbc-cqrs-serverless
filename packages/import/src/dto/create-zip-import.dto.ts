@@ -1,4 +1,4 @@
-import { IsNotEmpty, IsString } from 'class-validator'
+import { IsArray, IsNotEmpty, IsOptional, IsString } from 'class-validator'
 
 export class CreateZipImportDto {
   @IsString()
@@ -12,4 +12,8 @@ export class CreateZipImportDto {
   @IsString()
   @IsNotEmpty()
   tenantCode: string
+
+  @IsArray()
+  @IsOptional()
+  sortedFileKeys?: string[]
 }

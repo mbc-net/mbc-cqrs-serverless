@@ -55,6 +55,37 @@ export class ZipImportQueueEventHandler
         { result: { step: 'Unzipping archive' } },
       )
 
+      if (
+        zipJobAttributes.sortedFileKeys &&
+        zipJobAttributes.sortedFileKeys.length === 0
+      ) {
+        throw new Error('Sorted file keys are required.')
+      }
+
+      if (
+        zipJobAttributes.sortedFileKeys &&
+        zipJobAttributes.sortedFileKeys.length > 0
+      ) {
+        // Start the main orchestrator with the sorted list of files
+        await this.sfnService.startExecution(
+          this.zipOrchestratorArn,
+          {
+            masterJobKey: importKey,
+            sortedS3Keys: zipJobAttributes.sortedFileKeys,
+            // Pass through original attributes needed by the sub-workflows
+            parameters: {
+              bucket: zipJobAttributes.bucket,
+              tenantCode: zipJobAttributes.tenantCode,
+            },
+          },
+          `${zipJobAttributes.tenantCode}-zip-import-${Date.now()}`,
+        )
+
+        this.logger.log(
+          `Started ZIP Orchestrator Step Function for master job ${importEntity.id}`,
+        )
+      }
+
       const s3ReadStream = await this.getS3Stream(zipJobAttributes)
       const extractedFileKeys = await this.unzipAndUpload(
         s3ReadStream,
