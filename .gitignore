@@ -55,6 +55,11 @@ docker-data
 # test report
 report
 
+# Generated files from schematic tests (at monorepo root)
+# テストで生成されるファイル（monorepoルート）
+/src/
+/test/
+
 # dynamo local
 .dynamodb
 dynamodb-local-metadata.json
