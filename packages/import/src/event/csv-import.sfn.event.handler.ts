@@ -113,6 +113,7 @@ export class CsvImportSfnEventHandler
           tenantCode: attributes.tenantCode,
           attributes: transformedData,
           sourceId: attributes.sourceId,
+          s3Key: attributes.key,
         }
         createImportDtos.push(createImport)
       } catch (error) {
