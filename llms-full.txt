@@ -1,0 +1,256 @@
+# MBC CQRS Serverless Framework - Full Context
+
+> Comprehensive CQRS framework for AWS serverless applications with NestJS
+
+## Project Summary
+
+MBC CQRS Serverless is a production-ready TypeScript monorepo that implements:
+- Command Query Responsibility Segregation (CQRS) pattern
+- Event Sourcing with DynamoDB
+- Multi-tenant data isolation
+- AWS serverless architecture (Lambda, DynamoDB, SNS/SQS)
+
+## Technology Stack
+
+| Category | Technology |
+|----------|------------|
+| Language | TypeScript ES2021 (strict mode) |
+| Framework | NestJS v10.x |
+| Runtime | Node.js 18+ / AWS Lambda |
+| Database | DynamoDB (primary), RDS Aurora (optional) |
+| Messaging | SNS for events, SQS for queues |
+| Auth | Amazon Cognito with JWT |
+| Package Manager | npm workspaces |
+| Monorepo | Lerna v8.x |
+| Testing | Jest v29.x |
+| Infrastructure | AWS CDK v2, Serverless Framework |
+
+## Package Structure
+
+### @mbc-cqrs-serverless/core
+Main CQRS framework providing:
+- CommandService for write operations
+- DataService for read operations
+- Event publishing to SNS
+- Request context with tenant info
+- Authentication guards
+- Error handling
+
+### @mbc-cqrs-serverless/cli
+Project scaffolding:
+- `mbc new PROJECT_NAME` - Create new project
+- `mbc generate module NAME` - Generate module
+- `mbc generate controller NAME` - Generate controller
+
+### @mbc-cqrs-serverless/master
+Master data management:
+- MasterDataService - CRUD for master entities
+- MasterSettingService - Hierarchical settings (user/group/tenant/common)
+- MasterCopyService - RDS synchronization
+
+### @mbc-cqrs-serverless/tenant
+Multi-tenancy support:
+- TenantService - Tenant CRUD
+- TenantContext - Current tenant access
+- Tenant groups management
+
+### @mbc-cqrs-serverless/sequence
+ID generation:
+- Time-based sequence generation
+- Configurable patterns
+- Tenant-scoped sequences
+
+### @mbc-cqrs-serverless/task
+Long-running tasks:
+- Task queue management
+- Progress tracking
+- Error handling
+
+## Architecture Patterns
+
+### CQRS Flow
+
+```
+Client Request
+    │
+    ├─► Command (Write)
+    │       │
+    │       ▼
+    │   CommandHandler
+    │       │
+    │       ▼
+    │   CommandService.publish()
+    │       │
+    │       ├─► DynamoDB (persist)
+    │       └─► SNS (publish event)
+    │               │
+    │               ▼
+    │           EventHandler
+    │               │
+    │               ▼
+    │           Update Read Model
+    │
+    └─► Query (Read)
+            │
+            ▼
+        QueryHandler
+            │
+            ▼
+        DataService.getItem()
+            │
+            ▼
+        DynamoDB / RDS
+```
+
+### Data Key Structure
+
+```
+Partition Key (pk): {tenantCode}#{entityType}
+Sort Key (sk): {entityType}#{entityId}
+
+Example:
+pk: "TENANT001#ORDER"
+sk: "ORDER#20240101-001"
+```
+
+### Multi-Tenant Isolation
+
+All data operations automatically include tenant context:
+1. JWT token contains tenant claim
+2. RequestContext extracts tenant code
+3. All queries filtered by tenant pk prefix
+4. Cross-tenant access prevented
+
+## Code Patterns
+
+### Command Handler
+
+```typescript
+@CommandHandler(CreateOrderCommand)
+export class CreateOrderHandler implements ICommandHandler<CreateOrderCommand> {
+  constructor(private readonly commandService: CommandService) {}
+
+  async execute(command: CreateOrderCommand): Promise<OrderEntity> {
+    const { tenantCode, data } = command;
+
+    const entity = new OrderEntity();
+    entity.pk = `${tenantCode}#ORDER`;
+    entity.sk = `ORDER#${generateId()}`;
+    entity.name = data.name;
+    entity.amount = data.amount;
+
+    return this.commandService.publish(entity);
+  }
+}
+```
+
+### Query Handler
+
+```typescript
+@QueryHandler(GetOrderQuery)
+export class GetOrderHandler implements IQueryHandler<GetOrderQuery> {
+  constructor(@InjectDataService() private readonly dataService: DataService) {}
+
+  async execute(query: GetOrderQuery): Promise<OrderEntity> {
+    return this.dataService.getItem({
+      pk: `${query.tenantCode}#ORDER`,
+      sk: `ORDER#${query.orderId}`,
+    });
+  }
+}
+```
+
+### Event Handler
+
+```typescript
+@EventsHandler(OrderCreatedEvent)
+export class OrderCreatedHandler implements IEventHandler<OrderCreatedEvent> {
+  async handle(event: OrderCreatedEvent): Promise<void> {
+    // Update read models
+    // Send notifications
+    // Trigger workflows
+  }
+}
+```
+
+## Module Structure
+
+```
+src/orders/
+├── commands/
+│   ├── create-order.command.ts
+│   ├── create-order.handler.ts
+│   ├── update-order.command.ts
+│   └── update-order.handler.ts
+├── queries/
+│   ├── get-order.query.ts
+│   ├── get-order.handler.ts
+│   └── list-orders.handler.ts
+├── events/
+│   └── order-created.event.ts
+├── dto/
+│   ├── create-order.dto.ts
+│   ├── update-order.dto.ts
+│   └── order-response.dto.ts
+├── entities/
+│   └── order.entity.ts
+├── controllers/
+│   └── order.controller.ts
+└── orders.module.ts
+```
+
+## Development Commands
+
+```bash
+# Build
+npm run build
+
+# Test
+npm test
+npm run test:e2e
+npm run test:cov
+
+# Lint & Format
+npm run lint
+npm run format
+
+# Local Development
+npm run start:localstack
+npm run offline
+
+# Database
+npm run ddb:create
+```
+
+## Environment Variables
+
+```
+# API
+API_ENDPOINT=http://localhost:4000
+
+# Database
+DATA_TABLE_NAME=mbc-table
+
+# Auth
+COGNITO_ENDPOINT=http://localhost:9229
+USER_POOL_ID=local_pool_id
+
+# AWS Services
+SQS_ENDPOINT=http://localhost:9324
+SNS_ENDPOINT=http://localhost:4002
+```
+
+## Documentation Links
+
+- Full Docs: https://mbc-cqrs-serverless.mbc-net.com/
+- Examples: https://github.com/mbc-net/mbc-cqrs-serveless-samples
+- NestJS: https://docs.nestjs.com/
+- AWS SDK v3: https://docs.aws.amazon.com/AWSJavaScriptSDK/v3/latest/
+
+## File References
+
+- CLAUDE.md - Detailed AI guidance (Japanese)
+- AGENTS.md - General AI agent instructions
+- .cursorrules - Cursor IDE configuration
+- CONTRIBUTING.md - Contribution guidelines
+- docs/architecture/ - Architecture diagrams

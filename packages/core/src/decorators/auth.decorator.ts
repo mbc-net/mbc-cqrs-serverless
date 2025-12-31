@@ -9,6 +9,21 @@ import { HEADER_TENANT_CODE } from '../constants'
 import { RolesGuard } from '../guard'
 import { Roles } from './roles.decorator'
 
+/**
+ * Decorator that applies authentication and role-based access control.
+ * Combines RolesGuard with Swagger documentation.
+ *
+ * @param roles - Required roles for access
+ * @example
+ * ```typescript
+ * @Controller('orders')
+ * export class OrderController {
+ *   @Post()
+ *   @Auth('admin', 'manager')
+ *   createOrder() {}
+ * }
+ * ```
+ */
 export function Auth(...roles: string[]) {
   return AuthGuard({ roles })
 }
@@ -31,6 +46,9 @@ export function AuthGuard({
   )
 }
 
+/**
+ * Decorator that adds tenant code header requirement to Swagger docs.
+ */
 export function HeaderTenant() {
   return ApiHeader({
     name: HEADER_TENANT_CODE,

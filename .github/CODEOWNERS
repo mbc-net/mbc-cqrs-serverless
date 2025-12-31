@@ -1,0 +1,31 @@
+# MBC CQRS Serverless - Code Owners
+# These owners will be requested for review when someone opens a pull request.
+
+# Default owners for everything in the repo
+* @mbc-net/cqrs-maintainers
+
+# Core package
+/packages/core/ @mbc-net/core-team
+
+# CLI package
+/packages/cli/ @mbc-net/cli-team
+
+# Feature packages
+/packages/master/ @mbc-net/cqrs-maintainers
+/packages/tenant/ @mbc-net/cqrs-maintainers
+/packages/sequence/ @mbc-net/cqrs-maintainers
+/packages/task/ @mbc-net/cqrs-maintainers
+/packages/ui-setting/ @mbc-net/cqrs-maintainers
+
+# Documentation
+*.md @mbc-net/docs-team
+/docs/ @mbc-net/docs-team
+
+# CI/CD and infrastructure
+/.github/ @mbc-net/devops-team
+/infra/ @mbc-net/devops-team
+
+# Configuration files
+package.json @mbc-net/cqrs-maintainers
+lerna.json @mbc-net/cqrs-maintainers
+tsconfig*.json @mbc-net/cqrs-maintainers
