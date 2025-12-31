@@ -100,7 +100,7 @@ export async function handleAnalyzeTool(
     }
     case 'mbc_lookup_error': {
       const parsed = LookupErrorSchema.parse(args)
-      return await lookupError(parsed.error_message)
+      return await lookupError(parsed.error_message, projectPath)
     }
     default:
       return {
@@ -236,9 +236,10 @@ async function findFiles(dir: string, suffix: string): Promise<string[]> {
   return files
 }
 
-async function lookupError(errorMessage: string): Promise<{ content: { type: 'text'; text: string }[]; isError?: boolean }> {
-  const frameworkRoot = path.resolve(__dirname, '../../../../..')
-  const errorCatalogPath = path.join(frameworkRoot, 'docs', 'ERROR_CATALOG.md')
+async function lookupError(errorMessage: string, projectPath: string): Promise<{ content: { type: 'text'; text: string }[]; isError?: boolean }> {
+  // Use projectPath parameter which comes from MBC_PROJECT_PATH environment variable
+  // プロジェクトパスはMBC_PROJECT_PATH環境変数から取得されたパスを使用
+  const errorCatalogPath = path.join(projectPath, 'docs', 'ERROR_CATALOG.md')
 
   if (!fs.existsSync(errorCatalogPath)) {
     return {
