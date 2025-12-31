@@ -483,7 +483,7 @@ export class DirectoryService {
       sk: `${detailDto.sk}${VER_SEPARATOR}${version}`,
     })
     if (!item) {
-      throw new NotFoundException()
+      throw new NotFoundException('Directory version not found')
     }
 
     const latestItem = await this.dataService.getItem(detailDto)
@@ -784,7 +784,7 @@ export class DirectoryService {
 
     const data = (await this.dataService.getItem(key)) as DirectoryDataEntity
     if (!data) {
-      throw new NotFoundException()
+      throw new NotFoundException('Directory item not found')
     }
 
     const allowPermissions = [FileRole.DELETE, FileRole.TAKE_OWNERSHIP]
@@ -827,7 +827,7 @@ export class DirectoryService {
 
     const data = (await this.dataService.getItem(key)) as DirectoryDataEntity
     if (!data) {
-      throw new NotFoundException()
+      throw new NotFoundException('File not found')
     }
 
     const allowPermissions = [FileRole.DELETE, FileRole.TAKE_OWNERSHIP]

@@ -17,4 +17,9 @@ export class CreateImportDto {
 
   @IsObject()
   attributes: Record<string, any>
+
+  // S3 key: only exist when processing a CSV file
+  @IsString()
+  @IsOptional()
+  s3Key?: string
 }

@@ -18,7 +18,9 @@ export function getErrorResources(): Resource[] {
 }
 
 export async function readErrorCatalog(uri: string): Promise<{ contents: { uri: string; mimeType: string; text: string }[] }> {
-  const frameworkRoot = path.resolve(__dirname, '../../../../..')
+  // Use MBC_PROJECT_PATH environment variable or current working directory
+  // プロジェクトパスは環境変数MBC_PROJECT_PATHまたはカレントディレクトリを使用
+  const projectRoot = process.env.MBC_PROJECT_PATH || process.cwd()
 
   if (uri !== 'mbc://docs/errors') {
     throw new Error(`Unknown error resource: ${uri}`)
@@ -26,9 +28,9 @@ export async function readErrorCatalog(uri: string): Promise<{ contents: { uri: 
 
   let content: string
   try {
-    content = fs.readFileSync(path.join(frameworkRoot, 'docs', 'ERROR_CATALOG.md'), 'utf-8')
+    content = fs.readFileSync(path.join(projectRoot, 'docs', 'ERROR_CATALOG.md'), 'utf-8')
   } catch (error) {
-    content = 'Error catalog not found. Please ensure docs/ERROR_CATALOG.md exists.'
+    content = 'Error catalog not found. Please ensure docs/ERROR_CATALOG.md exists in your project.'
   }
 
   return {
