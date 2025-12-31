@@ -199,7 +199,7 @@ export class ImportService {
       type: dto.tableName,
       name: dto.name || dto.tableName,
       status: ImportStatusEnum.CREATED,
-      attributes: dto.attributes,
+      attributes: { ...dto.attributes, __s3Key: dto.s3Key },
       requestId: options.invokeContext?.context?.awsRequestId,
       createdAt: new Date(),
       updatedAt: new Date(),
