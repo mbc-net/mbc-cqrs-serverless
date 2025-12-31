@@ -340,7 +340,7 @@ describe('MasterDataService', () => {
       dataService.getItem.mockResolvedValue(existingData)
 
       await expect(service.create(createDto, { invokeContext: mockInvokeContext }))
-        .rejects.toThrow(BadRequestException)
+        .rejects.toThrow('Master data already exists')
       expect(commandService.publishAsync).not.toHaveBeenCalled()
     })
 
@@ -458,7 +458,7 @@ describe('MasterDataService', () => {
       dataService.getItem.mockResolvedValue(null)
 
       await expect(service.update(key, updateDto, { invokeContext: mockInvokeContext }))
-        .rejects.toThrow(NotFoundException)
+        .rejects.toThrow('Master data not found')
       expect(commandService.publishPartialUpdateAsync).not.toHaveBeenCalled()
     })
 
@@ -549,7 +549,7 @@ describe('MasterDataService', () => {
       dataService.getItem.mockResolvedValue(null)
 
       await expect(service.delete(key, { invokeContext: mockInvokeContext }))
-        .rejects.toThrow(NotFoundException)
+        .rejects.toThrow('Master data not found')
       expect(commandService.publishPartialUpdateAsync).not.toHaveBeenCalled()
     })
 
@@ -572,7 +572,7 @@ describe('MasterDataService', () => {
       dataService.getItem.mockResolvedValue(existingData)
 
       await expect(service.delete(key, { invokeContext: mockInvokeContext }))
-        .rejects.toThrow(BadRequestException)
+        .rejects.toThrow('This master data is already deleted')
       expect(commandService.publishPartialUpdateAsync).not.toHaveBeenCalled()
     })
   })
@@ -664,7 +664,7 @@ describe('MasterDataService', () => {
 
       dataService.getItem.mockResolvedValue(null)
 
-      await expect(service.getDetail(key)).rejects.toThrow(NotFoundException)
+      await expect(service.getDetail(key)).rejects.toThrow('Master data not found')
     })
   })
 

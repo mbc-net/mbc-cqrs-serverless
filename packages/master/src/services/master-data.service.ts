@@ -179,7 +179,7 @@ export class MasterDataService implements IMasterDataService {
     const dataSetting = await this.dataService.getItem({ pk, sk })
 
     if (dataSetting && dataSetting.isDeleted == false) {
-      throw new BadRequestException('Data setting is exist!')
+      throw new BadRequestException('Master data already exists')
     }
 
     const createCmd = {
@@ -208,7 +208,7 @@ export class MasterDataService implements IMasterDataService {
     const data = (await this.dataService.getItem(key)) as MasterDataEntity
 
     if (!data) {
-      throw new NotFoundException()
+      throw new NotFoundException('Master data not found')
     }
 
     const updateCmd = {
@@ -239,11 +239,11 @@ export class MasterDataService implements IMasterDataService {
     const data = (await this.dataService.getItem(key)) as MasterDataEntity
 
     if (!data) {
-      throw new NotFoundException()
+      throw new NotFoundException('Master data not found')
     }
 
     if (data.isDeleted) {
-      throw new BadRequestException('This setting is already delete!')
+      throw new BadRequestException('This master data is already deleted')
     }
 
     const deleteCmd = {
@@ -279,7 +279,7 @@ export class MasterDataService implements IMasterDataService {
   async getDetail(key: DetailDto) {
     const data = await this.dataService.getItem(key)
 
-    if (!data) throw new NotFoundException()
+    if (!data) throw new NotFoundException('Master data not found')
 
     return new MasterRdsEntity(data)
   }

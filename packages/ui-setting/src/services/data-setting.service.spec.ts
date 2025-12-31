@@ -317,7 +317,7 @@ describe('DataSettingService', () => {
       ).rejects.toThrow(BadRequestException)
       await expect(
         service.create(tenantCode, createDto, { invokeContext: mockInvokeContext })
-      ).rejects.toThrow('Data setting is exist!')
+      ).rejects.toThrow('Data setting already exists')
     })
 
     it('should throw NotFoundException when setting code does not exist', async () => {
@@ -344,7 +344,7 @@ describe('DataSettingService', () => {
       ).rejects.toThrow(NotFoundException)
       await expect(
         service.create(tenantCode, createDto, { invokeContext: mockInvokeContext })
-      ).rejects.toThrow('Setting code is not exist!')
+      ).rejects.toThrow('Setting code does not exist')
     })
 
     it('should create when existing data setting is deleted', async () => {
@@ -604,7 +604,7 @@ describe('DataSettingService', () => {
       ).rejects.toThrow(NotFoundException)
       await expect(
         service.update(key, updateDto, { invokeContext: mockInvokeContext })
-      ).rejects.toThrow('Setting code is not exist!')
+      ).rejects.toThrow('Setting code does not exist')
     })
   })
 
@@ -689,7 +689,7 @@ describe('DataSettingService', () => {
       ).rejects.toThrow(BadRequestException)
       await expect(
         service.delete(key, { invokeContext: mockInvokeContext })
-      ).rejects.toThrow('This setting is already delete!')
+      ).rejects.toThrow('This data setting is already deleted')
     })
   })
 
