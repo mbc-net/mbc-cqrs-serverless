@@ -355,7 +355,7 @@ export class MasterSettingService implements IMasterSettingService {
   async getDetail(key: DetailDto) {
     const data = await this.dataService.getItem(key)
 
-    if (!data) throw new NotFoundException()
+    if (!data) throw new NotFoundException('Master setting not found')
 
     return new MasterRdsEntity(data)
   }

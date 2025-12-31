@@ -146,7 +146,7 @@ export class <%= classify(name) %>Service {
 
     const data = (await this.dataService.getItem(key)) as <%= classify(name) %>DataEntity
     if (!data) {
-      throw new NotFoundException()
+      throw new NotFoundException('<%= classify(name) %> not found')
     }
     const commandDto: CommandPartialInputModel = {
       pk: data.pk,

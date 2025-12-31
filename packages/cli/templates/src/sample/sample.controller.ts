@@ -55,7 +55,7 @@ export class SampleController {
     this.logger.debug('commandService:' + this.commandService.tableName)
     const item = await this.commandService.getItem(detailDto)
     if (!item) {
-      throw new NotFoundException()
+      throw new NotFoundException('Sample command not found')
     }
     this.logger.debug('item:', item)
     return new SampleCommandEntity(item as SampleCommandEntity)
@@ -66,7 +66,7 @@ export class SampleController {
     this.logger.debug('dataService:' + this.dataService.tableName)
     const item = await this.dataService.getItem(detailDto)
     if (!item) {
-      throw new NotFoundException()
+      throw new NotFoundException('Sample data not found')
     }
     this.logger.debug('item:', item)
     return new SampleDataEntity(item as SampleDataEntity)

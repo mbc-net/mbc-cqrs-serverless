@@ -42,7 +42,7 @@ export class TaskController {
   async getTask(@Param() detailDto: DetailDto) {
     const item = await this.tasksService.getTask(detailDto)
     if (!item) {
-      throw new NotFoundException()
+      throw new NotFoundException('Task not found')
     }
     this.logger.debug('item:', item)
     return item
