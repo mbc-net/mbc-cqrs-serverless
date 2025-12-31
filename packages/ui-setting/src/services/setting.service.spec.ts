@@ -212,7 +212,7 @@ describe('SettingService', () => {
       ).rejects.toThrow(BadRequestException)
       await expect(
         service.create(tenantCode, createDto, { invokeContext: mockInvokeContext })
-      ).rejects.toThrow('Setting code is exist!')
+      ).rejects.toThrow('Setting code already exists')
     })
 
     it('should create when existing setting is deleted', async () => {
@@ -532,7 +532,7 @@ describe('SettingService', () => {
       ).rejects.toThrow(BadRequestException)
       await expect(
         service.delete(key, { invokeContext: mockInvokeContext })
-      ).rejects.toThrow('This setting is already delete!')
+      ).rejects.toThrow('This setting is already deleted')
     })
   })
 
