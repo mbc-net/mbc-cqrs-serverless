@@ -1,0 +1,135 @@
+# MBC CQRS Serverless Framework - Cursor Rules
+
+## Project Context
+
+This is a TypeScript/NestJS monorepo implementing the CQRS (Command Query Responsibility Segregation) pattern for AWS serverless applications. It uses Lerna v8.x for package management.
+
+## Technology Stack
+
+- Language: TypeScript (ES2021)
+- Framework: NestJS v10.x
+- Runtime: Node.js 18+ with AWS Lambda
+- Package Manager: npm with workspaces
+- Monorepo Tool: Lerna v8.x
+- Infrastructure: AWS CDK v2, Serverless Framework
+- Testing: Jest v29.x
+- Database: DynamoDB (primary), RDS/Aurora (optional via TypeORM)
+
+## Code Style Guidelines
+
+- Use TypeScript strict mode
+- Follow NestJS conventions for decorators and dependency injection
+- Use ESLint/Prettier configuration from project root
+- All public documentation must be in English
+- Commit messages in English
+
+## Naming Conventions
+
+- Commands: `CreateResourceCommand`, `UpdateResourceCommand`
+- Events: `ResourceCreatedEvent`, `ResourceUpdatedEvent`
+- Handlers: `CreateResourceHandler`, `UpdateResourceHandler`
+- DTOs: `CreateResourceDto`, `UpdateResourceDto`
+- Entities: `ResourceEntity`
+
+## Architecture Patterns
+
+### CQRS Implementation
+
+- Commands: State-changing write operations
+- Queries: Read-only operations (no state changes)
+- Events: Domain events published after command execution
+- Aggregates: Domain objects encapsulating business logic
+
+### Module Structure
+
+Each module should follow this structure:
+
+```
+src/
+├── controllers/      # REST/GraphQL endpoints
+├── commands/         # Command definitions and handlers
+├── queries/          # Query definitions and handlers
+├── events/           # Event definitions
+├── dto/              # Data transfer objects
+├── entities/         # Domain entities
+└── module.ts         # NestJS module definition
+```
+
+### Command Handler Pattern
+
+```typescript
+@CommandHandler(CreateResourceCommand)
+export class CreateResourceHandler implements ICommandHandler<CreateResourceCommand> {
+  async execute(command: CreateResourceCommand): Promise<void> {
+    // Business logic
+    // Publish events
+  }
+}
+```
+
+### Event Publishing
+
+```typescript
+await this.eventStore.publish(new ResourceCreatedEvent(data));
+```
+
+## Key Packages
+
+| Package | Purpose |
+|---------|---------|
+| @mbc-cqrs-serverless/core | Main CQRS framework with AWS integrations |
+| @mbc-cqrs-serverless/cli | Project scaffolding CLI |
+| @mbc-cqrs-serverless/master | Master data management |
+| @mbc-cqrs-serverless/sequence | Sequence/ID generation |
+| @mbc-cqrs-serverless/task | Long-running task management |
+| @mbc-cqrs-serverless/tenant | Multi-tenancy support |
+
+## Common Development Commands
+
+```bash
+# Build
+npm run build               # Build all packages
+
+# Testing
+npm run test                # Run unit tests
+npm run test:e2e            # Run E2E tests
+npm run test:cov            # Test with coverage
+
+# Code Quality
+npm run lint                # ESLint check
+npm run format              # Prettier format
+
+# Local Development
+npm run start:localstack    # Start LocalStack services
+npm run offline             # Start serverless offline
+
+# Database
+npm run ddb:create          # Create DynamoDB tables
+```
+
+## Testing Guidelines
+
+- Unit tests: Use Jest with aws-sdk-client-mock for AWS service mocking
+- E2E tests: Use LocalStack for AWS service emulation
+- Always write tests for new features
+- Maintain test coverage for critical paths
+
+## AWS Services Integration
+
+- Lambda: Serverless compute
+- DynamoDB: Event store and data persistence
+- SNS/SQS: Event publishing and message queuing
+- Cognito: Authentication and authorization
+- API Gateway: REST endpoints
+- AppSync: GraphQL endpoints
+- Step Functions: Workflow orchestration
+- S3: File storage
+- SES: Email notifications
+
+## Important Constraints
+
+- Never modify CLAUDE.md without explicit approval
+- All documentation (README, comments) must be in English
+- Follow semantic versioning for releases
+- Ensure type safety with TypeScript strict mode
+- Handle errors appropriately with proper logging

@@ -1,0 +1,74 @@
+# MBC CQRS Serverless Framework
+
+> A comprehensive CQRS (Command Query Responsibility Segregation) framework for building serverless applications on AWS, powered by NestJS and TypeScript.
+
+## Overview
+
+MBC CQRS Serverless is a monorepo providing a complete framework for implementing event-driven, serverless architectures using:
+
+- NestJS v10.x with TypeScript (ES2021)
+- AWS Lambda, DynamoDB, SNS/SQS, Cognito, API Gateway, AppSync
+- CQRS pattern with event sourcing
+- Multi-tenant data isolation
+- Lerna v8.x monorepo management
+
+## Documentation
+
+- Full Documentation: https://mbc-cqrs-serverless.mbc-net.com/
+- Getting Started: https://mbc-cqrs-serverless.mbc-net.com/docs/getting-started
+- CLI Reference: https://mbc-cqrs-serverless.mbc-net.com/docs/cli
+
+## Packages
+
+- @mbc-cqrs-serverless/core: Main CQRS framework with AWS integrations
+- @mbc-cqrs-serverless/cli: CLI scaffolding tool for project creation
+- @mbc-cqrs-serverless/master: Master data management
+- @mbc-cqrs-serverless/sequence: Sequence/ID generation with time-rotation
+- @mbc-cqrs-serverless/task: Long-running task management
+- @mbc-cqrs-serverless/tenant: Multi-tenancy support
+- @mbc-cqrs-serverless/ui-setting: UI configuration management
+- @mbc-cqrs-serverless/import: Data import module
+- @mbc-cqrs-serverless/directory: Directory management
+
+## Quick Start
+
+```bash
+# Install CLI globally
+npm install -g @mbc-cqrs-serverless/cli
+
+# Create new project
+mbc new PROJECT_NAME -p npm
+cd PROJECT_NAME
+
+# Start local development
+npm install
+npm run build
+npm run start:localstack
+npm run offline
+```
+
+## Architecture Pattern
+
+- Commands: State-changing write operations (CreateResourceCommand)
+- Queries: Read-only operations
+- Events: Domain events published after commands (ResourceCreatedEvent)
+- Handlers: Business logic implementation (CreateResourceHandler)
+
+## Module Structure
+
+```
+src/
+├── controllers/     # REST/GraphQL endpoints
+├── commands/        # Command handlers
+├── queries/         # Query handlers
+├── events/          # Event definitions
+├── dto/             # Data transfer objects
+├── entities/        # Domain entities
+└── module.ts        # Module definition
+```
+
+## Optional
+
+- Glossary: https://mbc-cqrs-serverless.mbc-net.com/docs/glossary
+- Examples: https://github.com/mbc-net/mbc-cqrs-serveless-samples
+- Japanese Guide: https://www.mbc-net.com/tag/mbc-cqrs-serverless/

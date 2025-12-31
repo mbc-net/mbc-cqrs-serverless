@@ -1746,26 +1746,28 @@ describe('SequencesService', () => {
           startMonth: 4,
         }
         jest.spyOn(masterService, 'getData').mockResolvedValue(mockMasterData)
-        
+
+        // Use June 15 to avoid timezone boundary issues
         const mockUpdate = {
-          'code': 'sequence#TODO#20991231',
+          'code': 'sequence#TODO#20990615',
           'updatedBy': '92ca4f68-9ac6-4080-9ae2-2f02a86206a4',
           'createdIp': '127.0.0.1',
           'tenantCode': 'MBC',
           'type': 'sequence',
-          'createdAt': '2099-12-31T23:59:59+07:00',
+          'createdAt': '2099-06-15T12:00:00Z',
           'updatedIp': '127.0.0.1',
           'createdBy': '92ca4f68-9ac6-4080-9ae2-2f02a86206a4',
           'requestId': '7724a67e-ded6-4ebb-9c88-c14070e24012',
           'name': 'daily',
-          'sk': 'sequence#TODO#20991231',
+          'sk': 'sequence#TODO#20990615',
           'pk': 'SEQ#MBC',
           'seq': 1,
-          'updatedAt': '2099-12-31T23:59:59+07:00',
+          'updatedAt': '2099-06-15T12:00:00Z',
         }
         jest.spyOn(dynamoDbService, 'updateItem').mockResolvedValue(mockUpdate)
 
-        const futureDate = new Date('2099-12-31T23:59:59+07:00')
+        // Use mid-year date to avoid timezone boundary issues
+        const futureDate = new Date('2099-06-15T12:00:00Z')
         const result = await service.generateSequenceItem({
           tenantCode: tenantCode,
           typeCode: 'sequence',
@@ -1783,26 +1785,31 @@ describe('SequencesService', () => {
           startMonth: 4,
         }
         jest.spyOn(masterService, 'getData').mockResolvedValue(mockMasterData)
-        
+
+        // Use June 1899 with UTC to avoid timezone boundary issues
+        // June (6) >= April (4), so fiscal year = 1899
+        // fiscal_year_value = 1899 - 2020 + 1 = -120
         const mockUpdate = {
-          'code': 'sequence#TODO#19000101',
+          'code': 'sequence#TODO#18990615',
           'updatedBy': '92ca4f68-9ac6-4080-9ae2-2f02a86206a4',
           'createdIp': '127.0.0.1',
           'tenantCode': 'MBC',
           'type': 'sequence',
-          'createdAt': '1900-01-01T00:00:00+07:00',
+          'createdAt': '1899-06-15T12:00:00Z',
           'updatedIp': '127.0.0.1',
           'createdBy': '92ca4f68-9ac6-4080-9ae2-2f02a86206a4',
           'requestId': '7724a67e-ded6-4ebb-9c88-c14070e24012',
           'name': 'daily',
-          'sk': 'sequence#TODO#19000101',
+          'sk': 'sequence#TODO#18990615',
           'pk': 'SEQ#MBC',
           'seq': 1,
-          'updatedAt': '1900-01-01T00:00:00+07:00',
+          'updatedAt': '1899-06-15T12:00:00Z',
         }
         jest.spyOn(dynamoDbService, 'updateItem').mockResolvedValue(mockUpdate)
 
-        const pastDate = new Date('1900-01-01T00:00:00+07:00')
+        // Use June 15, 1899 to avoid timezone boundary issues
+        // June (6) >= April (4), so fiscal year = 1899, value = -120
+        const pastDate = new Date('1899-06-15T12:00:00Z')
         const result = await service.generateSequenceItem({
           tenantCode: tenantCode,
           typeCode: 'sequence',

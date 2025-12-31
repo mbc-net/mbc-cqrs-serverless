@@ -1,0 +1,77 @@
+# Aider Configuration for MBC CQRS Serverless
+# https://aider.chat/docs/config.html
+
+# Read-only files for context (won't be edited)
+read:
+  - CLAUDE.md
+  - AGENTS.md
+  - llms.txt
+  - README.md
+  - CONTRIBUTING.md
+  - docs/architecture/system-overview.md
+  - docs/architecture/cqrs-flow.md
+  - packages/core/README.md
+
+# Files to ignore
+ignore:
+  - "node_modules/**"
+  - "dist/**"
+  - "coverage/**"
+  - "*.log"
+  - ".git/**"
+  - "package-lock.json"
+
+# Auto-commit settings
+auto-commits: false
+dirty-commits: false
+
+# Lint command after changes
+lint-cmd: "npm run lint"
+
+# Test command
+test-cmd: "npm test"
+
+# Code style
+code-theme: monokai
+
+# Model settings (user should override with their preferred model)
+# model: gpt-4
+
+# Project conventions
+conventions: |
+  ## MBC CQRS Serverless Conventions
+
+  ### Language
+  - All documentation and comments in English
+  - TypeScript with strict mode
+
+  ### Architecture
+  - CQRS pattern: Commands for writes, Queries for reads
+  - Event sourcing with DynamoDB
+  - Multi-tenant data isolation via partition key prefix
+
+  ### Naming
+  - Commands: CreateResourceCommand, UpdateResourceCommand
+  - Events: ResourceCreatedEvent, ResourceUpdatedEvent
+  - Handlers: CreateResourceHandler
+  - DTOs: CreateResourceDto, ResourceResponseDto
+
+  ### Key Structure
+  - PK: {tenantCode}#RESOURCE_TYPE
+  - SK: RESOURCE_TYPE#{id}
+
+  ### Testing
+  - Jest with aws-sdk-client-mock
+  - Unit tests for handlers and services
+  - E2E tests for controllers
+
+  ### Module Structure
+  ```
+  src/module/
+  ├── commands/
+  ├── queries/
+  ├── dto/
+  ├── entities/
+  ├── controllers/
+  └── module.ts
+  ```

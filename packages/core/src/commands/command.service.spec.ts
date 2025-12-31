@@ -1,3 +1,17 @@
+/**
+ * CommandService Test Suite
+ *
+ * Tests the core CQRS command handling functionality including:
+ * - Retrieving the latest versioned item from command store
+ * - Publishing partial updates (async and sync modes)
+ * - Dirty checking for command deduplication
+ * - TTL (Time-To-Live) management for command records
+ *
+ * Key concepts tested:
+ * - Optimistic locking via version numbers
+ * - Sort key versioning (sk@version format)
+ * - Command deduplication to prevent redundant writes
+ */
 import { createMock } from '@golevelup/ts-jest'
 import { Test } from '@nestjs/testing'
 import { ModuleMocker, MockFunctionMetadata } from 'jest-mock'
@@ -118,7 +132,12 @@ describe('CommandService', () => {
     commandService = moduleRef.get<CommandService>(CommandService)
   })
 
+  /**
+   * Tests for getLatestItem method
+   * Scenario: Retrieves the most recent versioned item by scanning sort keys
+   */
   describe('getLatestItem', () => {
+    /** Verifies that the item with highest version number is returned */
     it('should return latest item', async () => {
       const key = {
         pk: 'master',
@@ -129,6 +148,7 @@ describe('CommandService', () => {
       expect(item?.sk).toBe(addSortKeyVersion(key.sk, 11))
     })
 
+    /** Returns null when no item exists with the given key */
     it('should return null when data not have key', async () => {
       const key = {
         pk: 'master',
@@ -139,7 +159,13 @@ describe('CommandService', () => {
     })
   })
 
+  /**
+   * Tests for publishPartialUpdateAsync method
+   * Scenario: Async partial update that auto-fetches latest version (version=-1)
+   * Use case: Client wants to update without knowing current version
+   */
   describe('publishPartialUpdateAsync', () => {
+    /** Successfully updates when version=-1 triggers auto-fetch of latest */
     it('should update with the latest item', async () => {
       const key = {
         pk: 'master',
@@ -158,6 +184,7 @@ describe('CommandService', () => {
       expect(item?.version).toBe(latestItem.version + 1)
     })
 
+    /** Throws BadRequestException when trying to update non-existent item */
     it('should raise error with the non-existent item', async () => {
       const key = {
         pk: 'master',
@@ -177,18 +204,26 @@ describe('CommandService', () => {
     })
   })
 
+  /**
+   * Tests for isNotCommandDirty method
+   * Scenario: Checks if command data has changed to prevent redundant writes
+   * Purpose: Optimization to skip database writes when data is unchanged
+   */
   describe('isNotCommandDirty', () => {
+    /** Helper class to test attribute comparison with class instances */
     class MasterAttributes {
       constructor(public name: string) {
         this.name = name
       }
     }
 
+    /** Returns true when comparing identical objects (no changes) */
     it('should return true if command is not dirty', () => {
       const item = buildItem({ pk: 'master', sk: 'max_value@5' }, 5)
       expect(commandService.isNotCommandDirty(item, item)).toBe(true)
     })
 
+    /** Returns false when name property differs (data changed) */
     it('should return false if command is dirty', () => {
       const item = buildItem({ pk: 'master', sk: 'max_value@5' }, 5)
       expect(
@@ -196,6 +231,7 @@ describe('CommandService', () => {
       ).toBe(false)
     })
 
+    /** Handles class instance attributes - returns true when values match */
     it('should return true if input attributes is class instance', () => {
       const item = buildItem({ pk: 'master', sk: 'max_value@5' }, 5, {
         name: 'test',
@@ -204,6 +240,7 @@ describe('CommandService', () => {
       expect(commandService.isNotCommandDirty(item, input)).toBe(true)
     })
 
+    /** Handles class instance attributes - returns false when values differ */
     it('should return false if input attributes is class instance and not dirty', () => {
       const item = buildItem({ pk: 'master', sk: 'max_value@5' }, 5, {
         name: 'test',
@@ -214,7 +251,13 @@ describe('CommandService', () => {
     })
   })
 
+  /**
+   * Tests for publishPartialUpdateSync method
+   * Scenario: Synchronous update requiring exact version match (optimistic locking)
+   * Use case: Client has read the current version and wants safe concurrent update
+   */
   describe('publishPartialUpdateSync', () => {
+    /** Successfully updates when provided version matches current version */
     it('should update with the latest version item', async () => {
       const key = {
         pk: 'master',
@@ -235,6 +278,7 @@ describe('CommandService', () => {
       })
     })
 
+    /** Throws error when version doesn't match - prevents stale writes */
     it('should raise error with invalid version', async () => {
       const key = {
         pk: 'master',
@@ -255,6 +299,7 @@ describe('CommandService', () => {
       )
     })
 
+    /** Throws error when trying to update non-existent item */
     it('should raise error with item not found', async () => {
       const key = {
         pk: 'master',
@@ -276,7 +321,13 @@ describe('CommandService', () => {
     })
   })
 
+  /**
+   * Tests for publishSync method
+   * Scenario: Full synchronous publish with version validation
+   * Use case: Creating or updating entire command record synchronously
+   */
   describe('publishSync', () => {
+    /** Successfully publishes with version=-1 (auto-increment) */
     it('should update with the latest version item', async () => {
       const inputItem = buildItem({ pk: 'master', sk: 'max_value' }, -1)
 
@@ -290,6 +341,7 @@ describe('CommandService', () => {
       })
     })
 
+    /** Throws error when version doesn't match latest - optimistic lock failure */
     it('should raise error with invalid input version', async () => {
       const inputItem = buildItem({ pk: 'master', sk: 'max_value' }, 4)
       const res = commandService.publishSync(inputItem, {
@@ -304,6 +356,12 @@ describe('CommandService', () => {
   })
 })
 
+/**
+ * CommandService TTL Tests
+ *
+ * Tests TTL (Time-To-Live) functionality for command records.
+ * TTL allows automatic expiration of old command versions in DynamoDB.
+ */
 describe('CommandService', () => {
   let commandService: CommandService
   let dynamoDbService: DynamoDbService
@@ -337,7 +395,12 @@ describe('CommandService', () => {
     ttlService = moduleRef.get<TtlService>(TtlService)
   })
 
+  /**
+   * Tests for updateTtl method
+   * Scenario: Setting TTL values on command records for automatic cleanup
+   */
   describe('updateTtl', () => {
+    /** Updates TTL when calculateTtl returns -1 (use default) */
     it('should update with default TTL (null)', async () => {
       dynamoDBMock.on(GetItemCommand).resolves({
         Item: {},
@@ -352,6 +415,7 @@ describe('CommandService', () => {
       expect(dynamoDBMock).toHaveReceivedCommandTimes(PutItemCommand, 1)
     })
 
+    /** Skips TTL update for version 0 items (initial creation) */
     it('should not update ttl when version is less than 1', async () => {
       dynamoDBMock.on(GetItemCommand).resolves({
         Item: {},

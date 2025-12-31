@@ -1,3 +1,15 @@
+/**
+ * DataService Test Suite
+ *
+ * Tests the read-side data service of the CQRS pattern.
+ * DataService handles querying the projected/materialized view data.
+ *
+ * Key responsibilities tested:
+ * - Publishing command data to the data (read) table
+ * - Retrieving single items by key
+ * - Listing items by partition key with pagination
+ * - Preserving created metadata when updating existing items
+ */
 import { Test, TestingModule } from '@nestjs/testing'
 import { createMock } from '@golevelup/ts-jest'
 import { DataService } from './data.service'
@@ -73,7 +85,13 @@ describe('DataService', () => {
     expect(service).toBeDefined()
   })
 
+  /**
+   * Tests for publish method
+   * Scenario: Projecting command data to the read-side data table
+   * Maintains CQRS separation by syncing command changes to query store
+   */
   describe('publish', () => {
+    /** Preserves original creation metadata when updating existing item */
     it('should publish command model and return data model', async () => {
       const existingData: DataModel = {
         ...mockDataModel,
@@ -115,6 +133,7 @@ describe('DataService', () => {
       }))
     })
 
+    /** Uses command metadata for new items (no existing data) */
     it('should handle new item creation when no existing data', async () => {
       dynamoDbService.getItem.mockResolvedValue(null)
       dynamoDbService.putItem.mockResolvedValue(mockDataModel)
@@ -129,6 +148,7 @@ describe('DataService', () => {
       }))
     })
 
+    /** Propagates DynamoDB errors to caller */
     it('should handle publish errors', async () => {
       dynamoDbService.getItem.mockResolvedValue(null)
       const error = new Error('DynamoDB error')
@@ -138,7 +158,12 @@ describe('DataService', () => {
     })
   })
 
+  /**
+   * Tests for getItem method
+   * Scenario: Single item retrieval by partition key + sort key
+   */
   describe('getItem', () => {
+    /** Successfully retrieves item with matching key */
     it('should get item from DynamoDB', async () => {
       const key: DetailKey = { pk: 'test-pk', sk: 'test-sk' }
       
@@ -150,6 +175,7 @@ describe('DataService', () => {
       expect(result).toEqual(mockDataModel)
     })
 
+    /** Returns null for non-existent keys */
     it('should return null when item not found', async () => {
       const key: DetailKey = { pk: 'test-pk', sk: 'test-sk' }
 
@@ -161,7 +187,13 @@ describe('DataService', () => {
     })
   })
 
+  /**
+   * Tests for listItemsByPk method
+   * Scenario: Querying multiple items by partition key with optional filters
+   * Supports pagination via lastSk cursor
+   */
   describe('listItemsByPk', () => {
+    /** Returns items and pagination cursor */
     it('should list items by partition key', async () => {
       const pk = 'test-pk'
       const mockItems = [mockDataModel]
@@ -185,6 +217,7 @@ describe('DataService', () => {
       expect(result.items).toHaveLength(1)
     })
 
+    /** Handles empty result set gracefully */
     it('should handle empty results', async () => {
       const pk = 'test-pk'
 
@@ -199,6 +232,7 @@ describe('DataService', () => {
       expect(result.lastSk).toBeNull()
     })
 
+    /** Passes filter options (sk prefix, limit, order) to DynamoDB */
     it('should handle query with options', async () => {
       const pk = 'test-pk'
       const options = {

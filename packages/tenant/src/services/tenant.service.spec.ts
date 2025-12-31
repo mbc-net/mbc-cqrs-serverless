@@ -1,3 +1,16 @@
+/**
+ * TenantService Test Suite
+ *
+ * Tests multi-tenant management functionality including:
+ * - Creating common (shared) tenants
+ * - Creating individual tenants with unique codes
+ * - Re-creating tenants after soft delete
+ *
+ * Multi-tenancy model:
+ * - COMMON tenant: Shared resources across all tenants
+ * - Individual tenants: Isolated data per organization
+ * - Partition key format: TENANT#{tenantCode}
+ */
 import {
   CommandDto,
   CommandService,
@@ -80,10 +93,15 @@ describe('Tenant', () => {
     expect(service).toBeDefined()
   })
 
+  /**
+   * Tests for createCommonTenant method
+   * Scenario: Creating the shared COMMON tenant for cross-tenant resources
+   */
   describe('createCommonTenant', () => {
     afterEach(() => {
       jest.clearAllMocks()
     })
+    /** Creates new common tenant with version 1 */
     it('should create a new common tenant', async () => {
       const mockResponse = {
         pk: 'TENANT#COMMON',
@@ -116,6 +134,7 @@ describe('Tenant', () => {
 
       expect(result).toEqual(mockResponse)
     })
+    /** Re-creates tenant after soft delete - increments version from deleted record */
     it('should create a new common tenant with the same code after delete', async () => {
       const mockResponse = {
         pk: 'TENANT#COMMON',
@@ -163,10 +182,15 @@ describe('Tenant', () => {
     })
   })
 
+  /**
+   * Tests for createTenant method
+   * Scenario: Creating individual organization tenants with unique codes
+   */
   describe('createTenant', () => {
     afterEach(() => {
       jest.clearAllMocks()
     })
+    /** Creates new tenant with provided code and name */
     it('should create a new tenant', async () => {
       const mockResponse = {
         pk: 'TENANT#MBC',
@@ -200,6 +224,7 @@ describe('Tenant', () => {
 
       expect(result).toEqual(mockResponse)
     })
+    /** Re-creates tenant after soft delete - preserves code, increments version */
     it('should create a new tenant with the same code after delete', async () => {
       const mockResponse = {
         pk: 'TENANT#MBC',
