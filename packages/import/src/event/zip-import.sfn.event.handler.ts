@@ -44,15 +44,18 @@ export class ZipImportSfnEventHandler
 
     this.logger.log(`Triggering CSV job for file: ${s3Key}`)
 
-    // Use a regex to extract the table name from the filename.
-    // Convention: yyyymmddhhMMss-{table name}.csv
-    const match = s3Key.match(/\d{14}-(.+)\.csv$/)
-    if (!match || !match[1]) {
-      throw new Error(
-        `Could not parse tableName from filename: ${s3Key}. Expected format: yyyymmddhhMMss-{tableName}.csv`,
-      )
+    let tableName = parameters.tableName
+    if (!tableName) {
+      // Use a regex to extract the table name from the filename.
+      // Convention: yyyymmddhhMMss-{table name}.csv
+      const match = s3Key.match(/\d{14}-(.+)\.csv$/)
+      if (!match || !match[1]) {
+        throw new Error(
+          `Could not parse tableName from filename: ${s3Key}. Expected format: yyyymmddhhMMss-{tableName}.csv`,
+        )
+      }
+      tableName = match[1]
     }
-    const tableName = match[1]
 
     const dto: CreateCsvImportDto = {
       processingMode: ProcessingMode.STEP_FUNCTION,
