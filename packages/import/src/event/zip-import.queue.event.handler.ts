@@ -76,6 +76,7 @@ export class ZipImportQueueEventHandler
             parameters: {
               bucket: zipJobAttributes.bucket,
               tenantCode: zipJobAttributes.tenantCode,
+              tableName: zipJobAttributes.tableName,
             },
           },
           `${zipJobAttributes.tenantCode}-zip-import-${Date.now()}`,
@@ -84,6 +85,7 @@ export class ZipImportQueueEventHandler
         this.logger.log(
           `Started ZIP Orchestrator Step Function for master job ${importEntity.id}`,
         )
+        return
       }
 
       const s3ReadStream = await this.getS3Stream(zipJobAttributes)
@@ -119,6 +121,7 @@ export class ZipImportQueueEventHandler
           parameters: {
             bucket: zipJobAttributes.bucket,
             tenantCode: zipJobAttributes.tenantCode,
+            tableName: zipJobAttributes.tableName,
           },
         },
         `${zipJobAttributes.tenantCode}-zip-import-${Date.now()}`,
