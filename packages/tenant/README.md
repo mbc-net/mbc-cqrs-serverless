@@ -1,15 +1,19 @@
 ![MBC CQRS serverless framework](https://mbc-cqrs-serverless.mbc-net.com/img/mbc-cqrs-serverless.png)
 
-# MBC CQRS Serverless Framework - Tenant Package
+# @mbc-cqrs-serverless/tenant
 
-## Description
+[![npm version](https://badge.fury.io/js/@mbc-cqrs-serverless%2Ftenant.svg)](https://www.npmjs.com/package/@mbc-cqrs-serverless/tenant)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
-The Tenant package provides multi-tenancy support for CQRS applications. It manages:
+Multi-tenancy support for the MBC CQRS Serverless framework. Manage tenants, tenant groups, and role-based setting group assignments for enterprise SaaS applications.
+
+## Features
 
 - **Tenant Management**: Create, update, and manage tenant entities
-- **Tenant Groups**: Organize tenants into logical groups
+- **Tenant Groups**: Organize related entities within tenants
+- **Role-Based Settings**: Assign setting groups to user roles within tenants
+- **Common Tenant**: Shared configuration across all tenants
 - **Tenant Isolation**: Automatic data isolation between tenants
-- **Tenant Settings**: Tenant-specific configuration management
 
 ## Installation
 
@@ -17,154 +21,47 @@ The Tenant package provides multi-tenancy support for CQRS applications. It mana
 npm install @mbc-cqrs-serverless/tenant
 ```
 
-## Usage
+## Quick Start
 
-### Basic Setup
-
-Import and configure the tenant module:
+### 1. Register the Module
 
 ```typescript
-import { TenantModule } from '@mbc-cqrs-serverless/tenant';
 import { Module } from '@nestjs/common';
+import { TenantModule } from '@mbc-cqrs-serverless/tenant';
+import { TenantDataSyncHandler } from './handlers/tenant-data-sync.handler';
 
 @Module({
   imports: [
     TenantModule.register({
-      tableName: 'your-tenant-table',
+      enableController: true, // Optional: enable REST endpoints
+      dataSyncHandlers: [TenantDataSyncHandler], // Optional: custom sync handlers
     }),
   ],
 })
 export class AppModule {}
 ```
 
-### Tenant Operations
-
-#### Create Tenant
+### 2. Use the Tenant Service
 
 ```typescript
+import { Injectable } from '@nestjs/common';
 import { TenantService } from '@mbc-cqrs-serverless/tenant';
+import { IInvoke } from '@mbc-cqrs-serverless/core';
 
 @Injectable()
-export class MyTenantService {
+export class MyService {
   constructor(private readonly tenantService: TenantService) {}
 
-  async createTenant(data: CreateTenantDto) {
-    return this.tenantService.create({
-      code: 'TENANT001',
-      name: 'Acme Corporation',
-      description: 'Enterprise customer',
-      attributes: {
-        plan: 'enterprise',
-        maxUsers: 100,
+  async createTenant(data: any, opts: { invokeContext: IInvoke }) {
+    return this.tenantService.createTenant(
+      {
+        code: 'ACME',
+        name: 'Acme Corporation',
+        attributes: { plan: 'enterprise', maxUsers: 100 },
       },
-    });
+      opts,
+    );
   }
-}
-```
-
-#### Get Tenant
-
-```typescript
-async getTenant(tenantCode: string) {
-  return this.tenantService.findByCode(tenantCode);
-}
-
-async getAllTenants() {
-  return this.tenantService.findAll();
-}
-```
-
-#### Update Tenant
-
-```typescript
-async updateTenant(tenantCode: string, data: UpdateTenantDto) {
-  return this.tenantService.update(tenantCode, {
-    name: data.name,
-    attributes: data.attributes,
-  });
-}
-```
-
-#### Delete Tenant
-
-```typescript
-async deleteTenant(tenantCode: string) {
-  return this.tenantService.delete(tenantCode);
-}
-```
-
-### Tenant Groups
-
-Organize tenants into groups for easier management:
-
-#### Create Tenant Group
-
-```typescript
-async createTenantGroup(data: CreateGroupDto) {
-  return this.tenantService.createGroup({
-    code: 'ENTERPRISE',
-    name: 'Enterprise Customers',
-    tenantCodes: ['TENANT001', 'TENANT002'],
-  });
-}
-```
-
-#### Add Tenant to Group
-
-```typescript
-async addTenantToGroup(groupCode: string, tenantCode: string) {
-  return this.tenantService.addToGroup({
-    groupCode,
-    tenantCode,
-  });
-}
-```
-
-#### Update Tenant Group
-
-```typescript
-async updateTenantGroup(groupCode: string, data: UpdateGroupDto) {
-  return this.tenantService.updateGroup(groupCode, {
-    name: data.name,
-    tenantCodes: data.tenantCodes,
-  });
-}
-```
-
-### Tenant Context
-
-Access current tenant in your services:
-
-```typescript
-import { TenantContext, InjectTenantContext } from '@mbc-cqrs-serverless/tenant';
-
-@Injectable()
-export class OrderService {
-  constructor(
-    @InjectTenantContext() private readonly tenantContext: TenantContext
-  ) {}
-
-  async createOrder(data: CreateOrderDto) {
-    const tenantCode = this.tenantContext.getTenantCode();
-    // Order is automatically associated with current tenant
-    return this.orderRepository.create({
-      tenantCode,
-      ...data,
-    });
-  }
-}
-```
-
-### Common Tenant
-
-Create a common tenant for shared data:
-
-```typescript
-async createCommonTenant() {
-  return this.tenantService.createCommonTenant({
-    name: 'Common',
-    description: 'Shared data across all tenants',
-  });
 }
 ```
 
@@ -174,44 +71,221 @@ async createCommonTenant() {
 
 | Method | Description |
 |--------|-------------|
-| `create(dto)` | Create new tenant |
-| `update(code, dto)` | Update tenant |
-| `delete(code)` | Delete tenant |
-| `findByCode(code)` | Find tenant by code |
-| `findAll()` | Get all tenants |
-| `createGroup(dto)` | Create tenant group |
-| `updateGroup(code, dto)` | Update tenant group |
-| `addToGroup(dto)` | Add tenant to group |
-| `removeFromGroup(dto)` | Remove tenant from group |
+| `createTenant(dto, context)` | Create a new tenant |
+| `createCommonTenant(dto, context)` | Create the shared common tenant |
+| `updateTenant(key, dto, context)` | Update tenant properties |
+| `deleteTenant(key, context)` | Soft delete a tenant |
+| `getTenant(key)` | Get tenant by pk/sk |
+| `createTenantGroup(tenantCode, dto, context)` | Create a group within a tenant |
+| `addTenantGroup(dto, context)` | Add a group to tenant role settings |
+| `customizeSettingGroups(dto, context)` | Customize setting group order for a role |
 
-### TenantContext
+### TenantCreateDto
 
-| Method | Description |
-|--------|-------------|
-| `getTenantCode()` | Get current tenant code |
-| `getTenant()` | Get current tenant entity |
-| `isCommonTenant()` | Check if common tenant |
+| Property | Type | Required | Description |
+|----------|------|----------|-------------|
+| `code` | string | Yes | Unique tenant identifier |
+| `name` | string | Yes | Display name |
+| `attributes` | object | No | Custom tenant properties |
 
-## Tenant Data Structure
+### TenantGroupAddDto
+
+| Property | Type | Required | Description |
+|----------|------|----------|-------------|
+| `tenantCode` | string | Yes | Target tenant |
+| `role` | string | Yes | User role to configure |
+| `groupId` | string | Yes | Group to add to role settings |
+
+## Usage Examples
+
+### Create Common Tenant
+
+Create a shared tenant for common settings:
 
 ```typescript
-interface Tenant {
-  pk: string;           // Partition key
-  sk: string;           // Sort key
-  code: string;         // Unique tenant code
-  name: string;         // Display name
-  description?: string; // Optional description
-  attributes?: Record<string, any>; // Custom attributes
-  createdAt: string;    // Creation timestamp
-  updatedAt: string;    // Last update timestamp
+async createCommonTenant(opts: { invokeContext: IInvoke }) {
+  return this.tenantService.createCommonTenant(
+    {
+      name: 'Common Settings',
+      attributes: { description: 'Shared across all tenants' },
+    },
+    opts,
+  );
 }
 ```
 
+### Create Tenant
+
+```typescript
+async createTenant(dto: CreateTenantDto, opts: { invokeContext: IInvoke }) {
+  return this.tenantService.createTenant(
+    {
+      code: dto.code,
+      name: dto.name,
+      attributes: {
+        plan: dto.plan,
+        maxUsers: dto.maxUsers,
+        features: dto.features,
+      },
+    },
+    opts,
+  );
+}
+```
+
+### Update Tenant
+
+```typescript
+async updateTenant(
+  tenantCode: string,
+  dto: UpdateTenantDto,
+  opts: { invokeContext: IInvoke },
+) {
+  const pk = `TENANT#${tenantCode}`;
+  const sk = 'TENANT';
+
+  return this.tenantService.updateTenant(
+    { pk, sk },
+    { name: dto.name, attributes: dto.attributes },
+    opts,
+  );
+}
+```
+
+### Delete Tenant (Soft Delete)
+
+```typescript
+async deleteTenant(tenantCode: string, opts: { invokeContext: IInvoke }) {
+  const pk = `TENANT#${tenantCode}`;
+  const sk = 'TENANT';
+
+  return this.tenantService.deleteTenant({ pk, sk }, opts);
+}
+```
+
+### Role-Based Setting Groups
+
+Configure which setting groups apply to different user roles:
+
+```typescript
+// Add a group to admin role settings
+async addGroupToAdminRole(tenantCode: string, groupId: string, opts: { invokeContext: IInvoke }) {
+  return this.tenantService.addTenantGroup(
+    {
+      tenantCode,
+      role: 'admin',
+      groupId,
+    },
+    opts,
+  );
+}
+
+// Customize the order of setting groups for a role
+async customizeRoleSettings(
+  tenantCode: string,
+  role: string,
+  settingGroups: string[],
+  opts: { invokeContext: IInvoke },
+) {
+  return this.tenantService.customizeSettingGroups(
+    {
+      tenantCode,
+      role,
+      settingGroups, // Ordered list of group IDs
+    },
+    opts,
+  );
+}
+```
+
+### Create Tenant Group
+
+Create a sub-entity within a tenant:
+
+```typescript
+async createDepartment(
+  tenantCode: string,
+  dto: CreateDepartmentDto,
+  opts: { invokeContext: IInvoke },
+) {
+  return this.tenantService.createTenantGroup(
+    tenantCode,
+    {
+      code: dto.code,
+      name: dto.name,
+      attributes: dto.attributes,
+    },
+    opts,
+  );
+}
+```
+
+## Data Model
+
+### Tenant Key Pattern
+
+```
+pk: TENANT#[tenantCode]
+sk: TENANT
+
+Example:
+pk: TENANT#ACME
+sk: TENANT
+```
+
+### Tenant Group Key Pattern
+
+```
+pk: TENANT#[tenantCode]
+sk: [groupCode]
+
+Example:
+pk: TENANT#ACME
+sk: SALES_DEPT
+```
+
+### Setting Groups Structure
+
+Role-based setting groups are stored in tenant attributes:
+
+```json
+{
+  "pk": "TENANT#ACME",
+  "sk": "TENANT",
+  "attributes": {
+    "setting": [
+      {
+        "tenantRole": "admin",
+        "groups": ["GROUP#ADMIN", "GROUP#POWER_USER"],
+        "setting_groups": ["GROUP#ADMIN", "GROUP#POWER_USER"],
+        "setting_groups_mode": "auto"
+      },
+      {
+        "tenantRole": "user",
+        "groups": ["GROUP#USER"],
+        "setting_groups": ["GROUP#USER"],
+        "setting_groups_mode": "customized"
+      }
+    ]
+  }
+}
+```
+
+## Related Packages
+
+| Package | Description |
+|---------|-------------|
+| [@mbc-cqrs-serverless/core](https://www.npmjs.com/package/@mbc-cqrs-serverless/core) | Core CQRS framework |
+| [@mbc-cqrs-serverless/master](https://www.npmjs.com/package/@mbc-cqrs-serverless/master) | Hierarchical settings with tenant support |
+
 ## Documentation
 
-Visit https://mbc-cqrs-serverless.mbc-net.com/ to view the full documentation.
+Full documentation available at [https://mbc-cqrs-serverless.mbc-net.com/](https://mbc-cqrs-serverless.mbc-net.com/)
+
+- [Tenant Service Guide](https://mbc-cqrs-serverless.mbc-net.com/docs/tenant-service)
 
 ## License
 
-Copyright &copy; 2024, Murakami Business Consulting, Inc. https://www.mbc-net.com/
-This project and sub projects are under the MIT License.
+Copyright © 2024-2025, Murakami Business Consulting, Inc. [https://www.mbc-net.com/](https://www.mbc-net.com/)
+
+This project is under the [MIT License](../../LICENSE.txt).
