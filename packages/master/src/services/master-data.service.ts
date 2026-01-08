@@ -109,10 +109,7 @@ export class MasterDataService implements IMasterDataService {
 
     if (searchDto.settingCode?.trim()) {
       andConditions.push({
-        masterTypeCode: {
-          contains: searchDto.settingCode.trim(),
-          mode: 'insensitive',
-        },
+        masterTypeCode: searchDto.settingCode.trim(),
       })
     }
 

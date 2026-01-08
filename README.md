@@ -1,78 +1,175 @@
 ![MBC CQRS serverless framework](https://mbc-cqrs-serverless.mbc-net.com/img/mbc-cqrs-serverless.png)
 
-# MBC CQRS serverless framework
+# MBC CQRS Serverless Framework
 
-Unleash the power of scalable, resilient serverless applications with CQRS on AWS, the magic of NestJS and the convenience of local development workflows! ✨
+[![npm version](https://badge.fury.io/js/@mbc-cqrs-serverless%2Fcore.svg)](https://www.npmjs.com/package/@mbc-cqrs-serverless/core)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+
+Unleash the power of scalable, resilient serverless applications with CQRS on AWS, powered by NestJS and optimized for local development workflows.
 
 ## Overview
 
-This package provides core functionalities for implementing the Command Query Responsibility Segregation (CQRS) pattern within AWS serverless architectures, powered by the incredible NestJS framework. It simplifies the development of highly scalable and decoupled systems that can handle complex business logic and high-volume data processing.
+MBC CQRS Serverless is a comprehensive framework for implementing the Command Query Responsibility Segregation (CQRS) pattern within AWS serverless architectures. Built on top of NestJS, it simplifies the development of highly scalable and decoupled systems that handle complex business logic and high-volume data processing.
 
 ## Documentation
 
 Visit https://mbc-cqrs-serverless.mbc-net.com/ to view the full documentation.
 
+## Quick Start
+
+```bash
+# Install the CLI globally
+npm install -g @mbc-cqrs-serverless/cli
+
+# Create a new project
+mbc new my-cqrs-app
+
+# Navigate to project
+cd my-cqrs-app
+
+# Install dependencies
+npm install
+
+# Start local development
+npm run offline:docker   # Terminal 1: Start Docker services
+npm run migrate          # Terminal 2: Run database migrations
+npm run offline:sls      # Terminal 3: Start serverless offline
+```
+
+## Packages
+
+| Package | Description | Version |
+|---------|-------------|---------|
+| [@mbc-cqrs-serverless/cli](./packages/cli) | CLI tool for project scaffolding | [![npm](https://img.shields.io/npm/v/@mbc-cqrs-serverless/cli.svg)](https://www.npmjs.com/package/@mbc-cqrs-serverless/cli) |
+| [@mbc-cqrs-serverless/core](./packages/core) | Core CQRS framework with AWS integrations | [![npm](https://img.shields.io/npm/v/@mbc-cqrs-serverless/core.svg)](https://www.npmjs.com/package/@mbc-cqrs-serverless/core) |
+| [@mbc-cqrs-serverless/sequence](./packages/sequence) | Sequence number generation with rotation | [![npm](https://img.shields.io/npm/v/@mbc-cqrs-serverless/sequence.svg)](https://www.npmjs.com/package/@mbc-cqrs-serverless/sequence) |
+| [@mbc-cqrs-serverless/task](./packages/task) | Async task processing and queue management | [![npm](https://img.shields.io/npm/v/@mbc-cqrs-serverless/task.svg)](https://www.npmjs.com/package/@mbc-cqrs-serverless/task) |
+| [@mbc-cqrs-serverless/master](./packages/master) | Master data and hierarchical settings | [![npm](https://img.shields.io/npm/v/@mbc-cqrs-serverless/master.svg)](https://www.npmjs.com/package/@mbc-cqrs-serverless/master) |
+| [@mbc-cqrs-serverless/tenant](./packages/tenant) | Multi-tenancy support | [![npm](https://img.shields.io/npm/v/@mbc-cqrs-serverless/tenant.svg)](https://www.npmjs.com/package/@mbc-cqrs-serverless/tenant) |
+| [@mbc-cqrs-serverless/import](./packages/import) | Data import with CSV and REST support | [![npm](https://img.shields.io/npm/v/@mbc-cqrs-serverless/import.svg)](https://www.npmjs.com/package/@mbc-cqrs-serverless/import) |
+| [@mbc-cqrs-serverless/ui-setting](./packages/ui-setting) | UI configuration management | [![npm](https://img.shields.io/npm/v/@mbc-cqrs-serverless/ui-setting.svg)](https://www.npmjs.com/package/@mbc-cqrs-serverless/ui-setting) |
+
 ## Features
 
-- **CQRS framework for AWS serverless**:
+- **CQRS Framework for AWS Serverless**
   - Structured approach for separating commands and queries
-  - Integration with AWS services like Cognito, API Gateway, Lambda, DynamoDB, SNS, and SQS, StepFuction, RDS ⚡
-- **Event-driven architecture**:
-  - Leverages event sourcing and messaging for asynchronous communication
-  - Enables loose coupling and independent scaling of components
-- **Command and query handlers**:
-  - Provides abstractions for handling commands and queries
-  - Facilitates business logic implementation and data persistence
-- **Asynchronous communication**:
-  - Supports event publishing and message passing for inter-component communication
-- **Data consistency and integrity**:
-  - Ensures data consistency through event sourcing and optimistic locking
-  - Enforces data integrity with validation and constraints
-- **Experience a harmonious symphony of CQRS and NestJS:**
-  - **Modular structure**: Organize CQRS components with NestJS's elegant modularity
-  - **Dependency injection**: Simplify dependency management and embrace loose coupling with NestJS's DI system
-  - **TypeScript support**: Write type-safe, crystal-clear code with built-in TypeScript
-  - **Testing and error handling**: Build confidence with comprehensive testing and robust error handling, courtesy of NestJS
-  - **Ecosystem compatibility**: Tap into the vast NestJS universe of modules and libraries to expand possibilities
+  - Integration with AWS services: Cognito, API Gateway, Lambda, DynamoDB, SNS, SQS, Step Functions, RDS
 
-## Local Development Symphony
+- **Event-Driven Architecture**
+  - Event sourcing and messaging for asynchronous communication
+  - Loose coupling and independent scaling of components
 
-- **Embrace agility**: Experience rapid iteration and experimentation in a local environment, without the need for constant cloud deployment.
-- **Debugging bliss**: Debug with ease using your favorite tools and techniques, gaining deeper insights into your application's behavior.
-- **Cost-effective exploration**: Explore and refine your CQRS implementation locally, without incurring AWS costs during development.
+- **Command and Query Handlers**
+  - Abstractions for handling commands and queries
+  - Business logic implementation and data persistence
+
+- **Data Consistency**
+  - Event sourcing with optimistic locking
+  - Data integrity with validation and constraints
+
+- **NestJS Integration**
+  - Modular structure with elegant modularity
+  - Dependency injection for loose coupling
+  - Full TypeScript support
+  - Comprehensive testing and error handling
+
+## Local Development
+
+- **Rapid Iteration**: Develop and test locally without cloud deployment
+- **Easy Debugging**: Use your favorite tools with full access to application behavior
+- **Cost-Effective**: No AWS costs during development
 
 ## Installation
 
 ### Latest Stable Release
 ```bash
-$ npm i -g @mbc-cqrs-serverless/cli
+npm install -g @mbc-cqrs-serverless/cli
 ```
 
 ### Beta Release
 ```bash
-$ npm i -g @mbc-cqrs-serverless/cli@beta
+npm install -g @mbc-cqrs-serverless/cli@beta
 ```
 
 ### Specific Version
 ```bash
-$ npm i -g @mbc-cqrs-serverless/cli@1.0.0
+npm install -g @mbc-cqrs-serverless/cli@1.0.16
 ```
 
 ## Usage
 
-- Create a new application
+### Create a New Application
 
 ```bash
-$ mbc new YOUR_PROJECT_NAME
+mbc new my-app
+```
+
+### Create with Specific Version
+
+```bash
+mbc new my-app@1.0.16
 ```
 
 ## Examples
 
-- [Check here](https://github.com/mbc-net/mbc-cqrs-serveless-samples)
+Check out our [sample repository](https://github.com/mbc-net/mbc-cqrs-serverless-samples) for complete working examples:
+
+- **step-01-setup**: Environment setup
+- **step-02-create**: Create operations with CommandService
+- **step-03-rds-sync**: DynamoDB to RDS synchronization
+- **step-04-read**: Read operations with DataService
+- **step-05-search**: Search with Prisma/RDS
+- **step-06-update-delete**: Update and soft delete
+- **step-07-sequence**: Sequence number generation
+- **complete/basic**: Full CRUD implementation
+- **complete/with-task**: Async task processing
 
 ## Architecture
 
-- TODO
+For detailed architecture documentation, visit our [Architecture Guide](https://mbc-cqrs-serverless.mbc-net.com/docs/introduction).
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                    CQRS Architecture                             │
+├─────────────────────────────────────────────────────────────────┤
+│                                                                  │
+│  ┌──────────────┐                                               │
+│  │   Client     │                                               │
+│  └──────────────┘                                               │
+│         │                                                        │
+│         ▼                                                        │
+│  ┌──────────────┐      ┌──────────────┐      ┌──────────────┐   │
+│  │  Controller  │ ──▶  │   Service    │ ──▶  │   Command    │   │
+│  │  (REST API)  │      │   Layer      │      │   Service    │   │
+│  └──────────────┘      └──────────────┘      └──────────────┘   │
+│                               │                     │           │
+│                               │                     ▼           │
+│                               │              ┌──────────────┐   │
+│                               │              │  DynamoDB    │   │
+│                               │              │  (Command)   │   │
+│                               │              └──────────────┘   │
+│                               │                     │           │
+│                               │                     ▼ Stream    │
+│                               ▼              ┌──────────────┐   │
+│                        ┌──────────────┐      │ Step         │   │
+│                        │  DataService │      │ Functions    │   │
+│                        │  (Read)      │      └──────────────┘   │
+│                        └──────────────┘             │           │
+│                               │                     ▼           │
+│                               ▼              ┌──────────────┐   │
+│                        ┌──────────────┐      │  DynamoDB    │   │
+│                        │  DynamoDB    │ ◀─── │  (Data)      │   │
+│                        │  (Data)      │      └──────────────┘   │
+│                        └──────────────┘             │           │
+│                                                     ▼           │
+│                                              ┌──────────────┐   │
+│                        ┌──────────────┐ ◀─── │ DataSync     │   │
+│                        │  RDS/MySQL   │      │ Handler      │   │
+│                        │  (Query)     │      └──────────────┘   │
+│                        └──────────────┘                         │
+│                                                                  │
+└─────────────────────────────────────────────────────────────────┘
+```
 
 ## Development & Release Process
 
@@ -81,44 +178,21 @@ $ mbc new YOUR_PROJECT_NAME
 - `beta`: Beta releases for testing and validation
 - `main`: Stable production releases
 
-### Release Workflow
-
-#### 1. Beta Release
-```bash
-# Merge develop to beta
-git checkout beta
-git merge develop
-
-# Create beta tag
-git tag v1.0.0-beta.1
-git push origin --tags
-```
-
-#### 2. Production Release
-```bash
-# Merge beta to main
-git checkout main
-git merge beta
-
-# Create release tag
-git tag v1.0.0
-git push origin --tags
-```
-
 ### Versioning
 We follow [Semantic Versioning](https://semver.org/):
-- `v1.0.0` - Production release
-- `v1.0.0-beta.1` - Beta release
-- `v1.0.0-alpha.1` - Alpha release
+- `v1.0.16` - Production release (latest)
+- `v1.0.16-beta.1` - Beta release
+- `v1.0.16-alpha.1` - Alpha release
 
 ### Automated Publishing
 GitHub Actions automatically publishes packages to npm when tags are pushed:
 - Beta tags (`*-beta.*`) → `npm publish --tag beta`
 - Release tags (`v*.*.*`) → `npm publish --tag latest`
 
-## How to guide
+## How-to Guides
 
-- Japanese: https://www.mbc-net.com/tag/mbc-cqrs-serverless/
+- English: https://mbc-cqrs-serverless.mbc-net.com/docs/build-todo-app
+- Japanese: https://mbc-cqrs-serverless.mbc-net.com/ja/docs/build-todo-app
 
 ## Contributing
 
@@ -131,28 +205,16 @@ We welcome contributions! Please follow our development workflow:
 4. Write tests and ensure they pass
 5. Submit a pull request to `develop`
 
-### Adding New Packages
-```bash
-$ npm init --scope mbc-cqrs-serverless -w ./packages/{PACKAGE_NAME}
-```
-
 ### Build and Test
 ```bash
 # Build all packages
-$ npm run build
+npm run build
 
 # Run tests
-$ npm test
+npm test
 
 # Run linting
-$ npm run lint
-```
-
-### Release Process
-- Releases are automated via GitHub Actions
-- Manual publishing (for maintainers only):
-```bash
-$ npm run release
+npm run lint
 ```
 
 ### Pull Request Guidelines
@@ -164,12 +226,12 @@ $ npm run release
 
 ## References
 
-- Lerna: https://lerna.js.org/docs/introduction
-- NPM workspace: https://docs.npmjs.com/cli/v7/using-npm/workspaces
-- Nestjs: https://docs.nestjs.com/
-- Serverless framework: https://www.serverless.com/framework/docs
+- [Lerna](https://lerna.js.org/docs/introduction)
+- [NPM Workspaces](https://docs.npmjs.com/cli/v7/using-npm/workspaces)
+- [NestJS](https://docs.nestjs.com/)
+- [Serverless Framework](https://www.serverless.com/framework/docs)
 
 ## License
 
-Copyright &copy; 2024, Murakami Business Consulting, Inc. https://www.mbc-net.com/  
-This project and sub projects are under the MIT License.
+Copyright &copy; 2024-2025, Murakami Business Consulting, Inc. https://www.mbc-net.com/
+This project and sub projects are under the [MIT License](./LICENSE.txt).
