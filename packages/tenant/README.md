@@ -76,7 +76,7 @@ export class MyService {
 | `updateTenant(key, dto, context)` | Update tenant properties |
 | `deleteTenant(key, context)` | Soft delete a tenant |
 | `getTenant(key)` | Get tenant by pk/sk |
-| `createTenantGroup(tenantCode, dto, context)` | Create a group within a tenant |
+| `createTenantGroup(tenantGroupCode, dto, context)` | Create a tenant within a tenant group |
 | `addTenantGroup(dto, context)` | Add a group to tenant role settings |
 | `customizeSettingGroups(dto, context)` | Customize setting group order for a role |
 
@@ -200,16 +200,16 @@ async customizeRoleSettings(
 
 ### Create Tenant Group
 
-Create a sub-entity within a tenant:
+Create a tenant entity within a specific tenant group:
 
 ```typescript
 async createDepartment(
-  tenantCode: string,
+  tenantGroupCode: string,
   dto: CreateDepartmentDto,
   opts: { invokeContext: IInvoke },
 ) {
   return this.tenantService.createTenantGroup(
-    tenantCode,
+    tenantGroupCode,
     {
       code: dto.code,
       name: dto.name,

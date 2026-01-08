@@ -192,7 +192,7 @@ GitHub Actions automatically publishes packages to npm when tags are pushed:
 ## How-to Guides
 
 - English: https://mbc-cqrs-serverless.mbc-net.com/docs/build-todo-app
-- Japanese: https://www.mbc-net.com/tag/mbc-cqrs-serverless/
+- Japanese: https://mbc-cqrs-serverless.mbc-net.com/ja/docs/build-todo-app
 
 ## Contributing
 

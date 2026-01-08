@@ -71,4 +71,4 @@ src/
 
 - Glossary: https://mbc-cqrs-serverless.mbc-net.com/docs/glossary
 - Examples: https://github.com/mbc-net/mbc-cqrs-serveless-samples
-- Japanese Guide: https://www.mbc-net.com/tag/mbc-cqrs-serverless/
+- Japanese Guide: https://mbc-cqrs-serverless.mbc-net.com/ja/docs/build-todo-app
