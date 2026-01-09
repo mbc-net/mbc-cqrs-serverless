@@ -7,6 +7,8 @@
 
 The core package of the MBC CQRS Serverless framework, providing a complete implementation of CQRS (Command Query Responsibility Segregation) and Event Sourcing patterns for AWS serverless architectures.
 
+![Quick Start Demo](https://mbc-cqrs-serverless.mbc-net.com/demo/quick-start.gif)
+
 ## Features
 
 - **CQRS Pattern**: Separate command (write) and query (read) operations for better scalability

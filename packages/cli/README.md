@@ -7,6 +7,8 @@
 
 A command-line interface for the MBC CQRS Serverless framework. Quickly scaffold new projects, generate code, and manage your serverless CQRS applications.
 
+![Quick Start Demo](https://mbc-cqrs-serverless.mbc-net.com/demo/quick-start.gif)
+
 ## Features
 
 - **Project Scaffolding**: Create production-ready CQRS applications with a single command
