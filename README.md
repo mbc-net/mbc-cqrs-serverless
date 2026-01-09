@@ -65,6 +65,8 @@ npm run offline:sls      # Start API server
 
 ## See It in Action
 
+![Quick Start Demo](https://mbc-cqrs-serverless.mbc-net.com/demo/quick-start.gif)
+
 ### Create a CRUD endpoint in 30 lines:
 
 ```typescript
