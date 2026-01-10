@@ -98,6 +98,7 @@ export class ImportQueueEventHandler
       // )
     } catch (error) {
       // 5. Handle any errors during processing
+      // 5. 処理中のエラーをハンドリング
       this.logger.error(
         `Failed to process import job: ${importKey.pk}#${importKey.sk}`,
         error,
@@ -111,7 +112,24 @@ export class ImportQueueEventHandler
         }),
         this.importService.publishAlarm(event, (error as Error).stack),
       ])
-      throw error
+
+      // 6. Increment parent job counters to track failure and trigger completion check
+      // 6. 親ジョブのカウンターを更新し、完了チェックをトリガー
+      const skParts = importEntity.sk.split(KEY_SEPARATOR)
+      const parentId = skParts.slice(0, -1).join(KEY_SEPARATOR)
+
+      if (parentId.startsWith(CSV_IMPORT_PK_PREFIX)) {
+        this.logger.debug(
+          `Updating parent job counter for FAILED child: ${importEntity.id}`,
+        )
+        const parentKey = parseId(parentId)
+        // Mark as failed in parent job counters
+        // 親ジョブのカウンターで失敗としてマーク
+        await this.importService.incrementParentJobCounters(parentKey, false)
+      }
+
+      // Don't rethrow - the error has been handled and logged
+      // 再スローしない - エラーは処理・ログ済み
     }
   }
 
