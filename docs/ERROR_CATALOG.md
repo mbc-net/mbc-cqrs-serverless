@@ -327,6 +327,78 @@ Same as "version not match" error above - refresh and retry.
 
 ---
 
+## Import Module Errors
+
+### Step Functions Timeout (Import Job)
+
+**Location**: `packages/import/src/event/import-status.queue.event.handler.ts`
+
+**Symptom**: Step Functions execution stays in `RUNNING` state indefinitely for import jobs.
+
+**Cause**: Prior to version 0.1.75, the `ImportStatusHandler` only sent `SendTaskSuccessCommand` for completed jobs. When an import job failed, no callback was sent to Step Functions, causing it to wait indefinitely for the `waitForTaskToken` callback.
+
+**Solution** (Fixed in 0.1.75+):
+The handler now properly sends `SendTaskFailureCommand` when import jobs fail:
+
+```typescript
+// Internal behavior (automatic, no user action needed):
+// - COMPLETED status → SendTaskSuccessCommand
+// - FAILED status → SendTaskFailureCommand
+```
+
+If you're on an older version:
+1. Upgrade to `@mbc-cqrs-serverless/import@^0.1.75`
+2. For stuck executions, manually stop them via AWS Console or CLI:
+   ```bash
+   aws stepfunctions stop-execution --execution-arn <execution-arn>
+   ```
+
+---
+
+### BadRequestException: "No import strategy found for table: {tableName}"
+
+**Location**: `packages/import/src/import.service.ts`
+
+**Cause**: No import strategy is registered for the specified table name.
+
+**Solution**:
+Register an import strategy when configuring the ImportModule:
+
+```typescript
+ImportModule.register({
+  profiles: [
+    {
+      tableName: 'your-table-name',  // Must match the tableName in your import request
+      importStrategy: YourImportStrategy,
+      processStrategy: YourProcessStrategy,
+    },
+  ],
+})
+```
+
+---
+
+### Import Job Stuck in PROCESSING Status
+
+**Location**: `packages/import/src/event/import.queue.event.handler.ts`
+
+**Cause**: An error occurred during import processing but the job status wasn't properly updated, or DynamoDB streams failed to trigger the next step.
+
+**Solution**:
+1. Check CloudWatch logs for Lambda errors
+2. Verify DynamoDB streams are enabled on the import_tmp table
+3. Check if the SNS topic for import status notifications exists
+4. Clean up stuck records:
+   ```typescript
+   await importService.updateStatus(
+     { pk: 'CSV_IMPORT#tenant', sk: 'table#taskCode' },
+     ImportStatusEnum.FAILED,
+     { error: 'Manual cleanup' }
+   );
+   ```
+
+---
+
 ## HTTP Status Code Reference
 
 | Status | Exception | Meaning |
