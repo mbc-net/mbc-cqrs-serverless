@@ -3,6 +3,15 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [Unreleased]
+
+### Bug Fixes
+
+- **import:** add SendTaskFailure support to ImportStatusHandler for proper Step Functions error handling ([#xxx](https://github.com/mbc-net/mbc-cqrs-serverless/issues/xxx))
+  - Previously, when an import job failed, the Step Function would wait indefinitely because only SendTaskSuccess was implemented
+  - Now the handler properly sends SendTaskFailure when a job fails, allowing Step Functions to handle errors correctly
+  - Added comprehensive unit tests for the ImportStatusHandler
+
 ## [0.1.74-beta.0](https://github.com/mbc-net/mbc-cqrs-serverless/compare/v0.1.73-beta.0...v0.1.74-beta.0) (2025-08-25)
 
 ### Features
