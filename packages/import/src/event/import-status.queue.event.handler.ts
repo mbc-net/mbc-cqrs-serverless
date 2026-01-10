@@ -1,4 +1,7 @@
-import { SendTaskSuccessCommand } from '@aws-sdk/client-sfn'
+import {
+  SendTaskFailureCommand,
+  SendTaskSuccessCommand,
+} from '@aws-sdk/client-sfn'
 import {
   DetailKey,
   EventHandler,
@@ -28,19 +31,24 @@ export class ImportStatusHandler
   async execute(event: ImportStatusQueueEvent): Promise<void> {
     const notification = JSON.parse(event.body)
 
-    // 1. Filter for the specific event: a completed master CSV job.
+    // 1. Filter for specific events: completed or failed master CSV jobs.
     const pk = notification.pk as string
     const status = notification.content?.status
 
-    if (
-      status !== ImportStatusEnum.COMPLETED ||
-      !pk?.startsWith(`${CSV_IMPORT_PK_PREFIX}${KEY_SEPARATOR}`)
-    ) {
+    // Only process COMPLETED or FAILED status for CSV_IMPORT jobs
+    const isTerminalStatus =
+      status === ImportStatusEnum.COMPLETED ||
+      status === ImportStatusEnum.FAILED
+    const isCsvImportJob = pk?.startsWith(
+      `${CSV_IMPORT_PK_PREFIX}${KEY_SEPARATOR}`,
+    )
+
+    if (!isTerminalStatus || !isCsvImportJob) {
       return
     }
 
     this.logger.log(
-      `Received completed master CSV job event for: ${notification.id}`,
+      `Received ${status} master CSV job event for: ${notification.id}`,
     )
 
     try {
@@ -56,11 +64,20 @@ export class ImportStatusHandler
       // 3. Check if a taskToken was saved in its attributes.
       const taskToken = importJob.attributes?.taskToken
       if (taskToken) {
-        this.logger.log(`Found task token. Resuming Step Function.`)
+        this.logger.log(
+          `Found task token. Sending ${status} signal to Step Function.`,
+        )
 
-        // 4. Send the success signal back to the waiting Step Function.
-        // The output can be the result summary from the import job itself.
-        await this.sendTaskSuccess(taskToken, importJob.result)
+        // 4. Send the appropriate signal based on status.
+        if (status === ImportStatusEnum.COMPLETED) {
+          await this.sendTaskSuccess(taskToken, importJob.result)
+        } else if (status === ImportStatusEnum.FAILED) {
+          await this.sendTaskFailure(
+            taskToken,
+            'ImportFailed',
+            importJob.result,
+          )
+        }
       } else {
         this.logger.log(
           'No task token found in import job attributes. Nothing to do.',
@@ -83,6 +100,23 @@ export class ImportStatusHandler
       new SendTaskSuccessCommand({
         taskToken: taskToken,
         output: JSON.stringify(output),
+      }),
+    )
+  }
+
+  /**
+   * Sends a failure signal to a waiting Step Function task.
+   * @param taskToken The unique token of the paused task.
+   * @param error The error code to send back to the state machine.
+   * @param cause The detailed cause of the failure (will be JSON stringified).
+   */
+  async sendTaskFailure(taskToken: string, error: string, cause: any) {
+    this.logger.log(`Sending task failure for token: ${taskToken}`)
+    return this.sfnService.client.send(
+      new SendTaskFailureCommand({
+        taskToken: taskToken,
+        error: error,
+        cause: JSON.stringify(cause),
       }),
     )
   }
