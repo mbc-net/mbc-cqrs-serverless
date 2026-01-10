@@ -75,9 +75,11 @@ export class CsvImportSfnEventHandler
         this.logger.log(
           `Job ${input.sourceId} already finished. Setting final status.`,
         )
+        // Set status to FAILED if any child job failed, otherwise COMPLETED
+        // 子ジョブが1つでも失敗していればFAILED、そうでなければCOMPLETED
         const finalStatus =
           updatedEntity.failedRows > 0
-            ? ImportStatusEnum.COMPLETED
+            ? ImportStatusEnum.FAILED
             : ImportStatusEnum.COMPLETED
 
         await this.importService.updateStatus(parentKey, finalStatus)
@@ -240,8 +242,10 @@ export class CsvImportSfnEventHandler
       this.logger.log(
         `Finalizing parent CSV job ${parentKey.pk}#${parentKey.sk}`,
       )
+      // Set status to FAILED if any child job failed, otherwise COMPLETED
+      // 子ジョブが1つでも失敗していればFAILED、そうでなければCOMPLETED
       const finalStatus =
-        failedRows > 0 ? ImportStatusEnum.COMPLETED : ImportStatusEnum.COMPLETED
+        failedRows > 0 ? ImportStatusEnum.FAILED : ImportStatusEnum.COMPLETED
 
       await this.importService.updateStatus(parentKey, finalStatus, {
         result: {
