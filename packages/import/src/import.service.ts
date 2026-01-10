@@ -425,14 +425,17 @@ export class ImportService {
     const response = await this.dynamoDbService.client.send(command)
     const updatedEntity = unmarshall(response.Attributes) as ImportEntity
 
-    // 4. Check if the job is complete (this logic remains the same).
+    // 4. Check if the job is complete and update final status accordingly.
+    // 4. ジョブが完了したかチェックし、最終ステータスを更新する
     const { totalRows, processedRows, failedRows } = updatedEntity
     if (totalRows > 0 && processedRows >= totalRows) {
       this.logger.log(
         `Finalizing parent CSV job ${parentKey.pk}#${parentKey.sk}`,
       )
+      // Set status to FAILED if any child job failed, otherwise COMPLETED
+      // 子ジョブが1つでも失敗していればFAILED、そうでなければCOMPLETED
       const finalStatus =
-        failedRows > 0 ? ImportStatusEnum.COMPLETED : ImportStatusEnum.COMPLETED
+        failedRows > 0 ? ImportStatusEnum.FAILED : ImportStatusEnum.COMPLETED
 
       await this.updateStatus(parentKey, finalStatus, {
         result: {
