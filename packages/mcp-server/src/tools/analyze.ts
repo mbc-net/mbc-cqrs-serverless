@@ -48,6 +48,18 @@ const LookupErrorSchema = z.object({
   error_message: z.string().describe('The error message to look up'),
 })
 
+const CheckAntiPatternsSchema = z.object({
+  path: z.string().optional().describe('Path to check (defaults to src/)'),
+})
+
+const HealthCheckSchema = z.object({})
+
+const ExplainCodeSchema = z.object({
+  file_path: z.string().describe('Path to the file to explain'),
+  start_line: z.number().optional().describe('Starting line number'),
+  end_line: z.number().optional().describe('Ending line number'),
+})
+
 /**
  * Get all analyze tools.
  */
@@ -80,6 +92,49 @@ export function getAnalyzeTools(): Tool[] {
         required: ['error_message'],
       },
     },
+    {
+      name: 'mbc_check_anti_patterns',
+      description: 'Check the project code for common anti-patterns and bad practices. Returns a list of detected issues with locations and recommendations.',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          path: {
+            type: 'string',
+            description: 'Path to check (defaults to src/)',
+          },
+        },
+      },
+    },
+    {
+      name: 'mbc_health_check',
+      description: 'Perform a health check on the MBC CQRS Serverless project. Checks dependencies, structure, configuration, and common setup issues.',
+      inputSchema: {
+        type: 'object',
+        properties: {},
+      },
+    },
+    {
+      name: 'mbc_explain_code',
+      description: 'Analyze and explain a specific file or code section in the context of the MBC CQRS Serverless framework.',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          file_path: {
+            type: 'string',
+            description: 'Path to the file to explain',
+          },
+          start_line: {
+            type: 'number',
+            description: 'Starting line number (optional)',
+          },
+          end_line: {
+            type: 'number',
+            description: 'Ending line number (optional)',
+          },
+        },
+        required: ['file_path'],
+      },
+    },
   ]
 }
 
@@ -101,6 +156,20 @@ export async function handleAnalyzeTool(
     case 'mbc_lookup_error': {
       const parsed = LookupErrorSchema.parse(args)
       return await lookupError(parsed.error_message, projectPath)
+    }
+    case 'mbc_check_anti_patterns': {
+      const parsed = CheckAntiPatternsSchema.parse(args)
+      const targetPath = parsed.path ? path.resolve(projectPath, parsed.path) : path.join(projectPath, 'src')
+      return await checkAntiPatterns(targetPath, projectPath)
+    }
+    case 'mbc_health_check': {
+      HealthCheckSchema.parse(args)
+      return await healthCheck(projectPath)
+    }
+    case 'mbc_explain_code': {
+      const parsed = ExplainCodeSchema.parse(args)
+      const filePath = path.resolve(projectPath, parsed.file_path)
+      return await explainCode(filePath, parsed.start_line, parsed.end_line)
     }
     default:
       return {
@@ -336,4 +405,474 @@ function formatAnalysisResult(result: AnalysisResult): { content: { type: 'text'
   return {
     content: [{ type: 'text', text }],
   }
+}
+
+/**
+ * Anti-pattern detection interface.
+ */
+interface AntiPatternMatch {
+  code: string
+  name: string
+  severity: 'critical' | 'high' | 'medium' | 'low'
+  file: string
+  line: number
+  snippet: string
+  recommendation: string
+}
+
+/**
+ * Anti-patterns to check for.
+ */
+const ANTI_PATTERNS = [
+  {
+    code: 'AP001',
+    name: 'Direct DynamoDB Write',
+    severity: 'critical' as const,
+    pattern: /new\s+(PutItemCommand|UpdateItemCommand|DeleteItemCommand)\s*\(/,
+    recommendation: 'Use CommandService.publishAsync() instead of direct DynamoDB writes to maintain CQRS pattern.',
+  },
+  {
+    code: 'AP002',
+    name: 'Ignored Version Mismatch',
+    severity: 'high' as const,
+    pattern: /catch\s*\([^)]*\)\s*\{[^}]*VersionMismatch[^}]*(?:console\.log|\/\/|return\s*;)/,
+    recommendation: 'Handle VersionMismatchError by retrying with fresh data, not by ignoring.',
+  },
+  {
+    code: 'AP004',
+    name: 'N+1 Query Pattern',
+    severity: 'high' as const,
+    pattern: /for\s*\([^)]+\)\s*\{[^}]*await\s+(?:this\.)?(?:dataService|commandService)\./,
+    recommendation: 'Use batch operations or pre-fetch data before the loop.',
+  },
+  {
+    code: 'AP005',
+    name: 'Full Table Scan',
+    severity: 'high' as const,
+    pattern: /\.scan\s*\(\s*\{[^}]*TableName/,
+    recommendation: 'Use Query with proper key conditions instead of Scan.',
+  },
+  {
+    code: 'AP007',
+    name: 'Hardcoded Tenant',
+    severity: 'critical' as const,
+    pattern: /['"`]TENANT#\w+['"`]/,
+    recommendation: 'Use getUserContext(context).tenantCode to get tenant dynamically.',
+  },
+  {
+    code: 'AP008',
+    name: 'Missing Tenant Validation',
+    severity: 'critical' as const,
+    pattern: /(?:dto|body|request)\s*\.\s*tenantCode/,
+    recommendation: 'Never trust client-provided tenant codes. Use getUserContext() from authenticated context.',
+  },
+  {
+    code: 'AP009',
+    name: 'Throwing in Sync Handler',
+    severity: 'high' as const,
+    pattern: /@DataSyncHandler[^]*throw\s+(?:error|new\s+\w+Error)/,
+    recommendation: 'Handle errors gracefully in DataSyncHandler. Use DLQ for failed events.',
+  },
+  {
+    code: 'AP013',
+    name: 'Hardcoded Secret',
+    severity: 'critical' as const,
+    pattern: /(?:password|secret|apiKey|token)\s*[:=]\s*['"`][^'"`]{8,}['"`]/i,
+    recommendation: 'Use environment variables or AWS Secrets Manager for sensitive values.',
+  },
+  {
+    code: 'AP014',
+    name: 'Manual JWT Parsing',
+    severity: 'critical' as const,
+    pattern: /atob\s*\([^)]*\.split\s*\(['"`]\.['"`]\)/,
+    recommendation: 'Use the framework\'s built-in JWT validation via Cognito authorizer.',
+  },
+  {
+    code: 'AP017',
+    name: 'Heavy Module Import',
+    severity: 'medium' as const,
+    pattern: /^import\s+\*\s+as\s+\w+\s+from\s+['"`](?:aws-sdk|lodash|moment)['"`]/m,
+    recommendation: 'Import only what you need to reduce cold start time.',
+  },
+]
+
+/**
+ * Check for anti-patterns in code.
+ */
+async function checkAntiPatterns(
+  targetPath: string,
+  projectPath: string
+): Promise<{ content: { type: 'text'; text: string }[]; isError?: boolean }> {
+  if (!fs.existsSync(targetPath)) {
+    return {
+      content: [{ type: 'text', text: `Path not found: ${targetPath}` }],
+      isError: true,
+    }
+  }
+
+  const matches: AntiPatternMatch[] = []
+  const files = await findFiles(targetPath, '.ts')
+
+  for (const file of files) {
+    if (file.includes('.spec.') || file.includes('.test.') || file.includes('.d.ts')) {
+      continue
+    }
+
+    const content = fs.readFileSync(file, 'utf-8')
+    const lines = content.split('\n')
+
+    for (const ap of ANTI_PATTERNS) {
+      const regex = new RegExp(ap.pattern.source, 'gm')
+      let match
+      while ((match = regex.exec(content)) !== null) {
+        const lineNumber = content.substring(0, match.index).split('\n').length
+        const snippet = lines[lineNumber - 1]?.trim() || ''
+
+        matches.push({
+          code: ap.code,
+          name: ap.name,
+          severity: ap.severity,
+          file: path.relative(projectPath, file),
+          line: lineNumber,
+          snippet: snippet.length > 80 ? snippet.substring(0, 77) + '...' : snippet,
+          recommendation: ap.recommendation,
+        })
+      }
+    }
+  }
+
+  if (matches.length === 0) {
+    return {
+      content: [{
+        type: 'text',
+        text: '## Anti-Pattern Check Results\n\n✅ No anti-patterns detected! Your code follows best practices.',
+      }],
+    }
+  }
+
+  // Group by severity
+  const critical = matches.filter(m => m.severity === 'critical')
+  const high = matches.filter(m => m.severity === 'high')
+  const medium = matches.filter(m => m.severity === 'medium')
+  const low = matches.filter(m => m.severity === 'low')
+
+  let text = `## Anti-Pattern Check Results\n\n`
+  text += `Found **${matches.length}** potential issue(s):\n\n`
+  text += `| Severity | Count |\n|----------|-------|\n`
+  text += `| 🔴 Critical | ${critical.length} |\n`
+  text += `| 🟠 High | ${high.length} |\n`
+  text += `| 🟡 Medium | ${medium.length} |\n`
+  text += `| 🟢 Low | ${low.length} |\n\n`
+
+  for (const m of matches) {
+    const icon = m.severity === 'critical' ? '🔴' : m.severity === 'high' ? '🟠' : m.severity === 'medium' ? '🟡' : '🟢'
+    text += `### ${icon} ${m.code}: ${m.name}\n\n`
+    text += `**File:** \`${m.file}:${m.line}\`\n`
+    text += `**Snippet:** \`${m.snippet}\`\n\n`
+    text += `**Recommendation:** ${m.recommendation}\n\n`
+    text += `---\n\n`
+  }
+
+  return { content: [{ type: 'text', text }] }
+}
+
+/**
+ * Health check result interface.
+ */
+interface HealthCheckResult {
+  status: 'healthy' | 'warning' | 'error'
+  checks: {
+    name: string
+    status: 'pass' | 'warn' | 'fail'
+    message: string
+  }[]
+}
+
+/**
+ * Perform health check on project.
+ */
+async function healthCheck(
+  projectPath: string
+): Promise<{ content: { type: 'text'; text: string }[] }> {
+  const result: HealthCheckResult = {
+    status: 'healthy',
+    checks: [],
+  }
+
+  // Check package.json
+  const packageJsonPath = path.join(projectPath, 'package.json')
+  if (fs.existsSync(packageJsonPath)) {
+    const pkg = JSON.parse(fs.readFileSync(packageJsonPath, 'utf-8'))
+    const deps = { ...pkg.dependencies, ...pkg.devDependencies }
+
+    // Check for MBC packages
+    const mbcPackages = Object.keys(deps).filter(k => k.startsWith('@mbc-cqrs-serverless/'))
+    if (mbcPackages.length === 0) {
+      result.checks.push({
+        name: 'MBC Framework',
+        status: 'fail',
+        message: 'No @mbc-cqrs-serverless packages found. Is this an MBC project?',
+      })
+      result.status = 'error'
+    } else {
+      result.checks.push({
+        name: 'MBC Framework',
+        status: 'pass',
+        message: `Found ${mbcPackages.length} package(s): ${mbcPackages.join(', ')}`,
+      })
+    }
+
+    // Check for @nestjs packages
+    const nestPackages = Object.keys(deps).filter(k => k.startsWith('@nestjs/'))
+    if (nestPackages.length === 0) {
+      result.checks.push({
+        name: 'NestJS',
+        status: 'fail',
+        message: 'No @nestjs packages found.',
+      })
+      result.status = 'error'
+    } else {
+      result.checks.push({
+        name: 'NestJS',
+        status: 'pass',
+        message: `Found ${nestPackages.length} NestJS package(s)`,
+      })
+    }
+
+    // Check TypeScript version
+    const tsVersion = deps['typescript']
+    if (!tsVersion) {
+      result.checks.push({
+        name: 'TypeScript',
+        status: 'warn',
+        message: 'TypeScript not found in dependencies',
+      })
+      if (result.status === 'healthy') result.status = 'warning'
+    } else {
+      result.checks.push({
+        name: 'TypeScript',
+        status: 'pass',
+        message: `Version: ${tsVersion}`,
+      })
+    }
+  } else {
+    result.checks.push({
+      name: 'package.json',
+      status: 'fail',
+      message: 'package.json not found',
+    })
+    result.status = 'error'
+  }
+
+  // Check for .env file
+  const envPath = path.join(projectPath, '.env')
+  const envExamplePath = path.join(projectPath, '.env.example')
+  if (!fs.existsSync(envPath)) {
+    if (fs.existsSync(envExamplePath)) {
+      result.checks.push({
+        name: 'Environment',
+        status: 'warn',
+        message: '.env not found, but .env.example exists. Copy and configure it.',
+      })
+      if (result.status === 'healthy') result.status = 'warning'
+    } else {
+      result.checks.push({
+        name: 'Environment',
+        status: 'warn',
+        message: 'No .env file found',
+      })
+      if (result.status === 'healthy') result.status = 'warning'
+    }
+  } else {
+    result.checks.push({
+      name: 'Environment',
+      status: 'pass',
+      message: '.env file exists',
+    })
+  }
+
+  // Check for src directory
+  const srcPath = path.join(projectPath, 'src')
+  if (!fs.existsSync(srcPath)) {
+    result.checks.push({
+      name: 'Source Directory',
+      status: 'fail',
+      message: 'src/ directory not found',
+    })
+    result.status = 'error'
+  } else {
+    const moduleCount = (await findFiles(srcPath, '.module.ts')).length
+    result.checks.push({
+      name: 'Source Directory',
+      status: 'pass',
+      message: `Found ${moduleCount} module(s)`,
+    })
+  }
+
+  // Check for serverless.yml or serverless.ts
+  const serverlessYml = path.join(projectPath, 'serverless.yml')
+  const serverlessTs = path.join(projectPath, 'serverless.ts')
+  if (!fs.existsSync(serverlessYml) && !fs.existsSync(serverlessTs)) {
+    result.checks.push({
+      name: 'Serverless Config',
+      status: 'warn',
+      message: 'No serverless.yml or serverless.ts found',
+    })
+    if (result.status === 'healthy') result.status = 'warning'
+  } else {
+    result.checks.push({
+      name: 'Serverless Config',
+      status: 'pass',
+      message: fs.existsSync(serverlessYml) ? 'serverless.yml found' : 'serverless.ts found',
+    })
+  }
+
+  // Format output
+  const icon = result.status === 'healthy' ? '✅' : result.status === 'warning' ? '⚠️' : '❌'
+  let text = `## Project Health Check ${icon}\n\n`
+  text += `**Overall Status:** ${result.status.toUpperCase()}\n\n`
+  text += `| Check | Status | Details |\n`
+  text += `|-------|--------|--------|\n`
+
+  for (const check of result.checks) {
+    const statusIcon = check.status === 'pass' ? '✅' : check.status === 'warn' ? '⚠️' : '❌'
+    text += `| ${check.name} | ${statusIcon} | ${check.message} |\n`
+  }
+
+  return { content: [{ type: 'text', text }] }
+}
+
+/**
+ * Explain code in MBC context.
+ */
+async function explainCode(
+  filePath: string,
+  startLine?: number,
+  endLine?: number
+): Promise<{ content: { type: 'text'; text: string }[]; isError?: boolean }> {
+  if (!fs.existsSync(filePath)) {
+    return {
+      content: [{ type: 'text', text: `File not found: ${filePath}` }],
+      isError: true,
+    }
+  }
+
+  const content = fs.readFileSync(filePath, 'utf-8')
+  const lines = content.split('\n')
+  const fileName = path.basename(filePath)
+
+  let codeSection: string
+  if (startLine !== undefined && endLine !== undefined) {
+    codeSection = lines.slice(startLine - 1, endLine).join('\n')
+  } else {
+    codeSection = content
+  }
+
+  // Detect file type and patterns
+  const patterns: string[] = []
+  const explanations: string[] = []
+
+  // Module detection
+  if (content.includes('@Module(')) {
+    patterns.push('NestJS Module')
+    if (content.includes('CommandModule')) {
+      explanations.push('This module imports CommandModule, enabling CQRS command handling.')
+    }
+    if (content.includes('imports:')) {
+      explanations.push('The imports array lists other modules this module depends on.')
+    }
+    if (content.includes('providers:')) {
+      explanations.push('The providers array lists services and handlers available in this module.')
+    }
+  }
+
+  // Controller detection
+  if (content.includes('@Controller(')) {
+    patterns.push('REST Controller')
+    if (content.includes('@Get(')) explanations.push('Contains GET endpoint(s) for read operations.')
+    if (content.includes('@Post(')) explanations.push('Contains POST endpoint(s) for create operations.')
+    if (content.includes('@Patch(') || content.includes('@Put(')) {
+      explanations.push('Contains PATCH/PUT endpoint(s) for update operations.')
+    }
+    if (content.includes('@Delete(')) explanations.push('Contains DELETE endpoint(s) for delete operations.')
+  }
+
+  // Service detection
+  if (content.includes('@Injectable()') && fileName.includes('.service.')) {
+    patterns.push('Service')
+    if (content.includes('CommandService')) {
+      explanations.push('Uses CommandService for publishing commands (state changes).')
+    }
+    if (content.includes('DataService')) {
+      explanations.push('Uses DataService for querying data (read operations).')
+    }
+    if (content.includes('SequenceService')) {
+      explanations.push('Uses SequenceService for generating sequential IDs.')
+    }
+  }
+
+  // Entity detection
+  if (fileName.includes('.entity.')) {
+    patterns.push('Entity')
+    if (content.includes('CommandEntity')) {
+      explanations.push('This is a Command entity stored in the command table for write operations.')
+    }
+    if (content.includes('DataEntity')) {
+      explanations.push('This is a Data entity stored in the data table for read operations.')
+    }
+    if (content.includes('pk:') && content.includes('sk:')) {
+      explanations.push('Uses DynamoDB single-table design with partition key (pk) and sort key (sk).')
+    }
+  }
+
+  // Handler detection
+  if (content.includes('@DataSyncHandler(')) {
+    patterns.push('Data Sync Handler')
+    explanations.push('This handler reacts to DynamoDB Streams events for data synchronization.')
+    explanations.push('It runs when items are created, updated, or deleted in DynamoDB.')
+  }
+
+  // CQRS patterns
+  if (content.includes('publishAsync(')) {
+    explanations.push('Uses publishAsync() for non-blocking command publishing.')
+  }
+  if (content.includes('publishSync(')) {
+    explanations.push('Uses publishSync() for synchronous command execution (waits for Step Functions).')
+  }
+  if (content.includes('getUserContext(')) {
+    explanations.push('Extracts user context (tenantCode, userId, role) from the invocation context.')
+  }
+
+  // Build output
+  let text = `## Code Analysis: ${fileName}\n\n`
+
+  if (patterns.length > 0) {
+    text += `### Detected Patterns\n\n`
+    for (const p of patterns) {
+      text += `- ${p}\n`
+    }
+    text += '\n'
+  }
+
+  if (explanations.length > 0) {
+    text += `### Explanation\n\n`
+    for (const e of explanations) {
+      text += `- ${e}\n`
+    }
+    text += '\n'
+  }
+
+  if (startLine !== undefined && endLine !== undefined) {
+    text += `### Code Section (lines ${startLine}-${endLine})\n\n`
+    text += '```typescript\n'
+    text += codeSection
+    text += '\n```\n'
+  }
+
+  if (patterns.length === 0 && explanations.length === 0) {
+    text += 'No specific MBC CQRS patterns detected in this file.\n'
+    text += 'This might be a utility file, DTO, or non-framework-specific code.\n'
+  }
+
+  return { content: [{ type: 'text', text }] }
 }
