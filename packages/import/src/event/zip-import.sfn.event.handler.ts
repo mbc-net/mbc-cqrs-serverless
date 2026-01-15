@@ -1,9 +1,18 @@
-import { EventHandler, IEventHandler } from '@mbc-cqrs-serverless/core'
-import { Injectable, Logger } from '@nestjs/common'
+import {
+  DetailKey,
+  EventHandler,
+  IEventHandler,
+} from '@mbc-cqrs-serverless/core'
+import { Inject, Injectable, Logger } from '@nestjs/common'
 
 import { CreateCsvImportDto } from '../dto'
 import { ImportStatusEnum, ProcessingMode } from '../enum'
+import { ZIP_FINALIZATION_HOOKS } from '../import.module-definition'
 import { ImportService } from '../import.service'
+import {
+  IZipFinalizationHook,
+  ZipFinalizationContext,
+} from '../interface/zip-finalization-hook.interface'
 import { ZipImportSfnEvent } from './zip-import.sfn.event'
 
 @Injectable()
@@ -13,7 +22,11 @@ export class ZipImportSfnEventHandler
 {
   private readonly logger: Logger = new Logger(ZipImportSfnEventHandler.name)
 
-  constructor(private readonly importService: ImportService) {}
+  constructor(
+    private readonly importService: ImportService,
+    @Inject(ZIP_FINALIZATION_HOOKS)
+    private readonly finalizationHooks: IZipFinalizationHook[],
+  ) {}
 
   async execute(event: ZipImportSfnEvent): Promise<any> {
     const stateName = event.context.State.Name
@@ -105,6 +118,14 @@ export class ZipImportSfnEventHandler
     )
     const finalStatus = ImportStatusEnum.COMPLETED
 
+    // Execute finalization hooks in parallel
+    await this.executeFinalizationHooks(
+      event,
+      masterJobKey,
+      finalSummary,
+      finalStatus,
+    )
+
     await this.importService.updateStatus(masterJobKey, finalStatus, {
       result: finalSummary,
     })
@@ -112,5 +133,58 @@ export class ZipImportSfnEventHandler
     this.logger.log(
       `Successfully finalized ZIP master job ${masterJobKey.pk}#${masterJobKey.sk} with status ${finalStatus}`,
     )
+  }
+
+  /**
+   * Executes all registered ZIP finalization hooks in parallel.
+   * Errors are logged but do not affect job completion status.
+   */
+  private async executeFinalizationHooks(
+    event: ZipImportSfnEvent,
+    masterJobKey: DetailKey,
+    results: { totalRows: number; processedRows: number; failedRows: number },
+    status: ImportStatusEnum,
+  ): Promise<void> {
+    if (!this.finalizationHooks || this.finalizationHooks.length === 0) {
+      this.logger.debug('No ZIP finalization hooks registered')
+      return
+    }
+
+    this.logger.log(
+      `Executing ${this.finalizationHooks.length} ZIP finalization hook(s)`,
+    )
+
+    const context: ZipFinalizationContext = {
+      event,
+      masterJobKey,
+      results,
+      status,
+      executionInput: event.context.Execution.Input,
+    }
+
+    // Execute all hooks in parallel with error isolation
+    const hookPromises = this.finalizationHooks.map(async (hook, index) => {
+      try {
+        this.logger.log(
+          `Executing ZIP finalization hook ${index + 1}/${this.finalizationHooks.length}`,
+        )
+        await hook.execute(context)
+        this.logger.log(
+          `ZIP finalization hook ${index + 1} completed successfully`,
+        )
+      } catch (error) {
+        const errorMessage =
+          error instanceof Error ? error.message : String(error)
+        const errorStack = error instanceof Error ? error.stack : undefined
+        this.logger.error(
+          `ZIP finalization hook ${index + 1} failed: ${errorMessage}`,
+          errorStack,
+        )
+        // Continue execution - don't propagate error
+      }
+    })
+
+    await Promise.allSettled(hookPromises)
+    this.logger.log(`All ZIP finalization hooks completed`)
   }
 }
