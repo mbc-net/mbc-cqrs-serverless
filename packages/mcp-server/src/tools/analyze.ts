@@ -422,6 +422,7 @@ interface AntiPatternMatch {
 
 /**
  * Anti-patterns to check for.
+ * Codes are sequential from AP001 to AP010.
  */
 const ANTI_PATTERNS = [
   {
@@ -439,56 +440,57 @@ const ANTI_PATTERNS = [
     recommendation: 'Handle VersionMismatchError by retrying with fresh data, not by ignoring.',
   },
   {
-    code: 'AP004',
+    code: 'AP003',
     name: 'N+1 Query Pattern',
     severity: 'high' as const,
     pattern: /for\s*\([^)]+\)\s*\{[^}]*await\s+(?:this\.)?(?:dataService|commandService)\./,
     recommendation: 'Use batch operations or pre-fetch data before the loop.',
   },
   {
-    code: 'AP005',
+    code: 'AP004',
     name: 'Full Table Scan',
     severity: 'high' as const,
     pattern: /\.scan\s*\(\s*\{[^}]*TableName/,
     recommendation: 'Use Query with proper key conditions instead of Scan.',
   },
   {
-    code: 'AP007',
+    code: 'AP005',
     name: 'Hardcoded Tenant',
     severity: 'critical' as const,
     pattern: /['"`]TENANT#\w+['"`]/,
     recommendation: 'Use getUserContext(context).tenantCode to get tenant dynamically.',
   },
   {
-    code: 'AP008',
+    code: 'AP006',
     name: 'Missing Tenant Validation',
     severity: 'critical' as const,
     pattern: /(?:dto|body|request)\s*\.\s*tenantCode/,
     recommendation: 'Never trust client-provided tenant codes. Use getUserContext() from authenticated context.',
   },
   {
-    code: 'AP009',
+    code: 'AP007',
     name: 'Throwing in Sync Handler',
     severity: 'high' as const,
-    pattern: /@DataSyncHandler[^]*throw\s+(?:error|new\s+\w+Error)/,
+    // Limit match to 500 characters to avoid false positives across distant code
+    pattern: /@DataSyncHandler[\s\S]{0,500}throw\s+(?:error|new\s+\w+Error)/,
     recommendation: 'Handle errors gracefully in DataSyncHandler. Use DLQ for failed events.',
   },
   {
-    code: 'AP013',
+    code: 'AP008',
     name: 'Hardcoded Secret',
     severity: 'critical' as const,
     pattern: /(?:password|secret|apiKey|token)\s*[:=]\s*['"`][^'"`]{8,}['"`]/i,
     recommendation: 'Use environment variables or AWS Secrets Manager for sensitive values.',
   },
   {
-    code: 'AP014',
+    code: 'AP009',
     name: 'Manual JWT Parsing',
     severity: 'critical' as const,
     pattern: /atob\s*\([^)]*\.split\s*\(['"`]\.['"`]\)/,
     recommendation: 'Use the framework\'s built-in JWT validation via Cognito authorizer.',
   },
   {
-    code: 'AP017',
+    code: 'AP010',
     name: 'Heavy Module Import',
     severity: 'medium' as const,
     pattern: /^import\s+\*\s+as\s+\w+\s+from\s+['"`](?:aws-sdk|lodash|moment)['"`]/m,
@@ -511,6 +513,7 @@ async function checkAntiPatterns(
   }
 
   const matches: AntiPatternMatch[] = []
+  const skippedFiles: string[] = []
   const files = await findFiles(targetPath, '.ts')
 
   for (const file of files) {
@@ -518,7 +521,14 @@ async function checkAntiPatterns(
       continue
     }
 
-    const content = fs.readFileSync(file, 'utf-8')
+    let content: string
+    try {
+      content = fs.readFileSync(file, 'utf-8')
+    } catch (err) {
+      // Skip files that cannot be read (permission issues, etc.)
+      skippedFiles.push(path.relative(projectPath, file))
+      continue
+    }
     const lines = content.split('\n')
 
     for (const ap of ANTI_PATTERNS) {
@@ -542,11 +552,12 @@ async function checkAntiPatterns(
   }
 
   if (matches.length === 0) {
+    let text = '## Anti-Pattern Check Results\n\n✅ No anti-patterns detected! Your code follows best practices.'
+    if (skippedFiles.length > 0) {
+      text += `\n\n**Note:** ${skippedFiles.length} file(s) could not be read and were skipped.`
+    }
     return {
-      content: [{
-        type: 'text',
-        text: '## Anti-Pattern Check Results\n\n✅ No anti-patterns detected! Your code follows best practices.',
-      }],
+      content: [{ type: 'text', text }],
     }
   }
 
@@ -571,6 +582,10 @@ async function checkAntiPatterns(
     text += `**Snippet:** \`${m.snippet}\`\n\n`
     text += `**Recommendation:** ${m.recommendation}\n\n`
     text += `---\n\n`
+  }
+
+  if (skippedFiles.length > 0) {
+    text += `**Note:** ${skippedFiles.length} file(s) could not be read and were skipped.\n`
   }
 
   return { content: [{ type: 'text', text }] }
@@ -602,7 +617,18 @@ async function healthCheck(
   // Check package.json
   const packageJsonPath = path.join(projectPath, 'package.json')
   if (fs.existsSync(packageJsonPath)) {
-    const pkg = JSON.parse(fs.readFileSync(packageJsonPath, 'utf-8'))
+    let pkg: { dependencies?: Record<string, string>; devDependencies?: Record<string, string> }
+    try {
+      pkg = JSON.parse(fs.readFileSync(packageJsonPath, 'utf-8'))
+    } catch (err) {
+      result.checks.push({
+        name: 'package.json',
+        status: 'fail',
+        message: 'package.json exists but could not be parsed (invalid JSON)',
+      })
+      result.status = 'error'
+      pkg = {}
+    }
     const deps = { ...pkg.dependencies, ...pkg.devDependencies }
 
     // Check for MBC packages
