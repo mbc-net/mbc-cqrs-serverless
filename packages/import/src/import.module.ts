@@ -15,9 +15,10 @@ import {
   IMPORT_STRATEGY_MAP,
   OPTIONS_TYPE,
   PROCESS_STRATEGY_MAP,
+  ZIP_FINALIZATION_HOOKS,
 } from './import.module-definition'
 import { ImportService } from './import.service'
-import { ImportEntityProfile } from './interface'
+import { ImportEntityProfile, IZipFinalizationHook } from './interface'
 import { IImportStrategy } from './interface/import-strategy.interface'
 import { IProcessStrategy } from './interface/processing-strategy.interface'
 
@@ -40,7 +41,8 @@ export class ImportModule extends ConfigurableModuleClass {
   static register(options: typeof OPTIONS_TYPE): DynamicModule {
     const module = super.register(options)
 
-    const { enableController, profiles, imports } = options
+    const { enableController, profiles, imports, zipFinalizationHooks } =
+      options
 
     module.imports = [...(module.imports || []), ...(imports || [])]
 
@@ -56,6 +58,26 @@ export class ImportModule extends ConfigurableModuleClass {
         (p) => p.processStrategy,
       ),
     ]
+
+    // Add hooks provider
+    if (zipFinalizationHooks && zipFinalizationHooks.length > 0) {
+      // Add hook classes as providers so they can be injected
+      zipFinalizationHooks.forEach((hookClass) => {
+        dynamicProviders.push(hookClass)
+      })
+
+      // Add the array provider that collects all hook instances
+      dynamicProviders.push({
+        provide: ZIP_FINALIZATION_HOOKS,
+        useFactory: (...instances: IZipFinalizationHook[]) => instances,
+        inject: zipFinalizationHooks,
+      })
+    } else {
+      dynamicProviders.push({
+        provide: ZIP_FINALIZATION_HOOKS,
+        useValue: [],
+      })
+    }
 
     module.providers = [...(module.providers || []), ...dynamicProviders]
 
