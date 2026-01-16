@@ -1090,7 +1090,7 @@ export class InfraStack extends cdk.Stack {
     )
 
     const sesPolicy = new cdk.aws_iam.PolicyStatement({
-      actions: ['ses:SendEmail'],
+      actions: ['ses:SendEmail', 'ses:SendTemplatedEmail'],
       resources: ['*'],
     })
 

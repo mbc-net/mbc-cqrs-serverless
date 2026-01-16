@@ -53,3 +53,38 @@ export interface EmailNotification {
   /** Optional file attachments */
   attachments?: Attachment[]
 }
+
+/**
+ * Configuration for SES Inline Templates.
+ * The subject and body are defined here rather than in the AWS Console.
+ */
+export interface InlineTemplateContent {
+  /** The subject line, can include tags like {{name}} */
+  subject: string
+  /** The HTML body, can include tags like {{name}} */
+  html: string
+  /** Optional plain text body for clients that don't render HTML */
+  text?: string
+}
+
+/**
+ * Notification payload for sending emails via Inline Templates.
+ */
+export interface TemplatedEmailNotification {
+  /** Sender email address (uses default if not specified) */
+  fromAddr?: string
+  /** List of recipient email addresses */
+  toAddrs: string[]
+  /** Optional CC recipients */
+  ccAddrs?: string[]
+  /** Optional BCC recipients */
+  bccAddrs?: string[]
+  /** Optional reply-to addresses */
+  replyToAddrs?: string[]
+  /** The template structure (Subject, HTML, Text) */
+  template: InlineTemplateContent
+  /** The actual data to inject into the template variables. e.g. { name: "Alex", verificationCode: "12345" } */
+  data: Record<string, any>
+  /** Optional configuration set name to handle open/click tracking events */
+  configurationSetName?: string
+}

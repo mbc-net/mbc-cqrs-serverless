@@ -5,7 +5,7 @@ import { Logger } from '@nestjs/common'
 import nodemailer from 'nodemailer'
 
 import { EmailService } from './email.service'
-import { EmailNotification } from '../interfaces'
+import { EmailNotification, TemplatedEmailNotification } from '../interfaces'
 
 // --- Mocking Dependencies ---
 
@@ -522,6 +522,180 @@ describe('EmailService', () => {
       expect(results[1].status).toBe('rejected')
       expect(results[2].status).toBe('fulfilled')
       expect(mockAwsSend).toHaveBeenCalledTimes(3)
+    })
+  })
+
+  /**
+   * Test Overview: Tests Inline Template functionality
+   * Purpose: Ensures both AWS Native templates (Production) and Manual Compilation (Local/Offline) work correctly
+   * Details: Covers env-based logic switching, variable substitution, and validation
+   */
+  describe('sendInlineTemplateEmail', () => {
+    const OLD_ENV = process.env
+
+    beforeEach(() => {
+      jest.resetModules() // Most important - reset cache
+      process.env = { ...OLD_ENV } // Make a copy
+      mockAwsSend.mockResolvedValue({ MessageId: 'msg-id-123' })
+    })
+
+    afterAll(() => {
+      process.env = OLD_ENV // Restore original environment
+    })
+
+    const baseMsg: TemplatedEmailNotification = {
+      toAddrs: ['user@example.com'],
+      template: {
+        subject: 'Welcome {{name}}!',
+        html: '<p>Hello {{name}}, your code is {{code}}.</p>',
+        text: 'Hello {{name}}, code: {{code}}',
+      },
+      data: {
+        name: 'Alice',
+        code: '12345',
+      },
+    }
+
+    it('should return undefined and log warning if no recipients provided', async () => {
+      const msgNoRecipients: TemplatedEmailNotification = {
+        ...baseMsg,
+        toAddrs: [],
+        ccAddrs: [],
+        bccAddrs: [],
+      }
+
+      const result = await service.sendInlineTemplateEmail(msgNoRecipients)
+
+      expect(result).toBeUndefined()
+      expect(mockAwsSend).not.toHaveBeenCalled()
+    })
+
+    describe('Environment: PRODUCTION (AWS Native Templates)', () => {
+      beforeEach(() => {
+        // Ensure IS_OFFLINE is false/undefined
+        delete process.env.IS_OFFLINE
+      })
+
+      it('should use SendEmailCommand with Template structure', async () => {
+        await service.sendInlineTemplateEmail(baseMsg)
+
+        expect(SendEmailCommand).toHaveBeenCalledTimes(1)
+        const commandInput = (SendEmailCommand as unknown as jest.Mock).mock
+          .calls[0][0]
+
+        // 1. Check Payload Structure
+        expect(commandInput.Content.Template).toBeDefined()
+        expect(commandInput.Content.Simple).toBeUndefined()
+
+        // 2. Check Template Content
+        expect(commandInput.Content.Template.TemplateContent.Subject).toBe(
+          baseMsg.template.subject,
+        )
+        expect(commandInput.Content.Template.TemplateContent.Html).toBe(
+          baseMsg.template.html,
+        )
+
+        // 3. Check Data Serialization
+        // AWS requires TemplateData to be a JSON string
+        expect(commandInput.Content.Template.TemplateData).toBe(
+          JSON.stringify(baseMsg.data),
+        )
+      })
+
+      it('should include ConfigurationSetName if provided', async () => {
+        const msgWithConfig: TemplatedEmailNotification = {
+          ...baseMsg,
+          configurationSetName: 'TrackingSet',
+        }
+
+        await service.sendInlineTemplateEmail(msgWithConfig)
+
+        const commandInput = (SendEmailCommand as unknown as jest.Mock).mock
+          .calls[0][0]
+        expect(commandInput.ConfigurationSetName).toBe('TrackingSet')
+      })
+    })
+
+    describe('Environment: LOCAL/OFFLINE (Manual Compilation)', () => {
+      beforeEach(() => {
+        process.env.IS_OFFLINE = 'true'
+      })
+
+      it('should manually compile template and use Simple content structure', async () => {
+        await service.sendInlineTemplateEmail(baseMsg)
+
+        expect(SendEmailCommand).toHaveBeenCalledTimes(1)
+        const commandInput = (SendEmailCommand as unknown as jest.Mock).mock
+          .calls[0][0]
+
+        // 1. Check Payload Structure (Should be Simple, NOT Template)
+        expect(commandInput.Content.Simple).toBeDefined()
+        expect(commandInput.Content.Template).toBeUndefined()
+
+        // 2. Check Variable Substitution
+        // Subject: "Welcome {{name}}!" -> "Welcome Alice!"
+        expect(commandInput.Content.Simple.Subject.Data).toBe('Welcome Alice!')
+
+        // HTML: "Hello {{name}}, your code is {{code}}."
+        expect(commandInput.Content.Simple.Body.Html.Data).toBe(
+          '<p>Hello Alice, your code is 12345.</p>',
+        )
+
+        // Text: "Hello {{name}}, code: {{code}}"
+        expect(commandInput.Content.Simple.Body.Text.Data).toBe(
+          'Hello Alice, code: 12345',
+        )
+      })
+
+      it('should handle missing data keys by preserving the tag (regex fallback)', async () => {
+        // Missing 'code' in data
+        const incompleteDataMsg: TemplatedEmailNotification = {
+          ...baseMsg,
+          data: { name: 'Bob' }, // 'code' is missing
+        }
+
+        await service.sendInlineTemplateEmail(incompleteDataMsg)
+
+        const commandInput = (SendEmailCommand as unknown as jest.Mock).mock
+          .calls[0][0]
+
+        // Expect {{name}} to be replaced, but {{code}} to remain literally
+        expect(commandInput.Content.Simple.Body.Html.Data).toBe(
+          '<p>Hello Bob, your code is {{code}}.</p>',
+        )
+      })
+
+      it('should handle missing text part in template', async () => {
+        const msgNoText: TemplatedEmailNotification = {
+          ...baseMsg,
+          template: {
+            subject: 'Subj',
+            html: '<p>Html</p>',
+            // text is undefined
+          },
+        }
+
+        await service.sendInlineTemplateEmail(msgNoText)
+
+        const commandInput = (SendEmailCommand as unknown as jest.Mock).mock
+          .calls[0][0]
+
+        expect(commandInput.Content.Simple.Body.Text).toBeUndefined()
+        expect(commandInput.Content.Simple.Body.Html.Data).toBe('<p>Html</p>')
+      })
+    })
+
+    it('should catch and log errors during sending', async () => {
+      mockAwsSend.mockRejectedValue(new Error('AWS Validation Error'))
+
+      await expect(service.sendInlineTemplateEmail(baseMsg)).rejects.toThrow(
+        'AWS Validation Error',
+      )
+
+      expect(Logger.prototype.error).toHaveBeenCalledWith(
+        expect.stringContaining('Failed to send inline template email'),
+        expect.any(String),
+      )
     })
   })
 })
