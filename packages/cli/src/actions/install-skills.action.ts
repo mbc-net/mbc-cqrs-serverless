@@ -283,6 +283,6 @@ export default async function installSkillsAction(
   logger.log('')
   logger.info('You can now use these skills in Claude Code:')
   copiedSkills.forEach((skill) => {
-    logger.log(`  /${skill.replace('mbc-', 'mbc-')}`)
+    logger.log(`  /${skill}`)
   })
 }
