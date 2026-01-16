@@ -144,6 +144,62 @@ Use mbc_generate_module to create a Product module with sync mode
 Run mbc_validate_cqrs to check my CQRS implementation
 ```
 
+## Claude Code Skills
+
+This package includes Claude Code skills that provide guided assistance for MBC CQRS Serverless development.
+
+### Available Skills
+
+| Skill | Description |
+|-------|-------------|
+| `/mbc-generate` | Generate boilerplate code (modules, services, controllers, DTOs, handlers) |
+| `/mbc-review` | Review code for best practices and anti-patterns (20 patterns) |
+| `/mbc-migrate` | Guide version migrations and breaking changes |
+| `/mbc-debug` | Debug and troubleshoot common issues |
+
+### Installing Skills
+
+To use the skills, copy them to your Claude Code skills directory:
+
+```bash
+# Copy to personal skills (available in all projects)
+cp -r node_modules/@mbc-cqrs-serverless/mcp-server/skills/* ~/.claude/skills/
+
+# Or copy to project skills (shared with team)
+cp -r node_modules/@mbc-cqrs-serverless/mcp-server/skills/* .claude/skills/
+```
+
+### Using Skills
+
+Once installed, use the skills via slash commands:
+
+```
+/mbc-generate
+Create an Order module with RDS synchronization
+```
+
+```
+/mbc-review
+Review the code in src/order/order.service.ts
+```
+
+```
+/mbc-migrate
+I need to upgrade from v1.0.20 to v1.0.23
+```
+
+```
+/mbc-debug
+I'm getting ConditionalCheckFailedException errors
+```
+
+Or let Claude automatically detect when to use them based on your request:
+
+```
+"Generate a new Product module for my MBC CQRS project"
+```
+
+
 ## Development
 
 ### Building
