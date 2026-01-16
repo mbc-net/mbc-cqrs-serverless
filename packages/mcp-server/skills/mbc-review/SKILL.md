@@ -3,6 +3,20 @@ name: mbc-review
 description: Review code for MBC CQRS Serverless best practices and anti-patterns. Use this when reviewing code that uses MBC CQRS Serverless framework, checking for common mistakes, or validating implementation patterns.
 ---
 
+## Pre-flight Check (Version Update)
+
+Before executing this skill, check for updates:
+
+1. Run `mbc install-skills --check` to check if a newer version is available
+2. If the output shows "Update available: X.Y.Z → A.B.C", ask the user:
+   - "A newer version of MBC skills is available (X.Y.Z → A.B.C). Would you like to update before proceeding?"
+3. If the user agrees, run `mbc install-skills --force` to update
+4. If the user declines or skills are up-to-date, proceed with the skill
+
+**Note**: Skip this check if the user explicitly says to skip updates or if you've already checked in this session.
+
+---
+
 # MBC CQRS Serverless Code Review
 
 This skill reviews code for MBC CQRS Serverless best practices and identifies anti-patterns.

@@ -156,6 +156,64 @@ Add MBC CQRS UI common components to your project.
 mbc ui-common -p ./src/common-ui -c all
 ```
 
+### `mbc install-skills`
+
+Install Claude Code skills for MBC CQRS Serverless development.
+
+**Alias**: `skills`
+
+**Options**:
+- `-p, --project` - Install to project directory (`.claude/skills/`) instead of personal (`~/.claude/skills/`)
+- `-f, --force` - Overwrite existing skills
+- `-l, --list` - List available skills without installing
+- `-c, --check` - Check if updates are available without installing
+
+**Examples**:
+
+```bash
+# Install to personal skills directory (available in all projects)
+mbc install-skills
+
+# Install to project directory (shared with team via git)
+mbc install-skills --project
+
+# List available skills
+mbc install-skills --list
+
+# Force overwrite existing skills
+mbc install-skills --force
+
+# Check for updates
+mbc install-skills --check
+
+# Using alias
+mbc skills -p
+```
+
+**Upgrading Skills**:
+
+Skills do not auto-update. To upgrade to the latest version:
+
+```bash
+# Update CLI to latest version
+npm update -g @mbc-cqrs-serverless/cli
+
+# Check if updates are available
+mbc install-skills --check
+
+# Force reinstall to get latest version
+mbc install-skills --force
+```
+
+**Available Skills**:
+
+| Skill | Description |
+|-------|-------------|
+| `/mbc-generate` | Generate boilerplate code (modules, services, controllers, DTOs, handlers) |
+| `/mbc-review` | Review code for best practices and anti-patterns (20 patterns) |
+| `/mbc-migrate` | Guide version migrations and breaking changes |
+| `/mbc-debug` | Debug and troubleshoot common issues |
+
 ## Project Structure
 
 The CLI creates a standardized project structure optimized for CQRS:
