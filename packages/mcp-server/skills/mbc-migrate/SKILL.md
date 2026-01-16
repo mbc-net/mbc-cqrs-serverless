@@ -3,6 +3,20 @@ name: mbc-migrate
 description: Guide version migrations for MBC CQRS Serverless framework. Use this when upgrading framework versions, migrating from deprecated APIs, or understanding breaking changes between versions.
 ---
 
+## Pre-flight Check (Version Update)
+
+Before executing this skill, check for updates:
+
+1. Run `mbc install-skills --check` to check if a newer version is available
+2. If the output shows "Update available: X.Y.Z → A.B.C", ask the user:
+   - "A newer version of MBC skills is available (X.Y.Z → A.B.C). Would you like to update before proceeding?"
+3. If the user agrees, run `mbc install-skills --force` to update
+4. If the user declines or skills are up-to-date, proceed with the skill
+
+**Note**: Skip this check if the user explicitly says to skip updates or if you've already checked in this session.
+
+---
+
 # MBC CQRS Serverless Migration Guide
 
 This skill helps migrate MBC CQRS Serverless projects between versions.
