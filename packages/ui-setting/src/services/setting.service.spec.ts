@@ -83,7 +83,7 @@ describe('SettingService', () => {
         'MASTER#TEST_TENANT',
         expect.objectContaining({
           sk: expect.objectContaining({
-            skExpession: 'begins_with(sk, :settingPrefix)',
+            skExpression: 'begins_with(sk, :settingPrefix)',
             skAttributeValues: {
               ':settingPrefix': 'MASTER_SETTING#',
             },

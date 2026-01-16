@@ -448,7 +448,7 @@ export class DirectoryService {
     this.logger.debug('item:', item)
 
     const query = {
-      skExpession: 'begins_with(sk, :typeCode)',
+      skExpression: 'begins_with(sk, :typeCode)',
       skAttributeValues: { ':typeCode': `${item.code}${VER_SEPARATOR}` },
     }
 

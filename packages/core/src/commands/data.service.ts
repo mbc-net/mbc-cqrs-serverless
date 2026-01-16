@@ -125,7 +125,7 @@ export class DataService {
     pk: string,
     opts?: {
       sk?: {
-        skExpession: string
+        skExpression: string
         skAttributeValues: Record<string, string>
         skAttributeNames?: Record<string, string>
       }

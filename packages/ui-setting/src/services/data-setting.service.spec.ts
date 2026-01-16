@@ -113,7 +113,7 @@ describe('DataSettingService', () => {
         'MASTER#TEST_TENANT',
         expect.objectContaining({
           sk: {
-            skExpession: 'begins_with(sk, :settingCode)',
+            skExpression: 'begins_with(sk, :settingCode)',
             skAttributeValues: {
               ':settingCode': 'SETTING1#',
             },
