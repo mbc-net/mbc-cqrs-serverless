@@ -1,4 +1,8 @@
-import { SendEmailCommand, SESv2Client } from '@aws-sdk/client-sesv2'
+import {
+  SendEmailCommand,
+  SendEmailCommandOutput,
+  SESv2Client,
+} from '@aws-sdk/client-sesv2'
 import { Injectable, Logger } from '@nestjs/common'
 import { ConfigService } from '@nestjs/config'
 import nodemailer from 'nodemailer'
@@ -95,13 +99,15 @@ export class EmailService {
 
   /**
    * Sends an email using SES v2 Inline Templates.
-   * * @remarks
+   * @remarks
    * Supports a hybrid mode for local development:
    * - PRODUCTION: Uses AWS SES Native Inline Templates.
    * - OFFLINE/LOCAL: Falls back to 'Simple' email with manual variable substitution
    * to bypass limitations of local emulators (like serverless-offline-ses-v2).
    */
-  async sendInlineTemplateEmail(msg: TemplatedEmailNotification): Promise<any> {
+  async sendInlineTemplateEmail(
+    msg: TemplatedEmailNotification,
+  ): Promise<SendEmailCommandOutput | undefined> {
     // 1. Validation: Fail early if no recipients
     if (!msg.toAddrs.length && !msg.ccAddrs?.length && !msg.bccAddrs?.length) {
       this.logger.warn('Email skipped: No recipients provided.')
@@ -155,7 +161,7 @@ export class EmailService {
             TemplateContent: {
               Subject: msg.template.subject,
               Html: msg.template.html,
-              Text: msg.template.text,
+              ...(msg.template.text && { Text: msg.template.text }),
             },
             // Ensure data is valid JSON string
             TemplateData: JSON.stringify(msg.data || {}),
