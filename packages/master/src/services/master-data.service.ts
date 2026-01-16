@@ -150,7 +150,7 @@ export class MasterDataService implements IMasterDataService {
     const query = { sk: undefined }
 
     query.sk = {
-      skExpession: 'begins_with(sk, :settingCode)',
+      skExpression: 'begins_with(sk, :settingCode)',
       skAttributeValues: {
         ':settingCode': `${settingCode}${KEY_SEPARATOR}`,
       },

@@ -2,6 +2,7 @@
 import { Command } from 'commander'
 
 import { generateCommand } from './generate.command'
+import { installSkillsCommand } from './install-skills.command'
 import { newCommand } from './new.command'
 import { startCommand } from './start.command'
 import { uiCommand } from './ui.command'
@@ -11,6 +12,7 @@ export default function loadCommands(program: Command) {
   startCommand(program)
   uiCommand(program)
   generateCommand(program)
+  installSkillsCommand(program)
 
   // error handling
   program.on('command:*', () => {

@@ -360,7 +360,7 @@ describe('TaskService', () => {
         mockTableName,
         'SFN_TASK#tenant-code',
         {
-          skExpession: 'begins_with(sk, :typeCode)',
+          skExpression: 'begins_with(sk, :typeCode)',
           skAttributeValues: {
             ':typeCode': 'task-type#parent-uuid#',
           },
@@ -410,7 +410,7 @@ describe('TaskService', () => {
         mockTableName,
         'SFN_TASK#tenant-code',
         {
-          skExpession: 'begins_with(sk, :typeCode)',
+          skExpression: 'begins_with(sk, :typeCode)',
           skAttributeValues: {
             ':typeCode': 'task-type#parent-uuid#',
           },
@@ -422,7 +422,7 @@ describe('TaskService', () => {
         mockTableName,
         'SFN_TASK#tenant-code',
         {
-          skExpession: 'begins_with(sk, :typeCode)',
+          skExpression: 'begins_with(sk, :typeCode)',
           skAttributeValues: {
             ':typeCode': 'task-type#parent-uuid#',
           },
@@ -469,7 +469,7 @@ describe('TaskService', () => {
         mockTableName,
         'SFN_TASK#tenant-code',
         {
-          skExpession: 'begins_with(sk, :typeCode)',
+          skExpression: 'begins_with(sk, :typeCode)',
           skAttributeValues: {
             ':typeCode': '#',
           },
@@ -729,7 +729,7 @@ describe('TaskService', () => {
     it('should handle options parameters correctly', async () => {
       const options = {
         sk: {
-          skExpession: 'begins_with(sk, :prefix)',
+          skExpression: 'begins_with(sk, :prefix)',
           skAttributeValues: { ':prefix': 'task-type' },
           skAttributeNames: { '#status': 'status' },
         },

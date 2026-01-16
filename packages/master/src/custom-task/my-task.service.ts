@@ -31,7 +31,7 @@ export class MyTaskService {
       'SFN_TASK',
       {
         sk: {
-          skExpession: 'begins_with(sk, :code)',
+          skExpression: 'begins_with(sk, :code)',
           skAttributeValues: {
             ':code': `MASTER_COPY_${masterSettingCode}`,
           },
@@ -52,7 +52,7 @@ export class MyTaskService {
     type: string,
     options?: {
       sk?: {
-        skExpession: string
+        skExpression: string
         skAttributeValues: Record<string, string>
         skAttributeNames?: Record<string, string>
       }
