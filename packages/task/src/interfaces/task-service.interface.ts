@@ -55,7 +55,7 @@ export interface ITaskService {
     type?: string,
     options?: {
       sk?: {
-        skExpession: string
+        skExpression: string
         skAttributeValues: Record<string, string>
         skAttributeNames?: Record<string, string>
       }

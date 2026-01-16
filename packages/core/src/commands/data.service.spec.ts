@@ -237,7 +237,7 @@ describe('DataService', () => {
       const pk = 'test-pk'
       const options = {
         sk: {
-          skExpession: 'begins_with(sk, :sk)',
+          skExpression: 'begins_with(sk, :sk)',
           skAttributeValues: { ':sk': 'prefix' },
         },
         limit: 10,

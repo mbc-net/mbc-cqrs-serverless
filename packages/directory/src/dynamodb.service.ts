@@ -61,7 +61,7 @@ export class DynamoService {
     tableName: string,
     pk: string,
     sk?: {
-      skExpession: string
+      skExpression: string
       skAttributeValues: Record<string, string>
       skAttributeNames?: Record<string, string>
     },
@@ -78,7 +78,7 @@ export class DynamoService {
           ? this.toDdbKey({ pk, sk: startFromSk })
           : undefined,
         KeyConditionExpression:
-          'pk = :pk' + (sk ? ` and ${sk.skExpession}` : ''),
+          'pk = :pk' + (sk ? ` and ${sk.skExpression}` : ''),
         ExpressionAttributeNames: sk?.skAttributeNames,
         ExpressionAttributeValues: this.objToDdbItem({
           ...sk?.skAttributeValues,

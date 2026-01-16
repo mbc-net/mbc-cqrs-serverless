@@ -42,7 +42,7 @@ export class SettingService {
     const pk = generateSettingPk(tenantCode)
     const query = {
       sk: {
-        skExpession: 'begins_with(sk, :settingPrefix)',
+        skExpression: 'begins_with(sk, :settingPrefix)',
         skAttributeValues: {
           ':settingPrefix': `${SETTING_SK_PREFIX}${KEY_SEPARATOR}`,
         },
