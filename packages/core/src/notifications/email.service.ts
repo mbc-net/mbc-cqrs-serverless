@@ -3,7 +3,7 @@ import { Injectable, Logger } from '@nestjs/common'
 import { ConfigService } from '@nestjs/config'
 import nodemailer from 'nodemailer'
 
-import { EmailNotification } from '../interfaces'
+import { EmailNotification, TemplatedEmailNotification } from '../interfaces'
 
 const CLIENT_INSTANCE = Symbol()
 
@@ -87,6 +87,103 @@ export class EmailService {
     } catch (error) {
       this.logger.error(
         `Failed to send email to ${msg.toAddrs.join(', ')}`,
+        (error as Error).stack,
+      )
+      throw error
+    }
+  }
+
+  /**
+   * Sends an email using SES v2 Inline Templates.
+   * * @remarks
+   * Supports a hybrid mode for local development:
+   * - PRODUCTION: Uses AWS SES Native Inline Templates.
+   * - OFFLINE/LOCAL: Falls back to 'Simple' email with manual variable substitution
+   * to bypass limitations of local emulators (like serverless-offline-ses-v2).
+   */
+  async sendInlineTemplateEmail(msg: TemplatedEmailNotification): Promise<any> {
+    // 1. Validation: Fail early if no recipients
+    if (!msg.toAddrs.length && !msg.ccAddrs?.length && !msg.bccAddrs?.length) {
+      this.logger.warn('Email skipped: No recipients provided.')
+      return
+    }
+
+    try {
+      const fromAddress =
+        msg.fromAddr || this.config.get<string>('SES_FROM_EMAIL')
+      const isOffline =
+        process.env.IS_OFFLINE === 'true' || process.env.IS_OFFLINE === '1'
+
+      // 2. Privacy-safe logging
+      this.logger.log(
+        `Sending inline template email to ${msg.toAddrs.length} recipient(s). Mode: ${isOffline ? 'LOCAL_EMULATION' : 'AWS_NATIVE'}`,
+      )
+
+      let contentPayload: any
+
+      if (isOffline) {
+        // --- LOCAL FALLBACK LOGIC ---
+        // Emulators often crash with Inline Templates. We manually compile the template here.
+        this.logger.warn(
+          '⚠️ IS_OFFLINE detected: Switching to manual template compilation for local testing.',
+        )
+
+        const replaceVariables = (text: string, data: any) => {
+          if (!text) return ''
+          return text.replace(
+            /\{\{(\w+)\}\}/g,
+            (_, key) => data[key] || `{{${key}}}`,
+          )
+        }
+
+        contentPayload = {
+          Simple: {
+            Subject: { Data: replaceVariables(msg.template.subject, msg.data) },
+            Body: {
+              Html: { Data: replaceVariables(msg.template.html, msg.data) },
+              Text: msg.template.text
+                ? { Data: replaceVariables(msg.template.text, msg.data) }
+                : undefined,
+            },
+          },
+        }
+      } else {
+        // --- PRODUCTION AWS LOGIC ---
+        // Use native SES v2 Inline Template features
+        contentPayload = {
+          Template: {
+            TemplateContent: {
+              Subject: msg.template.subject,
+              Html: msg.template.html,
+              Text: msg.template.text,
+            },
+            // Ensure data is valid JSON string
+            TemplateData: JSON.stringify(msg.data || {}),
+          },
+        }
+      }
+
+      const command = new SendEmailCommand({
+        FromEmailAddress: fromAddress,
+        Destination: {
+          ToAddresses: msg.toAddrs,
+          CcAddresses: msg.ccAddrs,
+          BccAddresses: msg.bccAddrs,
+        },
+        ReplyToAddresses: msg.replyToAddrs,
+        ConfigurationSetName: msg.configurationSetName,
+        Content: contentPayload,
+      })
+
+      const result = await this[CLIENT_INSTANCE].send(command)
+
+      this.logger.log(`Template email sent successfully: ${result.MessageId}`)
+      return result
+    } catch (error) {
+      this.logger.error(
+        `Failed to send inline template email. 
+         ConfigSet: ${msg.configurationSetName || 'None'} 
+         Recipients (Count): ${msg.toAddrs.length}`,
         (error as Error).stack,
       )
       throw error
