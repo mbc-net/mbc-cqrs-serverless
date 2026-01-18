@@ -51,7 +51,7 @@ async function bootstrap(opts: AppModuleOptions) {
   const { httpAdapter } = app.get(HttpAdapterHost)
   app.useGlobalFilters(new DynamoDBExceptionFilter(httpAdapter))
 
-  //swager init
+  //swagger init
   if (configService.get<Environment>('NODE_ENV') === Environment.Local) {
     const { DocumentBuilder, SwaggerModule } = await import('@nestjs/swagger')
 
@@ -135,7 +135,7 @@ async function bootstrap(opts: AppModuleOptions) {
  * @see https://docs.aws.amazon.com/lambda/latest/dg/nodejs-handler.html
  */
 export function createHandler(opts: AppModuleOptions): Handler {
-  // Do not wait for lambdaHandler to be called before bootstraping Nest.
+  // Do not wait for lambdaHandler to be called before bootstrapping Nest.
   bootstrap(opts).then((server) => serverSubject.next(server))
 
   /**

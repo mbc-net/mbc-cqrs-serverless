@@ -60,7 +60,7 @@ const event = new StepFunctionTaskEvent({
   }),
   context: {
     Execution: {
-      Id: 'arn:aws:states:ap-northeast-1:101010101010:execution:dev-task-sfn-interation-map-sfn-task-handler:SFN_TASK-mbc-test-01JKT45QNNBKJ9BEBHR3CXABYF-1739264812217',
+      Id: 'arn:aws:states:ap-northeast-1:101010101010:execution:dev-task-sfn-iteration-map-sfn-task-handler:SFN_TASK-mbc-test-01JKT45QNNBKJ9BEBHR3CXABYF-1739264812217',
       Input: [
         {
           id: 'SFN_TASK#mbc#test#01JKT45QNNBKJ9BEBHR3CXABYF#0',
@@ -195,8 +195,8 @@ const event = new StepFunctionTaskEvent({
         'arn:aws:iam::101010101010:role/Devsfn-task-infraInfraSta-taskhandlerstatemachineRo-WP2YT2ahoiHk',
     },
     StateMachine: {
-      Id: 'arn:aws:states:ap-northeast-1:101010101010:stateMachine:dev-task-sfn-interation-map-sfn-task-handler',
-      Name: 'dev-task-sfn-interation-map-sfn-task-handler',
+      Id: 'arn:aws:states:ap-northeast-1:101010101010:stateMachine:dev-task-sfn-iteration-map-sfn-task-handler',
+      Name: 'dev-task-sfn-iteration-map-sfn-task-handler',
     },
     State: {
       Name: 'iterator',
@@ -205,7 +205,7 @@ const event = new StepFunctionTaskEvent({
     },
   },
   source:
-    'arn:aws:states:ap-northeast-1:101010101010:stateMachine:dev-task-sfn-interation-map-sfn-task-handler',
+    'arn:aws:states:ap-northeast-1:101010101010:stateMachine:dev-task-sfn-iteration-map-sfn-task-handler',
 })
 
 describe('TaskSfnEventHandler', () => {

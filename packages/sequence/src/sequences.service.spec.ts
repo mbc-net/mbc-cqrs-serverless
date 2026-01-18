@@ -7,7 +7,6 @@ import { FiscalYearOptions } from './interfaces/fiscal-year.interface'
 import { SequenceMasterDataProvider } from './sequence-master-factory'
 import { SequenceEntity } from './entities/sequence.entity'
 
-
 const optionsMock = {
   invokeContext: {
     event: {
@@ -541,7 +540,7 @@ describe('SequencesService', () => {
       expect(result).toEqual(mockSequenceResponse)
 
     })
-    it('should call generateSequenceItem with  yearly rotation, argument is a  year that is the same as the previous year', async () => {
+    it('should call generateSequenceItem with yearly rotation, argument is a year that is the same as the previous year', async () => {
       const mockMasterData = {
         typeCode: 'sequence',
         format: '%%no%%',
@@ -585,7 +584,7 @@ describe('SequencesService', () => {
       expect(result).toEqual(mockSequenceResponse)
 
     })
-    it('should call generateSequenceItem with  yearly rotation, argument is a  year other than the previous  year', async () => {
+    it('should call generateSequenceItem with yearly rotation, argument is a year other than the previous year', async () => {
       const mockMasterData = {
         typeCode: 'sequence',
         format: '%%no%%',
@@ -761,7 +760,7 @@ describe('SequencesService', () => {
       expect(result).toEqual(mockSequenceResponse)
 
     })
-    it('should call generateSequenceItem with daily rotation ', async () => {
+    it('should call generateSequenceItem with daily rotation', async () => {
       const mockMasterData = {
         typeCode: 'sequence',
         format: '%%no%%',
@@ -891,7 +890,7 @@ describe('SequencesService', () => {
       expect(result).toEqual(mockSequenceResponse)
 
     })
-    it('should call generateSequenceItem with none rotation,  the arguments have code 1, code 2, code 3, code4, code5 ', async () => {
+    it('should call generateSequenceItem with none rotation, the arguments have code 1, code 2, code 3, code4, code5', async () => {
       const mockMasterData = {
         typeCode: 'sequence',
         format: '%%code1%%-%%code2%%-%%code3%%-%%code4%%-%%code5%%-%%no%%',
@@ -938,7 +937,7 @@ describe('SequencesService', () => {
       )
       expect(result).toEqual(mockSequenceResponse)
     })
-    it('should call generateSequenceItem with none rotation,  format is %%code1%%-%%fiscal_year%%-%%no%%', async () => {
+    it('should call generateSequenceItem with none rotation, format is %%code1%%-%%fiscal_year%%-%%no%%', async () => {
       const mockMasterData = {
         typeCode: 'sequence',
         format: '%%code1%%-%%fiscal_year%%-%%no%%',
@@ -985,7 +984,7 @@ describe('SequencesService', () => {
       )
       expect(result).toEqual(mockSequenceResponse)
     })
-    it('should call generateSequenceItem with none rotation,  format is %%code1%%-%%month%%-%%no%%', async () => {
+    it('should call generateSequenceItem with none rotation, format is %%code1%%-%%month%%-%%no%%', async () => {
       const mockMasterData = {
         typeCode: 'sequence',
         format: '%%code1%%-%%month%%-%%no%%',
@@ -1029,7 +1028,7 @@ describe('SequencesService', () => {
       )
       expect(result).toEqual(mockSequenceResponse)
     })
-    it('should call generateSequenceItem with none rotation,  format is %%code1%%-%%day%%-%%no%%', async () => {
+    it('should call generateSequenceItem with none rotation, format is %%code1%%-%%day%%-%%no%%', async () => {
       const mockMasterData = {
         typeCode: 'sequence',
         format: '%%code1%%-%%day%%-%%no%%',
@@ -1072,7 +1071,7 @@ describe('SequencesService', () => {
       )
       expect(result).toEqual(mockSequenceResponse)
     })
-    it('should call generateSequenceItem with register date,  format is %%code1%%-%%fiscal_year%%-%%no%%', async () => {
+    it('should call generateSequenceItem with register date, format is %%code1%%-%%fiscal_year%%-%%no%%', async () => {
       const mockMasterData = {
         typeCode: 'sequence',
         format: '%%code1%%-%%fiscal_year%%-%%no%%',
@@ -1122,7 +1121,7 @@ describe('SequencesService', () => {
         format: '%%code1%%-%%fiscal_year%%-%%no%%',
         registerDate: new Date('2020-01-01'),
       }
-    
+
       const mockUpdate = {
         code: 'sequence#PI#2024',
         updatedBy: '92ca4f68-9ac6-4080-9ae2-2f02a86206a4',
@@ -1139,17 +1138,17 @@ describe('SequencesService', () => {
         seq: 2,
         updatedAt: '2024-11-27T17:46:36+07:00',
       }
-    
+
       jest.spyOn(masterService, 'getData').mockResolvedValue(mockMasterData)
       jest.spyOn(dynamoDbService, 'updateItem').mockResolvedValue(mockUpdate)
-    
+
       const mockSequenceResponse = new SequenceEntity({
         id: 'SEQ#MBC#sequence#PI#2024',
         no: 2,
         formattedNo: 'INV-PI-5-2-POST', // prefix + formatted + postfix
         issuedAt: new Date('2024-11-27T17:46:36+07:00'),
       })
-    
+
       const result = await service.generateSequenceItem(
         {
           tenantCode: tenantCode,
@@ -1163,10 +1162,10 @@ describe('SequencesService', () => {
           postfix: '-POST',
         },
       )
-    
+
       expect(result).toEqual(mockSequenceResponse)
     })
-    
+
     it('should call generateSequenceItem with minimum parameters', async () => {
       const mockMasterData = {
         typeCode: 'sequence',

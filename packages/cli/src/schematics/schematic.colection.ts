@@ -26,12 +26,12 @@ export const schematics: Schematic[] = [
   {
     name: 'entity',
     alias: 'en',
-    description: 'Create a entity.',
+    description: 'Create an entity.',
   },
   {
     name: 'dto',
     alias: 'dto',
-    description: 'Create a dto.',
+    description: 'Create a DTO.',
   },
 ]
 

@@ -17,7 +17,7 @@ export class TaskSfnEventHandler
   implements IEventHandler<StepFunctionTaskEvent>, OnModuleInit
 {
   private readonly logger: Logger = new Logger(TaskSfnEventHandler.name)
-  // We can not inject event module here because of event source can be disabled
+  // We cannot inject event module here because of event source can be disabled
   private eventBus: EventBus
 
   constructor(
