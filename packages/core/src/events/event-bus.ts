@@ -33,7 +33,7 @@ export class EventBus<EventBase extends IEvent = IEvent> {
     this.handlers.set(id, handlers)
 
     // this.logger.debug(
-    //   'binded handler for ' +
+    //   'bound handler for ' +
     //     id +
     //     ' => handlers size: ' +
     //     handlers.length +

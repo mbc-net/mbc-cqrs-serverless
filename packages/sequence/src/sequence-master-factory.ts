@@ -8,7 +8,7 @@ import { Inject, Injectable, Optional } from '@nestjs/common'
 
 import { DEFAULT_MASTER_DATA } from './constants/sequence.constant'
 
-Injectable()
+@Injectable()
 export class SequenceMasterDataProvider implements IMasterDataProvider {
   private tableName
   constructor(

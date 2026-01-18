@@ -48,7 +48,7 @@ export class GenerateFormattedSequenceDto {
   @ApiProperty({
     type: SequenceParamsDto,
     description:
-      'Parameters for generating the sequence. code1, code2,code3, code4, code5',
+      'Parameters for generating the sequence. code1, code2, code3, code4, code5',
   })
   params?: SequenceParamsDto
 

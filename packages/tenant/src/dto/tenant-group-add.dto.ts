@@ -3,7 +3,7 @@ import { IsString } from 'class-validator'
 
 export class TenantGroupAddDto {
   /**
-   * Value for tenant name create (require).
+   * Value for tenant name create (required).
    */
   @ApiProperty({
     type: String,

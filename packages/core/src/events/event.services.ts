@@ -67,7 +67,7 @@ export class EventService {
   }
 
   async handleS3Event(raw: S3Event) {
-    this.logger.debug('handleStepFunctionsEvent::', raw)
+    this.logger.debug('handleS3Event::', raw)
     const events = await this.eventFactory.transformS3(raw)
     return this.execute(events)
   }

@@ -50,7 +50,7 @@ export class AppModule extends ConfigurableModuleClass {
         cache: true,
         expandVariables: true,
         validationOptions: {
-          allowUnknow: false,
+          allowUnknown: false,
           abortEarly: true,
         },
         validate: getValidateConfig(options.envCls),

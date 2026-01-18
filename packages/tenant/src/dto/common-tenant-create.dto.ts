@@ -3,7 +3,7 @@ import { IsObject, IsOptional, IsString } from 'class-validator'
 
 export class CommonTenantCreateDto {
   /**
-   * Value for tenant name create (require).
+   * Value for tenant name create (required).
    */
   @ApiProperty({
     type: String,

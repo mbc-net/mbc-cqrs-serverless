@@ -83,7 +83,7 @@ export class DataSettingService {
 
     const dataSetting = await this.dataService.getItem({ pk, sk })
 
-    if (dataSetting && dataSetting.isDeleted == false) {
+    if (dataSetting && dataSetting.isDeleted === false) {
       throw new BadRequestException('Data setting already exists')
     }
 

@@ -3,7 +3,7 @@ import { IsObject, IsOptional, IsString } from 'class-validator'
 
 export class TenantCreateDto {
   /**
-   * Value for tenant code create (require).
+   * Value for tenant code create (required).
    */
   @ApiProperty({
     type: String,
@@ -15,7 +15,7 @@ export class TenantCreateDto {
   code: string
 
   /**
-   * Value for tenant name create (require).
+   * Value for tenant name create (required).
    */
   @ApiProperty({
     type: String,
