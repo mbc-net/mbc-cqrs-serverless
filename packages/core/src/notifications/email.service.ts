@@ -140,10 +140,11 @@ export class EmailService {
 
         const replaceVariables = (text: string, data: any) => {
           if (!text) return ''
-          
-          // Regex Explanation: /\{\{([^}]+)\}\}/g
-          // Matches {{...}} containing ANY character except '}' (supports Unicode/Japanese)
-          return text.replace(/\{\{([^}]+)\}\}/g, (_, expression) => {
+
+          // Regex Explanation: /\{\{([^}]{1,255})\}\}/g
+          // Matches {{...}} containing 1-255 characters except '}' (supports Unicode/Japanese)
+          // The 255 char limit prevents ReDoS (Regular Expression Denial of Service) attacks
+          return text.replace(/\{\{([^}]{1,255})\}\}/g, (_, expression) => {
             const key = expression.trim() // Remove spaces (e.g. {{ code }} -> code)
             const value = getDeepValue(data || {}, key)
             

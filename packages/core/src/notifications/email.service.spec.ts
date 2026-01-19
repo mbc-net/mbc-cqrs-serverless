@@ -861,6 +861,38 @@ describe('EmailService', () => {
           '<p>Active: false, Note: </p>',
         )
       })
+
+      it('should preserve placeholder when variable name exceeds 255 characters (ReDoS protection)', async () => {
+        const longKey = 'a'.repeat(256) // 256 characters - exceeds limit
+        const validKey = 'b'.repeat(255) // 255 characters - within limit
+
+        const msgWithLongKey: TemplatedEmailNotification = {
+          toAddrs: ['test@example.com'],
+          template: {
+            subject: `Long: {{${longKey}}}`,
+            html: `<p>Valid: {{${validKey}}}</p>`,
+          },
+          data: {
+            [longKey]: 'should not replace',
+            [validKey]: 'should replace',
+          },
+        }
+
+        await service.sendInlineTemplateEmail(msgWithLongKey)
+
+        const commandInput = (SendEmailCommand as unknown as jest.Mock).mock
+          .calls[0][0]
+
+        // 256 char key should NOT be replaced (exceeds 255 limit for ReDoS protection)
+        expect(commandInput.Content.Simple.Subject.Data).toBe(
+          `Long: {{${longKey}}}`,
+        )
+
+        // 255 char key should be replaced
+        expect(commandInput.Content.Simple.Body.Html.Data).toBe(
+          '<p>Valid: should replace</p>',
+        )
+      })
     })
 
     it('should catch and log errors during sending', async () => {
