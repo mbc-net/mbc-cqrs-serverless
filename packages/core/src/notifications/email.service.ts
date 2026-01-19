@@ -129,17 +129,28 @@ export class EmailService {
 
       if (isOffline) {
         // --- LOCAL FALLBACK LOGIC ---
-        // Emulators often crash with Inline Templates. We manually compile the template here.
         this.logger.warn(
           '⚠️ IS_OFFLINE detected: Switching to manual template compilation for local testing.',
         )
 
+        // Helper to access deep properties (e.g., "user.profile.name" or "認証コード")
+        const getDeepValue = (obj: any, path: string) => {
+          return path.split('.').reduce((acc, part) => acc && acc[part], obj)
+        }
+
         const replaceVariables = (text: string, data: any) => {
           if (!text) return ''
-          return text.replace(
-            /\{\{(\w+)\}\}/g,
-            (_, key) => data[key] || `{{${key}}}`,
-          )
+
+          // Regex Explanation: /\{\{([^}]{1,255})\}\}/g
+          // Matches {{...}} containing 1-255 characters except '}' (supports Unicode/Japanese)
+          // The 255 char limit prevents ReDoS (Regular Expression Denial of Service) attacks
+          return text.replace(/\{\{([^}]{1,255})\}\}/g, (_, expression) => {
+            const key = expression.trim() // Remove spaces (e.g. {{ code }} -> code)
+            const value = getDeepValue(data || {}, key)
+            
+            // If value exists, return it. Otherwise keep original tag.
+            return value !== undefined ? value : `{{${expression}}}`
+          })
         }
 
         contentPayload = {

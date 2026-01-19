@@ -6,7 +6,7 @@ export function uiCommand(program: Command) {
   program
     .command('ui-common')
     .alias('ui')
-    .description('add mbc-cqrs-ui-common components to your project.')
+    .description('Add mbc-cqrs-ui-common components to your project.')
     .requiredOption('-p, --pathDir <string>', 'The place of common-ui')
     .option('-b, --branch <string>', 'The branch name', 'main')
     .option('--auth <string>', 'The auth method (HTTPS - Token, SSH)', 'SSH')

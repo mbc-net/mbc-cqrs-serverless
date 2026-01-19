@@ -66,7 +66,7 @@ export class SettingService {
     const validField = this.isValidFields(createDto.attributes.fields)
     if (!validField) {
       throw new BadRequestException(
-        'Physical name of fields must not duplicate',
+        'Physical name of fields must not be duplicated',
       )
     }
 
@@ -75,7 +75,7 @@ export class SettingService {
 
     const setting = await this.dataService.getItem({ pk, sk })
 
-    if (setting && setting.isDeleted == false) {
+    if (setting && setting.isDeleted === false) {
       throw new BadRequestException('Setting code already exists')
     }
 
@@ -117,7 +117,7 @@ export class SettingService {
     const validField = this.isValidFields(updateDto?.attributes?.fields ?? [])
     if (!validField) {
       throw new BadRequestException(
-        'Physical name of fields must not duplicate',
+        'Physical name of fields must not be duplicated',
       )
     }
 

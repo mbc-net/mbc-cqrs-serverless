@@ -287,7 +287,7 @@ describe('SettingService', () => {
       ).rejects.toThrow(BadRequestException)
       await expect(
         service.create(tenantCode, createDto, { invokeContext: mockInvokeContext })
-      ).rejects.toThrow('Physical name of fields must not duplicate')
+      ).rejects.toThrow('Physical name of fields must not be duplicated')
     })
   })
 
@@ -444,7 +444,7 @@ describe('SettingService', () => {
       ).rejects.toThrow(BadRequestException)
       await expect(
         service.update(key, updateDto, { invokeContext: mockInvokeContext })
-      ).rejects.toThrow('Physical name of fields must not duplicate')
+      ).rejects.toThrow('Physical name of fields must not be duplicated')
     })
   })
 

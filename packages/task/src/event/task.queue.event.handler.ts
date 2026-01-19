@@ -20,7 +20,7 @@ export class TaskQueueEventHandler
   implements IEventHandler<TaskQueueEvent>, OnModuleInit
 {
   private readonly logger = new Logger(TaskQueueEventHandler.name)
-  // We can not inject event module here because of event source can be disabled
+  // We cannot inject event module here because of event source can be disabled
   private eventBus: EventBus
   private readonly sfnTaskArn: string
 

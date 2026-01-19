@@ -7,7 +7,7 @@ export class CommonSettingDto {
    */
   @ApiProperty({
     type: String,
-    example: ' User List Setting',
+    example: 'User List Setting',
     required: true,
     description: 'The name of the setting.',
   })

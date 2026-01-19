@@ -199,7 +199,7 @@ describe('CommandService', () => {
         invokeContext: {},
       })
       expect(call).rejects.toThrow(
-        new BadRequestException('The input key is not a valid, item not found'),
+        new BadRequestException('Invalid input key: item not found'),
       )
     })
   })
@@ -294,7 +294,7 @@ describe('CommandService', () => {
       })
       expect(res).rejects.toThrow(
         new BadRequestException(
-          'The input is not a valid, item not found or version not match',
+          'Invalid input: item not found or version mismatch',
         ),
       )
     })
@@ -315,7 +315,7 @@ describe('CommandService', () => {
       })
       expect(res).rejects.toThrow(
         new BadRequestException(
-          'The input is not a valid, item not found or version not match',
+          'Invalid input: item not found or version mismatch',
         ),
       )
     })

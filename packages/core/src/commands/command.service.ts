@@ -130,7 +130,7 @@ export class CommandService implements OnModuleInit, ICommandService {
 
     if (!item || item.version !== input.version) {
       throw new BadRequestException(
-        'The input is not a valid, item not found or version not match',
+        'Invalid input: item not found or version mismatch',
       )
     }
     if (!Object.keys(input).includes('ttl')) {
@@ -160,7 +160,7 @@ export class CommandService implements OnModuleInit, ICommandService {
     }
     if (!item) {
       throw new BadRequestException(
-        'The input key is not a valid, item not found',
+        'Invalid input key: item not found',
       )
     }
     if (!Object.keys(input).includes('ttl')) {
@@ -194,7 +194,7 @@ export class CommandService implements OnModuleInit, ICommandService {
     }
     if (!item) {
       throw new BadRequestException(
-        'The input key is not a valid, item not found',
+        'Invalid input key: item not found',
       )
     }
     if (!Object.keys(input).includes('ttl')) {
@@ -332,7 +332,7 @@ export class CommandService implements OnModuleInit, ICommandService {
     const item = await this.getItem(key)
     if (!item) {
       throw new BadRequestException(
-        'The input key is not a valid, item not found',
+        'Invalid input key: item not found',
       )
     }
     const userContext = getUserContext(options.invokeContext)
