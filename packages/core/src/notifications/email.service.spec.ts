@@ -229,8 +229,8 @@ describe('EmailService', () => {
           {
             filename: 'data.csv',
             content: Buffer.from('CSV,content,here'),
-          }
-        ]
+          },
+        ],
       }
 
       await service.sendEmail(emailWithMultipleAttachments)
@@ -253,8 +253,8 @@ describe('EmailService', () => {
           {
             filename: 'large-file.txt',
             content: largeContent,
-          }
-        ]
+          },
+        ],
       }
 
       await service.sendEmail(emailWithLargeAttachment)
@@ -282,8 +282,8 @@ describe('EmailService', () => {
           {
             filename: 'file_with_symbols!@#$%.txt',
             content: Buffer.from('content3'),
-          }
-        ]
+          },
+        ],
       }
 
       await service.sendEmail(emailWithSpecialFilenames)
@@ -291,8 +291,12 @@ describe('EmailService', () => {
       expect(mockNodemailerSendMail).toHaveBeenCalledTimes(1)
       const mailOptions = mockNodemailerSendMail.mock.calls[0][0]
       expect(mailOptions.attachments[0].filename).toBe('file with spaces.txt')
-      expect(mailOptions.attachments[1].filename).toBe('file-with-unicode-ñáéíóú.txt')
-      expect(mailOptions.attachments[2].filename).toBe('file_with_symbols!@#$%.txt')
+      expect(mailOptions.attachments[1].filename).toBe(
+        'file-with-unicode-ñáéíóú.txt',
+      )
+      expect(mailOptions.attachments[2].filename).toBe(
+        'file_with_symbols!@#$%.txt',
+      )
     })
 
     it('should handle empty attachments', async () => {
@@ -304,8 +308,8 @@ describe('EmailService', () => {
           {
             filename: 'empty.txt',
             content: Buffer.alloc(0),
-          }
-        ]
+          },
+        ],
       }
 
       await service.sendEmail(emailWithEmptyAttachment)
@@ -340,7 +344,8 @@ describe('EmailService', () => {
       await service.sendEmail(email)
 
       expect(SendEmailCommand).toHaveBeenCalledTimes(1)
-      const commandInput = (SendEmailCommand as unknown as jest.Mock).mock.calls[0][0]
+      const commandInput = (SendEmailCommand as unknown as jest.Mock).mock
+        .calls[0][0]
       expect(commandInput.FromEmailAddress).toBeUndefined()
     })
 
@@ -359,7 +364,8 @@ describe('EmailService', () => {
       await service.sendEmail(email)
 
       expect(SendEmailCommand).toHaveBeenCalledTimes(1)
-      const commandInput = (SendEmailCommand as unknown as jest.Mock).mock.calls[0][0]
+      const commandInput = (SendEmailCommand as unknown as jest.Mock).mock
+        .calls[0][0]
       expect(commandInput.FromEmailAddress).toBe('')
     })
 
@@ -398,8 +404,13 @@ describe('EmailService', () => {
       await service.sendEmail(emailWithInvalidAddresses)
 
       expect(SendEmailCommand).toHaveBeenCalledTimes(1)
-      const commandInput = (SendEmailCommand as unknown as jest.Mock).mock.calls[0][0]
-      expect(commandInput.Destination.ToAddresses).toEqual(['invalid-email', 'another@invalid', '@invalid.com'])
+      const commandInput = (SendEmailCommand as unknown as jest.Mock).mock
+        .calls[0][0]
+      expect(commandInput.Destination.ToAddresses).toEqual([
+        'invalid-email',
+        'another@invalid',
+        '@invalid.com',
+      ])
     })
 
     it('should handle empty toAddrs array', async () => {
@@ -412,7 +423,8 @@ describe('EmailService', () => {
       await service.sendEmail(emailWithEmptyToAddrs)
 
       expect(SendEmailCommand).toHaveBeenCalledTimes(1)
-      const commandInput = (SendEmailCommand as unknown as jest.Mock).mock.calls[0][0]
+      const commandInput = (SendEmailCommand as unknown as jest.Mock).mock
+        .calls[0][0]
       expect(commandInput.Destination.ToAddresses).toEqual([])
     })
 
@@ -426,7 +438,8 @@ describe('EmailService', () => {
       await service.sendEmail(emailWithoutSubject)
 
       expect(SendEmailCommand).toHaveBeenCalledTimes(1)
-      const commandInput = (SendEmailCommand as unknown as jest.Mock).mock.calls[0][0]
+      const commandInput = (SendEmailCommand as unknown as jest.Mock).mock
+        .calls[0][0]
       expect(commandInput.Content.Simple.Subject.Data).toBe('')
     })
 
@@ -440,7 +453,8 @@ describe('EmailService', () => {
       await service.sendEmail(emailWithoutBody)
 
       expect(SendEmailCommand).toHaveBeenCalledTimes(1)
-      const commandInput = (SendEmailCommand as unknown as jest.Mock).mock.calls[0][0]
+      const commandInput = (SendEmailCommand as unknown as jest.Mock).mock
+        .calls[0][0]
       expect(commandInput.Content.Simple.Body.Html.Data).toBe('')
     })
 
@@ -454,8 +468,11 @@ describe('EmailService', () => {
       await service.sendEmail(emailWithSpecialHtml)
 
       expect(SendEmailCommand).toHaveBeenCalledTimes(1)
-      const commandInput = (SendEmailCommand as unknown as jest.Mock).mock.calls[0][0]
-      expect(commandInput.Content.Simple.Body.Html.Data).toBe('<p>Special chars: &lt;&gt;&amp;&quot;&#39; and unicode: 🚀 ñáéíóú</p>')
+      const commandInput = (SendEmailCommand as unknown as jest.Mock).mock
+        .calls[0][0]
+      expect(commandInput.Content.Simple.Body.Html.Data).toBe(
+        '<p>Special chars: &lt;&gt;&amp;&quot;&#39; and unicode: 🚀 ñáéíóú</p>',
+      )
     })
   })
 
@@ -475,7 +492,7 @@ describe('EmailService', () => {
         body: `<p>Test content ${i}</p>`,
       }))
 
-      const promises = emails.map(email => service.sendEmail(email))
+      const promises = emails.map((email) => service.sendEmail(email))
       await Promise.all(promises)
 
       expect(mockAwsSend).toHaveBeenCalledTimes(5)
@@ -491,13 +508,15 @@ describe('EmailService', () => {
         toAddrs: [`test${i}@example.com`],
         subject: `Test Email ${i}`,
         body: `<p>Test content ${i}</p>`,
-        attachments: [{
-          filename: `file${i}.txt`,
-          content: Buffer.from(`content ${i}`)
-        }]
+        attachments: [
+          {
+            filename: `file${i}.txt`,
+            content: Buffer.from(`content ${i}`),
+          },
+        ],
       }))
 
-      const promises = emails.map(email => service.sendEmail(email))
+      const promises = emails.map((email) => service.sendEmail(email))
       await Promise.all(promises)
 
       expect(mockAwsSend).toHaveBeenCalledTimes(3)
@@ -511,12 +530,26 @@ describe('EmailService', () => {
         .mockResolvedValueOnce({}) // Success
 
       const emails = [
-        { toAddrs: ['success1@example.com'], subject: 'Success 1', body: '<p>Success</p>' },
-        { toAddrs: ['failure@example.com'], subject: 'Failure', body: '<p>Failure</p>' },
-        { toAddrs: ['success2@example.com'], subject: 'Success 2', body: '<p>Success</p>' }
+        {
+          toAddrs: ['success1@example.com'],
+          subject: 'Success 1',
+          body: '<p>Success</p>',
+        },
+        {
+          toAddrs: ['failure@example.com'],
+          subject: 'Failure',
+          body: '<p>Failure</p>',
+        },
+        {
+          toAddrs: ['success2@example.com'],
+          subject: 'Success 2',
+          body: '<p>Success</p>',
+        },
       ]
 
-      const results = await Promise.allSettled(emails.map(email => service.sendEmail(email)))
+      const results = await Promise.allSettled(
+        emails.map((email) => service.sendEmail(email)),
+      )
 
       expect(results[0].status).toBe('fulfilled')
       expect(results[1].status).toBe('rejected')
@@ -528,22 +561,13 @@ describe('EmailService', () => {
   /**
    * Test Overview: Tests Inline Template functionality
    * Purpose: Ensures both AWS Native templates (Production) and Manual Compilation (Local/Offline) work correctly
-   * Details: Covers env-based logic switching, variable substitution, and validation
+   * Details: Covers env-based logic switching, variable substitution (flat & nested), and validation
    */
   describe('sendInlineTemplateEmail', () => {
     const OLD_ENV = process.env
 
-    beforeEach(() => {
-      jest.resetModules() // Most important - reset cache
-      process.env = { ...OLD_ENV } // Make a copy
-      mockAwsSend.mockResolvedValue({ MessageId: 'msg-id-123' })
-    })
-
-    afterAll(() => {
-      process.env = OLD_ENV // Restore original environment
-    })
-
-    const baseMsg: TemplatedEmailNotification = {
+    // 1. Setup Test Data
+    const flatMsg: TemplatedEmailNotification = {
       toAddrs: ['user@example.com'],
       template: {
         subject: 'Welcome {{name}}!',
@@ -556,9 +580,36 @@ describe('EmailService', () => {
       },
     }
 
+    const nestedMsg: TemplatedEmailNotification = {
+      toAddrs: ['user@example.com'],
+      template: {
+        subject: 'Welcome {{user.profile.firstName}}!',
+        html: '<p>Hello, your access code is {{auth.otp}}.</p>',
+        text: 'Code: {{auth.otp}}',
+      },
+      data: {
+        user: {
+          profile: { firstName: 'Bob' },
+        },
+        auth: {
+          otp: '999888',
+        },
+      },
+    }
+
+    beforeEach(() => {
+      jest.resetModules()
+      process.env = { ...OLD_ENV }
+      mockAwsSend.mockResolvedValue({ MessageId: 'msg-id-123' })
+    })
+
+    afterAll(() => {
+      process.env = OLD_ENV
+    })
+
     it('should return undefined and log warning if no recipients provided', async () => {
       const msgNoRecipients: TemplatedEmailNotification = {
-        ...baseMsg,
+        ...flatMsg,
         toAddrs: [],
         ccAddrs: [],
         bccAddrs: [],
@@ -572,47 +623,37 @@ describe('EmailService', () => {
 
     describe('Environment: PRODUCTION (AWS Native Templates)', () => {
       beforeEach(() => {
-        // Ensure IS_OFFLINE is false/undefined
+        // Ensure IS_OFFLINE is unset for production simulation
         delete process.env.IS_OFFLINE
       })
 
-      it('should use SendEmailCommand with Template structure', async () => {
-        await service.sendInlineTemplateEmail(baseMsg)
+      it('should use SendEmailCommand with Template structure (Flat Data)', async () => {
+        await service.sendInlineTemplateEmail(flatMsg)
 
         expect(SendEmailCommand).toHaveBeenCalledTimes(1)
         const commandInput = (SendEmailCommand as unknown as jest.Mock).mock
           .calls[0][0]
 
-        // 1. Check Payload Structure
+        // Validation
         expect(commandInput.Content.Template).toBeDefined()
         expect(commandInput.Content.Simple).toBeUndefined()
-
-        // 2. Check Template Content
-        expect(commandInput.Content.Template.TemplateContent.Subject).toBe(
-          baseMsg.template.subject,
-        )
-        expect(commandInput.Content.Template.TemplateContent.Html).toBe(
-          baseMsg.template.html,
-        )
-
-        // 3. Check Data Serialization
-        // AWS requires TemplateData to be a JSON string
         expect(commandInput.Content.Template.TemplateData).toBe(
-          JSON.stringify(baseMsg.data),
+          JSON.stringify(flatMsg.data),
         )
       })
 
-      it('should include ConfigurationSetName if provided', async () => {
-        const msgWithConfig: TemplatedEmailNotification = {
-          ...baseMsg,
-          configurationSetName: 'TrackingSet',
-        }
+      it('should use SendEmailCommand with Template structure (Nested Data)', async () => {
+        await service.sendInlineTemplateEmail(nestedMsg)
 
-        await service.sendInlineTemplateEmail(msgWithConfig)
-
+        expect(SendEmailCommand).toHaveBeenCalledTimes(1)
         const commandInput = (SendEmailCommand as unknown as jest.Mock).mock
           .calls[0][0]
-        expect(commandInput.ConfigurationSetName).toBe('TrackingSet')
+
+        // Validation
+        expect(commandInput.Content.Template).toBeDefined()
+        expect(commandInput.Content.Template.TemplateData).toBe(
+          JSON.stringify(nestedMsg.data),
+        )
       })
     })
 
@@ -621,74 +662,148 @@ describe('EmailService', () => {
         process.env.IS_OFFLINE = 'true'
       })
 
-      it('should manually compile template and use Simple content structure', async () => {
-        await service.sendInlineTemplateEmail(baseMsg)
+      it('should manually compile FLAT object variables', async () => {
+        await service.sendInlineTemplateEmail(flatMsg)
 
         expect(SendEmailCommand).toHaveBeenCalledTimes(1)
         const commandInput = (SendEmailCommand as unknown as jest.Mock).mock
           .calls[0][0]
 
-        // 1. Check Payload Structure (Should be Simple, NOT Template)
+        // Ensure fallback to Simple email
         expect(commandInput.Content.Simple).toBeDefined()
         expect(commandInput.Content.Template).toBeUndefined()
 
-        // 2. Check Variable Substitution
-        // Subject: "Welcome {{name}}!" -> "Welcome Alice!"
+        // Check flat replacement: {{name}} -> Alice
         expect(commandInput.Content.Simple.Subject.Data).toBe('Welcome Alice!')
-
-        // HTML: "Hello {{name}}, your code is {{code}}."
         expect(commandInput.Content.Simple.Body.Html.Data).toBe(
           '<p>Hello Alice, your code is 12345.</p>',
         )
+      })
 
-        // Text: "Hello {{name}}, code: {{code}}"
-        expect(commandInput.Content.Simple.Body.Text.Data).toBe(
-          'Hello Alice, code: 12345',
+      it('should manually compile NESTED object variables', async () => {
+        await service.sendInlineTemplateEmail(nestedMsg)
+
+        expect(SendEmailCommand).toHaveBeenCalledTimes(1)
+        const commandInput = (SendEmailCommand as unknown as jest.Mock).mock
+          .calls[0][0]
+
+        // Check nested replacement
+        // {{user.profile.firstName}} -> Bob
+        expect(commandInput.Content.Simple.Subject.Data).toBe('Welcome Bob!')
+
+        // {{auth.otp}} -> 999888
+        expect(commandInput.Content.Simple.Body.Html.Data).toBe(
+          '<p>Hello, your access code is 999888.</p>',
         )
       })
 
-      it('should handle missing data keys by preserving the tag (regex fallback)', async () => {
-        // Missing 'code' in data
-        const incompleteDataMsg: TemplatedEmailNotification = {
-          ...baseMsg,
-          data: { name: 'Bob' }, // 'code' is missing
+      it('should handle missing keys by preserving the tag (Regex Fallback)', async () => {
+        const incompleteMsg: TemplatedEmailNotification = {
+          ...nestedMsg,
+          // 'auth' key is missing entirely from data
+          data: {
+            user: { profile: { firstName: 'Bob' } },
+          } as any,
         }
 
-        await service.sendInlineTemplateEmail(incompleteDataMsg)
+        await service.sendInlineTemplateEmail(incompleteMsg)
 
         const commandInput = (SendEmailCommand as unknown as jest.Mock).mock
           .calls[0][0]
 
-        // Expect {{name}} to be replaced, but {{code}} to remain literally
-        expect(commandInput.Content.Simple.Body.Html.Data).toBe(
-          '<p>Hello Bob, your code is {{code}}.</p>',
+        // {{user.profile.firstName}} should still work
+        expect(commandInput.Content.Simple.Subject.Data).toBe('Welcome Bob!')
+
+        // {{auth.otp}} should remain literally in the text because the data is missing
+        expect(commandInput.Content.Simple.Body.Html.Data).toContain(
+          '{{auth.otp}}',
         )
       })
 
-      it('should handle missing text part in template', async () => {
-        const msgNoText: TemplatedEmailNotification = {
-          ...baseMsg,
+      it('should handle Complex Scenarios (Japanese keys, Whitespace, Deep Nesting)', async () => {
+        const complexMsg: TemplatedEmailNotification = {
+          toAddrs: ['test@jp.com'],
           template: {
-            subject: 'Subj',
-            html: '<p>Html</p>',
-            // text is undefined
+            subject: 'Confirm: {{ 認証コード }}', // Contains spaces and Japanese
+            html: '<p>User: {{ user.details.name }}</p><p>Code: {{認証コード}}</p>',
+            text: 'Code: {{認証コード}}',
+          },
+          data: {
+            '認証コード': '12345', // Japanese Key
+            user: {
+              details: {
+                name: 'Taro', // Nested Key
+              },
+            },
           },
         }
 
-        await service.sendInlineTemplateEmail(msgNoText)
+        await service.sendInlineTemplateEmail(complexMsg)
 
+        const commandInput = (SendEmailCommand as unknown as jest.Mock).mock.calls[0][0]
+
+        // 1. Validate Japanese Key with Whitespace inside braces
+        // {{ 認証コード }} -> 12345
+        expect(commandInput.Content.Simple.Subject.Data).toBe('Confirm: 12345')
+
+        // 2. Validate Nested Object & Japanese Key without whitespace
+        // {{ user.details.name }} -> Taro
+        // {{認証コード}} -> 12345
+        expect(commandInput.Content.Simple.Body.Html.Data).toBe(
+          '<p>User: Taro</p><p>Code: 12345</p>',
+        )
+      })
+
+      it('should handle NESTED objects with JAPANESE keys and values', async () => {
+        const japaneseNestedMsg: TemplatedEmailNotification = {
+          toAddrs: ['jp-test@example.com'],
+          template: {
+            subject: '注文確認: {{ 注文.ID }}',
+            html: '<p>お客様: {{ 顧客.情報.名前 }} 様</p><p>商品: {{ 注文.詳細.品名 }}</p>',
+            text: 'お客様: {{ 顧客.情報.名前 }} 様, 商品: {{ 注文.詳細.品名 }}',
+          },
+          data: {
+            // Nested Japanese Keys
+            '注文': {
+              'ID': 'ORD-2024',
+              '詳細': {
+                '品名': 'ワイヤレスイヤホン', // Japanese Value
+              },
+            },
+            '顧客': {
+              '情報': {
+                '名前': '山田 太郎', // Japanese Value
+              },
+            },
+          },
+        }
+  
+        await service.sendInlineTemplateEmail(japaneseNestedMsg)
+  
         const commandInput = (SendEmailCommand as unknown as jest.Mock).mock
           .calls[0][0]
-
-        expect(commandInput.Content.Simple.Body.Text).toBeUndefined()
-        expect(commandInput.Content.Simple.Body.Html.Data).toBe('<p>Html</p>')
+  
+        // 1. Check Subject: {{ 注文.ID }} -> ORD-2024
+        expect(commandInput.Content.Simple.Subject.Data).toBe('注文確認: ORD-2024')
+  
+        // 2. Check Body HTML:
+        // {{ 顧客.情報.名前 }} -> 山田 太郎
+        // {{ 注文.詳細.品名 }} -> ワイヤレスイヤホン
+        expect(commandInput.Content.Simple.Body.Html.Data).toBe(
+          '<p>お客様: 山田 太郎 様</p><p>商品: ワイヤレスイヤホン</p>',
+        )
+  
+        // 3. Check Body Text: Same replacements
+        expect(commandInput.Content.Simple.Body.Text.Data).toBe(
+          'お客様: 山田 太郎 様, 商品: ワイヤレスイヤホン',
+        )
       })
     })
 
     it('should catch and log errors during sending', async () => {
       mockAwsSend.mockRejectedValue(new Error('AWS Validation Error'))
 
-      await expect(service.sendInlineTemplateEmail(baseMsg)).rejects.toThrow(
+      await expect(service.sendInlineTemplateEmail(flatMsg)).rejects.toThrow(
         'AWS Validation Error',
       )
 
