@@ -655,6 +655,19 @@ describe('EmailService', () => {
           JSON.stringify(nestedMsg.data),
         )
       })
+
+      it('should include ConfigurationSetName if provided', async () => {
+        const msgWithConfig: TemplatedEmailNotification = {
+          ...flatMsg,
+          configurationSetName: 'TrackingSet',
+        }
+
+        await service.sendInlineTemplateEmail(msgWithConfig)
+
+        const commandInput = (SendEmailCommand as unknown as jest.Mock).mock
+          .calls[0][0]
+        expect(commandInput.ConfigurationSetName).toBe('TrackingSet')
+      })
     })
 
     describe('Environment: LOCAL/OFFLINE (Manual Compilation)', () => {
@@ -777,25 +790,75 @@ describe('EmailService', () => {
             },
           },
         }
-  
+
         await service.sendInlineTemplateEmail(japaneseNestedMsg)
-  
+
         const commandInput = (SendEmailCommand as unknown as jest.Mock).mock
           .calls[0][0]
-  
+
         // 1. Check Subject: {{ 注文.ID }} -> ORD-2024
         expect(commandInput.Content.Simple.Subject.Data).toBe('注文確認: ORD-2024')
-  
+
         // 2. Check Body HTML:
         // {{ 顧客.情報.名前 }} -> 山田 太郎
         // {{ 注文.詳細.品名 }} -> ワイヤレスイヤホン
         expect(commandInput.Content.Simple.Body.Html.Data).toBe(
           '<p>お客様: 山田 太郎 様</p><p>商品: ワイヤレスイヤホン</p>',
         )
-  
+
         // 3. Check Body Text: Same replacements
         expect(commandInput.Content.Simple.Body.Text.Data).toBe(
           'お客様: 山田 太郎 様, 商品: ワイヤレスイヤホン',
+        )
+      })
+
+      it('should handle missing text part in template', async () => {
+        const msgNoText: TemplatedEmailNotification = {
+          ...flatMsg,
+          template: {
+            subject: 'Subject Only',
+            html: '<p>Html content</p>',
+            // text is undefined
+          },
+        }
+
+        await service.sendInlineTemplateEmail(msgNoText)
+
+        const commandInput = (SendEmailCommand as unknown as jest.Mock).mock
+          .calls[0][0]
+
+        expect(commandInput.Content.Simple.Body.Text).toBeUndefined()
+        expect(commandInput.Content.Simple.Body.Html.Data).toBe(
+          '<p>Html content</p>',
+        )
+      })
+
+      it('should handle falsy values correctly (0, false, empty string)', async () => {
+        const msgWithFalsyValues: TemplatedEmailNotification = {
+          toAddrs: ['test@example.com'],
+          template: {
+            subject: 'Count: {{count}}',
+            html: '<p>Active: {{active}}, Note: {{note}}</p>',
+            text: 'Count: {{count}}, Active: {{active}}',
+          },
+          data: {
+            count: 0, // falsy but valid
+            active: false, // falsy but valid
+            note: '', // empty string
+          },
+        }
+
+        await service.sendInlineTemplateEmail(msgWithFalsyValues)
+
+        const commandInput = (SendEmailCommand as unknown as jest.Mock).mock
+          .calls[0][0]
+
+        // 0 should be rendered as "0", not preserved as {{count}}
+        expect(commandInput.Content.Simple.Subject.Data).toBe('Count: 0')
+
+        // false should be rendered as "false", empty string as ""
+        expect(commandInput.Content.Simple.Body.Html.Data).toBe(
+          '<p>Active: false, Note: </p>',
         )
       })
     })
