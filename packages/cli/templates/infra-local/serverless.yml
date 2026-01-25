@@ -14,23 +14,35 @@ plugins:
   - serverless-offline
 
 custom:
+  # Port configuration - override via environment variables in .env
+  httpPort: ${env:LOCAL_HTTP_PORT, 3000}
+  lambdaPort: ${env:LOCAL_LAMBDA_PORT, 3002}
+  dynamodbPort: ${env:LOCAL_DYNAMODB_PORT, 8000}
+  sqsPort: ${env:LOCAL_SQS_PORT, 9324}
+  snsPort: ${env:LOCAL_SNS_PORT, 4002}
+  eventBridgePort: ${env:LOCAL_EVENTBRIDGE_PORT, 4010}
+  sesPort: ${env:LOCAL_SES_PORT, 8005}
+  cognitoPort: ${env:LOCAL_COGNITO_PORT, 9229}
+
   serverless-offline:
     corsAllowOrigin: '*'
     corsAllowHeaders: '*'
     host: 0.0.0.0
+    httpPort: ${self:custom.httpPort}
+    lambdaPort: ${self:custom.lambdaPort}
     reloadHandler: true
     ignoreJWTSignature: true
   serverless-offline-ses-v2:
-    port: 8005
+    port: ${self:custom.sesPort}
   serverless-offline-sns:
-    port: 4002 # a free port for the sns server to run on
+    port: ${self:custom.snsPort}
     debug: true
     subscriptions:
       - topic:
           topicName: CqrsSnsTopic
           rawMessageDelivery: 'true'
           filterPolicy: { 'action': ['task-execute'] }
-        queue: http://localhost:9324/101010101010/task-action-queue
+        queue: http://localhost:${self:custom.sqsPort}/101010101010/task-action-queue
       - topic:
           topicName: CqrsSnsTopic
           rawMessageDelivery: 'true'
@@ -39,21 +51,21 @@ custom:
               'action':
                 ['notification-action', 'command-status', 'task-status'],
             }
-        queue: http://localhost:9324/101010101010/notification-queue
+        queue: http://localhost:${self:custom.sqsPort}/101010101010/notification-queue
       - topic:
           topicName: CqrsSnsTopic
           rawMessageDelivery: 'true'
           filterPolicy: { 'action': ['sub-task-status'] }
-        queue: http://localhost:9324/101010101010/sub-task-status-queue
+        queue: http://localhost:${self:custom.sqsPort}/101010101010/sub-task-status-queue
       - topic:
           topicName: CqrsSnsTopic
           rawMessageDelivery: 'true'
           filterPolicy: { 'action': ['import-execute'] }
-        queue: http://localhost:9324/101010101010/import-action-queue
+        queue: http://localhost:${self:custom.sqsPort}/101010101010/import-action-queue
       - topic:
           topicName: AlarmSnsTopic
           rawMessageDelivery: 'true'
-        queue: http://localhost:9324/101010101010/alarm-queue
+        queue: http://localhost:${self:custom.sqsPort}/101010101010/alarm-queue
     # host: 0.0.0.0 # Optional, defaults to 127.0.0.1 if not provided to serverless-offline
     # sns-endpoint: http://127.0.0.1:4567 # Optional. Only if you want to use a custom SNS provider endpoint
     # sns-subscribe-endpoint: http://127.0.0.1:3000 # Optional. Only if you want to use a custom subscribe endpoint from SNS to send messages back to
@@ -63,7 +75,7 @@ custom:
     accountId: 101010101010
     debug: true
     apiVersion: '2012-11-05'
-    endpoint: http://localhost:9324
+    endpoint: http://localhost:${self:custom.sqsPort}
     region: ap-northeast-1
     accessKeyId: root
     secretAccessKey: root
@@ -80,19 +92,19 @@ custom:
     start:
       docker: true
       inMemory: true
-      port: 8000
+      port: ${self:custom.dynamodbPort}
       noStart: true
       seed: true
       migrate: false # create tables on start
       onStart: false
       convertEmptyValues: true
   serverless-offline-dynamodb-streams:
-    endpoint: http://localhost:8000
+    endpoint: http://localhost:${self:custom.dynamodbPort}
   serverless-offline-aws-eventbridge:
-    port: 4010 # port to run the eventBridge mock server on
+    port: ${self:custom.eventBridgePort}
     mockEventBridgeServer: true # Set to false if EventBridge is already mocked by another stack
     hostname: 127.0.0.1 # IP or hostname of existing EventBridge if mocked by another stack
-    pubSubPort: 4011 # Port to run the MQ server (or just listen if using an EventBridge Mock server from another stack)
+    pubSubPort: ${env:LOCAL_EVENTBRIDGE_PUBSUB_PORT, 4011}
     debug: false # flag to show debug messages
     account: '' # account id that gets passed to the event
     maximumRetryAttempts: 10 # maximumRetryAttempts to retry lambda
@@ -113,7 +125,7 @@ provider:
       localAuthorizer:
         type: jwt
         identitySource: $request.header.Authorization
-        issuerUrl: http://localhost:9229/local_2G7noHgW
+        issuerUrl: http://localhost:${self:custom.cognitoPort}/local_2G7noHgW
         audience:
           - dnk8y7ii3wled35p3lw0l2cd7
       # keycloakAuthorizer:
