@@ -4,9 +4,7 @@ $env:AWS_ACCOUNT_ID = "101010101010"
 $env:AWS_ACCESS_KEY_ID = "local"
 $env:AWS_SECRET_ACCESS_KEY = "local"
 
-$endpoint = "http://localhost:8000"
-
-# Load environment variables from .env file (assuming you have a utility to load it)
+# Load environment variables from .env file
 Get-Content .env | ForEach-Object {
     if ($_ -match "^\s*#") {
         return
@@ -18,6 +16,22 @@ Get-Content .env | ForEach-Object {
         [System.Environment]::SetEnvironmentVariable($name, $value, "Process")
     }
 }
+
+# Build table name prefix from environment variables
+# Default: NODE_ENV=local, APP_NAME from .env
+$tablePrefix = if ($env:NODE_ENV) { $env:NODE_ENV } else { "local" }
+$tablePrefix = "$tablePrefix-$env:APP_NAME"
+
+# Get ports from environment variables with defaults
+$dynamodbPort = if ($env:LOCAL_DYNAMODB_PORT) { $env:LOCAL_DYNAMODB_PORT } else { "8000" }
+$httpPort = if ($env:LOCAL_HTTP_PORT) { $env:LOCAL_HTTP_PORT } else { "3000" }
+
+$endpoint = "http://localhost:$dynamodbPort"
+
+Write-Host "Using configuration:"
+Write-Host "  TABLE_PREFIX: $tablePrefix"
+Write-Host "  DynamoDB endpoint: $endpoint"
+Write-Host "  Serverless HTTP port: $httpPort"
 
 Write-Host "Read table name"
 
@@ -34,9 +48,8 @@ foreach ($table in $tables) {
             exit 1
         }
 
-        Write-Host "Check health table local-$env:APP_NAME-$table-command"
-        Write-Host "local-$env:APP_NAME-$table-command"
-        $status = aws --endpoint $endpoint dynamodb describe-table --table-name "local-$env:APP_NAME-$table-command" --query "Table.TableStatus"
+        Write-Host "Check health table $tablePrefix-$table-command"
+        $status = aws --endpoint $endpoint dynamodb describe-table --table-name "$tablePrefix-$table-command" --query "Table.TableStatus"
 
         Write-Host "Table status: $status"
         if ($status -eq '"ACTIVE"') {
@@ -59,7 +72,7 @@ while ($true) {
     }
 
     Write-Host "Check health table tasks"
-    $status = aws --endpoint $endpoint dynamodb describe-table --table-name "local-$env:APP_NAME-tasks" --query "Table.TableStatus"
+    $status = aws --endpoint $endpoint dynamodb describe-table --table-name "$tablePrefix-tasks" --query "Table.TableStatus"
 
     Write-Host "Table status: $status"
     if ($status -eq '"ACTIVE"') {
@@ -82,7 +95,7 @@ while ($true) {
 
     Write-Host "Check health serverless"
     try {
-        $response = Invoke-WebRequest -Uri "http://localhost:3000" -UseBasicParsing -ErrorAction Stop
+        $response = Invoke-WebRequest -Uri "http://localhost:$httpPort" -UseBasicParsing -ErrorAction Stop
         $status = $response.StatusCode
     } catch {
         if ($_.Exception.Response -ne $null) {
@@ -122,12 +135,12 @@ foreach ($table in $tables) {
 
     Write-Host "Send a item to trigger command $table"
 
-    aws dynamodb put-item --endpoint http://localhost:8000 --table-name "local-$env:APP_NAME-$table-command" --item $escapedJsonItemString
+    aws dynamodb put-item --endpoint $endpoint --table-name "$tablePrefix-$table-command" --item $escapedJsonItemString
 }
 
-# Trigger asks stream
+# Trigger tasks stream
 Write-Host  "Send a command to trigger command stream tasks"
 $command = @"
-aws dynamodb put-item --endpoint http://localhost:8000 --table-name "local-$env:APP_NAME-tasks" --item '{\"input\":{\"M\":{}},\"sk\":{\"S\":\"$timestamp\"},\"pk\":{\"S\":\"test\"}}'
+aws dynamodb put-item --endpoint $endpoint --table-name "$tablePrefix-tasks" --item '{\"input\":{\"M\":{}},\"sk\":{\"S\":\"$timestamp\"},\"pk\":{\"S\":\"test\"}}'
 "@
 Invoke-Expression $command
