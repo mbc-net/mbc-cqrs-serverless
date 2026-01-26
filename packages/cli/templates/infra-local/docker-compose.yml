@@ -3,15 +3,15 @@ services:
   stepfunctions-local:
     image: amazon/aws-stepfunctions-local
     ports:
-      - 8083:8083
+      - ${LOCAL_SFN_PORT:-8083}:8083
     environment:
       - AWS_ACCOUNT_ID=101010101010
       - AWS_DEFAULT_REGION=ap-northeast-1
-      - LAMBDA_ENDPOINT=http://host.docker.internal:3002
-      - SQS_ENDPOINT=http://host.docker.internal:9324
-      - SNS_ENDPOINT=http://host.docker.internal:4002
-      - DYNAMODB_ENDPOINT=http://host.docker.internal:8000
-      - STEP_FUNCTIONS_ENDPOINT=http://host.docker.internal:8083
+      - LAMBDA_ENDPOINT=http://host.docker.internal:${LOCAL_LAMBDA_PORT:-3002}
+      - SQS_ENDPOINT=http://host.docker.internal:${LOCAL_SQS_PORT:-9324}
+      - SNS_ENDPOINT=http://host.docker.internal:${LOCAL_SNS_PORT:-4002}
+      - DYNAMODB_ENDPOINT=http://host.docker.internal:${LOCAL_DYNAMODB_PORT:-8000}
+      - STEP_FUNCTIONS_ENDPOINT=http://host.docker.internal:${LOCAL_SFN_PORT:-8083}
       - ECS_ENDPOINT=VALUE
     extra_hosts:
       - 'host.docker.internal:host-gateway'
@@ -24,12 +24,12 @@ services:
     volumes:
       - ./docker-data/mysql:/var/lib/mysql
     ports:
-      - 3306:3306
+      - ${LOCAL_RDS_PORT:-3306}:3306
 
   dynamodb-local:
     image: amazon/dynamodb-local
     ports:
-      - 8000:8000
+      - ${LOCAL_DYNAMODB_PORT:-8000}:8000
     volumes:
       - ./docker-data/dynamodb-local:/home/dynamodblocal/data
     working_dir: /home/dynamodblocal
@@ -43,15 +43,15 @@ services:
       - AWS_ACCESS_KEY_ID=local
       - AWS_SECRET_ACCESS_KEY=local
     ports:
-      - 8001:8001
+      - ${LOCAL_DDB_ADMIN_PORT:-8001}:8001
     depends_on:
       - dynamodb-local
 
   queue:
     image: softwaremill/elasticmq-native:latest
     ports:
-      - 9324:9324 # sqs
-      - 9325:9325 # ui
+      - ${LOCAL_SQS_PORT:-9324}:9324 # sqs
+      - ${LOCAL_SQS_UI_PORT:-9325}:9325 # ui
     volumes:
       - ./elasticmq.conf:/opt/elasticmq.conf
       - ./docker-data/elasticmq:/data
@@ -59,7 +59,7 @@ services:
   localstack:
     image: localstack/localstack
     ports:
-      - '4566:4566'
+      - '${LOCAL_S3_PORT:-4566}:4566'
       - '4510-4559:4510-4559'
     environment:
       - SERVICES=s3
@@ -76,7 +76,7 @@ services:
       context: ./appsync-simulator
       dockerfile: Dockerfile
     ports:
-      - 4001:4001
+      - ${LOCAL_APPSYNC_PORT:-4001}:4001
     environment:
       - PORT=4001
       - API_KEY=da2-fakeApiId123456
@@ -86,6 +86,6 @@ services:
       context: ./cognito-local
       dockerfile: Dockerfile
     ports:
-      - 9229:9229
+      - ${LOCAL_COGNITO_PORT:-9229}:9229
     volumes:
       - ./docker-data/.cognito:/app/.cognito
