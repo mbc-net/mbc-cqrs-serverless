@@ -6,11 +6,14 @@ import installSkillsAction, {
   getInstalledVersion,
   getPackageVersion,
   writeVersionFile,
+  getLatestVersionFromRegistry,
   VERSION_FILE_NAME,
+  VERSION_CACHE_FILE_NAME,
 } from './install-skills.action'
 
 jest.mock('fs')
 jest.mock('os')
+jest.mock('child_process')
 
 import {
   existsSync,
@@ -20,6 +23,7 @@ import {
   readFileSync,
   writeFileSync,
 } from 'fs'
+import { execSync } from 'child_process'
 import path from 'path'
 import os from 'os'
 
@@ -31,6 +35,7 @@ const mockReadFileSync = readFileSync as jest.MockedFunction<typeof readFileSync
 const mockWriteFileSync = writeFileSync as jest.MockedFunction<
   typeof writeFileSync
 >
+const mockExecSync = execSync as jest.MockedFunction<typeof execSync>
 
 describe('Install Skills Action', () => {
   const mockCommand = {
@@ -41,6 +46,8 @@ describe('Install Skills Action', () => {
   beforeEach(() => {
     jest.clearAllMocks()
     ;(os.homedir as jest.Mock).mockReturnValue('/home/user')
+    // Default mock for npm registry - returns a test version
+    mockExecSync.mockReturnValue('1.0.25\n')
   })
 
   describe('getSkillsSourcePath', () => {
@@ -361,6 +368,109 @@ describe('Install Skills Action', () => {
         expect(mockWriteFileSync).toHaveBeenCalledWith(
           expect.stringContaining(VERSION_FILE_NAME),
           '1.0.25',
+          'utf-8',
+        )
+      })
+    })
+
+    describe('getLatestVersionFromRegistry', () => {
+      it('should fetch version from npm registry', () => {
+        mockExistsSync.mockReturnValue(false)
+        mockExecSync.mockReturnValue('1.0.26\n')
+
+        const version = getLatestVersionFromRegistry('/dest/skills')
+
+        expect(version).toBe('1.0.26')
+        expect(mockExecSync).toHaveBeenCalledWith(
+          'npm view @mbc-cqrs-serverless/mcp-server version',
+          expect.objectContaining({ encoding: 'utf-8', timeout: 10000 }),
+        )
+      })
+
+      it('should use cached version if cache is valid', () => {
+        const cacheData = {
+          version: '1.0.25',
+          checkedAt: new Date().toISOString(), // Fresh cache
+        }
+        mockExistsSync.mockReturnValue(true)
+        mockReadFileSync.mockReturnValue(JSON.stringify(cacheData))
+
+        const version = getLatestVersionFromRegistry('/dest/skills')
+
+        expect(version).toBe('1.0.25')
+        expect(mockExecSync).not.toHaveBeenCalled()
+      })
+
+      it('should fetch from registry if cache is expired', () => {
+        const cacheData = {
+          version: '1.0.24',
+          checkedAt: new Date(Date.now() - 25 * 60 * 60 * 1000).toISOString(), // 25 hours ago
+        }
+        mockExistsSync.mockReturnValue(true)
+        mockReadFileSync.mockReturnValue(JSON.stringify(cacheData))
+        mockExecSync.mockReturnValue('1.0.26\n')
+
+        const version = getLatestVersionFromRegistry('/dest/skills')
+
+        expect(version).toBe('1.0.26')
+        expect(mockExecSync).toHaveBeenCalled()
+      })
+
+      it('should force refresh when forceRefresh is true', () => {
+        const cacheData = {
+          version: '1.0.24',
+          checkedAt: new Date().toISOString(), // Fresh cache
+        }
+        mockExistsSync.mockReturnValue(true)
+        mockReadFileSync.mockReturnValue(JSON.stringify(cacheData))
+        mockExecSync.mockReturnValue('1.0.26\n')
+
+        const version = getLatestVersionFromRegistry('/dest/skills', true)
+
+        expect(version).toBe('1.0.26')
+        expect(mockExecSync).toHaveBeenCalled()
+      })
+
+      it('should use expired cache as fallback when offline', () => {
+        const cacheData = {
+          version: '1.0.24',
+          checkedAt: new Date(Date.now() - 25 * 60 * 60 * 1000).toISOString(),
+        }
+        mockExistsSync.mockReturnValue(true)
+        mockReadFileSync.mockReturnValue(JSON.stringify(cacheData))
+        mockExecSync.mockImplementation(() => {
+          throw new Error('Network error')
+        })
+
+        const version = getLatestVersionFromRegistry('/dest/skills')
+
+        expect(version).toBe('1.0.24')
+      })
+
+      it('should return null when offline and no cache exists', () => {
+        mockExistsSync.mockReturnValue(false)
+        mockExecSync.mockImplementation(() => {
+          throw new Error('Network error')
+        })
+
+        const version = getLatestVersionFromRegistry('/dest/skills')
+
+        expect(version).toBeNull()
+      })
+
+      it('should save version to cache after fetching', () => {
+        mockExistsSync.mockReturnValue(true)
+        mockExecSync.mockReturnValue('1.0.26\n')
+        // Make cache read fail to trigger fetch
+        mockReadFileSync.mockImplementation(() => {
+          throw new Error('No cache')
+        })
+
+        getLatestVersionFromRegistry('/dest/skills')
+
+        expect(mockWriteFileSync).toHaveBeenCalledWith(
+          expect.stringContaining(VERSION_CACHE_FILE_NAME),
+          expect.stringContaining('"version": "1.0.26"'),
           'utf-8',
         )
       })

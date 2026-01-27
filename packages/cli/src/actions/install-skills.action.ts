@@ -1,4 +1,5 @@
 import { Command } from 'commander'
+import { execSync } from 'child_process'
 import {
   cpSync,
   existsSync,
@@ -16,6 +17,29 @@ import { logger } from '../ui'
  * Version file name for tracking installed skills version
  */
 export const VERSION_FILE_NAME = '.mbc-skills-version'
+
+/**
+ * Cache file name for storing latest version from npm registry
+ */
+export const VERSION_CACHE_FILE_NAME = '.mbc-version-cache.json'
+
+/**
+ * Cache TTL in milliseconds (24 hours)
+ */
+export const VERSION_CACHE_TTL_MS = 24 * 60 * 60 * 1000
+
+/**
+ * npm package name for mcp-server
+ */
+const MCP_SERVER_PACKAGE = '@mbc-cqrs-serverless/mcp-server'
+
+/**
+ * Version cache structure
+ */
+interface VersionCache {
+  version: string
+  checkedAt: string
+}
 
 /**
  * Get the path to the mcp-server skills source directory
@@ -167,6 +191,72 @@ export function writeVersionFile(destPath: string, version: string): void {
   writeFileSync(versionFilePath, version, 'utf-8')
 }
 
+/**
+ * Get the latest package version from npm registry with caching
+ * @param destPath - The destination path where cache file is stored
+ * @param forceRefresh - Force refresh from npm registry, ignoring cache
+ * @returns The latest version or null if not available
+ */
+export function getLatestVersionFromRegistry(
+  destPath: string,
+  forceRefresh = false,
+): string | null {
+  const cacheFilePath = path.join(destPath, VERSION_CACHE_FILE_NAME)
+
+  // Check cache first (unless force refresh)
+  if (!forceRefresh && existsSync(cacheFilePath)) {
+    try {
+      const cache: VersionCache = JSON.parse(
+        readFileSync(cacheFilePath, 'utf-8'),
+      )
+      const cacheAge = Date.now() - new Date(cache.checkedAt).getTime()
+
+      if (cacheAge < VERSION_CACHE_TTL_MS) {
+        // Cache is still valid
+        return cache.version
+      }
+    } catch {
+      // Cache read failed, continue to fetch from registry
+    }
+  }
+
+  // Fetch from npm registry
+  try {
+    const version = execSync(`npm view ${MCP_SERVER_PACKAGE} version`, {
+      encoding: 'utf-8',
+      timeout: 10000,
+      stdio: ['pipe', 'pipe', 'pipe'],
+    }).trim()
+
+    // Ensure destination directory exists before writing cache
+    if (!existsSync(destPath)) {
+      mkdirSync(destPath, { recursive: true })
+    }
+
+    // Save to cache
+    const cache: VersionCache = {
+      version,
+      checkedAt: new Date().toISOString(),
+    }
+    writeFileSync(cacheFilePath, JSON.stringify(cache, null, 2), 'utf-8')
+
+    return version
+  } catch {
+    // Offline or error - try to use expired cache as fallback
+    if (existsSync(cacheFilePath)) {
+      try {
+        const cache: VersionCache = JSON.parse(
+          readFileSync(cacheFilePath, 'utf-8'),
+        )
+        return cache.version
+      } catch {
+        return null
+      }
+    }
+    return null
+  }
+}
+
 export interface InstallSkillsOptions {
   project?: boolean
   force?: boolean
@@ -223,25 +313,28 @@ export default async function installSkillsAction(
   // Check mode - compare versions without installing
   if (check) {
     const installedVersion = getInstalledVersion(destPath)
-    const packageVersion = getPackageVersion(sourcePath)
+    // Get latest version from npm registry (with 24h cache)
+    const latestVersion = getLatestVersionFromRegistry(destPath, force)
 
     if (!installedVersion) {
       logger.warn('Skills are not installed.')
-      logger.info(`Available version: ${packageVersion || 'unknown'}`)
+      logger.info(`Available version: ${latestVersion || 'unknown'}`)
       logger.info('Run `mbc install-skills` to install.')
       return
     }
 
-    if (!packageVersion) {
-      logger.warn('Could not determine package version.')
+    if (!latestVersion) {
+      logger.warn(
+        'Could not determine latest version. Check your network connection.',
+      )
       logger.info(`Installed version: ${installedVersion}`)
       return
     }
 
-    if (installedVersion === packageVersion) {
+    if (installedVersion === latestVersion) {
       logger.success(`Skills are up to date (${installedVersion}).`)
     } else {
-      logger.warn(`Update available: ${installedVersion} → ${packageVersion}`)
+      logger.warn(`Update available: ${installedVersion} → ${latestVersion}`)
       logger.info('Run `mbc install-skills --force` to update.')
     }
     return
@@ -264,8 +357,11 @@ export default async function installSkillsAction(
   logger.title('install', `Installing skills to ${destPath}`)
   const copiedSkills = copySkills(sourcePath, destPath)
 
+  // Get version from npm registry (preferred) or fall back to local package.json
+  const latestVersion = getLatestVersionFromRegistry(destPath, true)
+  const packageVersion = latestVersion || getPackageVersion(sourcePath)
+
   // Write version file
-  const packageVersion = getPackageVersion(sourcePath)
   if (packageVersion) {
     writeVersionFile(destPath, packageVersion)
   }
