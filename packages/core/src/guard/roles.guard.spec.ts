@@ -8,10 +8,8 @@
  * - Tenant code validation (required for all requests)
  * - Role matching against @Roles() decorator requirements
  * - JWT token parsing for role extraction
- *
- * Test tokens used:
- * - systemAdminToken: Contains role "system_admin"
- * - userToken: Contains role "user"
+ * - System admin can override tenant via header (when no custom:tenant)
+ * - Regular users require custom:tenant in Cognito (cannot use header override)
  */
 import { createMock } from '@golevelup/ts-jest'
 import { ExecutionContext } from '@nestjs/common'
@@ -19,18 +17,41 @@ import { RolesGuard } from './roles.guard'
 import { Reflector } from '@nestjs/core'
 import { Test } from '@nestjs/testing'
 import { ROLE_METADATA } from '../decorators'
+import * as jwtDecode from 'jwt-decode'
 
-const systemAdminToken =
-  'eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCIsImtpZCI6IkNvZ25pdG9Mb2NhbCJ9.eyJjb2duaXRvOnVzZXJuYW1lIjoiYWRtaW4yIiwiYXV0aF90aW1lIjoxNzI1NTMyNzk3LCJlbWFpbCI6ImFkbWluQHRlc3QuY29tIiwiZW1haWxfdmVyaWZpZWQiOmZhbHNlLCJldmVudF9pZCI6IjExNzY4NjljLTJiYjAtNDE3ZC1iMWI5LWI4YjJiMjBmNzRjNCIsImlhdCI6MTcyNTUzMjc5NywianRpIjoiMGYwY2NkMjItZTliNi00YTkzLWI0MDUtMDA5ODg4YWJlNTBkIiwic3ViIjoiOTJjYTRmNjgtOWFjNi00MDgwLTlhZTItMmYwMmE4NjIwNmE0IiwidG9rZW5fdXNlIjoiaWQiLCJjdXN0b206cm9sZXMiOiJbe1wicm9sZVwiOlwic3lzdGVtX2FkbWluXCJ9XSIsImV4cCI6MTcyNTYxOTE5NywiYXVkIjoiZG5rOHk3aWkzd2xlZDM1cDNsdzBsMmNkNyIsImlzcyI6Imh0dHA6Ly9sb2NhbGhvc3Q6OTIyOS9sb2NhbF8yRzdub0hnVyJ9.g3s5U8GyahEkVKZ-DmGc8_bfrN0Dq0FOAZnpic1vEXXQbi0tE8dsDAQZc3IyWwuZRmdQcbjAA7jTXQUM5enDAG2uFY5DWSJg_fzVNMJ9-fCuUmG-ZnoZWuM6J4nlvhgUYktEB5Y3sEpj5JjWH6jJfTvX_QDfLLXGkWU_Mm7EAvu8eHXdwsrnI3sJfwE5gGOzp_s9bucpzgF7DEbQnf15fGwot8RrMhV-5DucR_nad5gQHMAiGL7ROaN58W1WqnGXViiXIGhw0qpnQhcNfj-la2dDY5ICE4Jw6bg1lkALWey_bJoQTI9Gc4D88CRZuEG1x2IyAzhmwPrV9GXk9mEeuQ'
+// Mock jwt-decode to control claims in tests
+jest.mock('jwt-decode', () => ({
+  jwtDecode: jest.fn(),
+}))
 
-const userToken =
-  'eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCIsImtpZCI6IkNvZ25pdG9Mb2NhbCJ9.eyJjb2duaXRvOnVzZXJuYW1lIjoiYWRtaW4yIiwiYXV0aF90aW1lIjoxNzI1NTMyNzk3LCJlbWFpbCI6ImFkbWluQHRlc3QuY29tIiwiZW1haWxfdmVyaWZpZWQiOmZhbHNlLCJldmVudF9pZCI6IjExNzY4NjljLTJiYjAtNDE3ZC1iMWI5LWI4YjJiMjBmNzRjNCIsImlhdCI6MTcyNTUzMjc5NywianRpIjoiMGYwY2NkMjItZTliNi00YTkzLWI0MDUtMDA5ODg4YWJlNTBkIiwic3ViIjoiOTJjYTRmNjgtOWFjNi00MDgwLTlhZTItMmYwMmE4NjIwNmE0IiwidG9rZW5fdXNlIjoiaWQiLCJjdXN0b206cm9sZXMiOiJbe1wicm9sZVwiOlwidXNlclwifV0iLCJleHAiOjE3MjU2MTkxOTcsImF1ZCI6ImRuazh5N2lpM3dsZWQzNXAzbHcwbDJjZDciLCJpc3MiOiJodHRwOi8vbG9jYWxob3N0OjkyMjkvbG9jYWxfMkc3bm9IZ1cifQ.076V49LzDp8kSBYWXJgK0DH3tEFYzKwM79uhzb01pe86RJGLQXWjEnRxzVE9eF-nuGV87AMHEnB8NYtujClFN03QzEiBuiU2iGFmIL4VOy20FfunS4_yy6Wq0ZZuCmaDgZRBg0SRDm7KY7UCJn4ClU-j0ydCCbpSRoECgOpOsLZdIYaj4N3p5S7URQh_y2qsbvtRJ_kmSzLlAwXTv9sFOVJ2ddUAZlCyb6C1ow08rdqk3_YkV-h8gd6zRccgd2O-T4Y6ulvDaZuN-xc71qbACuUWdvp4sa3oyV-EIRvkIgYWrSF1-AuXDZyXt-6NpCDXQ1dusnTfK-8W4m4vy7JNHg'
+const mockJwtDecode = jwtDecode.jwtDecode as jest.Mock
 
-const createRequestStub = (token: string, tenantCode = 'test') => ({
+// Dummy token (actual decoding is mocked)
+const dummyToken = 'dummy.jwt.token'
+
+// Claims for system admin (global admin with no tenant)
+const systemAdminClaims = {
+  sub: '92ca4f68-9ac6-4080-9ae2-2f02a86206a4',
+  'cognito:username': 'admin',
+  email: 'admin@test.com',
+  'custom:roles': JSON.stringify([{ role: 'system_admin' }]),
+  // No custom:tenant - system admin uses header
+}
+
+// Claims for regular user with tenant
+const tenantUserClaims = {
+  sub: '12345678-1234-1234-1234-123456789012',
+  'cognito:username': 'user1',
+  email: 'user@test.com',
+  'custom:tenant': 'test',
+  'custom:roles': JSON.stringify([{ tenant: 'test', role: 'user' }]),
+}
+
+const createRequestStub = (tenantCode = 'test') => ({
   headers: {
     'x-tenant-code': tenantCode,
   },
-  get: () => token,
+  get: () => dummyToken,
 })
 
 const execution_context: ExecutionContext = createMock<ExecutionContext>({
@@ -60,9 +81,10 @@ describe('RolesGuard', () => {
   /** Rejects request when x-tenant-code header is missing or empty */
   it('should return false if tenant code does not exist', async () => {
     // Arrange
+    mockJwtDecode.mockReturnValue(systemAdminClaims)
     jest.spyOn(reflector, 'getAllAndOverride').mockReturnValue(['system_admin'])
     ;(execution_context.switchToHttp().getRequest as jest.Mock).mockReturnValue(
-      createRequestStub(systemAdminToken, ''),
+      createRequestStub(''),
     )
     // Act & Assert
     expect(await rolesGuard.canActivate(execution_context)).toBeFalsy()
@@ -72,9 +94,10 @@ describe('RolesGuard', () => {
   /** Grants access when user's role matches required role */
   it('should return true if the user has the system admin role', async () => {
     // Arrange
+    mockJwtDecode.mockReturnValue(systemAdminClaims)
     jest.spyOn(reflector, 'getAllAndOverride').mockReturnValue(['system_admin'])
     ;(execution_context.switchToHttp().getRequest as jest.Mock).mockReturnValue(
-      createRequestStub(systemAdminToken),
+      createRequestStub(),
     )
     // Act & Assert
     expect(await rolesGuard.canActivate(execution_context)).toBeTruthy()
@@ -87,11 +110,12 @@ describe('RolesGuard', () => {
   /** Grants access when user has one of multiple allowed roles */
   it('should return true if the user has the user role', async () => {
     // Arrange
+    mockJwtDecode.mockReturnValue(tenantUserClaims)
     jest
       .spyOn(reflector, 'getAllAndOverride')
       .mockReturnValue(['system_admin', 'user'])
     ;(execution_context.switchToHttp().getRequest as jest.Mock).mockReturnValue(
-      createRequestStub(userToken),
+      createRequestStub(),
     )
     // Act & Assert
     expect(await rolesGuard.canActivate(execution_context)).toBeTruthy()
@@ -104,9 +128,10 @@ describe('RolesGuard', () => {
   /** Denies access when user's role is not in the required roles list */
   it('should return false if the user has only the user role', async () => {
     // Arrange
+    mockJwtDecode.mockReturnValue(tenantUserClaims)
     jest.spyOn(reflector, 'getAllAndOverride').mockReturnValue(['system_admin'])
     ;(execution_context.switchToHttp().getRequest as jest.Mock).mockReturnValue(
-      createRequestStub(userToken),
+      createRequestStub(),
     )
     // Act & Assert
     expect(await rolesGuard.canActivate(execution_context)).toBeFalsy()
@@ -114,5 +139,36 @@ describe('RolesGuard', () => {
       execution_context.getHandler(),
       execution_context.getClass(),
     ])
+  })
+
+  /** Non-system-admin cannot override tenant via header */
+  it('should return false if non-system-admin tries to use header tenant', async () => {
+    // Arrange - user without custom:tenant trying to use header
+    const userWithoutTenantClaims = {
+      sub: '12345678-1234-1234-1234-123456789012',
+      'cognito:username': 'user1',
+      email: 'user@test.com',
+      'custom:roles': JSON.stringify([{ role: 'user' }]),
+      // No custom:tenant - should NOT be able to use header
+    }
+    mockJwtDecode.mockReturnValue(userWithoutTenantClaims)
+    jest.spyOn(reflector, 'getAllAndOverride').mockReturnValue(['user'])
+    ;(execution_context.switchToHttp().getRequest as jest.Mock).mockReturnValue(
+      createRequestStub('attempted-tenant'),
+    )
+    // Act & Assert - should fail because non-admin cannot use header tenant
+    expect(await rolesGuard.canActivate(execution_context)).toBeFalsy()
+  })
+
+  /** System admin can use header to specify tenant */
+  it('should allow system admin to override tenant via header', async () => {
+    // Arrange
+    mockJwtDecode.mockReturnValue(systemAdminClaims)
+    jest.spyOn(reflector, 'getAllAndOverride').mockReturnValue(['system_admin'])
+    ;(execution_context.switchToHttp().getRequest as jest.Mock).mockReturnValue(
+      createRequestStub('any-tenant'),
+    )
+    // Act & Assert - system admin should be able to access any tenant via header
+    expect(await rolesGuard.canActivate(execution_context)).toBeTruthy()
   })
 })
