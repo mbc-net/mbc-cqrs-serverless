@@ -1,6 +1,6 @@
 import { ExecutionContext } from '@nestjs/common'
 
-import { HEADER_TENANT_CODE, ROLE_SYSTEM_ADMIN } from '../constants'
+import { HEADER_TENANT_CODE } from '../constants'
 import { extractInvokeContext, getAuthorizerClaims, IInvoke } from './invoke'
 
 export interface CustomRole {
@@ -18,6 +18,16 @@ export class UserContext {
   }
 }
 
+/**
+ * Extract user context from JWT claims and request headers.
+ *
+ * Tenant code determination:
+ * 1. If `custom:tenant` exists in JWT claims, use it (user bound to specific tenant)
+ * 2. Otherwise, use `x-tenant-code` header (for cross-tenant operations)
+ *
+ * Note: Security validation for header-based tenant override is handled by RolesGuard,
+ * not by this function. This allows for flexible security policies at the application level.
+ */
 export function getUserContext(ctx: IInvoke | ExecutionContext): UserContext {
   if ('getHandler' in ctx) {
     ctx = extractInvokeContext(ctx)
@@ -26,30 +36,16 @@ export function getUserContext(ctx: IInvoke | ExecutionContext): UserContext {
 
   const userId = claims.sub
 
-  // Parse roles first (needed for system admin check)
+  // Parse roles
   const roles = (
     JSON.parse(claims['custom:roles'] || '[]') as CustomRole[]
   ).map((role) => ({ ...role, tenant: (role.tenant || '').toLowerCase() }))
 
-  // Check if user is system admin (tenant-independent check)
-  const isSystemAdmin = roles.some(
-    (r) => r.role === ROLE_SYSTEM_ADMIN && r.tenant === '',
-  )
-
   // Determine tenant code
   // 1. Cognito custom:tenant attribute takes priority
-  // 2. Only system admin can override tenant code via header
-  // 3. Otherwise, tenant code is empty (will be rejected by RolesGuard)
-  const headerTenantCode = (ctx?.event?.headers || {})[HEADER_TENANT_CODE]
-  let tenantCode: string
-
-  if (claims['custom:tenant']) {
-    tenantCode = claims['custom:tenant']
-  } else if (isSystemAdmin && headerTenantCode) {
-    tenantCode = headerTenantCode
-  } else {
-    tenantCode = ''
-  }
+  // 2. Otherwise, use header value (security check delegated to RolesGuard)
+  const tenantCode =
+    claims['custom:tenant'] || (ctx?.event?.headers || {})[HEADER_TENANT_CODE]
 
   // Find tenantRole
   let tenantRole = ''
