@@ -335,16 +335,16 @@ describe('RolesGuard', () => {
       expect(await rolesGuard.canActivate(execution_context)).toBeFalsy()
     })
 
-    /** Common tenant code should be case-sensitive */
-    it('should be case-sensitive for common tenant matching', async () => {
-      // Arrange - 'COMMON' should not match 'common'
+    /** Common tenant code should be case-insensitive (tenantCode is normalized to lowercase) */
+    it('should be case-insensitive for common tenant matching', async () => {
+      // Arrange - 'COMMON' should match 'common' because tenantCode is normalized
       mockJwtDecode.mockReturnValue(userWithoutTenantClaims)
       jest.spyOn(reflector, 'getAllAndOverride').mockReturnValue(['user'])
       ;(execution_context.switchToHttp().getRequest as jest.Mock).mockReturnValue(
         createRequestStub('COMMON'),
       )
-      // Act & Assert - 'COMMON' != 'common', should fail
-      expect(await rolesGuard.canActivate(execution_context)).toBeFalsy()
+      // Act & Assert - 'COMMON' is normalized to 'common', should succeed
+      expect(await rolesGuard.canActivate(execution_context)).toBeTruthy()
     })
 
     /** User with custom:tenant should not be affected by header override checks */
@@ -832,18 +832,19 @@ describe('RolesGuard', () => {
       expect(await rolesGuard.canActivate(execution_context)).toBeFalsy()
     })
 
-    /** Tenant code case sensitivity - header vs common tenant */
-    it('should be case-sensitive when matching header tenant to common tenants', async () => {
-      // 'Common' (capital C) should not match 'common'
+    /** Tenant code case - header vs common tenant (case-insensitive) */
+    it('should be case-insensitive when matching header tenant to common tenants', async () => {
+      // 'Common' (capital C) should match 'common' because tenantCode is normalized
       mockJwtDecode.mockReturnValue(userWithoutTenantClaims)
       jest.spyOn(reflector, 'getAllAndOverride').mockReturnValue(['user'])
       ;(execution_context.switchToHttp().getRequest as jest.Mock).mockReturnValue(
         createRequestStub('Common'),
       )
 
-      expect(await rolesGuard.canActivate(execution_context)).toBeFalsy()
+      // Both 'Common' and 'common' should work (normalized to lowercase)
+      expect(await rolesGuard.canActivate(execution_context)).toBeTruthy()
 
-      // But 'common' should work
+      // 'common' should also work
       ;(execution_context.switchToHttp().getRequest as jest.Mock).mockReturnValue(
         createRequestStub('common'),
       )

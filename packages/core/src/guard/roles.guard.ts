@@ -7,9 +7,9 @@ import {
 import { Reflector } from '@nestjs/core'
 
 import {
+  DEFAULT_COMMON_TENANT_CODES,
   DEFAULT_CROSS_TENANT_ROLES,
   ROLE_SYSTEM_ADMIN,
-  TENANT_COMMON,
 } from '../constants'
 import {
   extractInvokeContext,
@@ -94,7 +94,8 @@ export class RolesGuard implements CanActivate {
 
   /**
    * Get list of common tenant codes that anyone can access via header.
-   * Override this method to customize common tenant codes (e.g., read from environment variables).
+   * By default, reads from COMMON_TENANT_CODES environment variable (comma-separated).
+   * Override this method to customize common tenant codes.
    *
    * Example override in application:
    * ```typescript
@@ -105,12 +106,13 @@ export class RolesGuard implements CanActivate {
    * ```
    */
   protected getCommonTenantCodes(): string[] {
-    return [TENANT_COMMON]
+    return DEFAULT_COMMON_TENANT_CODES
   }
 
   /**
    * Get list of roles that can perform cross-tenant operations via header override.
-   * Override this method to customize cross-tenant roles (e.g., read from environment variables).
+   * By default, reads from CROSS_TENANT_ROLES environment variable (comma-separated).
+   * Override this method to customize cross-tenant roles.
    *
    * Example override in application:
    * ```typescript

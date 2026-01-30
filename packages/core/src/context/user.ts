@@ -44,10 +44,12 @@ export function getUserContext(ctx: IInvoke | ExecutionContext): UserContext {
   // Determine tenant code
   // 1. Cognito custom:tenant attribute takes priority
   // 2. Otherwise, use header value (security check delegated to RolesGuard)
-  const tenantCode =
+  // Note: tenantCode is normalized to lowercase for case-insensitive matching with role.tenant
+  const tenantCode = (
     claims['custom:tenant'] || (ctx?.event?.headers || {})[HEADER_TENANT_CODE]
+  )?.toLowerCase()
 
-  // Find tenantRole
+  // Find tenantRole (case-insensitive matching - both tenantCode and role.tenant are lowercase)
   let tenantRole = ''
   for (const { tenant, role } of roles) {
     if (tenant === '' || tenant === tenantCode) {

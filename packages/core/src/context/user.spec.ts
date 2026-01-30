@@ -226,8 +226,9 @@ describe('getUserContext', () => {
 
       const result = getUserContext(ctx)
 
-      // custom:tenant takes priority, case preserved
-      expect(result.tenantCode).toBe('Tenant-A')
+      // custom:tenant takes priority, normalized to lowercase
+      expect(result.tenantCode).toBe('tenant-a')
+      expect(result.tenantRole).toBe('user')
     })
 
     it('should handle multiple roles including both global and tenant-specific', () => {
@@ -379,7 +380,7 @@ describe('getUserContext', () => {
       expect(result.tenantRole).toBe('user')
     })
 
-    it('should pass through header with special characters', () => {
+    it('should pass through header with special characters (lowercased)', () => {
       const ctx = createMockContext(
         {
           sub: 'admin-123',
@@ -392,8 +393,8 @@ describe('getUserContext', () => {
 
       const result = getUserContext(ctx)
 
-      // The header value is passed as-is (validation should happen elsewhere)
-      expect(result.tenantCode).toBe('tenant-a\r\nX-Injected: malicious')
+      // The header value is lowercased (validation should happen elsewhere)
+      expect(result.tenantCode).toBe('tenant-a\r\nx-injected: malicious')
     })
   })
 
@@ -417,42 +418,21 @@ describe('getUserContext', () => {
       expect(result.constructor.name).toBe('Object')
     })
 
-    it('should preserve tenantCode case from custom:tenant', () => {
+    it('should normalize tenantCode to lowercase', () => {
       const ctx = createMockContext({
         sub: 'user-123',
-        'custom:tenant': 'tenanta', // lowercase to match role
+        'custom:tenant': 'TenantA', // Mixed case
         'custom:roles': JSON.stringify([{ tenant: 'tenanta', role: 'user' }]),
       })
 
       const result = getUserContext(ctx)
 
-      // tenantCode should preserve original case
+      // tenantCode is normalized to lowercase
       expect(result.tenantCode).toBe('tenanta')
-      // Role matching: role.tenant is lowercased, compared with tenantCode as-is
       expect(result.tenantRole).toBe('user')
     })
 
-    it('should document case sensitivity behavior between tenantCode and role.tenant', () => {
-      // IMPORTANT: This test documents a known behavior:
-      // - role.tenant is normalized to lowercase during parsing
-      // - tenantCode (from custom:tenant or header) is NOT normalized
-      // - Therefore, 'TenantA' !== 'tenanta' and role won't match
-      const ctx = createMockContext({
-        sub: 'user-123',
-        'custom:tenant': 'TenantA', // Mixed case
-        'custom:roles': JSON.stringify([{ tenant: 'TenantA', role: 'user' }]), // Same case
-      })
-
-      const result = getUserContext(ctx)
-
-      // tenantCode preserves case
-      expect(result.tenantCode).toBe('TenantA')
-      // But role.tenant is lowercased to 'tenanta', which doesn't match 'TenantA'
-      // This means the role won't be found!
-      expect(result.tenantRole).toBe('')
-    })
-
-    it('should preserve tenantCode case from header', () => {
+    it('should normalize tenantCode from header to lowercase', () => {
       const ctx = createMockContext(
         {
           sub: 'user-123',
@@ -463,12 +443,12 @@ describe('getUserContext', () => {
 
       const result = getUserContext(ctx)
 
-      // tenantCode should preserve header case
-      expect(result.tenantCode).toBe('TenantB')
+      // tenantCode from header is also normalized to lowercase
+      expect(result.tenantCode).toBe('tenantb')
     })
 
-    it('should match role with lowercase tenant regardless of tenantCode case', () => {
-      // User has TenantA (mixed case), role is defined for tenanta (lowercase)
+    it('should match role with any case combination (case-insensitive)', () => {
+      // User has TenantA (mixed case), role is defined as TENANTA (uppercase)
       const ctx = createMockContext({
         sub: 'user-123',
         'custom:tenant': 'TenantA',
@@ -479,13 +459,81 @@ describe('getUserContext', () => {
 
       const result = getUserContext(ctx)
 
-      // Role tenant is lowercased during parsing, so 'TENANTA' becomes 'tenanta'
-      // tenantCode 'TenantA' doesn't match 'tenanta' exactly
-      // But the current implementation compares tenantCode with lowercased role.tenant
-      // So 'TenantA' === 'tenanta' is false, role won't match
-      expect(result.tenantCode).toBe('TenantA')
-      // This reveals the current behavior - case mismatch means no role match
-      expect(result.tenantRole).toBe('')
+      // Both tenantCode and role.tenant are normalized to lowercase
+      // 'TenantA' -> 'tenanta', 'TENANTA' -> 'tenanta'
+      // They match, so role is found
+      expect(result.tenantCode).toBe('tenanta')
+      expect(result.tenantRole).toBe('admin')
+    })
+  })
+
+  describe('case-insensitive tenant code handling', () => {
+    it('should treat TenantA and tenanta as the same tenant', () => {
+      const ctx = createMockContext({
+        sub: 'user-123',
+        'custom:tenant': 'TenantA',
+        'custom:roles': JSON.stringify([{ tenant: 'tenanta', role: 'user' }]),
+      })
+
+      const result = getUserContext(ctx)
+
+      expect(result.tenantCode).toBe('tenanta')
+      expect(result.tenantRole).toBe('user')
+    })
+
+    it('should treat TENANT-B and tenant-b as the same tenant', () => {
+      const ctx = createMockContext(
+        {
+          sub: 'user-123',
+          'custom:roles': JSON.stringify([{ tenant: 'tenant-b', role: 'admin' }]),
+        },
+        { [HEADER_TENANT_CODE]: 'TENANT-B' },
+      )
+
+      const result = getUserContext(ctx)
+
+      expect(result.tenantCode).toBe('tenant-b')
+      expect(result.tenantRole).toBe('admin')
+    })
+
+    it('should match role regardless of case in custom:tenant and role.tenant', () => {
+      // All different case combinations should match
+      const testCases = [
+        { tenant: 'ABC', roleTenant: 'abc' },
+        { tenant: 'abc', roleTenant: 'ABC' },
+        { tenant: 'AbC', roleTenant: 'aBc' },
+        { tenant: 'TENANT_CODE', roleTenant: 'tenant_code' },
+      ]
+
+      for (const { tenant, roleTenant } of testCases) {
+        const ctx = createMockContext({
+          sub: 'user-123',
+          'custom:tenant': tenant,
+          'custom:roles': JSON.stringify([{ tenant: roleTenant, role: 'user' }]),
+        })
+
+        const result = getUserContext(ctx)
+
+        expect(result.tenantRole).toBe('user')
+        expect(result.tenantCode).toBe(tenant.toLowerCase())
+      }
+    })
+
+    it('should handle mixed case in header tenant code', () => {
+      const ctx = createMockContext(
+        {
+          sub: 'admin-123',
+          'custom:roles': JSON.stringify([
+            { tenant: 'target-tenant', role: 'admin' },
+          ]),
+        },
+        { [HEADER_TENANT_CODE]: 'Target-Tenant' },
+      )
+
+      const result = getUserContext(ctx)
+
+      expect(result.tenantCode).toBe('target-tenant')
+      expect(result.tenantRole).toBe('admin')
     })
   })
 
