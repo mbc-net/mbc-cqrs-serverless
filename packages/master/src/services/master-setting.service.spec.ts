@@ -166,7 +166,7 @@ describe('SettingService', () => {
   })
   it('should return common-level setting if found', async () => {
     jest.spyOn(service, 'getSetting').mockResolvedValueOnce({
-      id: 'SETTING#COMMON#CommonListSetting',
+      id: 'SETTING#common#CommonListSetting',
       settingValue: {},
     })
 
@@ -177,7 +177,7 @@ describe('SettingService', () => {
 
     expect(response).toEqual(
       new MasterSettingEntity({
-        id: 'SETTING#COMMON#CommonListSetting',
+        id: 'SETTING#common#CommonListSetting',
         settingValue: {},
       }),
     )
@@ -195,13 +195,13 @@ describe('SettingService', () => {
       const pk = `${SETTING_TENANT_PREFIX}${KEY_SEPARATOR}${SettingTypeEnum.TENANT_COMMON}`
       const sk = settingCode
       const mockResponse = {
-        pk: 'SETTING#COMMON',
+        pk: 'SETTING#common',
         sk: 'UserListSetting',
-        id: 'SETTING#COMMON#UserListSetting',
+        id: 'SETTING#common#UserListSetting',
         attributes: {},
         code: 'UserListSetting',
         version: 1,
-        tenantCode: 'COMMON',
+        tenantCode: 'common',
         name: 'UserListSetting',
         type: 'MASTER',
       }
@@ -220,13 +220,13 @@ describe('SettingService', () => {
       }
 
       jest.spyOn(commandService, 'publishAsync').mockResolvedValue({
-        pk: 'SETTING#COMMON',
+        pk: 'SETTING#common',
         sk: 'UserListSetting',
-        id: 'SETTING#COMMON#UserListSetting',
+        id: 'SETTING#common#UserListSetting',
         attributes: {},
         code: 'UserListSetting',
         version: 1,
-        tenantCode: 'COMMON',
+        tenantCode: 'common',
         name: 'UserListSetting',
         type: 'MASTER',
       })
@@ -236,13 +236,13 @@ describe('SettingService', () => {
     })
     it('should create a new common setting', async () => {
       const mockResponse = {
-        pk: 'SETTING#COMMON',
+        pk: 'SETTING#common',
         sk: 'UserListSetting',
-        id: 'SETTING#COMMON#UserListSetting',
+        id: 'SETTING#common#UserListSetting',
         attributes: {},
         code: 'UserListSetting',
         version: 1,
-        tenantCode: 'COMMON',
+        tenantCode: 'common',
         name: 'UserListSetting',
         type: 'MASTER',
       }
@@ -254,13 +254,13 @@ describe('SettingService', () => {
       }
 
       jest.spyOn(commandService, 'publishAsync').mockResolvedValue({
-        pk: 'SETTING#COMMON',
+        pk: 'SETTING#common',
         sk: 'UserListSetting',
-        id: 'SETTING#COMMON#UserListSetting',
+        id: 'SETTING#common#UserListSetting',
         attributes: {},
         code: 'UserListSetting',
         version: 1,
-        tenantCode: 'COMMON',
+        tenantCode: 'common',
         name: 'UserListSetting',
         type: 'MASTER',
       })
@@ -273,13 +273,13 @@ describe('SettingService', () => {
     })
     it('should create a new common setting with the same code after delete', async () => {
       const mockResponse = {
-        pk: 'SETTING#COMMON',
+        pk: 'SETTING#common',
         sk: 'UserListSetting',
-        id: 'SETTING#COMMON#UserListSetting',
+        id: 'SETTING#common#UserListSetting',
         attributes: {},
         code: 'UserListSetting',
         version: 3,
-        tenantCode: 'COMMON',
+        tenantCode: 'common',
         name: 'UserListSetting',
         type: 'MASTER',
       }
@@ -291,26 +291,26 @@ describe('SettingService', () => {
       }
 
       jest.spyOn(dataService, 'getItem').mockResolvedValue({
-        pk: 'SETTING#COMMON',
+        pk: 'SETTING#common',
         sk: 'UserListSetting',
-        id: 'SETTING#COMMON#UserListSetting',
+        id: 'SETTING#common#UserListSetting',
         attributes: {},
         code: 'UserListSetting',
         version: 2,
-        tenantCode: 'COMMON',
+        tenantCode: 'common',
         name: 'UserListSetting',
         type: 'MASTER',
         isDeleted: true,
       })
 
       jest.spyOn(commandService, 'publishAsync').mockResolvedValue({
-        pk: 'SETTING#COMMON',
+        pk: 'SETTING#common',
         sk: 'UserListSetting',
-        id: 'SETTING#COMMON#UserListSetting',
+        id: 'SETTING#common#UserListSetting',
         attributes: {},
         code: 'UserListSetting',
         version: 3,
-        tenantCode: 'COMMON',
+        tenantCode: 'common',
         name: 'UserListSetting',
         type: 'MASTER',
       })
@@ -1000,13 +1000,13 @@ describe('SettingService', () => {
 
         const mockCommonSetting = {
           id: 'test-id',
-          pk: 'SETTING#COMMON',
+          pk: 'SETTING#common',
           sk: `SETTING#${specialCode}`,
           code: specialCode,
           name: 'Special Setting',
           version: 1,
           type: 'MASTER',
-          tenantCode: 'COMMON',
+          tenantCode: 'common',
           isDeleted: false,
           attributes: { special: true },
           createdAt: new Date(),
@@ -1118,13 +1118,13 @@ describe('SettingService', () => {
 
         const existingDeletedSetting: DataModel = {
           id: 'existing-id',
-          pk: 'SETTING#COMMON',
+          pk: 'SETTING#common',
           sk: 'SETTING#RECREATED_SETTING',
           code: 'RECREATED_SETTING',
           name: 'RECREATED_SETTING',
           version: 3,
           type: 'MASTER',
-          tenantCode: 'COMMON',
+          tenantCode: 'common',
           isDeleted: true,
           attributes: { original: true, version: 1 },
           createdAt: new Date('2023-01-01'),
@@ -1134,11 +1134,11 @@ describe('SettingService', () => {
         dataService.getItem.mockResolvedValue(existingDeletedSetting)
         const mockResponse: CommandModel = {
           id: 'existing-id',
-          pk: 'SETTING#COMMON',
+          pk: 'SETTING#common',
           sk: 'SETTING#RECREATED_SETTING',
           version: 3,
           type: 'MASTER',
-          tenantCode: 'COMMON',
+          tenantCode: 'common',
           name: 'RECREATED_SETTING',
           code: 'RECREATED_SETTING',
           isDeleted: false,
@@ -1173,13 +1173,13 @@ describe('SettingService', () => {
 
         const existingDeletedSetting: DataModel = {
           id: 'existing-id',
-          pk: 'SETTING#COMMON',
+          pk: 'SETTING#common',
           sk: 'SETTING#CYCLED_SETTING',
           code: 'CYCLED_SETTING',
           name: 'CYCLED_SETTING',
           version: 7,
           type: 'MASTER',
-          tenantCode: 'COMMON',
+          tenantCode: 'common',
           isDeleted: true,
           attributes: { cycle: 3, previous: true },
           createdAt: new Date('2023-01-01'),
@@ -1189,11 +1189,11 @@ describe('SettingService', () => {
         dataService.getItem.mockResolvedValue(existingDeletedSetting)
         const mockResponse: CommandModel = {
           id: 'existing-id',
-          pk: 'SETTING#COMMON',
+          pk: 'SETTING#common',
           sk: 'SETTING#CYCLED_SETTING',
           version: 7,
           type: 'MASTER',
-          tenantCode: 'COMMON',
+          tenantCode: 'common',
           name: 'CYCLED_SETTING',
           code: 'CYCLED_SETTING',
           isDeleted: false,
@@ -1498,13 +1498,13 @@ describe('SettingService', () => {
 
         const mockCommonSetting = {
           id: 'test-id',
-          pk: 'SETTING#COMMON',
+          pk: 'SETTING#common',
           sk: 'SETTING#CONCURRENT_SETTING',
           code: 'CONCURRENT_SETTING',
           name: 'Concurrent Setting',
           version: 1,
           type: 'MASTER',
-          tenantCode: 'COMMON',
+          tenantCode: 'common',
           isDeleted: false,
           attributes: { concurrent: true },
           createdAt: new Date(),

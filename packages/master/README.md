@@ -118,7 +118,7 @@ Settings are resolved in order of specificity (most specific wins):
          ↓ if not found
 3. Tenant Setting   (SETTING#code)
          ↓ if not found
-4. Common Setting   (pk: SETTING#COMMON)
+4. Common Setting   (pk: SETTING#common)
 ```
 
 ### Example: Theme Setting
@@ -256,7 +256,7 @@ sk: DATA#[settingCode]#[code]
 ### Master Setting Key Pattern
 
 ```
-pk: SETTING#[tenantCode] or SETTING#COMMON
+pk: SETTING#[tenantCode] or SETTING#common
 sk: SETTING#[code]                           (tenant/common)
     SETTING#TENANT_GROUP#[groupId]#[code]    (group)
     SETTING#TENANT_USER#[userId]#[code]      (user)

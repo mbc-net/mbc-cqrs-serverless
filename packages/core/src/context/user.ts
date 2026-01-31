@@ -18,6 +18,16 @@ export class UserContext {
   }
 }
 
+/**
+ * Extract user context from JWT claims and request headers.
+ *
+ * Tenant code determination:
+ * 1. If `custom:tenant` exists in JWT claims, use it (user bound to specific tenant)
+ * 2. Otherwise, use `x-tenant-code` header (for cross-tenant operations)
+ *
+ * Note: Security validation for header-based tenant override is handled by RolesGuard,
+ * not by this function. This allows for flexible security policies at the application level.
+ */
 export function getUserContext(ctx: IInvoke | ExecutionContext): UserContext {
   if ('getHandler' in ctx) {
     ctx = extractInvokeContext(ctx)
@@ -25,12 +35,21 @@ export function getUserContext(ctx: IInvoke | ExecutionContext): UserContext {
   const claims = getAuthorizerClaims(ctx)
 
   const userId = claims.sub
-  const tenantCode =
-    claims['custom:tenant'] || (ctx?.event?.headers || {})[HEADER_TENANT_CODE]
-  // find tenantRole
+
+  // Parse roles
   const roles = (
     JSON.parse(claims['custom:roles'] || '[]') as CustomRole[]
   ).map((role) => ({ ...role, tenant: (role.tenant || '').toLowerCase() }))
+
+  // Determine tenant code
+  // 1. Cognito custom:tenant attribute takes priority
+  // 2. Otherwise, use header value (security check delegated to RolesGuard)
+  // Note: tenantCode is normalized to lowercase for case-insensitive matching with role.tenant
+  const tenantCode = (
+    claims['custom:tenant'] || (ctx?.event?.headers || {})[HEADER_TENANT_CODE]
+  )?.toLowerCase()
+
+  // Find tenantRole (case-insensitive matching - both tenantCode and role.tenant are lowercase)
   let tenantRole = ''
   for (const { tenant, role } of roles) {
     if (tenant === '' || tenant === tenantCode) {
