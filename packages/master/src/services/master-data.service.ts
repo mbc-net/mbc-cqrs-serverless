@@ -145,7 +145,7 @@ export class MasterDataService implements IMasterDataService {
     if (tenantCode) {
       pk = generateMasterPk(tenantCode)
     } else {
-      pk = generateMasterPk('COMMON')
+      pk = generateMasterPk('common')
     }
     const query = { sk: undefined }
 

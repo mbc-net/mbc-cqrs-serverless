@@ -114,7 +114,7 @@ describe('TenantController', () => {
       }
       const expectedResult = {
         pk: 'TENANT#common-tenant',
-        sk: 'COMMON',
+        sk: 'common',
         name: 'Common Tenant',
         version: 1,
       }

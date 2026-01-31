@@ -110,9 +110,9 @@ describe('Tenant', () => {
         attributes: {},
         code: 'MASTER',
         version: 1,
-        tenantCode: 'COMMON',
+        tenantCode: 'common',
         name: 'MBC',
-        type: 'COMMON',
+        type: 'common',
       }
 
       const dto: CommonTenantCreateDto = {
@@ -126,9 +126,9 @@ describe('Tenant', () => {
         attributes: {},
         code: 'MASTER',
         version: 1,
-        tenantCode: 'COMMON',
+        tenantCode: 'common',
         name: 'MBC',
-        type: 'COMMON',
+        type: 'common',
       })
       const result = await service.createCommonTenant(dto, optionsMock)
 
@@ -143,9 +143,9 @@ describe('Tenant', () => {
         attributes: {},
         code: 'MASTER',
         version: 3,
-        tenantCode: 'COMMON',
+        tenantCode: 'common',
         name: 'MBC',
-        type: 'COMMON',
+        type: 'common',
       }
 
       const dto: CommonTenantCreateDto = {
@@ -159,9 +159,9 @@ describe('Tenant', () => {
         attributes: {},
         code: 'MASTER',
         version: 2,
-        tenantCode: 'COMMON',
+        tenantCode: 'common',
         name: 'MBC',
-        type: 'COMMON',
+        type: 'common',
         isDeleted: true,
       })
 
@@ -172,9 +172,9 @@ describe('Tenant', () => {
         attributes: {},
         code: 'MASTER',
         version: 3,
-        tenantCode: 'COMMON',
+        tenantCode: 'common',
         name: 'MBC',
-        type: 'COMMON',
+        type: 'common',
       })
       const result = await service.createCommonTenant(dto, optionsMock)
 
