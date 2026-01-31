@@ -114,9 +114,9 @@ describe('Tenant', () => {
     /** Creates new common tenant with version 1 */
     it('should create a new common tenant', async () => {
       const mockResponse = {
-        pk: 'TENANT#COMMON',
+        pk: 'TENANT#common',
         sk: 'MASTER',
-        id: 'TENANT#COMMON#MASTER',
+        id: 'TENANT#common#MASTER',
         attributes: {},
         code: 'MASTER',
         version: 1,
@@ -130,9 +130,9 @@ describe('Tenant', () => {
       }
 
       jest.spyOn(commandService, 'publishAsync').mockResolvedValue({
-        pk: 'TENANT#COMMON',
+        pk: 'TENANT#common',
         sk: 'MASTER',
-        id: 'TENANT#COMMON#MASTER',
+        id: 'TENANT#common#MASTER',
         attributes: {},
         code: 'MASTER',
         version: 1,
@@ -147,9 +147,9 @@ describe('Tenant', () => {
     /** Re-creates tenant after soft delete - increments version from deleted record */
     it('should create a new common tenant with the same code after delete', async () => {
       const mockResponse = {
-        pk: 'TENANT#COMMON',
+        pk: 'TENANT#common',
         sk: 'MASTER',
-        id: 'TENANT#COMMON#MASTER',
+        id: 'TENANT#common#MASTER',
         attributes: {},
         code: 'MASTER',
         version: 3,
@@ -163,9 +163,9 @@ describe('Tenant', () => {
       }
 
       jest.spyOn(dataService, 'getItem').mockResolvedValue({
-        pk: 'TENANT#COMMON',
+        pk: 'TENANT#common',
         sk: 'MASTER',
-        id: 'TENANT#COMMON#MASTER',
+        id: 'TENANT#common#MASTER',
         attributes: {},
         code: 'MASTER',
         version: 2,
@@ -176,9 +176,9 @@ describe('Tenant', () => {
       })
 
       jest.spyOn(commandService, 'publishAsync').mockResolvedValue({
-        pk: 'TENANT#COMMON',
+        pk: 'TENANT#common',
         sk: 'MASTER',
-        id: 'TENANT#COMMON#MASTER',
+        id: 'TENANT#common#MASTER',
         attributes: {},
         code: 'MASTER',
         version: 3,
@@ -205,7 +205,7 @@ describe('Tenant', () => {
       const mockResponse = {
         pk: 'TENANT#MBC',
         sk: 'MASTER',
-        id: 'TENANT#COMMON#MASTER',
+        id: 'TENANT#MBC#MASTER',
         attributes: {},
         code: 'MASTER',
         version: 1,
@@ -222,7 +222,7 @@ describe('Tenant', () => {
       jest.spyOn(commandService, 'publishAsync').mockResolvedValue({
         pk: 'TENANT#MBC',
         sk: 'MASTER',
-        id: 'TENANT#COMMON#MASTER',
+        id: 'TENANT#MBC#MASTER',
         attributes: {},
         code: 'MASTER',
         version: 1,
@@ -239,7 +239,7 @@ describe('Tenant', () => {
       const mockResponse = {
         pk: 'TENANT#MBC',
         sk: 'MASTER',
-        id: 'TENANT#COMMON#MASTER',
+        id: 'TENANT#MBC#MASTER',
         attributes: {},
         code: 'MASTER',
         version: 3,
@@ -256,7 +256,7 @@ describe('Tenant', () => {
       jest.spyOn(dataService, 'getItem').mockResolvedValue({
         pk: 'TENANT#MBC',
         sk: 'MASTER',
-        id: 'TENANT#COMMON#MASTER',
+        id: 'TENANT#MBC#MASTER',
         attributes: {},
         code: 'MASTER',
         version: 2,
@@ -269,7 +269,7 @@ describe('Tenant', () => {
       jest.spyOn(commandService, 'publishAsync').mockResolvedValue({
         pk: 'TENANT#MBC',
         sk: 'MASTER',
-        id: 'TENANT#COMMON#MASTER',
+        id: 'TENANT#MBC#MASTER',
         attributes: {},
         code: 'MASTER',
         version: 3,
