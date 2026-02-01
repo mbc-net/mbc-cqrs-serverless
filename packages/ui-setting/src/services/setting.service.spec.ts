@@ -151,7 +151,7 @@ describe('SettingService', () => {
         createdAt: new Date(),
         updatedAt: new Date(),
       }
-      commandService.publish.mockResolvedValue(mockCommandResult)
+      commandService.publishAsync.mockResolvedValue(mockCommandResult)
 
       const result = await service.create(tenantCode, createDto, { invokeContext: mockInvokeContext })
 
@@ -159,7 +159,7 @@ describe('SettingService', () => {
         pk: 'MASTER#TEST_TENANT',
         sk: 'MASTER_SETTING#NEW_CODE',
       })
-      expect(commandService.publish).toHaveBeenCalledWith(
+      expect(commandService.publishAsync).toHaveBeenCalledWith(
         expect.objectContaining({
           id: 'MASTER#TEST_TENANT#MASTER_SETTING#NEW_CODE',
           pk: 'MASTER#TEST_TENANT',
@@ -255,12 +255,12 @@ describe('SettingService', () => {
         createdAt: new Date(),
         updatedAt: new Date(),
       }
-      commandService.publish.mockResolvedValue(mockCommandResult)
+      commandService.publishAsync.mockResolvedValue(mockCommandResult)
 
       const result = await service.create(tenantCode, createDto, { invokeContext: mockInvokeContext })
 
       expect(result).toBeInstanceOf(SettingDataEntity)
-      expect(commandService.publish).toHaveBeenCalledWith(
+      expect(commandService.publishAsync).toHaveBeenCalledWith(
         expect.objectContaining({
           version: 2,
         }),
@@ -331,12 +331,12 @@ describe('SettingService', () => {
         attributes: updateDto.attributes!,
         updatedAt: new Date(),
       }
-      commandService.publish.mockResolvedValue(mockUpdateResult)
+      commandService.publishAsync.mockResolvedValue(mockUpdateResult)
 
       const result = await service.update(key, updateDto, { invokeContext: mockInvokeContext })
 
       expect(dataService.getItem).toHaveBeenCalledWith(key)
-      expect(commandService.publish).toHaveBeenCalledWith(
+      expect(commandService.publishAsync).toHaveBeenCalledWith(
         expect.objectContaining({
           name: updateDto.name,
           attributes: updateDto.attributes,
@@ -394,11 +394,11 @@ describe('SettingService', () => {
         name: updateDto.name!,
         updatedAt: new Date(),
       }
-      commandService.publish.mockResolvedValue(mockUpdateResult)
+      commandService.publishAsync.mockResolvedValue(mockUpdateResult)
 
       await service.update(key, updateDto, { invokeContext: mockInvokeContext })
 
-      expect(commandService.publish).toHaveBeenCalledWith(
+      expect(commandService.publishAsync).toHaveBeenCalledWith(
         expect.objectContaining({
           name: updateDto.name,
           attributes: existingData.attributes,
@@ -476,12 +476,12 @@ describe('SettingService', () => {
         isDeleted: true,
         updatedAt: new Date(),
       }
-      commandService.publish.mockResolvedValue(mockDeleteResult)
+      commandService.publishAsync.mockResolvedValue(mockDeleteResult)
 
       const result = await service.delete(key, { invokeContext: mockInvokeContext })
 
       expect(dataService.getItem).toHaveBeenCalledWith(key)
-      expect(commandService.publish).toHaveBeenCalledWith(
+      expect(commandService.publishAsync).toHaveBeenCalledWith(
         expect.objectContaining({
           ...existingData,
           isDeleted: true,

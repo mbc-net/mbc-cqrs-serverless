@@ -11,6 +11,12 @@ See [Conventional Commits](https://conventionalcommits.org) for commit guideline
   - This change affects partition key format: `TENANT#COMMON` → `TENANT#common`
   - **Migration required:** Existing data with `TENANT#COMMON` partition keys needs to be migrated
   - See [Migration Guide](https://mbc-cqrs-serverless.mbc-net.com/docs/migration/v1.1.0) for detailed instructions
+- **core:** Remove deprecated `CommandService.publish()` method
+  - Use `publishAsync()` instead
+- **core:** Remove deprecated `CommandService.publishPartialUpdate()` method
+  - Use `publishPartialUpdateAsync()` instead
+- **sequence:** Remove deprecated `SequencesService.genNewSequence()` method
+  - Use `generateSequenceItem()` or `generateSequenceItemWithProvideSetting()` instead
 
 ### Features
 
