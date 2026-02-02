@@ -22,11 +22,11 @@
 
 import { DynamoDBClient } from '@aws-sdk/client-dynamodb'
 import { S3Client } from '@aws-sdk/client-s3'
-import { SQSClient } from '@aws-sdk/client-sqs'
-import { SNSClient } from '@aws-sdk/client-sns'
-import { SFNClient } from '@aws-sdk/client-sfn'
 import { SESv2Client } from '@aws-sdk/client-sesv2'
-import { mockClient, AwsClientStub } from 'aws-sdk-client-mock'
+import { SFNClient } from '@aws-sdk/client-sfn'
+import { SNSClient } from '@aws-sdk/client-sns'
+import { SQSClient } from '@aws-sdk/client-sqs'
+import { AwsClientStub, mockClient } from 'aws-sdk-client-mock'
 
 /**
  * Default AWS region for test clients

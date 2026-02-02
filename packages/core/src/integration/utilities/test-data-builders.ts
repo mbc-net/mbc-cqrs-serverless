@@ -16,8 +16,8 @@
  *   const items = createTestItems(100)
  */
 
-import { marshall, unmarshall } from '@aws-sdk/util-dynamodb'
 import type { AttributeValue } from '@aws-sdk/client-dynamodb'
+import { marshall, unmarshall } from '@aws-sdk/util-dynamodb'
 
 // ============================================================================
 // DynamoDB Item Builders
@@ -313,16 +313,11 @@ export function createSQSBatchEntries(
 /**
  * Creates an SNS message for publishing
  */
-export function createSNSMessage(
-  options: {
-    subject?: string
-    message: unknown
-    messageAttributes?: Record<
-      string,
-      { DataType: string; StringValue?: string }
-    >
-  },
-): {
+export function createSNSMessage(options: {
+  subject?: string
+  message: unknown
+  messageAttributes?: Record<string, { DataType: string; StringValue?: string }>
+}): {
   Subject?: string
   Message: string
   MessageAttributes?: Record<string, { DataType: string; StringValue?: string }>
@@ -362,8 +357,7 @@ export function createSFNExecutionName(prefix = 'test-execution'): string {
  * Creates a random string of specified length
  */
 export function createRandomString(length: number): string {
-  const chars =
-    'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789'
+  const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789'
   let result = ''
   for (let i = 0; i < length; i++) {
     result += chars.charAt(Math.floor(Math.random() * chars.length))
@@ -384,7 +378,10 @@ export function createNestedTestData(
 
   const result: Record<string, unknown> = {}
   for (let i = 0; i < breadth; i++) {
-    result[`level_${depth}_item_${i}`] = createNestedTestData(depth - 1, breadth)
+    result[`level_${depth}_item_${i}`] = createNestedTestData(
+      depth - 1,
+      breadth,
+    )
   }
   return result
 }

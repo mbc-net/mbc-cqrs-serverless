@@ -626,9 +626,7 @@ export function isThrottlingError(error: AWSError): boolean {
 /**
  * Checks if an error is a network error
  */
-export function isNetworkError(
-  error: Error & { code?: string },
-): boolean {
+export function isNetworkError(error: Error & { code?: string }): boolean {
   const networkErrorCodes: NetworkErrorCode[] = [
     'ECONNRESET',
     'ECONNREFUSED',
@@ -639,7 +637,10 @@ export function isNetworkError(
     'EAI_AGAIN',
   ]
 
-  if (error.code && networkErrorCodes.includes(error.code as NetworkErrorCode)) {
+  if (
+    error.code &&
+    networkErrorCodes.includes(error.code as NetworkErrorCode)
+  ) {
     return true
   }
 

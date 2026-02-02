@@ -1,4 +1,4 @@
-import { spawn, execSync } from 'child_process'
+import { execSync, spawn } from 'child_process'
 import * as fs from 'fs'
 import * as path from 'path'
 
@@ -17,7 +17,10 @@ export interface GeneratorResult {
  * Allows swapping CLI-based generation with direct schematics in the future.
  */
 export interface IGenerator {
-  generateModule(name: string, options?: { mode?: 'async' | 'sync' }): Promise<GeneratorResult>
+  generateModule(
+    name: string,
+    options?: { mode?: 'async' | 'sync' },
+  ): Promise<GeneratorResult>
   generateController(name: string): Promise<GeneratorResult>
   generateService(name: string): Promise<GeneratorResult>
   generateEntity(name: string): Promise<GeneratorResult>
@@ -31,7 +34,10 @@ export interface IGenerator {
 export class CliGenerator implements IGenerator {
   constructor(private readonly projectPath: string) {}
 
-  async generateModule(name: string, options?: { mode?: 'async' | 'sync' }): Promise<GeneratorResult> {
+  async generateModule(
+    name: string,
+    options?: { mode?: 'async' | 'sync' },
+  ): Promise<GeneratorResult> {
     try {
       const preCheck = this.checkPrerequisites()
       if (!preCheck.success) return preCheck

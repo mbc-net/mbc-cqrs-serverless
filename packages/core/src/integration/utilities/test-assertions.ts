@@ -168,7 +168,9 @@ export function assertErrorMetadata(
 
   if (expected.name !== undefined) {
     if (awsError.name !== expected.name) {
-      throw new Error(`Expected error name ${expected.name}, but got ${awsError.name}`)
+      throw new Error(
+        `Expected error name ${expected.name}, but got ${awsError.name}`,
+      )
     }
   }
 
@@ -270,7 +272,9 @@ export async function assertThrowsErrorWithName(
 ): Promise<void> {
   try {
     await fn()
-    throw new Error(`Expected function to throw ${expectedName}, but it did not throw`)
+    throw new Error(
+      `Expected function to throw ${expectedName}, but it did not throw`,
+    )
   } catch (error) {
     if ((error as Error).name !== expectedName) {
       throw new Error(
@@ -290,7 +294,9 @@ export async function assertThrowsErrorMatching(
 ): Promise<void> {
   try {
     await fn()
-    throw new Error(`Expected function to throw error matching ${description}, but it did not throw`)
+    throw new Error(
+      `Expected function to throw error matching ${description}, but it did not throw`,
+    )
   } catch (error) {
     if (!predicate(error)) {
       throw new Error(
@@ -409,10 +415,7 @@ export async function assertNoMemoryLeak<T>(
 /**
  * Asserts that an array has the expected length
  */
-export function assertArrayLength<T>(
-  array: T[],
-  expectedLength: number,
-): void {
+export function assertArrayLength<T>(array: T[], expectedLength: number): void {
   if (array.length !== expectedLength) {
     throw new Error(
       `Expected array length ${expectedLength}, but got ${array.length}`,
@@ -440,10 +443,7 @@ export function assertAllMatch<T>(
 /**
  * Asserts that an array contains unique items based on a key function
  */
-export function assertUniqueBy<T, K>(
-  array: T[],
-  keyFn: (item: T) => K,
-): void {
+export function assertUniqueBy<T, K>(array: T[], keyFn: (item: T) => K): void {
   const seen = new Set<K>()
   const duplicates: K[] = []
 
