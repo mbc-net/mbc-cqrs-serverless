@@ -111,7 +111,10 @@
       "^(\\.{1,2}/.*)\\.js$": "$1"
     },
     "collectCoverageFrom": [
-      "**/*.(t|j)s"
+      "**/*.(t|j)s",
+      "!**/dist/**",
+      "!**/node_modules/**",
+      "!**/*.d.ts"
     ],
     "coverageDirectory": "../coverage",
     "coverageThreshold": {
