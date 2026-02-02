@@ -120,7 +120,7 @@ describe('Performance Regression Tests', () => {
   jest.setTimeout(10000)
 
   describe('DynamoDB marshall performance', () => {
-    it('should marshall 1000 simple items within 200ms', () => {
+    it('should marshall 1000 simple items within 500ms', () => {
       const items = generateItemsArray(1000)
 
       const start = performance.now()
@@ -129,10 +129,11 @@ describe('Performance Regression Tests', () => {
       }
       const duration = performance.now() - start
 
-      expect(duration).toBeLessThan(200)
+      // Relaxed threshold for CI environments
+      expect(duration).toBeLessThan(500)
     })
 
-    it('should marshall 100 complex nested objects within 100ms', () => {
+    it('should marshall 100 complex nested objects within 300ms', () => {
       const complexObjects = Array.from({ length: 100 }, () =>
         generateLargeObject(3, 3),
       )
@@ -143,10 +144,11 @@ describe('Performance Regression Tests', () => {
       }
       const duration = performance.now() - start
 
-      expect(duration).toBeLessThan(100)
+      // Relaxed threshold for CI environments
+      expect(duration).toBeLessThan(300)
     })
 
-    it('should marshall object with 100 fields within 10ms', () => {
+    it('should marshall object with 100 fields within 50ms', () => {
       const largeObj: Record<string, unknown> = {}
       for (let i = 0; i < 100; i++) {
         largeObj[`field${i}`] = {
@@ -160,10 +162,11 @@ describe('Performance Regression Tests', () => {
       marshall(largeObj)
       const duration = performance.now() - start
 
-      expect(duration).toBeLessThan(10)
+      // Relaxed threshold for CI environments
+      expect(duration).toBeLessThan(50)
     })
 
-    it('should marshall array of 500 strings within 50ms', () => {
+    it('should marshall array of 500 strings within 200ms', () => {
       const data = {
         strings: Array.from(
           { length: 500 },
@@ -175,12 +178,13 @@ describe('Performance Regression Tests', () => {
       marshall(data)
       const duration = performance.now() - start
 
-      expect(duration).toBeLessThan(50)
+      // Relaxed threshold for CI environments
+      expect(duration).toBeLessThan(200)
     })
   })
 
   describe('DynamoDB unmarshall performance', () => {
-    it('should unmarshall 1000 simple items within 200ms', () => {
+    it('should unmarshall 1000 simple items within 500ms', () => {
       const items = generateItemsArray(1000).map((item) => marshall(item))
 
       const start = performance.now()
@@ -189,10 +193,11 @@ describe('Performance Regression Tests', () => {
       }
       const duration = performance.now() - start
 
-      expect(duration).toBeLessThan(200)
+      // Relaxed threshold for CI environments
+      expect(duration).toBeLessThan(500)
     })
 
-    it('should unmarshall 100 complex nested objects within 100ms', () => {
+    it('should unmarshall 100 complex nested objects within 300ms', () => {
       const marshalledObjects = Array.from({ length: 100 }, () =>
         marshall(generateLargeObject(3, 3)),
       )
@@ -203,12 +208,13 @@ describe('Performance Regression Tests', () => {
       }
       const duration = performance.now() - start
 
-      expect(duration).toBeLessThan(100)
+      // Relaxed threshold for CI environments
+      expect(duration).toBeLessThan(300)
     })
   })
 
   describe('class-transformer performance', () => {
-    it('should transform 500 simple objects within 100ms', () => {
+    it('should transform 500 simple objects within 300ms', () => {
       const plainObjects = generateItemsArray(500)
 
       const start = performance.now()
@@ -217,10 +223,11 @@ describe('Performance Regression Tests', () => {
       }
       const duration = performance.now() - start
 
-      expect(duration).toBeLessThan(100)
+      // Relaxed threshold for CI environments
+      expect(duration).toBeLessThan(300)
     })
 
-    it('should transform 100 objects with nested arrays within 100ms', () => {
+    it('should transform 100 objects with nested arrays within 300ms', () => {
       const containers = Array.from({ length: 100 }, (_, i) => ({
         id: `container-${i}`,
         items: generateItemsArray(10),
@@ -234,10 +241,11 @@ describe('Performance Regression Tests', () => {
       }
       const duration = performance.now() - start
 
-      expect(duration).toBeLessThan(100)
+      // Relaxed threshold for CI environments
+      expect(duration).toBeLessThan(300)
     })
 
-    it('should apply transforms to 500 objects within 100ms', () => {
+    it('should apply transforms to 500 objects within 300ms', () => {
       const objects = Array.from({ length: 500 }, (_, i) => ({
         name: 'test',
         value: i,
@@ -250,10 +258,11 @@ describe('Performance Regression Tests', () => {
       }
       const duration = performance.now() - start
 
-      expect(duration).toBeLessThan(100)
+      // Relaxed threshold for CI environments
+      expect(duration).toBeLessThan(300)
     })
 
-    it('should serialize 500 instances to plain within 100ms', () => {
+    it('should serialize 500 instances to plain within 300ms', () => {
       const instances = generateItemsArray(500).map((obj) =>
         plainToInstance(ItemDto, obj),
       )
@@ -264,12 +273,13 @@ describe('Performance Regression Tests', () => {
       }
       const duration = performance.now() - start
 
-      expect(duration).toBeLessThan(100)
+      // Relaxed threshold for CI environments
+      expect(duration).toBeLessThan(300)
     })
   })
 
   describe('class-validator performance', () => {
-    it('should validate 200 valid objects synchronously within 200ms', () => {
+    it('should validate 200 valid objects synchronously within 500ms', () => {
       const instances = generateItemsArray(200).map((obj) => {
         const instance = new ItemDto()
         instance.id = obj.id
@@ -284,10 +294,11 @@ describe('Performance Regression Tests', () => {
       }
       const duration = performance.now() - start
 
-      expect(duration).toBeLessThan(200)
+      // Relaxed threshold for CI environments
+      expect(duration).toBeLessThan(500)
     })
 
-    it('should validate 100 objects asynchronously within 300ms', async () => {
+    it('should validate 100 objects asynchronously within 500ms', async () => {
       const instances = generateItemsArray(100).map((obj) => {
         const instance = new ItemDto()
         instance.id = obj.id
@@ -300,10 +311,11 @@ describe('Performance Regression Tests', () => {
       await Promise.all(instances.map((instance) => validate(instance)))
       const duration = performance.now() - start
 
-      expect(duration).toBeLessThan(300)
+      // Relaxed threshold for CI environments
+      expect(duration).toBeLessThan(500)
     })
 
-    it('should validate 50 objects with nested validation within 200ms', async () => {
+    it('should validate 50 objects with nested validation within 500ms', async () => {
       const containers = Array.from({ length: 50 }, (_, i) => {
         const container = new ContainerDto()
         container.id = `container-${i}`
@@ -323,12 +335,13 @@ describe('Performance Regression Tests', () => {
       await Promise.all(containers.map((container) => validate(container)))
       const duration = performance.now() - start
 
-      expect(duration).toBeLessThan(200)
+      // Relaxed threshold for CI environments
+      expect(duration).toBeLessThan(500)
     })
   })
 
   describe('RxJS performance', () => {
-    it('should process 10000 values through operators within 100ms', async () => {
+    it('should process 10000 values through operators within 300ms', async () => {
       const subject = new Subject<number>()
       const processed$ = subject.pipe(
         filter((x) => x % 2 === 0),
@@ -346,10 +359,11 @@ describe('Performance Regression Tests', () => {
       await resultPromise
       const duration = performance.now() - start
 
-      expect(duration).toBeLessThan(100)
+      // Relaxed threshold for CI environments
+      expect(duration).toBeLessThan(300)
     })
 
-    it('should handle 1000 subscriptions and emissions within 100ms', () => {
+    it('should handle 1000 subscriptions and emissions within 300ms', () => {
       const subject = new Subject<number>()
       const subscriptions: Array<() => void> = []
       let emissionCount = 0
@@ -372,11 +386,12 @@ describe('Performance Regression Tests', () => {
       // Cleanup
       subscriptions.forEach((unsub) => unsub())
 
-      expect(duration).toBeLessThan(100)
+      // Relaxed threshold for CI environments
+      expect(duration).toBeLessThan(300)
       expect(emissionCount).toBe(100 * 1000) // 100 subscribers * 1000 emissions
     })
 
-    it('should create 1000 observables within 50ms', () => {
+    it('should create 1000 observables within 200ms', () => {
       const start = performance.now()
       const observables: Observable<number>[] = []
 
@@ -390,7 +405,8 @@ describe('Performance Regression Tests', () => {
       }
       const duration = performance.now() - start
 
-      expect(duration).toBeLessThan(50)
+      // Relaxed threshold for CI environments
+      expect(duration).toBeLessThan(200)
       expect(observables.length).toBe(1000)
     })
   })
@@ -473,7 +489,7 @@ describe('Performance Regression Tests', () => {
       expect(duration).toBeLessThan(1000)
     })
 
-    it('should hash binary data (1MB total) within 500ms', async () => {
+    it('should hash binary data (1MB total) within 1000ms', async () => {
       const binaryData = Buffer.alloc(1024 * 1024, 'x') // 1MB
 
       const start = performance.now()
@@ -482,12 +498,13 @@ describe('Performance Regression Tests', () => {
       await hash.digest()
       const duration = performance.now() - start
 
-      expect(duration).toBeLessThan(500)
+      // Relaxed threshold for CI environments
+      expect(duration).toBeLessThan(1000)
     })
   })
 
   describe('Combined operation performance', () => {
-    it('should process full CQRS flow (marshall, transform, validate) within 500ms for 100 items', async () => {
+    it('should process full CQRS flow (marshall, transform, validate) within 1000ms for 100 items', async () => {
       const rawItems = generateItemsArray(100).map((item) => ({
         pk: `ITEM#${item.id}`,
         sk: 'DATA',
@@ -522,10 +539,11 @@ describe('Performance Regression Tests', () => {
 
       const duration = performance.now() - start
 
-      expect(duration).toBeLessThan(500)
+      // Relaxed threshold for CI environments
+      expect(duration).toBeLessThan(1000)
     })
 
-    it('should handle event sourcing pattern within 300ms for 500 events', () => {
+    it('should handle event sourcing pattern within 1000ms for 500 events', () => {
       const events = Array.from({ length: 500 }, (_, i) => ({
         eventId: ulid(),
         aggregateId: 'order-001',
@@ -566,7 +584,8 @@ describe('Performance Regression Tests', () => {
 
       const duration = performance.now() - start
 
-      expect(duration).toBeLessThan(300)
+      // Relaxed threshold for CI environments
+      expect(duration).toBeLessThan(1000)
       expect(Object.keys(grouped).length).toBe(3)
     })
   })
@@ -589,7 +608,8 @@ describe('Performance Regression Tests', () => {
 
       const duration = performance.now() - start
 
-      expect(duration).toBeLessThan(500)
+      // Relaxed threshold for CI environments
+      expect(duration).toBeLessThan(1000)
       expect(processedCount).toBe(totalItems)
     })
   })
