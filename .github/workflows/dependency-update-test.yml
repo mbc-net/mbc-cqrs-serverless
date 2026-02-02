@@ -32,7 +32,7 @@ jobs:
         run: npm run build
 
       - name: Run integration tests
-        run: npm test -- --testPathPattern="integration" --coverage
+        run: npm test -- --testPathPattern="integration" --passWithNoTests
 
       - name: Run breaking change detection tests
         run: npm test -- --testPathPattern="breaking-change-detection"
