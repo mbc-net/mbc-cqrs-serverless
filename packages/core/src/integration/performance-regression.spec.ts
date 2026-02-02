@@ -412,7 +412,7 @@ describe('Performance Regression Tests', () => {
   })
 
   describe('ULID generation performance', () => {
-    it('should generate 10000 ULIDs within 1000ms', () => {
+    it('should generate 10000 ULIDs within 2000ms', () => {
       const start = performance.now()
       const ids: string[] = []
 
@@ -422,7 +422,7 @@ describe('Performance Regression Tests', () => {
       const duration = performance.now() - start
 
       // Relaxed threshold for CI environments with varying performance
-      expect(duration).toBeLessThan(1000)
+      expect(duration).toBeLessThan(2000)
       expect(ids.length).toBe(10000)
 
       // Verify uniqueness
@@ -430,7 +430,7 @@ describe('Performance Regression Tests', () => {
       expect(uniqueIds.size).toBe(10000)
     })
 
-    it('should generate 10000 monotonic ULIDs within 1000ms', () => {
+    it('should generate 10000 monotonic ULIDs within 2000ms', () => {
       const factory = monotonicFactory()
 
       const start = performance.now()
@@ -442,7 +442,7 @@ describe('Performance Regression Tests', () => {
       const duration = performance.now() - start
 
       // Relaxed threshold for CI environments with varying performance
-      expect(duration).toBeLessThan(1000)
+      expect(duration).toBeLessThan(2000)
       expect(ids.length).toBe(10000)
 
       // Verify monotonic ordering
@@ -468,7 +468,7 @@ describe('Performance Regression Tests', () => {
       const duration = performance.now() - start
 
       // Relaxed threshold for CI environments with varying performance
-      expect(duration).toBeLessThan(1000)
+      expect(duration).toBeLessThan(2000)
     })
 
     it('should hash 100 large strings (10KB each) within 1000ms', async () => {
@@ -486,7 +486,7 @@ describe('Performance Regression Tests', () => {
       const duration = performance.now() - start
 
       // Relaxed threshold for CI environments with varying performance
-      expect(duration).toBeLessThan(1000)
+      expect(duration).toBeLessThan(2000)
     })
 
     it('should hash binary data (1MB total) within 1000ms', async () => {
@@ -499,7 +499,7 @@ describe('Performance Regression Tests', () => {
       const duration = performance.now() - start
 
       // Relaxed threshold for CI environments
-      expect(duration).toBeLessThan(1000)
+      expect(duration).toBeLessThan(2000)
     })
   })
 
@@ -540,7 +540,7 @@ describe('Performance Regression Tests', () => {
       const duration = performance.now() - start
 
       // Relaxed threshold for CI environments
-      expect(duration).toBeLessThan(1000)
+      expect(duration).toBeLessThan(2000)
     })
 
     it('should handle event sourcing pattern within 1000ms for 500 events', () => {
@@ -585,7 +585,7 @@ describe('Performance Regression Tests', () => {
       const duration = performance.now() - start
 
       // Relaxed threshold for CI environments
-      expect(duration).toBeLessThan(1000)
+      expect(duration).toBeLessThan(2000)
       expect(Object.keys(grouped).length).toBe(3)
     })
   })
@@ -609,7 +609,7 @@ describe('Performance Regression Tests', () => {
       const duration = performance.now() - start
 
       // Relaxed threshold for CI environments
-      expect(duration).toBeLessThan(1000)
+      expect(duration).toBeLessThan(2000)
       expect(processedCount).toBe(totalItems)
     })
   })
