@@ -9,7 +9,11 @@
     "deploy": "npm run build && npm run release",
     "test": "NODE_ENV=test jest",
     "test:watch": "NODE_ENV=test jest --watch",
-    "test:cov": "NODE_ENV=test jest --coverage"
+    "test:cov": "NODE_ENV=test jest --coverage",
+    "lint": "eslint packages --ext .ts --ignore-pattern '**/dist/**' --ignore-pattern '**/schematics/**'",
+    "format": "prettier --write \"packages/**/*.ts\"",
+    "format:check": "prettier --check \"packages/**/*.ts\"",
+    "prepare": "husky"
   },
   "repository": {
     "type": "git",
@@ -79,7 +83,15 @@
     "ts-loader": "^9.5.1",
     "ts-node": "^10.9.2",
     "tsconfig-paths": "4.2.0",
-    "typescript": "^5.3.3"
+    "typescript": "^5.3.3",
+    "husky": "^9.0.0",
+    "lint-staged": "^15.0.0"
+  },
+  "lint-staged": {
+    "*.ts": [
+      "eslint --fix",
+      "prettier --write"
+    ]
   },
   "workspaces": [
     "packages/*"
@@ -102,6 +114,14 @@
       "**/*.(t|j)s"
     ],
     "coverageDirectory": "../coverage",
+    "coverageThreshold": {
+      "global": {
+        "branches": 70,
+        "functions": 70,
+        "lines": 70,
+        "statements": 70
+      }
+    },
     "testEnvironment": "node",
     "reporters": [
       "default",
