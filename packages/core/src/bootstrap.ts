@@ -5,7 +5,8 @@ import serverlessExpress from '@codegenie/serverless-express'
 import { ClassSerializerInterceptor, ValidationPipe } from '@nestjs/common'
 import { ConfigService } from '@nestjs/config'
 import { HttpAdapterHost, NestFactory, Reflector } from '@nestjs/core'
-import { Callback, Context, Handler } from 'aws-lambda'
+import { Context, Handler } from 'aws-lambda'
+import * as express from 'express'
 import { firstValueFrom, ReplaySubject } from 'rxjs'
 
 import { AppModule } from './app.module'
@@ -31,6 +32,13 @@ async function bootstrap(opts: AppModuleOptions) {
     logger,
   })
 
+  const configService = app.get(ConfigService)
+  const bodySizeLimit =
+    configService.get<string>('REQUEST_BODY_SIZE_LIMIT') || '100kb'
+
+  app.use(express.json({ limit: bodySizeLimit }))
+  app.use(express.urlencoded({ limit: bodySizeLimit, extended: true }))
+
   app.useGlobalPipes(
     new ValidationPipe({
       transform: true,
@@ -43,8 +51,7 @@ async function bootstrap(opts: AppModuleOptions) {
   const { httpAdapter } = app.get(HttpAdapterHost)
   app.useGlobalFilters(new DynamoDBExceptionFilter(httpAdapter))
 
-  //swager init
-  const configService = app.get(ConfigService)
+  //swagger init
   if (configService.get<Environment>('NODE_ENV') === Environment.Local) {
     const { DocumentBuilder, SwaggerModule } = await import('@nestjs/swagger')
 
@@ -102,7 +109,7 @@ async function bootstrap(opts: AppModuleOptions) {
 
   return serverlessExpress({
     app: expressApp,
-    // resolutionMode: 'CALLBACK',
+    resolutionMode: 'PROMISE',
     eventSourceRoutes: {
       AWS_SNS: '/event/sns',
       AWS_SQS: '/event/sqs',
@@ -118,13 +125,28 @@ async function bootstrap(opts: AppModuleOptions) {
   })
 }
 
+/**
+ * Create Lambda handler
+ *
+ * Node.js 24 compatibility:
+ * - Handler signature is (event, context) only
+ * - callback parameter is not used (not supported in Node.js 24)
+ *
+ * @see https://docs.aws.amazon.com/lambda/latest/dg/nodejs-handler.html
+ */
 export function createHandler(opts: AppModuleOptions): Handler {
-  // Do not wait for lambdaHandler to be called before bootstraping Nest.
+  // Do not wait for lambdaHandler to be called before bootstrapping Nest.
   bootstrap(opts).then((server) => serverSubject.next(server))
 
-  return async (event: any, context: Context, callback: Callback) => {
+  /**
+   * Async handler type for Node.js 24 compatibility
+   *
+   * Node.js 24 does not support callback-based handlers.
+   * This type represents an async handler that returns a Promise.
+   */
+  return async (event: any, context: Context) => {
     // Wait for bootstrap to finish, then start handling requests.
     const server = await firstValueFrom(serverSubject)
-    return server(event, context, callback)
+    return server(event, context, null)
   }
 }

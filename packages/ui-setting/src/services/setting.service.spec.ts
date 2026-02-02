@@ -83,7 +83,7 @@ describe('SettingService', () => {
         'MASTER#TEST_TENANT',
         expect.objectContaining({
           sk: expect.objectContaining({
-            skExpession: 'begins_with(sk, :settingPrefix)',
+            skExpression: 'begins_with(sk, :settingPrefix)',
             skAttributeValues: {
               ':settingPrefix': 'MASTER_SETTING#',
             },
@@ -212,7 +212,7 @@ describe('SettingService', () => {
       ).rejects.toThrow(BadRequestException)
       await expect(
         service.create(tenantCode, createDto, { invokeContext: mockInvokeContext })
-      ).rejects.toThrow('Setting code is exist!')
+      ).rejects.toThrow('Setting code already exists')
     })
 
     it('should create when existing setting is deleted', async () => {
@@ -287,7 +287,7 @@ describe('SettingService', () => {
       ).rejects.toThrow(BadRequestException)
       await expect(
         service.create(tenantCode, createDto, { invokeContext: mockInvokeContext })
-      ).rejects.toThrow('Physical name of fields must not duplicate')
+      ).rejects.toThrow('Physical name of fields must not be duplicated')
     })
   })
 
@@ -444,7 +444,7 @@ describe('SettingService', () => {
       ).rejects.toThrow(BadRequestException)
       await expect(
         service.update(key, updateDto, { invokeContext: mockInvokeContext })
-      ).rejects.toThrow('Physical name of fields must not duplicate')
+      ).rejects.toThrow('Physical name of fields must not be duplicated')
     })
   })
 
@@ -532,7 +532,7 @@ describe('SettingService', () => {
       ).rejects.toThrow(BadRequestException)
       await expect(
         service.delete(key, { invokeContext: mockInvokeContext })
-      ).rejects.toThrow('This setting is already delete!')
+      ).rejects.toThrow('This setting is already deleted')
     })
   })
 

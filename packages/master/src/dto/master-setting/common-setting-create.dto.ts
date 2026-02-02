@@ -1,5 +1,5 @@
 import { ApiProperty } from '@nestjs/swagger'
-import { IsObject, IsString } from 'class-validator'
+import { IsObject, IsOptional, IsString } from 'class-validator'
 
 export class CommonSettingDto {
   /**
@@ -7,7 +7,7 @@ export class CommonSettingDto {
    */
   @ApiProperty({
     type: String,
-    example: ' User List Setting',
+    example: 'User List Setting',
     required: true,
     description: 'The name of the setting.',
   })
@@ -26,6 +26,16 @@ export class CommonSettingDto {
   })
   @IsString()
   code: string
+
+  @ApiProperty({
+    type: String,
+    example: 'MBC',
+    required: false,
+    description: 'The tenant code.',
+  })
+  @IsString()
+  @IsOptional()
+  tenantCode?: string
 
   /**
    * Additional attributes for the tenant (required).

@@ -46,7 +46,7 @@ const tasks = [
 const sqsMessage = {
   messageId: '739f77c1-7c59-49e5-950e-f4124117f2b2',
   receiptHandle: '',
-  body: '{"action":"sub-task-status","pk":"SFN_TASK#mbc","sk":"test#01JKSCHHRN0VS7K5H2FWZKK1FH#1","table":"dev-task-sfn-interation-map-tasks","id":"SFN_TASK#mbc#test#01JKSCHHRN0VS7K5H2FWZKK1FH#1","tenantCode":"mbc","content":{"status":"COMPLETED","attributes":{"result":[["Result after process 7051.110175869866"]]}}}',
+  body: '{"action":"sub-task-status","pk":"SFN_TASK#mbc","sk":"test#01JKSCHHRN0VS7K5H2FWZKK1FH#1","table":"dev-task-sfn-iteration-map-tasks","id":"SFN_TASK#mbc#test#01JKSCHHRN0VS7K5H2FWZKK1FH#1","tenantCode":"mbc","content":{"status":"COMPLETED","attributes":{"result":[["Result after process 7051.110175869866"]]}}}',
   attributes: {
     ApproximateReceiveCount: '1',
     AWSTraceHeader: '',
@@ -66,7 +66,7 @@ const sqsMessage = {
   md5OfBody: '',
   eventSource: 'aws:sqs',
   eventSourceARN:
-    'arn:aws:sqs:ap-northeast-1:1010101010:dev-task-sfn-interation-map-sub-task-status-queue',
+    'arn:aws:sqs:ap-northeast-1:1010101010:dev-task-sfn-iteration-map-sub-task-status-queue',
   awsRegion: 'ap-northeast-1',
 }
 

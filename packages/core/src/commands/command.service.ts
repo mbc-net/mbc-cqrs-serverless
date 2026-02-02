@@ -130,7 +130,7 @@ export class CommandService implements OnModuleInit, ICommandService {
 
     if (!item || item.version !== input.version) {
       throw new BadRequestException(
-        'The input is not a valid, item not found or version not match',
+        'Invalid input: item not found or version mismatch',
       )
     }
     if (!Object.keys(input).includes('ttl')) {
@@ -160,7 +160,7 @@ export class CommandService implements OnModuleInit, ICommandService {
     }
     if (!item) {
       throw new BadRequestException(
-        'The input key is not a valid, item not found',
+        'Invalid input key: item not found',
       )
     }
     if (!Object.keys(input).includes('ttl')) {
@@ -194,7 +194,7 @@ export class CommandService implements OnModuleInit, ICommandService {
     }
     if (!item) {
       throw new BadRequestException(
-        'The input key is not a valid, item not found',
+        'Invalid input key: item not found',
       )
     }
     if (!Object.keys(input).includes('ttl')) {
@@ -332,7 +332,7 @@ export class CommandService implements OnModuleInit, ICommandService {
     const item = await this.getItem(key)
     if (!item) {
       throw new BadRequestException(
-        'The input key is not a valid, item not found',
+        'Invalid input key: item not found',
       )
     }
     const userContext = getUserContext(options.invokeContext)
@@ -392,7 +392,7 @@ export class CommandService implements OnModuleInit, ICommandService {
   }
 
   async updateStatus(key: DetailKey, status: string, notifyId?: string) {
-    await this.dynamoDbService.updateItem(this.tableName, key, {
+    const item = await this.dynamoDbService.updateItem(this.tableName, key, {
       set: { status },
     })
 
@@ -403,7 +403,7 @@ export class CommandService implements OnModuleInit, ICommandService {
       table: this.tableName,
       id: notifyId || `${this.tableName}#${key.pk}#${key.sk}`,
       tenantCode: key.pk.substring(key.pk.indexOf('#') + 1),
-      content: { status },
+      content: { status, source: item?.source },
     })
   }
 
@@ -488,5 +488,28 @@ export class CommandService implements OnModuleInit, ICommandService {
 
     this.logger.debug('updateTtl::', command)
     return await this.dynamoDbService.putItem(this.tableName, command)
+  }
+
+  async updateTaskToken(key: DetailKey, token: string) {
+    this.logger.debug(`Saving taskToken for ${key.pk}#${key.sk}`)
+
+    return await this.dynamoDbService.updateItem(this.tableName, key, {
+      set: { taskToken: token },
+    })
+  }
+
+  async getNextCommand(currentKey: DetailKey): Promise<CommandModel> {
+    this.logger.debug(
+      `Getting next command for ${currentKey.pk}#${currentKey.sk}`,
+    )
+
+    const nextKey = {
+      pk: currentKey.pk,
+      sk: addSortKeyVersion(
+        removeSortKeyVersion(currentKey.sk),
+        getSortKeyVersion(currentKey.sk) + 1,
+      ),
+    }
+    return await this.dynamoDbService.getItem(this.tableName, nextKey)
   }
 }

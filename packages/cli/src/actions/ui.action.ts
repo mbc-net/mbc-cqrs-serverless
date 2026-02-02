@@ -24,7 +24,7 @@ export default async function uiAction(options: object, command: Command) {
     componentOptions.findIndex((optionName) => optionName === component) === -1
   ) {
     logger.error(
-      `Please choose correct component options: ${componentOptions.join(', ')}`,
+      `Please choose the correct component options: ${componentOptions.join(', ')}`,
     )
   }
 
@@ -34,7 +34,7 @@ export default async function uiAction(options: object, command: Command) {
     return
   }
 
-  // Check tsconfig.json contain path @ms
+  // Check tsconfig.json contains path @ms
   const tsconfig = JSON.parse(
     readFileSync(path.join(process.cwd(), 'tsconfig.json'), 'utf8'),
   )
@@ -44,7 +44,7 @@ export default async function uiAction(options: object, command: Command) {
     tsconfig?.compilerOptions?.paths &&
     tsconfig?.compilerOptions?.paths.hasOwnProperty('@ms/*')
   ) {
-    logger.error('The project already contain mbc-cqrs-ui-common')
+    logger.error('The project already contains mbc-cqrs-ui-common')
     return
   }
 

@@ -46,7 +46,7 @@ export class AbstractRunner {
 
   /**
    * @param command
-   * @returns The entire command that will be ran when calling `run(command)`.
+   * @returns The entire command that will be run when calling `run(command)`.
    */
   public rawFullCommand(command: string): string {
     const commandArgs: string[] = [...this.args, command]

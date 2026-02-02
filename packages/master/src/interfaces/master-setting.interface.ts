@@ -21,7 +21,7 @@ export interface IMasterSettingService {
    * Fetch settings from DynamoDB in the order of levels: user => group => tenant => common.
    * Return the settings result for the user.
    * @param key - The key used to identify the setting e.g. UserListSetting
-   * @returns A promise that resolves to the setting s data entity.
+   * @returns A promise that resolves to the setting's data entity.
    *     Example MasterSettingEntity
    *     {
    *       id: SETTING#mbc#USER#abc#UserListSetting

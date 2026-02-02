@@ -51,7 +51,7 @@ export class TenantService implements ITenantService {
     })
     if (tenant && tenant.isDeleted === false) {
       throw new BadRequestException(
-        `Tenant already exist: ${SettingTypeEnum.TENANT_COMMON}`,
+        `Tenant already exists: ${SettingTypeEnum.TENANT_COMMON}`,
       )
     }
 
@@ -82,7 +82,7 @@ export class TenantService implements ITenantService {
     })
     if (tenant && tenant.isDeleted === false) {
       throw new BadRequestException(
-        `Tenant already exist: ${SettingTypeEnum.TENANT_COMMON}`,
+        `Tenant already exists: ${SettingTypeEnum.TENANT_COMMON}`,
       )
     }
 
@@ -96,6 +96,7 @@ export class TenantService implements ITenantService {
       type: code,
       version: tenant?.version ?? VERSION_FIRST,
       attributes: attributes,
+      isDeleted: false,
     }
 
     return await this.commandService.publishAsync(command, context)
@@ -118,7 +119,10 @@ export class TenantService implements ITenantService {
         pk,
         sk,
         name: dto.name,
-        attributes: dto.attributes,
+        attributes: {
+          ...data.attributes,
+          ...dto.attributes,
+        },
         version: data.version,
       },
       context,
@@ -283,5 +287,40 @@ export class TenantService implements ITenantService {
 
       return countB !== countA ? countB - countA : a.localeCompare(b)
     })
+  }
+
+  async createTenantGroup(
+    tenantGroupCode: string,
+    dto: TenantCreateDto,
+    context: { invokeContext: IInvoke },
+  ): Promise<CommandModel> {
+    const { name, code, attributes } = dto
+    const pk = `${TENANT_SYSTEM_PREFIX}${KEY_SEPARATOR}${tenantGroupCode}`
+    const sk = code
+
+    const tenant = await this.dataService.getItem({
+      pk,
+      sk,
+    })
+    if (tenant && tenant.isDeleted === false) {
+      throw new BadRequestException(
+        `Tenant already exists: ${SettingTypeEnum.TENANT} - sk: ${sk}`,
+      )
+    }
+
+    const command: CommandDto = {
+      pk: pk,
+      sk: sk,
+      id: generateId(pk, sk),
+      tenantCode: tenantGroupCode,
+      code: code,
+      type: SettingTypeEnum.TENANT,
+      name: name,
+      version: tenant?.version ?? VERSION_FIRST,
+      attributes: attributes,
+      isDeleted: false,
+    }
+
+    return await this.commandService.publishAsync(command, context)
   }
 }

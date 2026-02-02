@@ -1,0 +1,62 @@
+{
+  "name": "@mbc-cqrs-serverless/mcp-server",
+  "version": "0.1.74-beta.0",
+  "description": "MCP (Model Context Protocol) server for MBC CQRS Serverless framework - enables AI tools to interact with the framework",
+  "keywords": [
+    "mbc",
+    "cqrs",
+    "serverless",
+    "mcp",
+    "model-context-protocol",
+    "ai",
+    "claude",
+    "cursor",
+    "llm",
+    "code-generation"
+  ],
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "bin": {
+    "mbc-mcp-server": "./bin/mcp-server.js"
+  },
+  "files": [
+    "dist",
+    "bin",
+    "!dist/tsconfig.tsbuildinfo"
+  ],
+  "scripts": {
+    "build": "rm -rf dist && tsc",
+    "dev": "tsc --watch",
+    "start": "node ./bin/mcp-server.js",
+    "test": "jest --passWithNoTests",
+    "test:watch": "jest --watch",
+    "test:cov": "jest --coverage"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/mbc-net/mbc-cqrs-serverless.git",
+    "directory": "packages/mcp-server"
+  },
+  "author": "Murakami Business Consulting, Inc.",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/mbc-net/mbc-cqrs-serverless/issues"
+  },
+  "homepage": "https://mbc-cqrs-serverless.mbc-net.com/",
+  "publishConfig": {
+    "access": "public"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.0.0",
+    "zod": "^3.23.0"
+  },
+  "devDependencies": {
+    "@types/jest": "^29.5.0",
+    "@types/node": "^20.10.0",
+    "jest": "^29.7.0",
+    "ts-jest": "^29.1.0"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}

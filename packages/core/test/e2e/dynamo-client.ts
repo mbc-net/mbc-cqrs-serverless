@@ -50,7 +50,7 @@ const listItemsByPk = async (
   tableName: string,
   pk: string,
   sk?: {
-    skExpession: string
+    skExpression: string
     skAttributeValues: Record<string, string>
     skAttributeNames?: Record<string, string>
   },
@@ -62,7 +62,7 @@ const listItemsByPk = async (
       ExclusiveStartKey: startFromSk
         ? toDdbKey({ pk, sk: startFromSk })
         : undefined,
-      KeyConditionExpression: 'pk = :pk' + (sk ? ` and ${sk.skExpession}` : ''),
+      KeyConditionExpression: 'pk = :pk' + (sk ? ` and ${sk.skExpression}` : ''),
       ExpressionAttributeNames: sk?.skAttributeNames,
       ExpressionAttributeValues: await objToDdbItem(tableName, {
         ...sk?.skAttributeValues,

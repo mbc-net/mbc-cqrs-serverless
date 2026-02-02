@@ -1,134 +1,355 @@
 ![MBC CQRS serverless framework](https://mbc-cqrs-serverless.mbc-net.com/img/mbc-cqrs-serverless.png)
 
-# MBC CQRS serverless framework CLI package
+# @mbc-cqrs-serverless/cli
 
-## Description
+[![npm version](https://badge.fury.io/js/@mbc-cqrs-serverless%2Fcli.svg)](https://www.npmjs.com/package/@mbc-cqrs-serverless/cli)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
-The MBC CLI is a command-line interface tool that helps you initialize and manage MBC CQRS Serverless applications. It provides commands for project creation, version management, and development workflow automation.
+A command-line interface for the MBC CQRS Serverless framework. Quickly scaffold new projects, generate code, and manage your serverless CQRS applications.
+
+![Quick Start Demo](https://mbc-cqrs-serverless.mbc-net.com/demo/quick-start.gif)
+
+## Features
+
+- **Project Scaffolding**: Create production-ready CQRS applications with a single command
+- **Code Generation**: Generate modules, controllers, services, entities, and DTOs
+- **Version Management**: Install specific framework versions or use the latest
+- **Local Development**: Built-in commands for starting local development servers
 
 ## Installation
 
-To install the `mbc` command globally, run:
+### Global Installation (Recommended)
 
 ```bash
 npm install -g @mbc-cqrs-serverless/cli
 ```
 
-## Usage
-
-### Project Creation
-
-The CLI provides flexible options for creating new projects:
+### Version-Specific Installation
 
 ```bash
-mbc new [projectName[@version]]
+# Latest stable release
+npm install -g @mbc-cqrs-serverless/cli
+
+# Beta release
+npm install -g @mbc-cqrs-serverless/cli@beta
+
+# Specific version
+npm install -g @mbc-cqrs-serverless/cli@1.0.16
 ```
 
-#### Basic Usage Examples
+Verify installation:
 
-1. Create a new project in the current directory:
 ```bash
-mbc new
+mbc --version
 ```
 
-2. Create a project with a specific name:
+## Quick Start
+
+Create and run a new CQRS application in minutes:
+
 ```bash
+# Create a new project
 mbc new my-cqrs-app
+
+# Navigate to project
+cd my-cqrs-app
+
+# Install dependencies
+npm install
+
+# Start local development (run in separate terminals)
+npm run offline:docker   # Terminal 1: Start Docker services
+npm run migrate          # Terminal 2: Run database migrations
+npm run offline:sls      # Terminal 3: Start serverless offline
 ```
 
-3. Create a project with a specific version:
+## Commands
+
+### `mbc new [name[@version]]`
+
+Generate a new CQRS application.
+
+**Alias**: `n`
+
+**Examples**:
+
 ```bash
-mbc new my-cqrs-app@0.1.45
+# Create project in current directory (prompts for name)
+mbc new
+
+# Create project with a specific name
+mbc new my-app
+
+# Create project with a specific framework version
+mbc new my-app@1.0.16
+
+# Use alias
+mbc n my-app
 ```
 
-### Project Structure
+### `mbc generate <schematic> [name]`
 
-The CLI creates a standardized project structure:
+Generate code elements using schematics.
+
+**Alias**: `g`
+
+**Options**:
+- `-d, --dry-run` - Report actions without writing files
+- `--mode <mode>` - Operation mode: sync or async (default: async)
+- `--schema` / `--no-schema` - Enable/disable schema generation
+
+**Available Schematics**:
+
+| Name | Alias | Description |
+|------|-------|-------------|
+| `module` | `mo` | Create a module |
+| `controller` | `co` | Create a controller |
+| `service` | `se` | Create a service |
+| `entity` | `en` | Create an entity |
+| `dto` | `dto` | Create a DTO |
+
+**Examples**:
+
+```bash
+# Generate a new module
+mbc generate module todo
+
+# Generate a controller (using alias)
+mbc g co todo
+
+# Generate a service with async mode
+mbc g service todo --mode async
+
+# Dry run to preview changes
+mbc g module order --dry-run
+```
+
+### `mbc start`
+
+Start the application with Serverless Framework.
+
+**Alias**: `s`
+
+```bash
+mbc start
+# or
+mbc s
+```
+
+### `mbc ui-common`
+
+Add MBC CQRS UI common components to your project.
+
+**Alias**: `ui`
+
+**Options**:
+- `-p, --pathDir <string>` - Path for common-ui (required)
+- `-b, --branch <string>` - Branch name (default: main)
+- `--auth <string>` - Auth method: HTTPS or SSH (default: SSH)
+- `--token <string>` - Token for HTTPS auth (format: tokenId:tokenPassword)
+- `-c, --component <string>` - Component to install: all, appsync, or component (default: all)
+- `--alias` - Alias to common-ui
+
+**Example**:
+
+```bash
+mbc ui-common -p ./src/common-ui -c all
+```
+
+### `mbc install-skills`
+
+Install Claude Code skills for MBC CQRS Serverless development.
+
+**Alias**: `skills`
+
+**Options**:
+- `-p, --project` - Install to project directory (`.claude/skills/`) instead of personal (`~/.claude/skills/`)
+- `-f, --force` - Overwrite existing skills
+- `-l, --list` - List available skills without installing
+- `-c, --check` - Check if updates are available without installing
+
+**Examples**:
+
+```bash
+# Install to personal skills directory (available in all projects)
+mbc install-skills
+
+# Install to project directory (shared with team via git)
+mbc install-skills --project
+
+# List available skills
+mbc install-skills --list
+
+# Force overwrite existing skills
+mbc install-skills --force
+
+# Check for updates
+mbc install-skills --check
+
+# Using alias
+mbc skills -p
+```
+
+**Upgrading Skills**:
+
+Skills do not auto-update. To upgrade to the latest version:
+
+```bash
+# Update CLI to latest version
+npm update -g @mbc-cqrs-serverless/cli
+
+# Check if updates are available
+mbc install-skills --check
+
+# Force reinstall to get latest version
+mbc install-skills --force
+```
+
+**Available Skills**:
+
+| Skill | Description |
+|-------|-------------|
+| `/mbc-generate` | Generate boilerplate code (modules, services, controllers, DTOs, handlers) |
+| `/mbc-review` | Review code for best practices and anti-patterns (20 patterns) |
+| `/mbc-migrate` | Guide version migrations and breaking changes |
+| `/mbc-debug` | Debug and troubleshoot common issues |
+
+## Project Structure
+
+The CLI creates a standardized project structure optimized for CQRS:
 
 ```
 my-cqrs-app/
 ├── src/
-│   ├── commands/       # Command handlers
-│   ├── events/        # Event handlers
-│   ├── interfaces/    # TypeScript interfaces
-│   └── services/      # Business logic services
+│   ├── app.module.ts           # Root application module
+│   ├── main.ts                 # Application entry point
+│   ├── todo/                   # Example module (optional)
+│   │   ├── todo.module.ts      # Module definition
+│   │   ├── todo.controller.ts  # REST controller
+│   │   ├── todo.service.ts     # Business logic
+│   │   ├── dto/                # Data transfer objects
+│   │   │   ├── create-todo.dto.ts
+│   │   │   └── update-todo.dto.ts
+│   │   └── entity/             # Entity definitions
+│   │       └── todo.entity.ts
+│   ├── prisma/                 # Prisma ORM configuration
+│   │   ├── schema.prisma       # Database schema
+│   │   └── prisma.service.ts   # Prisma service
+│   └── helpers/                # Utility functions
+├── infra-local/                # Local infrastructure config
+│   └── cognito-local/          # Local Cognito setup
 ├── test/
-│   ├── e2e/          # End-to-end tests
-│   └── unit/         # Unit tests
-├── package.json
-└── serverless.yml    # Serverless Framework configuration
+│   ├── e2e/                    # End-to-end tests
+│   └── unit/                   # Unit tests
+├── .env.example                # Environment template
+├── docker-compose.yml          # Docker services
+├── package.json                # Dependencies
+├── serverless.yml              # Serverless Framework config
+└── tsconfig.json               # TypeScript configuration
 ```
 
-### Development Workflow
+## Development Workflow
 
-1. After creating a project, install dependencies:
+### 1. Create Project
+
 ```bash
+mbc new my-cqrs-app
 cd my-cqrs-app
 npm install
 ```
 
-2. Build the project:
+### 2. Configure Environment
+
 ```bash
-npm run build
+cp .env.example .env
+# Edit .env with your settings
 ```
 
-3. Start local development environment:
+### 3. Start Local Infrastructure
+
 ```bash
-npm run offline:docker  # Start local infrastructure
-npm run migrate        # Run database migrations
-npm run offline:sls    # Start serverless offline
+# Start Docker services (DynamoDB Local, LocalStack, etc.)
+npm run offline:docker
 ```
 
-### Available Commands
+### 4. Initialize Database
 
-- `mbc new`: Create a new project
-- `mbc version`: Display CLI version
-- `mbc help`: Show command help
-- `mbc list`: List available project templates
-
-### Configuration
-
-The CLI supports configuration through:
-- Command line arguments
-- Environment variables
-- Configuration files
-
-Example configuration file (`.mbcrc.json`):
-```json
-{
-  "defaultTemplate": "basic",
-  "region": "ap-northeast-1",
-  "stage": "dev"
-}
+```bash
+# Run Prisma migrations
+npm run migrate
 ```
+
+### 5. Start Development Server
+
+```bash
+# Start Serverless Offline
+npm run offline:sls
+```
+
+### 6. Generate New Components
+
+```bash
+# Add a new module
+mbc g module order
+
+# Add related components
+mbc g controller order
+mbc g service order
+mbc g entity order
+mbc g dto order
+```
+
+## Related Packages
+
+| Package | Description |
+|---------|-------------|
+| [@mbc-cqrs-serverless/core](https://www.npmjs.com/package/@mbc-cqrs-serverless/core) | Core CQRS framework |
+| [@mbc-cqrs-serverless/sequence](https://www.npmjs.com/package/@mbc-cqrs-serverless/sequence) | Sequence number generation |
+| [@mbc-cqrs-serverless/task](https://www.npmjs.com/package/@mbc-cqrs-serverless/task) | Async task processing |
+| [@mbc-cqrs-serverless/master](https://www.npmjs.com/package/@mbc-cqrs-serverless/master) | Master data management |
+| [@mbc-cqrs-serverless/tenant](https://www.npmjs.com/package/@mbc-cqrs-serverless/tenant) | Multi-tenancy support |
+| [@mbc-cqrs-serverless/import](https://www.npmjs.com/package/@mbc-cqrs-serverless/import) | Data import utilities |
+| [@mbc-cqrs-serverless/ui-setting](https://www.npmjs.com/package/@mbc-cqrs-serverless/ui-setting) | UI configuration |
 
 ## Documentation
 
-Visit https://mbc-cqrs-serverless.mbc-net.com/ to view the full documentation, including:
-- Detailed CLI commands and options
-- Project setup and configuration
-- Development server setup
-- Available endpoints and services
+Full documentation is available at [https://mbc-cqrs-serverless.mbc-net.com/](https://mbc-cqrs-serverless.mbc-net.com/)
+
+- [Getting Started](https://mbc-cqrs-serverless.mbc-net.com/docs/introduction)
+- [CLI Reference](https://mbc-cqrs-serverless.mbc-net.com/docs/cli)
+- [Build a Todo App Tutorial](https://mbc-cqrs-serverless.mbc-net.com/docs/build-todo-app)
 
 ## Troubleshooting
 
-Common issues and solutions:
+### Version Not Found
 
-1. Version not found:
 ```bash
 mbc new myapp@999.999.999
-# Error: Version not found. Available versions: [0.1.45, 0.1.44, ...]
+# Error: Version not found
 ```
-Solution: Use `mbc list versions` to see available versions.
 
-2. Project creation fails:
+**Solution**: Check available versions on [npm](https://www.npmjs.com/package/@mbc-cqrs-serverless/cli?activeTab=versions).
+
+### Project Creation Fails
+
 ```bash
 mbc new my-project
 # Error: Directory not empty
 ```
-Solution: Use a new directory or remove existing files.
+
+**Solution**: Use a new directory or remove existing files first.
+
+### Permission Denied
+
+```bash
+npm install -g @mbc-cqrs-serverless/cli
+# EACCES: permission denied
+```
+
+**Solution**: Fix npm permissions or use a Node version manager like nvm.
 
 ## License
 
-Copyright &copy; 2024, Murakami Business Consulting, Inc. https://www.mbc-net.com/  
-This project and sub projects are under the MIT License.
+Copyright © 2024-2025, Murakami Business Consulting, Inc. [https://www.mbc-net.com/](https://www.mbc-net.com/)
+
+This project is under the [MIT License](../../LICENSE.txt).

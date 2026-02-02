@@ -6,12 +6,10 @@ import {
 } from '@mbc-cqrs-serverless/core'
 import {
   BadRequestException,
-  //   BadRequestException,
   Body,
   Controller,
   Delete,
   Get,
-  Logger,
   Param,
   Post,
   Put,
@@ -25,6 +23,7 @@ import {
   MasterDataCreateDto,
   MasterDataUpdateDto,
 } from '../dto'
+import { MasterDataCreateBulkDto } from '../dto/master-copy/master-data-create-bulk.dto'
 import { CreateMasterDataDto } from '../dto/master-data/data-create.dto'
 import { MasterDataSearchDto } from '../dto/master-data/data-search.dto'
 import { UpdateDataSettingDto } from '../dto/master-data/data-update.dto'
@@ -34,8 +33,6 @@ import { MasterDataService } from '../services/master-data.service'
 @Controller('api/master-data')
 @ApiTags('master-data')
 export class MasterDataController {
-  private readonly logger = new Logger(MasterDataController.name)
-
   constructor(private readonly masterDataService: MasterDataService) {}
 
   @Get('/')
@@ -111,6 +108,14 @@ export class MasterDataController {
     @INVOKE_CONTEXT() invokeContext: IInvoke,
   ) {
     return this.masterDataService.createSetting(createDto, invokeContext)
+  }
+
+  @Post('/bulk')
+  async createBulk(
+    @Body() createDto: MasterDataCreateBulkDto,
+    @INVOKE_CONTEXT() invokeContext: IInvoke,
+  ) {
+    return this.masterDataService.createBulk(createDto, invokeContext)
   }
 
   @Put('/:id')

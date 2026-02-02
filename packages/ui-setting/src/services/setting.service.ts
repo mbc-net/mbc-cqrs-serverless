@@ -42,7 +42,7 @@ export class SettingService {
     const pk = generateSettingPk(tenantCode)
     const query = {
       sk: {
-        skExpession: 'begins_with(sk, :settingPrefix)',
+        skExpression: 'begins_with(sk, :settingPrefix)',
         skAttributeValues: {
           ':settingPrefix': `${SETTING_SK_PREFIX}${KEY_SEPARATOR}`,
         },
@@ -66,7 +66,7 @@ export class SettingService {
     const validField = this.isValidFields(createDto.attributes.fields)
     if (!validField) {
       throw new BadRequestException(
-        'Physical name of fields must not duplicate',
+        'Physical name of fields must not be duplicated',
       )
     }
 
@@ -75,8 +75,8 @@ export class SettingService {
 
     const setting = await this.dataService.getItem({ pk, sk })
 
-    if (setting && setting.isDeleted == false) {
-      throw new BadRequestException('Setting code is exist!')
+    if (setting && setting.isDeleted === false) {
+      throw new BadRequestException('Setting code already exists')
     }
 
     const id = generateId(pk, sk)
@@ -111,13 +111,13 @@ export class SettingService {
     const data = (await this.dataService.getItem(key)) as SettingDataEntity
 
     if (!data) {
-      throw new NotFoundException()
+      throw new NotFoundException('Setting not found')
     }
 
     const validField = this.isValidFields(updateDto?.attributes?.fields ?? [])
     if (!validField) {
       throw new BadRequestException(
-        'Physical name of fields must not duplicate',
+        'Physical name of fields must not be duplicated',
       )
     }
 
@@ -153,11 +153,11 @@ export class SettingService {
     const data = (await this.dataService.getItem(key)) as SettingDataEntity
 
     if (!data) {
-      throw new NotFoundException()
+      throw new NotFoundException('Setting not found')
     }
 
     if (data.isDeleted) {
-      throw new BadRequestException('This setting is already delete!')
+      throw new BadRequestException('This setting is already deleted')
     }
 
     const deleteCmd: SettingCommandDto = {

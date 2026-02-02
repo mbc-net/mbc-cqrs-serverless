@@ -48,9 +48,9 @@ export class SequencesService implements ISequenceService {
    * @deprecated This method is deprecated at V0.2.
    * Seq data structure
    * - pk: SEQ#tenantCode
-   * - sk: typeCode#rotateValue ( e.x: `user#20230401` )
+   * - sk: typeCode#rotateValue ( e.g.: `user#20230401` )
    * - code: typeCode#rotateValue
-   * - name: rotateBy ( e.x: `daily` )
+   * - name: rotateBy ( e.g.: `daily` )
    * - tenant_code: tenantCode
    * - type: typeCode
    * - seq: sequence value ( atomic counter )
@@ -66,7 +66,7 @@ export class SequencesService implements ISequenceService {
     const sk = `${dto.typeCode}${KEY_SEPARATOR}${rotateVal}`
 
     const sourceIp =
-      options?.invokeContext?.event?.requestContext?.http?.sourceIp
+      options?.invokeContext?.event?.requestContext?.http?.sourceIp || 'unknown'
     const userContext = getUserContext(options.invokeContext)
     const userId = userContext.userId || 'system'
     const now = new Date()
@@ -97,9 +97,9 @@ export class SequencesService implements ISequenceService {
   /**
    * Seq data structure
    * - pk: SEQ#tenantCode
-   * - sk: typeCode#code1#code2#code3#code4#code5rotateValue ( e.x: `user#20230401` )
+   * - sk: typeCode#code1#code2#code3#code4#code5#rotateValue ( e.g.: `user#20230401` )
    * - code: typeCode#rotateValue
-   * - name: rotateBy ( e.x: `daily` )
+   * - name: rotateBy ( e.g.: `daily` )
    * - tenant_code: tenantCode
    * - type: typeCode
    * - seq: sequence value ( atomic counter )
@@ -108,7 +108,7 @@ export class SequencesService implements ISequenceService {
    * - createdBy: createdBy
    * - createdIp: createdIp
    * - attributes: {
-   *    formatted_no: formattedNo ( e.x: `2023-04-01-0001` )
+   *    formatted_no: formattedNo ( e.g.: `2023-04-01-0001` )
    *    fiscal_year: fiscalYear
    *    issued_at: issuedAt
    * }
@@ -153,7 +153,7 @@ export class SequencesService implements ISequenceService {
       startMonth,
     })
     const sourceIp =
-      options?.invokeContext?.event?.requestContext?.http?.sourceIp
+      options?.invokeContext?.event?.requestContext?.http?.sourceIp || 'unknown'
     const userContext = options
       ? getUserContext(options.invokeContext)
       : undefined
@@ -239,7 +239,7 @@ export class SequencesService implements ISequenceService {
       startMonth,
     })
     const sourceIp =
-      options?.invokeContext?.event?.requestContext?.http?.sourceIp
+      options?.invokeContext?.event?.requestContext?.http?.sourceIp || 'unknown'
     const userContext = options
       ? getUserContext(options.invokeContext)
       : undefined

@@ -7,7 +7,6 @@ import { FiscalYearOptions } from './interfaces/fiscal-year.interface'
 import { SequenceMasterDataProvider } from './sequence-master-factory'
 import { SequenceEntity } from './entities/sequence.entity'
 
-
 const optionsMock = {
   invokeContext: {
     event: {
@@ -541,7 +540,7 @@ describe('SequencesService', () => {
       expect(result).toEqual(mockSequenceResponse)
 
     })
-    it('should call generateSequenceItem with  yearly rotation, argument is a  year that is the same as the previous year', async () => {
+    it('should call generateSequenceItem with yearly rotation, argument is a year that is the same as the previous year', async () => {
       const mockMasterData = {
         typeCode: 'sequence',
         format: '%%no%%',
@@ -585,7 +584,7 @@ describe('SequencesService', () => {
       expect(result).toEqual(mockSequenceResponse)
 
     })
-    it('should call generateSequenceItem with  yearly rotation, argument is a  year other than the previous  year', async () => {
+    it('should call generateSequenceItem with yearly rotation, argument is a year other than the previous year', async () => {
       const mockMasterData = {
         typeCode: 'sequence',
         format: '%%no%%',
@@ -761,7 +760,7 @@ describe('SequencesService', () => {
       expect(result).toEqual(mockSequenceResponse)
 
     })
-    it('should call generateSequenceItem with daily rotation ', async () => {
+    it('should call generateSequenceItem with daily rotation', async () => {
       const mockMasterData = {
         typeCode: 'sequence',
         format: '%%no%%',
@@ -891,7 +890,7 @@ describe('SequencesService', () => {
       expect(result).toEqual(mockSequenceResponse)
 
     })
-    it('should call generateSequenceItem with none rotation,  the arguments have code 1, code 2, code 3, code4, code5 ', async () => {
+    it('should call generateSequenceItem with none rotation, the arguments have code 1, code 2, code 3, code4, code5', async () => {
       const mockMasterData = {
         typeCode: 'sequence',
         format: '%%code1%%-%%code2%%-%%code3%%-%%code4%%-%%code5%%-%%no%%',
@@ -938,7 +937,7 @@ describe('SequencesService', () => {
       )
       expect(result).toEqual(mockSequenceResponse)
     })
-    it('should call generateSequenceItem with none rotation,  format is %%code1%%-%%fiscal_year%%-%%no%%', async () => {
+    it('should call generateSequenceItem with none rotation, format is %%code1%%-%%fiscal_year%%-%%no%%', async () => {
       const mockMasterData = {
         typeCode: 'sequence',
         format: '%%code1%%-%%fiscal_year%%-%%no%%',
@@ -985,7 +984,7 @@ describe('SequencesService', () => {
       )
       expect(result).toEqual(mockSequenceResponse)
     })
-    it('should call generateSequenceItem with none rotation,  format is %%code1%%-%%month%%-%%no%%', async () => {
+    it('should call generateSequenceItem with none rotation, format is %%code1%%-%%month%%-%%no%%', async () => {
       const mockMasterData = {
         typeCode: 'sequence',
         format: '%%code1%%-%%month%%-%%no%%',
@@ -1029,7 +1028,7 @@ describe('SequencesService', () => {
       )
       expect(result).toEqual(mockSequenceResponse)
     })
-    it('should call generateSequenceItem with none rotation,  format is %%code1%%-%%day%%-%%no%%', async () => {
+    it('should call generateSequenceItem with none rotation, format is %%code1%%-%%day%%-%%no%%', async () => {
       const mockMasterData = {
         typeCode: 'sequence',
         format: '%%code1%%-%%day%%-%%no%%',
@@ -1072,7 +1071,7 @@ describe('SequencesService', () => {
       )
       expect(result).toEqual(mockSequenceResponse)
     })
-    it('should call generateSequenceItem with register date,  format is %%code1%%-%%fiscal_year%%-%%no%%', async () => {
+    it('should call generateSequenceItem with register date, format is %%code1%%-%%fiscal_year%%-%%no%%', async () => {
       const mockMasterData = {
         typeCode: 'sequence',
         format: '%%code1%%-%%fiscal_year%%-%%no%%',
@@ -1122,7 +1121,7 @@ describe('SequencesService', () => {
         format: '%%code1%%-%%fiscal_year%%-%%no%%',
         registerDate: new Date('2020-01-01'),
       }
-    
+
       const mockUpdate = {
         code: 'sequence#PI#2024',
         updatedBy: '92ca4f68-9ac6-4080-9ae2-2f02a86206a4',
@@ -1139,17 +1138,17 @@ describe('SequencesService', () => {
         seq: 2,
         updatedAt: '2024-11-27T17:46:36+07:00',
       }
-    
+
       jest.spyOn(masterService, 'getData').mockResolvedValue(mockMasterData)
       jest.spyOn(dynamoDbService, 'updateItem').mockResolvedValue(mockUpdate)
-    
+
       const mockSequenceResponse = new SequenceEntity({
         id: 'SEQ#MBC#sequence#PI#2024',
         no: 2,
         formattedNo: 'INV-PI-5-2-POST', // prefix + formatted + postfix
         issuedAt: new Date('2024-11-27T17:46:36+07:00'),
       })
-    
+
       const result = await service.generateSequenceItem(
         {
           tenantCode: tenantCode,
@@ -1163,10 +1162,10 @@ describe('SequencesService', () => {
           postfix: '-POST',
         },
       )
-    
+
       expect(result).toEqual(mockSequenceResponse)
     })
-    
+
     it('should call generateSequenceItem with minimum parameters', async () => {
       const mockMasterData = {
         typeCode: 'sequence',
@@ -1746,26 +1745,28 @@ describe('SequencesService', () => {
           startMonth: 4,
         }
         jest.spyOn(masterService, 'getData').mockResolvedValue(mockMasterData)
-        
+
+        // Use June 15 to avoid timezone boundary issues
         const mockUpdate = {
-          'code': 'sequence#TODO#20991231',
+          'code': 'sequence#TODO#20990615',
           'updatedBy': '92ca4f68-9ac6-4080-9ae2-2f02a86206a4',
           'createdIp': '127.0.0.1',
           'tenantCode': 'MBC',
           'type': 'sequence',
-          'createdAt': '2099-12-31T23:59:59+07:00',
+          'createdAt': '2099-06-15T12:00:00Z',
           'updatedIp': '127.0.0.1',
           'createdBy': '92ca4f68-9ac6-4080-9ae2-2f02a86206a4',
           'requestId': '7724a67e-ded6-4ebb-9c88-c14070e24012',
           'name': 'daily',
-          'sk': 'sequence#TODO#20991231',
+          'sk': 'sequence#TODO#20990615',
           'pk': 'SEQ#MBC',
           'seq': 1,
-          'updatedAt': '2099-12-31T23:59:59+07:00',
+          'updatedAt': '2099-06-15T12:00:00Z',
         }
         jest.spyOn(dynamoDbService, 'updateItem').mockResolvedValue(mockUpdate)
 
-        const futureDate = new Date('2099-12-31T23:59:59+07:00')
+        // Use mid-year date to avoid timezone boundary issues
+        const futureDate = new Date('2099-06-15T12:00:00Z')
         const result = await service.generateSequenceItem({
           tenantCode: tenantCode,
           typeCode: 'sequence',
@@ -1783,26 +1784,31 @@ describe('SequencesService', () => {
           startMonth: 4,
         }
         jest.spyOn(masterService, 'getData').mockResolvedValue(mockMasterData)
-        
+
+        // Use June 1899 with UTC to avoid timezone boundary issues
+        // June (6) >= April (4), so fiscal year = 1899
+        // fiscal_year_value = 1899 - 2020 + 1 = -120
         const mockUpdate = {
-          'code': 'sequence#TODO#19000101',
+          'code': 'sequence#TODO#18990615',
           'updatedBy': '92ca4f68-9ac6-4080-9ae2-2f02a86206a4',
           'createdIp': '127.0.0.1',
           'tenantCode': 'MBC',
           'type': 'sequence',
-          'createdAt': '1900-01-01T00:00:00+07:00',
+          'createdAt': '1899-06-15T12:00:00Z',
           'updatedIp': '127.0.0.1',
           'createdBy': '92ca4f68-9ac6-4080-9ae2-2f02a86206a4',
           'requestId': '7724a67e-ded6-4ebb-9c88-c14070e24012',
           'name': 'daily',
-          'sk': 'sequence#TODO#19000101',
+          'sk': 'sequence#TODO#18990615',
           'pk': 'SEQ#MBC',
           'seq': 1,
-          'updatedAt': '1900-01-01T00:00:00+07:00',
+          'updatedAt': '1899-06-15T12:00:00Z',
         }
         jest.spyOn(dynamoDbService, 'updateItem').mockResolvedValue(mockUpdate)
 
-        const pastDate = new Date('1900-01-01T00:00:00+07:00')
+        // Use June 15, 1899 to avoid timezone boundary issues
+        // June (6) >= April (4), so fiscal year = 1899, value = -120
+        const pastDate = new Date('1899-06-15T12:00:00Z')
         const result = await service.generateSequenceItem({
           tenantCode: tenantCode,
           typeCode: 'sequence',

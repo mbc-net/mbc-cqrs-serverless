@@ -1,19 +1,24 @@
 import { DataStoreModule, QueueModule } from '@mbc-cqrs-serverless/core'
 import { DynamicModule, Module, Provider, Type } from '@nestjs/common'
 
+import { CommandFinishedHandler } from './event/command-finished.queue.event.handler'
 import { CsvImportQueueEventHandler } from './event/csv-import.queue.event.handler'
 import { CsvImportSfnEventHandler } from './event/csv-import.sfn.event.handler'
 import { ImportEventHandler } from './event/import.event.handler'
 import { ImportQueueEventHandler } from './event/import.queue.event.handler'
+import { ImportStatusHandler } from './event/import-status.queue.event.handler'
+import { ZipImportQueueEventHandler } from './event/zip-import.queue.event.handler'
+import { ZipImportSfnEventHandler } from './event/zip-import.sfn.event.handler'
 import { ImportController } from './import.controller'
 import {
   ConfigurableModuleClass,
   IMPORT_STRATEGY_MAP,
   OPTIONS_TYPE,
   PROCESS_STRATEGY_MAP,
+  ZIP_FINALIZATION_HOOKS,
 } from './import.module-definition'
 import { ImportService } from './import.service'
-import { ImportEntityProfile } from './interface'
+import { ImportEntityProfile, IZipFinalizationHook } from './interface'
 import { IImportStrategy } from './interface/import-strategy.interface'
 import { IProcessStrategy } from './interface/processing-strategy.interface'
 
@@ -25,6 +30,10 @@ import { IProcessStrategy } from './interface/processing-strategy.interface'
     ImportQueueEventHandler,
     CsvImportQueueEventHandler,
     CsvImportSfnEventHandler,
+    CommandFinishedHandler,
+    ImportStatusHandler,
+    ZipImportQueueEventHandler,
+    ZipImportSfnEventHandler,
   ],
   exports: [ImportService],
 })
@@ -32,7 +41,8 @@ export class ImportModule extends ConfigurableModuleClass {
   static register(options: typeof OPTIONS_TYPE): DynamicModule {
     const module = super.register(options)
 
-    const { enableController, profiles, imports } = options
+    const { enableController, profiles, imports, zipFinalizationHooks } =
+      options
 
     module.imports = [...(module.imports || []), ...(imports || [])]
 
@@ -48,6 +58,26 @@ export class ImportModule extends ConfigurableModuleClass {
         (p) => p.processStrategy,
       ),
     ]
+
+    // Add hooks provider
+    if (zipFinalizationHooks && zipFinalizationHooks.length > 0) {
+      // Add hook classes as providers so they can be injected
+      zipFinalizationHooks.forEach((hookClass) => {
+        dynamicProviders.push(hookClass)
+      })
+
+      // Add the array provider that collects all hook instances
+      dynamicProviders.push({
+        provide: ZIP_FINALIZATION_HOOKS,
+        useFactory: (...instances: IZipFinalizationHook[]) => instances,
+        inject: zipFinalizationHooks,
+      })
+    } else {
+      dynamicProviders.push({
+        provide: ZIP_FINALIZATION_HOOKS,
+        useValue: [],
+      })
+    }
 
     module.providers = [...(module.providers || []), ...dynamicProviders]
 

@@ -166,7 +166,7 @@ export class TaskService implements ITaskService {
         this.tableName,
         subTask.pk,
         {
-          skExpession: 'begins_with(sk, :typeCode)',
+          skExpression: 'begins_with(sk, :typeCode)',
           skAttributeValues: {
             ':typeCode': `${parentKey}${KEY_SEPARATOR}`,
           },
@@ -255,7 +255,7 @@ export class TaskService implements ITaskService {
     type?: string,
     options?: {
       sk?: {
-        skExpession: string
+        skExpression: string
         skAttributeValues: Record<string, string>
         skAttributeNames?: Record<string, string>
       }

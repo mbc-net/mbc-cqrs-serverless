@@ -15,6 +15,7 @@ import { CommandService } from './command.service'
 import { DataService } from './data.service'
 import { CommandStatus, getCommandStatus } from './enums/status.enum'
 import { HistoryService } from './history.service'
+import { StepFunctionService } from '../step-func/step-function.service'
 
 @Injectable()
 export class CommandEventHandler {
@@ -30,6 +31,7 @@ export class CommandEventHandler {
     private readonly s3Service: S3Service,
     private readonly snsService: SnsService,
     private readonly config: ConfigService,
+    private readonly sfnService: StepFunctionService,
   ) {
     this.logger = new Logger(
       `${CommandEventHandler.name}:${this.options.tableName}`,
@@ -100,6 +102,7 @@ export class CommandEventHandler {
     event: DataSyncCommandSfnEvent,
   ): Promise<StepFunctionStateInput> {
     this.logger.debug('waitConfirmToken::', event)
+    await this.commandService.updateTaskToken(event.commandKey, event.taskToken)
     return {
       result: {
         token: event.taskToken,
@@ -215,6 +218,35 @@ export class CommandEventHandler {
     event: DataSyncCommandSfnEvent,
   ): Promise<StepFunctionStateInput> {
     this.logger.debug('checkNextToken:: ', event.commandRecord)
+
+    const nextCommand = await this.commandService.getNextCommand(
+      event.commandKey,
+    )
+    if (!nextCommand) {
+      this.logger.debug('No next command version found. Chain ends.')
+      return null
+    }
+
+    if (nextCommand.taskToken) {
+      this.logger.log(
+        `Found waiting command v${nextCommand.version}. Resuming...`,
+      )
+
+      try {
+        await this.sfnService.resumeExecution(nextCommand.taskToken, {
+          result: 'resumed_by_prev_version',
+          prevVersion: event.commandRecord.version,
+        })
+      } catch (e) {
+        this.logger.warn(
+          `Could not resume command v${nextCommand.version}: ${e instanceof Error ? e.message : 'Unknown error'}`,
+        )
+      }
+    } else {
+      this.logger.warn(
+        `Next command v${nextCommand.version} found but no token. Status: ${nextCommand.status}`,
+      )
+    }
 
     return null
   }

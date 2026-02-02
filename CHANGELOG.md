@@ -3,6 +3,39 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.0.20](https://github.com/mbc-net/mbc-cqrs-serverless/releases/tag/v1.0.20)
+
+### Bug Fixes
+
+- **import:** Fix Step Functions CSV handler always setting COMPLETED status regardless of child job failures
+  - Fixed `CsvImportSfnEventHandler.finalizeParentJob()` to correctly set status to FAILED when any child job fails
+  - Fixed `CsvImportSfnEventHandler` in `csv_loader` state to correctly set status to FAILED when early finalization occurs with failures
+  - Previously, the ternary operator was incorrectly returning COMPLETED for both true and false cases: `failedRows > 0 ? COMPLETED : COMPLETED`
+  - Now correctly returns FAILED when failedRows > 0: `failedRows > 0 ? FAILED : COMPLETED`
+  - This bug caused Step Functions to report SUCCESS even when child import jobs failed with errors like `ConditionalCheckFailedException`
+  - Added comprehensive unit tests for CsvImportSfnEventHandler (5 tests)
+
+## [1.0.18](https://github.com/mbc-net/mbc-cqrs-serverless/releases/tag/v1.0.18)
+
+### Bug Fixes
+
+- **import:** add SendTaskFailure support to ImportStatusHandler for proper Step Functions error handling ([#275](https://github.com/mbc-net/mbc-cqrs-serverless/pull/275))
+  - Previously, when an import job failed, the Step Function would wait indefinitely because only SendTaskSuccess was implemented
+  - Now the handler properly sends SendTaskFailure when a job fails, allowing Step Functions to handle errors correctly
+  - Added `sendTaskFailure()` method to send `SendTaskFailureCommand`
+  - Handler now processes both `COMPLETED` and `FAILED` statuses for CSV import jobs
+  - Added comprehensive unit tests for the ImportStatusHandler (16 tests)
+
+## [0.1.75-beta.0](https://github.com/mbc-net/mbc-cqrs-serverless/compare/v0.1.74-beta.0...v0.1.75-beta.0)
+
+### Bug Fixes
+
+- **import:** Add `SendTaskFailure` support to `ImportStatusHandler` for proper Step Functions error handling
+  - Previously, when an import job failed, the Step Function would wait indefinitely because only `SendTaskSuccess` was implemented
+  - Now the handler properly sends `SendTaskFailure` when a job fails, allowing Step Functions to handle errors correctly
+  - Added `sendTaskFailure()` method to send `SendTaskFailureCommand`
+  - Handler now processes both `COMPLETED` and `FAILED` statuses for CSV import jobs
+
 ## [0.1.74-beta.0](https://github.com/mbc-net/mbc-cqrs-serverless/compare/v0.1.73-beta.0...v0.1.74-beta.0) (2025-08-25)
 
 ### Features

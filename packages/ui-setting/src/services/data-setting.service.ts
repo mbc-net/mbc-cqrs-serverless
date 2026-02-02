@@ -46,7 +46,7 @@ export class DataSettingService {
     const query = { sk: undefined, limit: 100 }
     if (searchDto.settingCode) {
       query.sk = {
-        skExpession: 'begins_with(sk, :settingCode)',
+        skExpression: 'begins_with(sk, :settingCode)',
         skAttributeValues: {
           ':settingCode': `${searchDto.settingCode}${KEY_SEPARATOR}`,
         },
@@ -83,8 +83,8 @@ export class DataSettingService {
 
     const dataSetting = await this.dataService.getItem({ pk, sk })
 
-    if (dataSetting && dataSetting.isDeleted == false) {
-      throw new BadRequestException('Data setting is exist!')
+    if (dataSetting && dataSetting.isDeleted === false) {
+      throw new BadRequestException('Data setting already exists')
     }
 
     const settingSk = generateSettingSk(settingCode)
@@ -95,7 +95,7 @@ export class DataSettingService {
     })) as SettingDataEntity
 
     if (!setting || setting.isDeleted) {
-      throw new NotFoundException('Setting code is not exist!')
+      throw new NotFoundException('Setting code does not exist')
     }
 
     const createCmd: DataSettingCommandDto = {
@@ -129,7 +129,7 @@ export class DataSettingService {
     const data = (await this.dataService.getItem(key)) as DataSettingDataEntity
 
     if (!data) {
-      throw new NotFoundException()
+      throw new NotFoundException('Data setting not found')
     }
 
     if (updateDto.attributes) {
@@ -142,7 +142,7 @@ export class DataSettingService {
       })) as SettingDataEntity
 
       if (!setting || setting.isDeleted) {
-        throw new NotFoundException('Setting code is not exist!')
+        throw new NotFoundException('Setting code does not exist')
       }
     }
 
@@ -175,11 +175,11 @@ export class DataSettingService {
     const data = (await this.dataService.getItem(key)) as DataSettingDataEntity
 
     if (!data) {
-      throw new NotFoundException()
+      throw new NotFoundException('Data setting not found')
     }
 
     if (data.isDeleted) {
-      throw new BadRequestException('This setting is already delete!')
+      throw new BadRequestException('This data setting is already deleted')
     }
 
     const deleteCmd: DataSettingCommandDto = {

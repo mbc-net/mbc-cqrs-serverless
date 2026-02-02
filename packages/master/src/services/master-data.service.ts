@@ -33,6 +33,7 @@ import {
   MasterRdsListEntity,
   UpdateDataSettingDto,
 } from '../dto'
+import { MasterDataCreateBulkDto } from '../dto/master-copy/master-data-create-bulk.dto'
 import { MasterDataEntity, MasterDataListEntity } from '../entities'
 import { generateMasterDataSk, generateMasterPk } from '../helpers'
 import { getOrderBys } from '../helpers/rds'
@@ -96,19 +97,19 @@ export class MasterDataService implements IMasterDataService {
 
     if (searchDto.keyword?.trim()) {
       andConditions.push({
-        name: { contains: searchDto.keyword.trim(), mode: 'insensitive'  },
+        name: { contains: searchDto.keyword.trim(), mode: 'insensitive' },
       })
     }
 
     if (searchDto.code?.trim()) {
       andConditions.push({
-        masterCode: { contains: searchDto.code.trim(), mode: 'insensitive'  },
+        masterCode: { contains: searchDto.code.trim(), mode: 'insensitive' },
       })
     }
 
     if (searchDto.settingCode?.trim()) {
       andConditions.push({
-        masterTypeCode: { contains: searchDto.settingCode.trim(), mode: 'insensitive' },
+        masterTypeCode: searchDto.settingCode.trim(),
       })
     }
 
@@ -149,7 +150,7 @@ export class MasterDataService implements IMasterDataService {
     const query = { sk: undefined }
 
     query.sk = {
-      skExpession: 'begins_with(sk, :settingCode)',
+      skExpression: 'begins_with(sk, :settingCode)',
       skAttributeValues: {
         ':settingCode': `${settingCode}${KEY_SEPARATOR}`,
       },
@@ -175,7 +176,7 @@ export class MasterDataService implements IMasterDataService {
     const dataSetting = await this.dataService.getItem({ pk, sk })
 
     if (dataSetting && dataSetting.isDeleted == false) {
-      throw new BadRequestException('Data setting is exist!')
+      throw new BadRequestException('Master data already exists')
     }
 
     const createCmd = {
@@ -204,7 +205,7 @@ export class MasterDataService implements IMasterDataService {
     const data = (await this.dataService.getItem(key)) as MasterDataEntity
 
     if (!data) {
-      throw new NotFoundException()
+      throw new NotFoundException('Master data not found')
     }
 
     const updateCmd = {
@@ -235,11 +236,11 @@ export class MasterDataService implements IMasterDataService {
     const data = (await this.dataService.getItem(key)) as MasterDataEntity
 
     if (!data) {
-      throw new NotFoundException()
+      throw new NotFoundException('Master data not found')
     }
 
     if (data.isDeleted) {
-      throw new BadRequestException('This setting is already delete!')
+      throw new BadRequestException('This master data is already deleted')
     }
 
     const deleteCmd = {
@@ -275,7 +276,7 @@ export class MasterDataService implements IMasterDataService {
   async getDetail(key: DetailDto) {
     const data = await this.dataService.getItem(key)
 
-    if (!data) throw new NotFoundException()
+    if (!data) throw new NotFoundException('Master data not found')
 
     return new MasterRdsEntity(data)
   }
@@ -289,7 +290,7 @@ export class MasterDataService implements IMasterDataService {
           seq: true,
         },
         where: {
-          tenantCode: userContext.tenantCode,
+          tenantCode: createDto.tenantCode ?? userContext.tenantCode,
           masterType: DATA_SK_PREFIX,
           masterTypeCode: createDto.settingCode,
         },
@@ -301,13 +302,19 @@ export class MasterDataService implements IMasterDataService {
     return await this.create(
       {
         code: createDto.code ?? ulid(),
-        tenantCode: userContext.tenantCode,
+        tenantCode: createDto.tenantCode ?? userContext.tenantCode,
         name: createDto.name,
         settingCode: createDto.settingCode,
         attributes: createDto.attributes ?? {},
         seq,
       },
       { invokeContext },
+    )
+  }
+
+  async createBulk(createDto: MasterDataCreateBulkDto, invokeContext: IInvoke) {
+    return Promise.all(
+      createDto.items.map((item) => this.createSetting(item, invokeContext)),
     )
   }
 

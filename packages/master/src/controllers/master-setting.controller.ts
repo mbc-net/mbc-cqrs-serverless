@@ -10,6 +10,7 @@ import {
   Controller,
   Delete,
   Get,
+  Logger,
   Param,
   Patch,
   Post,
@@ -25,6 +26,7 @@ import {
   MasterSettingUpdateDto,
 } from '../dto'
 import { CommonSettingDto } from '../dto/master-setting/common-setting-create.dto'
+import { CommonSettingBulkDto } from '../dto/master-setting/common-setting-create-bulk.dto'
 import { GroupSettingDto } from '../dto/master-setting/group-setting-create.dto'
 import { GetSettingDto } from '../dto/master-setting/setting-get.dto'
 import { TenantSettingDto } from '../dto/master-setting/tenant-setting-create.dto'
@@ -36,6 +38,8 @@ import { MasterSettingService } from '../services/master-setting.service'
 @Controller('api/master-setting')
 @ApiTags('master-settings')
 export class MasterSettingController {
+  private readonly logger = new Logger(MasterSettingController.name)
+
   constructor(private readonly masterSettingService: MasterSettingService) {}
 
   @Get('/list')
@@ -122,6 +126,14 @@ export class MasterSettingController {
     @INVOKE_CONTEXT() invokeContext: IInvoke,
   ) {
     return this.masterSettingService.create(createDto, invokeContext)
+  }
+
+  @Post('/bulk')
+  async createBulk(
+    @Body() createDto: CommonSettingBulkDto,
+    @INVOKE_CONTEXT() invokeContext: IInvoke,
+  ) {
+    return this.masterSettingService.createBulk(createDto, invokeContext)
   }
 
   @Put('/:id')

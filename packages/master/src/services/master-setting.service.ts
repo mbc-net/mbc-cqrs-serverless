@@ -45,6 +45,7 @@ import {
   UpdateSettingDto,
   UserSettingDto,
 } from '../dto'
+import { CommonSettingBulkDto } from '../dto/master-setting/common-setting-create-bulk.dto'
 import { MasterSettingEntity } from '../entities'
 import { SettingTypeEnum } from '../enums'
 import { generateMasterPk, generateMasterSettingSk, parseId } from '../helpers'
@@ -354,7 +355,7 @@ export class MasterSettingService implements IMasterSettingService {
   async getDetail(key: DetailDto) {
     const data = await this.dataService.getItem(key)
 
-    if (!data) throw new NotFoundException()
+    if (!data) throw new NotFoundException('Master setting not found')
 
     return new MasterRdsEntity(data)
   }
@@ -364,9 +365,15 @@ export class MasterSettingService implements IMasterSettingService {
     return await this.createTenantSetting(
       {
         ...createDto,
-        tenantCode: userContext.tenantCode,
+        tenantCode: createDto.tenantCode ?? userContext.tenantCode,
       },
       { invokeContext },
+    )
+  }
+
+  async createBulk(createDto: CommonSettingBulkDto, invokeContext: IInvoke) {
+    return Promise.all(
+      createDto.items.map((item) => this.create(item, invokeContext)),
     )
   }
 
@@ -382,7 +389,7 @@ export class MasterSettingService implements IMasterSettingService {
       key,
       {
         code,
-        tenantCode: userContext.tenantCode,
+        tenantCode: updateDto.tenantCode ?? userContext.tenantCode,
         name: updateDto.name,
         settingValue: updateDto.attributes,
       },
@@ -426,7 +433,7 @@ export class MasterSettingService implements IMasterSettingService {
 
     if (searchDto.name?.trim()) {
       andConditions.push({
-        name: { contains: searchDto.name.trim(), mode: 'insensitive' }
+        name: { contains: searchDto.name.trim(), mode: 'insensitive' },
       })
     }
 

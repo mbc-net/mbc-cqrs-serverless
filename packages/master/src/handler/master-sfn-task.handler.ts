@@ -178,7 +178,7 @@ export class MasterSfnTaskEventHandler
 
           this.logger.debug('sfn-event-copyDataToTenant-tenantData', tenantData)
 
-          // des tenant data is exist and not deleted => update des data same as src data
+          // dest tenant data exists and not deleted => update dest data same as src data
           if (tenantData && tenantData.isDeleted === false) {
             this.logger.debug('sfn-event-copyDataToTenant-update', { pk, sk })
 
@@ -199,7 +199,7 @@ export class MasterSfnTaskEventHandler
           // src data is deleted => do nothing
           if (data.isDeleted === true) return
 
-          // src data is exist => create des data
+          // src data exists => create dest data
           return this.masterDataService.create(
             {
               code: data.masterCode,

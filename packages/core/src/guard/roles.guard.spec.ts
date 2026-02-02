@@ -1,3 +1,18 @@
+/**
+ * RolesGuard Test Suite
+ *
+ * Tests role-based access control (RBAC) guard functionality.
+ * The guard validates JWT tokens and checks user roles against required roles.
+ *
+ * Key behaviors tested:
+ * - Tenant code validation (required for all requests)
+ * - Role matching against @Roles() decorator requirements
+ * - JWT token parsing for role extraction
+ *
+ * Test tokens used:
+ * - systemAdminToken: Contains role "system_admin"
+ * - userToken: Contains role "user"
+ */
 import { createMock } from '@golevelup/ts-jest'
 import { ExecutionContext } from '@nestjs/common'
 import { RolesGuard } from './roles.guard'
@@ -42,6 +57,7 @@ describe('RolesGuard', () => {
     jest.clearAllMocks()
   })
 
+  /** Rejects request when x-tenant-code header is missing or empty */
   it('should return false if tenant code does not exist', async () => {
     // Arrange
     jest.spyOn(reflector, 'getAllAndOverride').mockReturnValue(['system_admin'])
@@ -53,6 +69,7 @@ describe('RolesGuard', () => {
     expect(reflector.getAllAndOverride).toHaveBeenCalledTimes(0)
   })
 
+  /** Grants access when user's role matches required role */
   it('should return true if the user has the system admin role', async () => {
     // Arrange
     jest.spyOn(reflector, 'getAllAndOverride').mockReturnValue(['system_admin'])
@@ -67,6 +84,7 @@ describe('RolesGuard', () => {
     ])
   })
 
+  /** Grants access when user has one of multiple allowed roles */
   it('should return true if the user has the user role', async () => {
     // Arrange
     jest
@@ -83,6 +101,7 @@ describe('RolesGuard', () => {
     ])
   })
 
+  /** Denies access when user's role is not in the required roles list */
   it('should return false if the user has only the user role', async () => {
     // Arrange
     jest.spyOn(reflector, 'getAllAndOverride').mockReturnValue(['system_admin'])
