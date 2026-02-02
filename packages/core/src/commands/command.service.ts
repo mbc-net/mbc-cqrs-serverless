@@ -172,40 +172,6 @@ export class CommandService implements OnModuleInit, ICommandService {
     return await this.publishAsync(fullInput, options)
   }
 
-  /**
-   * @deprecated Use {@link publishPartialUpdateAsync} instead.
-   * This function is outdated and will be removed in the next major release.
-   */
-  async publishPartialUpdate(
-    input: CommandPartialInputModel,
-    options: ICommandOptions,
-  ) {
-    let item: CommandModel
-    if (input.version > VERSION_FIRST) {
-      item = await this.getItem({
-        pk: input.pk,
-        sk: addSortKeyVersion(input.sk, input.version),
-      })
-    } else {
-      item = await this.getLatestItem({
-        pk: input.pk,
-        sk: removeSortKeyVersion(input.sk),
-      })
-    }
-    if (!item) {
-      throw new BadRequestException(
-        'Invalid input key: item not found',
-      )
-    }
-    if (!Object.keys(input).includes('ttl')) {
-      delete item.ttl
-    }
-    const fullInput = mergeDeep({}, item, input, { version: item.version })
-
-    this.logger.debug('publishPartialUpdate::', fullInput)
-    return await this.publish(fullInput, options)
-  }
-
   async publishSync(
     input: CommandInputModel,
     options: ICommandOptions,
@@ -318,14 +284,6 @@ export class CommandService implements OnModuleInit, ICommandService {
       'attribute_not_exists(pk) AND attribute_not_exists(sk)',
     )
     return command
-  }
-
-  /**
-   * @deprecated Use {@link publishAsync} instead.
-   * This function is outdated and will be removed in the next major release.
-   */
-  async publish(input: CommandInputModel, options: ICommandOptions) {
-    return await this.publishAsync(input, options)
   }
 
   async duplicate(key: DetailKey, options: ICommandOptions) {

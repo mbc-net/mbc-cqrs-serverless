@@ -109,7 +109,7 @@ export class DataSettingService {
       ...createDto,
     }
 
-    const item = await this.commandService.publish(createCmd, {
+    const item = await this.commandService.publishAsync(createCmd, {
       source: getCommandSource(
         basename(__dirname),
         this.constructor.name,
@@ -159,7 +159,7 @@ export class DataSettingService {
       attributes: updateDto.attributes ?? data.attributes,
     }
 
-    const item = await this.commandService.publish(updateCmd, {
+    const item = await this.commandService.publishAsync(updateCmd, {
       source: getCommandSource(
         basename(__dirname),
         this.constructor.name,
@@ -187,7 +187,7 @@ export class DataSettingService {
       isDeleted: true,
     }
 
-    const item = await this.commandService.publish(deleteCmd, {
+    const item = await this.commandService.publishAsync(deleteCmd, {
       source: getCommandSource(
         basename(__dirname),
         this.constructor.name,
