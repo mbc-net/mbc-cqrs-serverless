@@ -1,5 +1,5 @@
-import { Command } from 'commander'
 import { execSync } from 'child_process'
+import { Command } from 'commander'
 import {
   cpSync,
   existsSync,
@@ -48,24 +48,9 @@ export function getSkillsSourcePath(): string {
   // Try to find the mcp-server package
   const possiblePaths = [
     // When installed globally or locally via npm
-    path.join(
-      __dirname,
-      '..',
-      '..',
-      '..',
-      'mcp-server',
-      'skills',
-    ),
+    path.join(__dirname, '..', '..', '..', 'mcp-server', 'skills'),
     // When running from monorepo
-    path.join(
-      __dirname,
-      '..',
-      '..',
-      '..',
-      '..',
-      'mcp-server',
-      'skills',
-    ),
+    path.join(__dirname, '..', '..', '..', '..', 'mcp-server', 'skills'),
     // When installed via npm in node_modules
     path.join(
       process.cwd(),
@@ -141,7 +126,9 @@ export function copySkills(sourcePath: string, destPath: string): string[] {
  */
 function listSkills(sourcePath: string): string[] {
   const entries = readdirSync(sourcePath, { withFileTypes: true })
-  return entries.filter((entry) => entry.isDirectory()).map((entry) => entry.name)
+  return entries
+    .filter((entry) => entry.isDirectory())
+    .map((entry) => entry.name)
 }
 
 /**

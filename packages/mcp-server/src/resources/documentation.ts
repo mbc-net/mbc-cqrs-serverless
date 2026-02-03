@@ -1,6 +1,6 @@
+import { Resource } from '@modelcontextprotocol/sdk/types.js'
 import * as fs from 'fs'
 import * as path from 'path'
-import { Resource } from '@modelcontextprotocol/sdk/types.js'
 
 /**
  * Documentation resources for MBC CQRS Serverless framework.
@@ -11,19 +11,22 @@ export function getDocumentationResources(): Resource[] {
     {
       uri: 'mbc://docs/overview',
       name: 'Framework Overview',
-      description: 'Complete documentation of MBC CQRS Serverless framework including architecture, APIs, and usage examples',
+      description:
+        'Complete documentation of MBC CQRS Serverless framework including architecture, APIs, and usage examples',
       mimeType: 'text/plain',
     },
     {
       uri: 'mbc://docs/llms-short',
       name: 'Framework Summary',
-      description: 'Concise summary of MBC CQRS Serverless framework for quick reference',
+      description:
+        'Concise summary of MBC CQRS Serverless framework for quick reference',
       mimeType: 'text/plain',
     },
     {
       uri: 'mbc://docs/architecture',
       name: 'Architecture Guide',
-      description: 'CQRS and Event Sourcing architecture patterns used in the framework',
+      description:
+        'CQRS and Event Sourcing architecture patterns used in the framework',
       mimeType: 'text/markdown',
     },
     {
@@ -47,7 +50,9 @@ export function getDocumentationResources(): Resource[] {
   ]
 }
 
-export async function readDocumentation(uri: string): Promise<{ contents: { uri: string; mimeType: string; text: string }[] }> {
+export async function readDocumentation(
+  uri: string,
+): Promise<{ contents: { uri: string; mimeType: string; text: string }[] }> {
   const frameworkRoot = path.resolve(__dirname, '../../../../..')
 
   let content: string
@@ -61,15 +66,21 @@ export async function readDocumentation(uri: string): Promise<{ contents: { uri:
       content = await readFileContent(path.join(frameworkRoot, 'llms.txt'))
       break
     case 'mbc://docs/architecture':
-      content = await readFileContent(path.join(frameworkRoot, 'docs', 'ARCHITECTURE.md'))
+      content = await readFileContent(
+        path.join(frameworkRoot, 'docs', 'ARCHITECTURE.md'),
+      )
       mimeType = 'text/markdown'
       break
     case 'mbc://docs/faq':
-      content = await readFileContent(path.join(frameworkRoot, 'docs', 'FAQ.md'))
+      content = await readFileContent(
+        path.join(frameworkRoot, 'docs', 'FAQ.md'),
+      )
       mimeType = 'text/markdown'
       break
     case 'mbc://docs/troubleshooting':
-      content = await readFileContent(path.join(frameworkRoot, 'docs', 'TROUBLESHOOTING.md'))
+      content = await readFileContent(
+        path.join(frameworkRoot, 'docs', 'TROUBLESHOOTING.md'),
+      )
       mimeType = 'text/markdown'
       break
     case 'mbc://docs/security':

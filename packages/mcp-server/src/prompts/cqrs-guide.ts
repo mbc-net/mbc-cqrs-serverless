@@ -8,11 +8,13 @@ export function getCqrsPrompts(): Prompt[] {
   return [
     {
       name: 'cqrs_implementation_guide',
-      description: 'Get guidance on implementing CQRS patterns with MBC CQRS Serverless framework',
+      description:
+        'Get guidance on implementing CQRS patterns with MBC CQRS Serverless framework',
       arguments: [
         {
           name: 'feature_type',
-          description: 'Type of feature to implement (module, entity, command, query, event)',
+          description:
+            'Type of feature to implement (module, entity, command, query, event)',
           required: true,
         },
         {
@@ -59,7 +61,7 @@ export function getCqrsPrompts(): Prompt[] {
 
 export function getCqrsPromptMessages(
   name: string,
-  args: Record<string, string>
+  args: Record<string, string>,
 ): { messages: PromptMessage[] } {
   const safeArgs = args || {}
 
@@ -67,17 +69,17 @@ export function getCqrsPromptMessages(
     case 'cqrs_implementation_guide':
       return getImplementationGuideMessages(
         safeArgs.feature_type || 'module',
-        safeArgs.feature_name || 'Example'
+        safeArgs.feature_name || 'Example',
       )
     case 'debug_command_error':
       return getDebugCommandMessages(
         safeArgs.error_message || 'Unknown error',
-        safeArgs.operation
+        safeArgs.operation,
       )
     case 'migration_guide':
       return getMigrationGuideMessages(
         safeArgs.from_version || '0.1.0',
-        safeArgs.to_version || 'latest'
+        safeArgs.to_version || 'latest',
       )
     default:
       return {
@@ -93,7 +95,7 @@ export function getCqrsPromptMessages(
 
 function getImplementationGuideMessages(
   featureType: string,
-  featureName: string
+  featureName: string,
 ): { messages: PromptMessage[] } {
   const guides: Record<string, string> = {
     module: `# Implementing a ${featureName} Module
@@ -313,7 +315,9 @@ export class ${featureName}DataSyncHandler implements IDataSyncHandler {
 \`\`\``,
   }
 
-  const guide = guides[featureType] || `Unknown feature type: ${featureType}. Valid types are: module, entity, command, query, event`
+  const guide =
+    guides[featureType] ||
+    `Unknown feature type: ${featureType}. Valid types are: module, entity, command, query, event`
 
   return {
     messages: [
@@ -337,7 +341,7 @@ export class ${featureName}DataSyncHandler implements IDataSyncHandler {
 
 function getDebugCommandMessages(
   errorMessage: string,
-  operation?: string
+  operation?: string,
 ): { messages: PromptMessage[] } {
   const operationContext = operation ? ` during ${operation} operation` : ''
 
@@ -429,7 +433,7 @@ Use the \`mbc_lookup_error\` tool for specific error solutions.`,
 
 function getMigrationGuideMessages(
   fromVersion: string,
-  toVersion: string
+  toVersion: string,
 ): { messages: PromptMessage[] } {
   return {
     messages: [

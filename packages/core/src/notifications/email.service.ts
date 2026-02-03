@@ -147,7 +147,7 @@ export class EmailService {
           return text.replace(/\{\{([^}]{1,255})\}\}/g, (_, expression) => {
             const key = expression.trim() // Remove spaces (e.g. {{ code }} -> code)
             const value = getDeepValue(data || {}, key)
-            
+
             // If value exists, return it. Otherwise keep original tag.
             return value !== undefined ? value : `{{${expression}}}`
           })
