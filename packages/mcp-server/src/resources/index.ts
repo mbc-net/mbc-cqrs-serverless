@@ -1,5 +1,9 @@
 import { Resource } from '@modelcontextprotocol/sdk/types.js'
-import { getDocumentationResources, readDocumentation } from './documentation.js'
+
+import {
+  getDocumentationResources,
+  readDocumentation,
+} from './documentation.js'
 import { getErrorResources, readErrorCatalog } from './errors.js'
 import { getProjectResources, readProjectResource } from './project.js'
 
@@ -19,7 +23,7 @@ export function registerResources(): Resource[] {
  */
 export async function handleResourceRead(
   uri: string,
-  projectPath: string
+  projectPath: string,
 ): Promise<{ contents: { uri: string; mimeType: string; text: string }[] }> {
   if (uri.startsWith('mbc://docs/errors')) {
     return readErrorCatalog(uri)

@@ -12,9 +12,9 @@ import {
 import { Injectable, Logger } from '@nestjs/common'
 
 import { CSV_IMPORT_PK_PREFIX } from '../constant'
+import { ImportStatusEnum } from '../enum'
 import { ImportService } from '../import.service'
 import { ImportStatusQueueEvent } from './import-status.queue.event'
-import { ImportStatusEnum } from '../enum'
 
 @Injectable()
 @EventHandler(ImportStatusQueueEvent)

@@ -1,6 +1,6 @@
 import {
-  SFNClient,
   SendTaskSuccessCommand,
+  SFNClient,
   StartExecutionCommand,
 } from '@aws-sdk/client-sfn'
 import { Injectable, Logger } from '@nestjs/common'

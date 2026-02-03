@@ -4,7 +4,8 @@ export const HEADER_TENANT_CODE = 'x-tenant-code'
  * @deprecated Use DEFAULT_COMMON_TENANT_CODES instead. Will be removed in v1.2.0.
  * Common tenant code for shared resources.
  */
-export const TENANT_COMMON = process.env.COMMON_TENANT_CODES?.split(',')[0]?.trim() || 'common'
+export const TENANT_COMMON =
+  process.env.COMMON_TENANT_CODES?.split(',')[0]?.trim() || 'common'
 
 export const DEFAULT_TENANT_CODE = 'single'
 
