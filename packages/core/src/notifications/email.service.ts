@@ -32,6 +32,11 @@ export class EmailService {
         BccAddresses: msg.bccAddrs,
       }
 
+      const emailTags = msg.emailTags?.map((tag) => ({
+        Name: tag.name,
+        Value: tag.value,
+      }))
+
       if (!msg.attachments || msg.attachments.length === 0) {
         this.logger.log(`Sending simple email to ${msg.toAddrs.join(', ')}`)
 
@@ -45,6 +50,7 @@ export class EmailService {
             },
           },
           ReplyToAddresses: msg.replyToAddrs,
+          EmailTags: emailTags,
         })
 
         const result = await this[CLIENT_INSTANCE].send(command)
@@ -84,6 +90,7 @@ export class EmailService {
         Content: {
           Raw: { Data: emailBuffer },
         },
+        EmailTags: emailTags,
       })
 
       const result = await this[CLIENT_INSTANCE].send(command)
@@ -142,14 +149,15 @@ export class EmailService {
           if (!text) return ''
 
           // Regex Explanation: /\{\{([^}]{1,255})\}\}/g
-          // Matches {{...}} containing 1-255 characters except '}' (supports Unicode/Japanese)
-          // The 255 char limit prevents ReDoS (Regular Expression Denial of Service) attacks
+          // 1. [^}]: Matches any character that is NOT a closing curly brace.
+          // 2. {1,255}: Limits length to prevent ReDoS.
           return text.replace(/\{\{([^}]{1,255})\}\}/g, (_, expression) => {
             const key = expression.trim() // Remove spaces (e.g. {{ code }} -> code)
             const value = getDeepValue(data || {}, key)
 
-            // If value exists, return it. Otherwise keep original tag.
-            return value !== undefined ? value : `{{${expression}}}`
+            // AWS SES behavior: If the value is missing, the tag remains in the output
+            // or is handled by the template engine. We'll keep the original tag here.
+            return value !== undefined ? String(value) : `{{${expression}}}`
           })
         }
 
@@ -180,6 +188,11 @@ export class EmailService {
         }
       }
 
+      const emailTags = msg.emailTags?.map((tag) => ({
+        Name: tag.name,
+        Value: tag.value,
+      }))
+
       const command = new SendEmailCommand({
         FromEmailAddress: fromAddress,
         Destination: {
@@ -190,6 +203,7 @@ export class EmailService {
         ReplyToAddresses: msg.replyToAddrs,
         ConfigurationSetName: msg.configurationSetName,
         Content: contentPayload,
+        EmailTags: emailTags,
       })
 
       const result = await this[CLIENT_INSTANCE].send(command)
