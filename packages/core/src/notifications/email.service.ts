@@ -161,11 +161,6 @@ export class EmailService {
           })
         }
 
-        const emailTags = msg.emailTags?.map((tag) => ({
-          Name: tag.name,
-          Value: tag.value,
-        }))
-
         contentPayload = {
           Simple: {
             Subject: { Data: replaceVariables(msg.template.subject, msg.data) },
@@ -176,7 +171,6 @@ export class EmailService {
                 : undefined,
             },
           },
-          EmailTags: emailTags,
         }
       } else {
         // --- PRODUCTION AWS LOGIC ---
