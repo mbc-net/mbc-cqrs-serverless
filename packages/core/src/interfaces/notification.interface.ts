@@ -20,6 +20,16 @@ export interface INotification {
 }
 
 /**
+ * Email tag for SES notifications.
+ */
+export interface EmailTag {
+  /** Tag name (e.g., 'department', 'campaign') */
+  name: string
+  /** Tag value (e.g., 'finance', 'welcome-series') */
+  value: string
+}
+
+/**
  * Email attachment for SES notifications.
  */
 export interface Attachment {
@@ -52,6 +62,8 @@ export interface EmailNotification {
   replyToAddrs?: string[]
   /** Optional file attachments */
   attachments?: Attachment[]
+  /** AWS SES Tags for categorization/filtering */
+  emailTags?: EmailTag[]
 }
 
 /**
@@ -87,4 +99,6 @@ export interface TemplatedEmailNotification {
   data: Record<string, any>
   /** Optional configuration set name to handle open/click tracking events */
   configurationSetName?: string
+  /** AWS SES Tags for categorization/filtering */
+  emailTags?: EmailTag[]
 }

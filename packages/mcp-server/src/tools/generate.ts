@@ -1,13 +1,19 @@
 import { Tool } from '@modelcontextprotocol/sdk/types.js'
 import { z } from 'zod'
+
 import { CliGenerator, GeneratorResult } from './generator.js'
 
 /**
  * Schema definitions for generate tools.
  */
 const GenerateModuleSchema = z.object({
-  name: z.string().describe('Name of the module to generate (e.g., "order", "product")'),
-  mode: z.enum(['async', 'sync']).optional().describe('Command processing mode: async (default) or sync'),
+  name: z
+    .string()
+    .describe('Name of the module to generate (e.g., "order", "product")'),
+  mode: z
+    .enum(['async', 'sync'])
+    .optional()
+    .describe('Command processing mode: async (default) or sync'),
 })
 
 const GenerateComponentSchema = z.object({
@@ -21,13 +27,15 @@ export function getGenerateTools(): Tool[] {
   return [
     {
       name: 'mbc_generate_module',
-      description: 'Generate a new CQRS module with controller, service, entity, and DTOs. This creates a complete module structure following MBC CQRS patterns.',
+      description:
+        'Generate a new CQRS module with controller, service, entity, and DTOs. This creates a complete module structure following MBC CQRS patterns.',
       inputSchema: {
         type: 'object',
         properties: {
           name: {
             type: 'string',
-            description: 'Name of the module to generate (e.g., "order", "product")',
+            description:
+              'Name of the module to generate (e.g., "order", "product")',
           },
           mode: {
             type: 'string',
@@ -82,7 +90,8 @@ export function getGenerateTools(): Tool[] {
     },
     {
       name: 'mbc_generate_dto',
-      description: 'Generate a new DTO (Data Transfer Object) for request/response handling.',
+      description:
+        'Generate a new DTO (Data Transfer Object) for request/response handling.',
       inputSchema: {
         type: 'object',
         properties: {
@@ -103,7 +112,7 @@ export function getGenerateTools(): Tool[] {
 export async function handleGenerateTool(
   name: string,
   args: Record<string, unknown>,
-  projectPath: string
+  projectPath: string,
 ): Promise<{ content: { type: 'text'; text: string }[]; isError?: boolean }> {
   const generator = new CliGenerator(projectPath)
   let result: GeneratorResult
@@ -111,7 +120,9 @@ export async function handleGenerateTool(
   switch (name) {
     case 'mbc_generate_module': {
       const parsed = GenerateModuleSchema.parse(args)
-      result = await generator.generateModule(parsed.name, { mode: parsed.mode })
+      result = await generator.generateModule(parsed.name, {
+        mode: parsed.mode,
+      })
       break
     }
     case 'mbc_generate_controller': {
@@ -144,14 +155,20 @@ export async function handleGenerateTool(
   if (result.success) {
     let message = result.message
     if (result.files && result.files.length > 0) {
-      message += '\n\nCreated files:\n' + result.files.map(f => `- ${f}`).join('\n')
+      message +=
+        '\n\nCreated files:\n' + result.files.map((f) => `- ${f}`).join('\n')
     }
     return {
       content: [{ type: 'text', text: message }],
     }
   } else {
     return {
-      content: [{ type: 'text', text: `Error: ${result.message}\n${result.error || ''}` }],
+      content: [
+        {
+          type: 'text',
+          text: `Error: ${result.message}\n${result.error || ''}`,
+        },
+      ],
       isError: true,
     }
   }

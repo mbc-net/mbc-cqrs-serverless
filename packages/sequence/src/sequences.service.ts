@@ -15,7 +15,6 @@ import { Injectable, Logger } from '@nestjs/common'
 import {
   GenerateFormattedSequenceDto,
   GenerateFormattedSequenceWithProvidedSettingDto,
-  GenerateSequenceDto,
   SequenceParamsDto,
 } from './dto'
 import { SequenceEntity } from './entities/sequence.entity'
@@ -37,61 +36,8 @@ export class SequencesService implements ISequenceService {
     this.logger.debug('tableName: ' + this.tableName)
   }
 
-  /**
-   * @deprecated This method is deprecated at V0.2.
-   */
   async getCurrentSequence(key: DetailKey): Promise<DataEntity> {
     return await this.dynamoDbService.getItem(this.tableName, key)
-  }
-
-  /**
-   * @deprecated This method is deprecated at V0.2.
-   * Seq data structure
-   * - pk: SEQ#tenantCode
-   * - sk: typeCode#rotateValue ( e.g.: `user#20230401` )
-   * - code: typeCode#rotateValue
-   * - name: rotateBy ( e.g.: `daily` )
-   * - tenant_code: tenantCode
-   * - type: typeCode
-   * - seq: sequence value ( atomic counter )
-   */
-  async genNewSequence(
-    dto: GenerateSequenceDto,
-    options: {
-      invokeContext: IInvoke
-    },
-  ): Promise<DataEntity> {
-    const rotateVal = this.getRotateValue(dto.rotateBy, dto.date)
-    const pk = `SEQ${KEY_SEPARATOR}${dto.tenantCode}`
-    const sk = `${dto.typeCode}${KEY_SEPARATOR}${rotateVal}`
-
-    const sourceIp =
-      options?.invokeContext?.event?.requestContext?.http?.sourceIp || 'unknown'
-    const userContext = getUserContext(options.invokeContext)
-    const userId = userContext.userId || 'system'
-    const now = new Date()
-    const item = await this.dynamoDbService.updateItem(
-      this.tableName,
-      { pk, sk },
-      {
-        set: {
-          code: sk,
-          name: dto.rotateBy || 'none',
-          tenantCode: dto.tenantCode,
-          type: dto.typeCode,
-          seq: { ifNotExists: 0, incrementBy: 1 },
-          requestId: options.invokeContext?.context?.awsRequestId,
-          createdAt: { ifNotExists: now },
-          createdBy: { ifNotExists: userId },
-          createdIp: { ifNotExists: sourceIp },
-          updatedAt: now,
-          updatedBy: userId,
-          updatedIp: sourceIp,
-        },
-      },
-    )
-
-    return item
   }
 
   /**

@@ -1,17 +1,14 @@
 import { Tool } from '@modelcontextprotocol/sdk/types.js'
+
+import { getAnalyzeTools, handleAnalyzeTool } from './analyze.js'
 import { getGenerateTools, handleGenerateTool } from './generate.js'
 import { getValidateTools, handleValidateTool } from './validate.js'
-import { getAnalyzeTools, handleAnalyzeTool } from './analyze.js'
 
 /**
  * Register all available tools.
  */
 export function registerTools(): Tool[] {
-  return [
-    ...getGenerateTools(),
-    ...getValidateTools(),
-    ...getAnalyzeTools(),
-  ]
+  return [...getGenerateTools(), ...getValidateTools(), ...getAnalyzeTools()]
 }
 
 /**
@@ -20,7 +17,7 @@ export function registerTools(): Tool[] {
 export async function handleToolCall(
   name: string,
   args: Record<string, unknown>,
-  projectPath: string
+  projectPath: string,
 ): Promise<{ content: { type: 'text'; text: string }[]; isError?: boolean }> {
   // Generate tools
   if (name.startsWith('mbc_generate_')) {

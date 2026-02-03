@@ -1,9 +1,25 @@
 import { createMock } from '@golevelup/ts-jest'
+import { BadRequestException } from '@nestjs/common'
 import { Test, TestingModule } from '@nestjs/testing'
-import { DetailDto, IInvoke } from '@mbc-cqrs-serverless/core'
+import { DetailDto, IInvoke, getUserContext } from '@mbc-cqrs-serverless/core'
 
 import { DataSettingController } from './data-setting.controller'
 import { DataSettingService } from '../services/data-setting.service'
+import { DataSettingSearchDto } from '../dto/data-setting-search.dto'
+import { DataSettingDataListEntity } from '../entities/data-setting-data-list.entity'
+
+// Mock getUserContext
+jest.mock('@mbc-cqrs-serverless/core', () => {
+  const original = jest.requireActual('@mbc-cqrs-serverless/core')
+  return {
+    ...original,
+    getUserContext: jest.fn(),
+  }
+})
+
+const mockGetUserContext = getUserContext as jest.MockedFunction<
+  typeof getUserContext
+>
 
 describe('DataSettingController', () => {
   let controller: DataSettingController
@@ -26,6 +42,12 @@ describe('DataSettingController', () => {
   } as IInvoke
 
   beforeEach(async () => {
+    // Default mock for getUserContext
+    mockGetUserContext.mockReturnValue({
+      tenantCode: 'test-tenant',
+      userId: 'test-user',
+    } as any)
+
     const module: TestingModule = await Test.createTestingModule({
       controllers: [DataSettingController],
       providers: [DataSettingService],
@@ -37,8 +59,66 @@ describe('DataSettingController', () => {
     service = module.get<DataSettingService>(DataSettingService)
   })
 
+  afterEach(() => {
+    jest.clearAllMocks()
+  })
+
   it('should be defined', () => {
     expect(controller).toBeDefined()
+  })
+
+  describe('listData', () => {
+    it('should list data settings successfully', async () => {
+      const searchDto: DataSettingSearchDto = {}
+      const expectedResult = {
+        items: [
+          {
+            pk: 'MASTER#test-tenant',
+            sk: 'SETTING1#DATA1',
+            code: 'DATA1',
+            name: 'Test Data 1',
+          },
+        ],
+      } as DataSettingDataListEntity
+
+      jest.spyOn(service, 'list').mockResolvedValue(expectedResult)
+
+      const result = await controller.listData(mockInvokeContext, searchDto)
+
+      expect(service.list).toHaveBeenCalledWith('test-tenant', searchDto)
+      expect(result).toEqual(expectedResult)
+    })
+
+    it('should filter by setting code', async () => {
+      const searchDto: DataSettingSearchDto = { settingCode: 'SETTING1' }
+      const expectedResult = {
+        items: [
+          {
+            pk: 'MASTER#test-tenant',
+            sk: 'SETTING1#DATA1',
+            code: 'DATA1',
+          },
+        ],
+      } as DataSettingDataListEntity
+
+      jest.spyOn(service, 'list').mockResolvedValue(expectedResult)
+
+      const result = await controller.listData(mockInvokeContext, searchDto)
+
+      expect(service.list).toHaveBeenCalledWith('test-tenant', searchDto)
+      expect(result).toEqual(expectedResult)
+    })
+
+    it('should handle service errors', async () => {
+      const searchDto: DataSettingSearchDto = {}
+      const error = new Error('List failed')
+
+      jest.spyOn(service, 'list').mockRejectedValue(error)
+
+      await expect(
+        controller.listData(mockInvokeContext, searchDto),
+      ).rejects.toThrow('List failed')
+    })
   })
 
   describe('getDetail', () => {
@@ -68,6 +148,19 @@ describe('DataSettingController', () => {
       jest.spyOn(service, 'get').mockRejectedValue(error)
 
       await expect(controller.getDetail(mockInvokeContext, dto)).rejects.toThrow('Data setting not found')
+    })
+
+    it('should throw BadRequestException for mismatched tenant', async () => {
+      mockGetUserContext.mockReturnValue({
+        tenantCode: 'other-tenant',
+        userId: 'test-user',
+      } as any)
+
+      const dto: DetailDto = { pk: 'MASTER#test-tenant', sk: 'test-sk' }
+
+      await expect(
+        controller.getDetail(mockInvokeContext, dto),
+      ).rejects.toThrow(BadRequestException)
     })
   })
 
@@ -151,6 +244,20 @@ describe('DataSettingController', () => {
         controller.updateDataSetting(mockInvokeContext, key, updateDto as any),
       ).rejects.toThrow('Update failed')
     })
+
+    it('should throw BadRequestException for mismatched tenant', async () => {
+      mockGetUserContext.mockReturnValue({
+        tenantCode: 'other-tenant',
+        userId: 'test-user',
+      } as any)
+
+      const key: DetailDto = { pk: 'MASTER#test-tenant', sk: 'test-sk' }
+      const updateDto = { name: 'Updated Data Setting' }
+
+      await expect(
+        controller.updateDataSetting(mockInvokeContext, key, updateDto as any),
+      ).rejects.toThrow(BadRequestException)
+    })
   })
 
   describe('deleteDataSetting', () => {
@@ -182,6 +289,93 @@ describe('DataSettingController', () => {
       await expect(
         controller.deleteDataSetting(mockInvokeContext, key),
       ).rejects.toThrow('Deletion failed')
+    })
+
+    it('should throw BadRequestException for mismatched tenant', async () => {
+      mockGetUserContext.mockReturnValue({
+        tenantCode: 'other-tenant',
+        userId: 'test-user',
+      } as any)
+
+      const key: DetailDto = { pk: 'MASTER#test-tenant', sk: 'test-sk' }
+
+      await expect(
+        controller.deleteDataSetting(mockInvokeContext, key),
+      ).rejects.toThrow(BadRequestException)
+    })
+  })
+
+  describe('checkExistCode', () => {
+    it('should return true when code exists', async () => {
+      const settingCode = 'SETTING1'
+      const code = 'DATA1'
+
+      jest.spyOn(service, 'checkExistCode').mockResolvedValue(true)
+
+      const result = await controller.checkExistCode(
+        mockInvokeContext,
+        settingCode,
+        code,
+      )
+
+      expect(service.checkExistCode).toHaveBeenCalledWith(
+        'test-tenant',
+        settingCode,
+        code,
+      )
+      expect(result).toBe(true)
+    })
+
+    it('should return false when code does not exist', async () => {
+      const settingCode = 'SETTING1'
+      const code = 'NONEXISTENT'
+
+      jest.spyOn(service, 'checkExistCode').mockResolvedValue(false)
+
+      const result = await controller.checkExistCode(
+        mockInvokeContext,
+        settingCode,
+        code,
+      )
+
+      expect(service.checkExistCode).toHaveBeenCalledWith(
+        'test-tenant',
+        settingCode,
+        code,
+      )
+      expect(result).toBe(false)
+    })
+
+    it('should use tenant from user context', async () => {
+      mockGetUserContext.mockReturnValue({
+        tenantCode: 'custom-tenant',
+        userId: 'test-user',
+      } as any)
+
+      const settingCode = 'SETTING1'
+      const code = 'DATA1'
+
+      jest.spyOn(service, 'checkExistCode').mockResolvedValue(true)
+
+      await controller.checkExistCode(mockInvokeContext, settingCode, code)
+
+      expect(service.checkExistCode).toHaveBeenCalledWith(
+        'custom-tenant',
+        settingCode,
+        code,
+      )
+    })
+
+    it('should handle service errors', async () => {
+      const settingCode = 'SETTING1'
+      const code = 'DATA1'
+      const error = new Error('Check failed')
+
+      jest.spyOn(service, 'checkExistCode').mockRejectedValue(error)
+
+      await expect(
+        controller.checkExistCode(mockInvokeContext, settingCode, code),
+      ).rejects.toThrow('Check failed')
     })
   })
 })

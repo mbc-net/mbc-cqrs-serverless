@@ -233,7 +233,7 @@ describe('MasterDataService', () => {
       await service.list(searchDto)
 
       expect(dataService.listItemsByPk).toHaveBeenCalledWith(
-        'MASTER#COMMON',
+        'MASTER#common',
         expect.any(Object)
       )
     })

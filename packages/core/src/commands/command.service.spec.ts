@@ -160,6 +160,81 @@ describe('CommandService', () => {
   })
 
   /**
+   * Tests for publishAsync method
+   * Scenario: Async publish that creates or updates a command record
+   * Use case: Primary method for publishing commands asynchronously
+   */
+  describe('publishAsync', () => {
+    /** Successfully creates a new item with version 1 */
+    it('should create new item with version 1', async () => {
+      const key = {
+        pk: 'master',
+        sk: 'new_item',
+      }
+      const inputItem = buildItem(key, 0)
+      const item = await commandService.publishAsync(inputItem, {
+        invokeContext: {},
+      })
+      expect(item).toBeDefined()
+      expect(item?.version).toBe(1)
+      expect(item?.sk).toBe('new_item@1')
+    })
+
+    /** Successfully updates with version=-1 (auto-fetch latest) */
+    it('should update with the latest version when version is -1', async () => {
+      const key = {
+        pk: 'master',
+        sk: 'max_value',
+      }
+      const inputItem = {
+        ...buildItem(key, -1),
+        name: 'updated',
+      }
+      const latestItem = await commandService.getLatestItem(key)
+      const item = await commandService.publishAsync(inputItem, {
+        invokeContext: {},
+      })
+      expect(item).toBeDefined()
+      expect(item?.version).toBe(latestItem.version + 1)
+    })
+
+    /** Throws error when specified version doesn't match existing item */
+    it('should raise error with invalid version', async () => {
+      const key = {
+        pk: 'master',
+        sk: 'max_value',
+      }
+      const inputItem = buildItem(key, 99) // non-existent version
+      const call = commandService.publishAsync(inputItem, {
+        invokeContext: {},
+      })
+      expect(call).rejects.toThrow(
+        new BadRequestException(
+          'Invalid input version. The input version must be equal to the latest version',
+        ),
+      )
+    })
+
+    /** Returns null when command data is not dirty (no changes) */
+    it('should return null when command is not dirty', async () => {
+      const key = {
+        pk: 'master',
+        sk: 'max_value',
+      }
+      const latestItem = await commandService.getLatestItem(key)
+      // Use same data as latest item
+      const inputItem = {
+        ...latestItem,
+        version: -1,
+      }
+      const item = await commandService.publishAsync(inputItem, {
+        invokeContext: {},
+      })
+      expect(item).toBeNull()
+    })
+  })
+
+  /**
    * Tests for publishPartialUpdateAsync method
    * Scenario: Async partial update that auto-fetches latest version (version=-1)
    * Use case: Client wants to update without knowing current version
