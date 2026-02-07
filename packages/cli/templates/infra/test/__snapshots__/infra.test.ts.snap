@@ -48,7 +48,9 @@ exports[`snapshot test for InfraStack 1`] = `
       },
     },
     "UserPoolId": {
-      "Value": "ap-northeast-1_NfyqKTjPS",
+      "Value": {
+        "Ref": "devuserpool23B1805F",
+      },
     },
     "httpdistributiondomain": {
       "Value": {
@@ -88,7 +90,7 @@ exports[`snapshot test for InfraStack 1`] = `
             "Arn",
           ],
         },
-        "Runtime": "nodejs20.x",
+        "Runtime": "nodejs22.x",
         "Tags": [
           {
             "Key": "env",
@@ -96,7 +98,7 @@ exports[`snapshot test for InfraStack 1`] = `
           },
           {
             "Key": "name",
-            "Value": "task-sfn-interation-map",
+            "Value": "",
           },
         ],
         "Timeout": 120,
@@ -138,7 +140,7 @@ exports[`snapshot test for InfraStack 1`] = `
           },
           {
             "Key": "name",
-            "Value": "task-sfn-interation-map",
+            "Value": "",
           },
         ],
       },
@@ -146,8 +148,8 @@ exports[`snapshot test for InfraStack 1`] = `
     },
     "AppSyncCnameRecord408D9525": {
       "Properties": {
-        "HostedZoneId": "Z07014542L73WTE1YO27B",
-        "Name": "task-sfn-infra-appsync.developer-pionero.mbc-dev.com.",
+        "HostedZoneId": "Z0123456789ABCDEFGHIJ",
+        "Name": "example.com.",
         "ResourceRecords": [
           {
             "Fn::GetAtt": [
@@ -170,10 +172,10 @@ exports[`snapshot test for InfraStack 1`] = `
           },
           {
             "Key": "name",
-            "Value": "task-sfn-interation-map",
+            "Value": "",
           },
         ],
-        "TopicName": "dev-task-sfn-interation-map-alarm-sns",
+        "TopicName": "dev--alarm-sns",
       },
       "Type": "AWS::SNS::Topic",
     },
@@ -202,14 +204,16 @@ exports[`snapshot test for InfraStack 1`] = `
         "SupportedIdentityProviders": [
           "COGNITO",
         ],
-        "UserPoolId": "ap-northeast-1_NfyqKTjPS",
+        "UserPoolId": {
+          "Ref": "devuserpool23B1805F",
+        },
       },
       "Type": "AWS::Cognito::UserPoolClient",
     },
     "commandhandlersfnlog9072E963": {
       "DeletionPolicy": "Delete",
       "Properties": {
-        "LogGroupName": "/aws/vendedlogs/states/dev-task-sfn-interation-map--command-handler-state-machine-Logs",
+        "LogGroupName": "/aws/vendedlogs/states/dev---command-handler-state-machine-Logs",
         "RetentionInDays": 180,
         "Tags": [
           {
@@ -218,7 +222,7 @@ exports[`snapshot test for InfraStack 1`] = `
           },
           {
             "Key": "name",
-            "Value": "task-sfn-interation-map",
+            "Value": "",
           },
         ],
       },
@@ -338,7 +342,7 @@ exports[`snapshot test for InfraStack 1`] = `
             "Arn",
           ],
         },
-        "StateMachineName": "dev-task-sfn-interation-map-command-handler",
+        "StateMachineName": "dev--command-handler",
         "Tags": [
           {
             "Key": "env",
@@ -346,7 +350,7 @@ exports[`snapshot test for InfraStack 1`] = `
           },
           {
             "Key": "name",
-            "Value": "task-sfn-interation-map",
+            "Value": "",
           },
         ],
         "TracingConfiguration": {
@@ -377,7 +381,7 @@ exports[`snapshot test for InfraStack 1`] = `
           },
           {
             "Key": "name",
-            "Value": "task-sfn-interation-map",
+            "Value": "",
           },
         ],
       },
@@ -449,10 +453,31 @@ exports[`snapshot test for InfraStack 1`] = `
       },
       "Type": "AWS::IAM::Policy",
     },
+    "csvimportmappolicyB91FD9A7": {
+      "Properties": {
+        "PolicyDocument": {
+          "Statement": [
+            {
+              "Action": "states:StartExecution",
+              "Effect": "Allow",
+              "Resource": "arn:aws:states:ap-northeast-1:101010101010:stateMachine:dev--import-csv-handler",
+            },
+          ],
+          "Version": "2012-10-17",
+        },
+        "PolicyName": "csvimportmappolicyB91FD9A7",
+        "Roles": [
+          {
+            "Ref": "importcsvstatemachineRole472165F7",
+          },
+        ],
+      },
+      "Type": "AWS::IAM::Policy",
+    },
     "ddbattributes95C63151": {
       "DeletionPolicy": "Delete",
       "Properties": {
-        "BucketName": "dev-task-sfn-interation-map-ddb-attributes",
+        "BucketName": "dev--ddb-attributes",
         "CorsConfiguration": {
           "CorsRules": [
             {
@@ -484,12 +509,92 @@ exports[`snapshot test for InfraStack 1`] = `
           },
           {
             "Key": "name",
-            "Value": "task-sfn-interation-map",
+            "Value": "",
           },
         ],
       },
       "Type": "AWS::S3::Bucket",
       "UpdateReplacePolicy": "Delete",
+    },
+    "devuserpool23B1805F": {
+      "DeletionPolicy": "Retain",
+      "Properties": {
+        "AccountRecoverySetting": {
+          "RecoveryMechanisms": [
+            {
+              "Name": "admin_only",
+              "Priority": 1,
+            },
+          ],
+        },
+        "AdminCreateUserConfig": {
+          "AllowAdminCreateUserOnly": true,
+        },
+        "AliasAttributes": [
+          "preferred_username",
+        ],
+        "DeletionProtection": "ACTIVE",
+        "EmailConfiguration": {
+          "EmailSendingAccount": "COGNITO_DEFAULT",
+        },
+        "EmailVerificationMessage": "The verification code to your new account is {####}",
+        "EmailVerificationSubject": "Verify your new account",
+        "MfaConfiguration": "OFF",
+        "Policies": {
+          "PasswordPolicy": {
+            "MinimumLength": 6,
+            "RequireLowercase": false,
+            "RequireNumbers": false,
+            "RequireSymbols": false,
+            "RequireUppercase": false,
+          },
+        },
+        "Schema": [
+          {
+            "AttributeDataType": "String",
+            "Mutable": true,
+            "Name": "tenant",
+            "StringAttributeConstraints": {
+              "MaxLength": "50",
+            },
+          },
+          {
+            "AttributeDataType": "String",
+            "Mutable": true,
+            "Name": "company_code",
+            "StringAttributeConstraints": {
+              "MaxLength": "50",
+            },
+          },
+          {
+            "AttributeDataType": "String",
+            "Mutable": true,
+            "Name": "member_id",
+            "StringAttributeConstraints": {
+              "MaxLength": "2024",
+            },
+          },
+          {
+            "AttributeDataType": "String",
+            "Mutable": true,
+            "Name": "roles",
+          },
+        ],
+        "SmsVerificationMessage": "The verification code to your new account is {####}",
+        "UserPoolName": "dev--user-pool",
+        "UserPoolTags": {
+          "env": "dev",
+          "name": "",
+        },
+        "VerificationMessageTemplate": {
+          "DefaultEmailOption": "CONFIRM_WITH_CODE",
+          "EmailMessage": "The verification code to your new account is {####}",
+          "EmailSubject": "Verify your new account",
+          "SmsMessage": "The verification code to your new account is {####}",
+        },
+      },
+      "Type": "AWS::Cognito::UserPool",
+      "UpdateReplacePolicy": "Retain",
     },
     "httpapiAccessLogs0179ABB1": {
       "DeletionPolicy": "Retain",
@@ -502,7 +607,7 @@ exports[`snapshot test for InfraStack 1`] = `
           },
           {
             "Key": "name",
-            "Value": "task-sfn-interation-map",
+            "Value": "",
           },
         ],
       },
@@ -513,7 +618,7 @@ exports[`snapshot test for InfraStack 1`] = `
       "Properties": {
         "DistributionConfig": {
           "Aliases": [
-            "task-sfn-infra.developer-pionero.mbc-dev.com",
+            "",
           ],
           "DefaultCacheBehavior": {
             "AllowedMethods": [
@@ -558,7 +663,7 @@ exports[`snapshot test for InfraStack 1`] = `
               "OriginCustomHeaders": [
                 {
                   "HeaderName": "X-Origin-Verify",
-                  "HeaderValue": "dev-task-sfn-interation-map-653338303031343731376464613638663933303936316338666463646537",
+                  "HeaderValue": "dev--653338303031343731376464613638663933303936316338666463646537",
                 },
               ],
             },
@@ -574,7 +679,7 @@ exports[`snapshot test for InfraStack 1`] = `
             },
           },
           "ViewerCertificate": {
-            "AcmCertificateArn": "arn:aws:acm:us-east-1:465316005105:certificate/495946ea-1231-47cb-b09d-0ae7305866fb",
+            "AcmCertificateArn": "arn:aws:acm:us-east-1:101010101010:certificate/test-http",
             "MinimumProtocolVersion": "TLSv1.2_2021",
             "SslSupportMethod": "sni-only",
           },
@@ -586,7 +691,7 @@ exports[`snapshot test for InfraStack 1`] = `
           },
           {
             "Key": "name",
-            "Value": "task-sfn-interation-map",
+            "Value": "",
           },
         ],
       },
@@ -594,8 +699,8 @@ exports[`snapshot test for InfraStack 1`] = `
     },
     "httpdistributionarecord0FBAAC08": {
       "Properties": {
-        "HostedZoneId": "Z07014542L73WTE1YO27B",
-        "Name": "task-sfn-infra.developer-pionero.mbc-dev.com.",
+        "HostedZoneId": "Z0123456789ABCDEFGHIJ",
+        "Name": "example.com.",
         "ResourceRecords": [
           {
             "Fn::GetAtt": [
@@ -608,6 +713,329 @@ exports[`snapshot test for InfraStack 1`] = `
         "Type": "CNAME",
       },
       "Type": "AWS::Route53::RecordSet",
+    },
+    "importactionsqs5E43BE2E": {
+      "DeletionPolicy": "Delete",
+      "Properties": {
+        "QueueName": "dev--import-action-queue",
+        "Tags": [
+          {
+            "Key": "env",
+            "Value": "dev",
+          },
+          {
+            "Key": "name",
+            "Value": "",
+          },
+        ],
+      },
+      "Type": "AWS::SQS::Queue",
+      "UpdateReplacePolicy": "Delete",
+    },
+    "importactionsqsPolicyCCA46E8B": {
+      "Properties": {
+        "PolicyDocument": {
+          "Statement": [
+            {
+              "Action": "sqs:SendMessage",
+              "Condition": {
+                "ArnEquals": {
+                  "aws:SourceArn": {
+                    "Ref": "mainsnsC0381B34",
+                  },
+                },
+              },
+              "Effect": "Allow",
+              "Principal": {
+                "Service": "sns.amazonaws.com",
+              },
+              "Resource": {
+                "Fn::GetAtt": [
+                  "importactionsqs5E43BE2E",
+                  "Arn",
+                ],
+              },
+            },
+          ],
+          "Version": "2012-10-17",
+        },
+        "Queues": [
+          {
+            "Ref": "importactionsqs5E43BE2E",
+          },
+        ],
+      },
+      "Type": "AWS::SQS::QueuePolicy",
+    },
+    "importactionsqsTestInfraStackmainsnsA010224CB9B81AFA": {
+      "DependsOn": [
+        "importactionsqsPolicyCCA46E8B",
+      ],
+      "Properties": {
+        "Endpoint": {
+          "Fn::GetAtt": [
+            "importactionsqs5E43BE2E",
+            "Arn",
+          ],
+        },
+        "FilterPolicy": {
+          "action": [
+            "import-execute",
+          ],
+        },
+        "Protocol": "sqs",
+        "RawMessageDelivery": true,
+        "TopicArn": {
+          "Ref": "mainsnsC0381B34",
+        },
+      },
+      "Type": "AWS::SNS::Subscription",
+    },
+    "importcsvhandlersfnlog948FF17F": {
+      "DeletionPolicy": "Delete",
+      "Properties": {
+        "LogGroupName": "/aws/vendedlogs/states/dev---import-csv-handler-state-machine-logs",
+        "RetentionInDays": 180,
+        "Tags": [
+          {
+            "Key": "env",
+            "Value": "dev",
+          },
+          {
+            "Key": "name",
+            "Value": "",
+          },
+        ],
+      },
+      "Type": "AWS::Logs::LogGroup",
+      "UpdateReplacePolicy": "Delete",
+    },
+    "importcsvstatemachine4B3EA406": {
+      "DeletionPolicy": "Delete",
+      "DependsOn": [
+        "importcsvstatemachineRoleDefaultPolicyC6679553",
+        "importcsvstatemachineRole472165F7",
+      ],
+      "Properties": {
+        "DefinitionString": {
+          "Fn::Join": [
+            "",
+            [
+              "{"StartAt":"import-csv","States":{"import-csv":{"Type":"Map","End":true,"ItemProcessor":{"ProcessorConfig":{"Mode":"DISTRIBUTED","ExecutionType":"EXPRESS"},"StartAt":"csv_rows_handler","States":{"csv_rows_handler":{"End":true,"Retry":[{"ErrorEquals":["Lambda.ClientExecutionTimeoutException","Lambda.ServiceException","Lambda.AWSLambdaException","Lambda.SdkClientException"],"IntervalSeconds":2,"MaxAttempts":6,"BackoffRate":2}],"Type":"Task","OutputPath":"$.Payload[0][0]","Resource":"arn:",
+              {
+                "Ref": "AWS::Partition",
+              },
+              ":states:::lambda:invoke","Parameters":{"FunctionName":"",
+              {
+                "Fn::GetAtt": [
+                  "lambdaapi893CD94E",
+                  "Arn",
+                ],
+              },
+              "","Payload":{"input.$":"$","context.$":"$$"}}}}},"MaxConcurrency":50,"ItemReader":{"Resource":"arn:aws:states:::s3:getObject","ReaderConfig":{"InputType":"CSV","CSVHeaderLocation":"FIRST_ROW"},"Parameters":{"Bucket.$":"$.bucket","Key.$":"$.key"}},"ItemBatcher":{"MaxInputBytesPerBatch":10,"BatchInput":{"Attributes.$":"$"}},"Label":"import-csv"}},"Comment":"A state machine for import-csv module handler"}",
+            ],
+          ],
+        },
+        "LoggingConfiguration": {
+          "Destinations": [
+            {
+              "CloudWatchLogsLogGroup": {
+                "LogGroupArn": {
+                  "Fn::GetAtt": [
+                    "importcsvhandlersfnlog948FF17F",
+                    "Arn",
+                  ],
+                },
+              },
+            },
+          ],
+          "Level": "ALL",
+        },
+        "RoleArn": {
+          "Fn::GetAtt": [
+            "importcsvstatemachineRole472165F7",
+            "Arn",
+          ],
+        },
+        "StateMachineName": "dev--import-csv-handler",
+        "Tags": [
+          {
+            "Key": "env",
+            "Value": "dev",
+          },
+          {
+            "Key": "name",
+            "Value": "",
+          },
+        ],
+        "TracingConfiguration": {
+          "Enabled": true,
+        },
+      },
+      "Type": "AWS::StepFunctions::StateMachine",
+      "UpdateReplacePolicy": "Delete",
+    },
+    "importcsvstatemachineRole472165F7": {
+      "Properties": {
+        "AssumeRolePolicyDocument": {
+          "Statement": [
+            {
+              "Action": "sts:AssumeRole",
+              "Effect": "Allow",
+              "Principal": {
+                "Service": "states.amazonaws.com",
+              },
+            },
+          ],
+          "Version": "2012-10-17",
+        },
+        "Tags": [
+          {
+            "Key": "env",
+            "Value": "dev",
+          },
+          {
+            "Key": "name",
+            "Value": "",
+          },
+        ],
+      },
+      "Type": "AWS::IAM::Role",
+    },
+    "importcsvstatemachineRoleDefaultPolicyC6679553": {
+      "Properties": {
+        "PolicyDocument": {
+          "Statement": [
+            {
+              "Action": "lambda:InvokeFunction",
+              "Effect": "Allow",
+              "Resource": [
+                {
+                  "Fn::GetAtt": [
+                    "lambdaapi893CD94E",
+                    "Arn",
+                  ],
+                },
+                {
+                  "Fn::Join": [
+                    "",
+                    [
+                      {
+                        "Fn::GetAtt": [
+                          "lambdaapi893CD94E",
+                          "Arn",
+                        ],
+                      },
+                      ":*",
+                    ],
+                  ],
+                },
+              ],
+            },
+            {
+              "Action": [
+                "logs:CreateLogDelivery",
+                "logs:GetLogDelivery",
+                "logs:UpdateLogDelivery",
+                "logs:DeleteLogDelivery",
+                "logs:ListLogDeliveries",
+                "logs:PutResourcePolicy",
+                "logs:DescribeResourcePolicies",
+                "logs:DescribeLogGroups",
+              ],
+              "Effect": "Allow",
+              "Resource": "*",
+            },
+            {
+              "Action": [
+                "xray:PutTraceSegments",
+                "xray:PutTelemetryRecords",
+                "xray:GetSamplingRules",
+                "xray:GetSamplingTargets",
+              ],
+              "Effect": "Allow",
+              "Resource": "*",
+            },
+            {
+              "Action": [
+                "s3:GetObject*",
+                "s3:GetBucket*",
+                "s3:List*",
+              ],
+              "Effect": "Allow",
+              "Resource": [
+                {
+                  "Fn::GetAtt": [
+                    "ddbattributes95C63151",
+                    "Arn",
+                  ],
+                },
+                {
+                  "Fn::Join": [
+                    "",
+                    [
+                      {
+                        "Fn::GetAtt": [
+                          "ddbattributes95C63151",
+                          "Arn",
+                        ],
+                      },
+                      "/*",
+                    ],
+                  ],
+                },
+              ],
+            },
+          ],
+          "Version": "2012-10-17",
+        },
+        "PolicyName": "importcsvstatemachineRoleDefaultPolicyC6679553",
+        "Roles": [
+          {
+            "Ref": "importcsvstatemachineRole472165F7",
+          },
+        ],
+      },
+      "Type": "AWS::IAM::Policy",
+    },
+    "importtmpdecsB7F4BA11": {
+      "DeletionPolicy": "Delete",
+      "DependsOn": [
+        "importtmpdecsCustomResourcePolicy8BB24BAE",
+      ],
+      "Properties": {
+        "Create": "{"service":"DynamoDB","action":"describeTable","parameters":{"TableName":"dev--import_tmp"},"physicalResourceId":{"responsePath":"Table.TableArn"}}",
+        "InstallLatestAwsSdk": true,
+        "ServiceToken": {
+          "Fn::GetAtt": [
+            "AWS679f53fac002430cb0da5b7982bd22872D164C4C",
+            "Arn",
+          ],
+        },
+      },
+      "Type": "Custom::AWS",
+      "UpdateReplacePolicy": "Delete",
+    },
+    "importtmpdecsCustomResourcePolicy8BB24BAE": {
+      "Properties": {
+        "PolicyDocument": {
+          "Statement": [
+            {
+              "Action": "dynamodb:DescribeTable",
+              "Effect": "Allow",
+              "Resource": "*",
+            },
+          ],
+          "Version": "2012-10-17",
+        },
+        "PolicyName": "importtmpdecsCustomResourcePolicy8BB24BAE",
+        "Roles": [
+          {
+            "Ref": "AWS679f53fac002430cb0da5b7982bd2287ServiceRoleC1EA0FF2",
+          },
+        ],
+      },
+      "Type": "AWS::IAM::Policy",
     },
     "lambdaapi893CD94E": {
       "DependsOn": [
@@ -630,12 +1058,14 @@ exports[`snapshot test for InfraStack 1`] = `
                 "GraphQLUrl",
               ],
             },
-            "APP_NAME": "task-sfn-interation-map",
+            "APP_NAME": "",
             "ATTRIBUTE_LIMIT_SIZE": "389120",
-            "COGNITO_USER_POOL_ID": "ap-northeast-1_NfyqKTjPS",
-            "DATABASE_URL": "postgresql:///mbc/cqrs/rds-account@db.mbc-net.com/dev_cdk_infra?schema=public",
+            "COGNITO_USER_POOL_ID": {
+              "Ref": "devuserpool23B1805F",
+            },
+            "DATABASE_URL": "postgresql://@/?schema=public",
             "EVENT_SOURCE_DISABLED": "false",
-            "FRONT_BASE_URL": "test-cqrs.developer-pionero.mbc-dev.com",
+            "FRONT_BASE_URL": "",
             "LOG_LEVEL": "verbose",
             "NODE_ENV": "dev",
             "NODE_OPTIONS": "--enable-source-maps",
@@ -645,9 +1075,10 @@ exports[`snapshot test for InfraStack 1`] = `
             "S3_PUBLIC_BUCKET_NAME": {
               "Ref": "publicbucket0D82CFFB",
             },
-            "SES_FROM_EMAIL": "noreply@developer-pionero.mbc-dev.com",
-            "SFN_COMMAND_ARN": "arn:aws:states:ap-northeast-1:101010101010:stateMachine:dev-task-sfn-interation-map-command-handler",
-            "SFN_TASK_ARN": "arn:aws:states:ap-northeast-1:101010101010:stateMachine:dev-task-sfn-interation-map-sfn-task-handler",
+            "SES_FROM_EMAIL": "",
+            "SFN_COMMAND_ARN": "arn:aws:states:ap-northeast-1:101010101010:stateMachine:dev--command-handler",
+            "SFN_IMPORT_CSV_ARN": "arn:aws:states:ap-northeast-1:101010101010:stateMachine:dev--import-csv-handler",
+            "SFN_TASK_ARN": "arn:aws:states:ap-northeast-1:101010101010:stateMachine:dev--sfn-task-handler",
             "SNS_ALARM_TOPIC_ARN": {
               "Ref": "alarmsnsFB7BBC3B",
             },
@@ -657,7 +1088,7 @@ exports[`snapshot test for InfraStack 1`] = `
             "TZ": "Asia/Tokyo",
           },
         },
-        "FunctionName": "dev-task-sfn-interation-map-lambda-api",
+        "FunctionName": "dev--lambda-api",
         "Handler": "main.handler",
         "Layers": [
           {
@@ -676,7 +1107,7 @@ exports[`snapshot test for InfraStack 1`] = `
             "Arn",
           ],
         },
-        "Runtime": "nodejs18.x",
+        "Runtime": "nodejs20.x",
         "Tags": [
           {
             "Key": "env",
@@ -684,7 +1115,7 @@ exports[`snapshot test for InfraStack 1`] = `
           },
           {
             "Key": "name",
-            "Value": "task-sfn-interation-map",
+            "Value": "",
           },
         ],
         "Timeout": 31536000,
@@ -693,12 +1124,50 @@ exports[`snapshot test for InfraStack 1`] = `
         },
         "VpcConfig": {
           "SecurityGroupIds": [
-            "sg-06d0f5fc2d4225f50",
+            {
+              "Fn::GetAtt": [
+                "lambdaapiSecurityGroup76BCD08C",
+                "GroupId",
+              ],
+            },
           ],
           "SubnetIds": [],
         },
       },
       "Type": "AWS::Lambda::Function",
+    },
+    "lambdaapiDynamoDBEventSourceTestInfraStackimporttmptableD054449DE218503B": {
+      "Properties": {
+        "BatchSize": 1,
+        "EventSourceArn": {
+          "Fn::GetAtt": [
+            "importtmpdecsB7F4BA11",
+            "Table.LatestStreamArn",
+          ],
+        },
+        "FilterCriteria": {
+          "Filters": [
+            {
+              "Pattern": "{"eventName":["INSERT"]}",
+            },
+          ],
+        },
+        "FunctionName": {
+          "Ref": "lambdaapi893CD94E",
+        },
+        "StartingPosition": "TRIM_HORIZON",
+        "Tags": [
+          {
+            "Key": "env",
+            "Value": "dev",
+          },
+          {
+            "Key": "name",
+            "Value": "",
+          },
+        ],
+      },
+      "Type": "AWS::Lambda::EventSourceMapping",
     },
     "lambdaapiDynamoDBEventSourceTestInfraStacksamplecommandtable0EA54DEAC580030B": {
       "Properties": {
@@ -727,7 +1196,7 @@ exports[`snapshot test for InfraStack 1`] = `
           },
           {
             "Key": "name",
-            "Value": "task-sfn-interation-map",
+            "Value": "",
           },
         ],
       },
@@ -760,11 +1229,35 @@ exports[`snapshot test for InfraStack 1`] = `
           },
           {
             "Key": "name",
-            "Value": "task-sfn-interation-map",
+            "Value": "",
           },
         ],
       },
       "Type": "AWS::Lambda::EventSourceMapping",
+    },
+    "lambdaapiSecurityGroup76BCD08C": {
+      "Properties": {
+        "GroupDescription": "Automatic security group for Lambda Function TestInfraStacklambdaapiA7796739",
+        "SecurityGroupEgress": [
+          {
+            "CidrIp": "0.0.0.0/0",
+            "Description": "Allow all outbound traffic by default",
+            "IpProtocol": "-1",
+          },
+        ],
+        "Tags": [
+          {
+            "Key": "env",
+            "Value": "dev",
+          },
+          {
+            "Key": "name",
+            "Value": "",
+          },
+        ],
+        "VpcId": "vpc-12345",
+      },
+      "Type": "AWS::EC2::SecurityGroup",
     },
     "lambdaapiServiceRole7E4263EE": {
       "Properties": {
@@ -813,7 +1306,7 @@ exports[`snapshot test for InfraStack 1`] = `
           },
           {
             "Key": "name",
-            "Value": "task-sfn-interation-map",
+            "Value": "",
           },
         ],
       },
@@ -880,6 +1373,22 @@ exports[`snapshot test for InfraStack 1`] = `
               },
             },
             {
+              "Action": [
+                "sqs:ReceiveMessage",
+                "sqs:ChangeMessageVisibility",
+                "sqs:GetQueueUrl",
+                "sqs:DeleteMessage",
+                "sqs:GetQueueAttributes",
+              ],
+              "Effect": "Allow",
+              "Resource": {
+                "Fn::GetAtt": [
+                  "importactionsqs5E43BE2E",
+                  "Arn",
+                ],
+              },
+            },
+            {
               "Action": "dynamodb:ListStreams",
               "Effect": "Allow",
               "Resource": "*",
@@ -914,6 +1423,20 @@ exports[`snapshot test for InfraStack 1`] = `
             },
             {
               "Action": [
+                "dynamodb:DescribeStream",
+                "dynamodb:GetRecords",
+                "dynamodb:GetShardIterator",
+              ],
+              "Effect": "Allow",
+              "Resource": {
+                "Fn::GetAtt": [
+                  "importtmpdecsB7F4BA11",
+                  "Table.LatestStreamArn",
+                ],
+              },
+            },
+            {
+              "Action": [
                 "cognito-idp:AdminGetUser",
                 "cognito-idp:AdminAddUserToGroup",
                 "cognito-idp:AdminCreateUser",
@@ -926,15 +1449,9 @@ exports[`snapshot test for InfraStack 1`] = `
               ],
               "Effect": "Allow",
               "Resource": {
-                "Fn::Join": [
-                  "",
-                  [
-                    "arn:",
-                    {
-                      "Ref": "AWS::Partition",
-                    },
-                    ":cognito-idp:ap-northeast-1:101010101010:userpool/ap-northeast-1_NfyqKTjPS",
-                  ],
+                "Fn::GetAtt": [
+                  "devuserpool23B1805F",
+                  "Arn",
                 ],
               },
             },
@@ -1089,6 +1606,31 @@ exports[`snapshot test for InfraStack 1`] = `
       },
       "Type": "AWS::IAM::Policy",
     },
+    "lambdaapiSqsEventSourceTestInfraStackimportactionsqs8852D59E50E2FC5A": {
+      "Properties": {
+        "BatchSize": 1,
+        "EventSourceArn": {
+          "Fn::GetAtt": [
+            "importactionsqs5E43BE2E",
+            "Arn",
+          ],
+        },
+        "FunctionName": {
+          "Ref": "lambdaapi893CD94E",
+        },
+        "Tags": [
+          {
+            "Key": "env",
+            "Value": "dev",
+          },
+          {
+            "Key": "name",
+            "Value": "",
+          },
+        ],
+      },
+      "Type": "AWS::Lambda::EventSourceMapping",
+    },
     "lambdaapiSqsEventSourceTestInfraStacknotifysqs3E7CCF8682B43C89": {
       "Properties": {
         "BatchSize": 1,
@@ -1108,7 +1650,7 @@ exports[`snapshot test for InfraStack 1`] = `
           },
           {
             "Key": "name",
-            "Value": "task-sfn-interation-map",
+            "Value": "",
           },
         ],
       },
@@ -1133,7 +1675,7 @@ exports[`snapshot test for InfraStack 1`] = `
           },
           {
             "Key": "name",
-            "Value": "task-sfn-interation-map",
+            "Value": "",
           },
         ],
       },
@@ -1158,7 +1700,7 @@ exports[`snapshot test for InfraStack 1`] = `
           },
           {
             "Key": "name",
-            "Value": "task-sfn-interation-map",
+            "Value": "",
           },
         ],
       },
@@ -1176,7 +1718,7 @@ exports[`snapshot test for InfraStack 1`] = `
                 "dynamodb:Query",
               ],
               "Effect": "Allow",
-              "Resource": "arn:aws:dynamodb:ap-northeast-1:101010101010:table/dev-task-sfn-interation-map-*",
+              "Resource": "arn:aws:dynamodb:ap-northeast-1:101010101010:table/dev--*",
             },
           ],
           "Version": "2012-10-17",
@@ -1225,7 +1767,7 @@ exports[`snapshot test for InfraStack 1`] = `
                 "states:DescribeExecution",
               ],
               "Effect": "Allow",
-              "Resource": "arn:aws:states:ap-northeast-1:101010101010:stateMachine:dev-task-sfn-interation-map-command-handler",
+              "Resource": "arn:aws:states:ap-northeast-1:101010101010:stateMachine:dev--command-handler",
             },
           ],
           "Version": "2012-10-17",
@@ -1239,12 +1781,36 @@ exports[`snapshot test for InfraStack 1`] = `
       },
       "Type": "AWS::IAM::Policy",
     },
+    "lambdaimportcsvsfnstepfunctionpolicy724D9485": {
+      "Properties": {
+        "PolicyDocument": {
+          "Statement": [
+            {
+              "Action": "states:*",
+              "Effect": "Allow",
+              "Resource": "arn:aws:states:ap-northeast-1:101010101010:stateMachine:dev--import-csv-handler",
+            },
+          ],
+          "Version": "2012-10-17",
+        },
+        "PolicyName": "lambdaimportcsvsfnstepfunctionpolicy724D9485",
+        "Roles": [
+          {
+            "Ref": "lambdaapiServiceRole7E4263EE",
+          },
+        ],
+      },
+      "Type": "AWS::IAM::Policy",
+    },
     "lambdasespolicyC6CB28C8": {
       "Properties": {
         "PolicyDocument": {
           "Statement": [
             {
-              "Action": "ses:SendEmail",
+              "Action": [
+                "ses:SendEmail",
+                "ses:SendTemplatedEmail",
+              ],
               "Effect": "Allow",
               "Resource": "*",
             },
@@ -1267,7 +1833,7 @@ exports[`snapshot test for InfraStack 1`] = `
             {
               "Action": "states:*",
               "Effect": "Allow",
-              "Resource": "arn:aws:states:ap-northeast-1:101010101010:stateMachine:dev-task-sfn-interation-map-sfn-task-handler",
+              "Resource": "arn:aws:states:ap-northeast-1:101010101010:stateMachine:dev--sfn-task-handler",
             },
           ],
           "Version": "2012-10-17",
@@ -1363,11 +1929,11 @@ exports[`snapshot test for InfraStack 1`] = `
           "MaxAge": 31536000,
         },
         "Description": "HTTP API for Lambda integration",
-        "Name": "dev-task-sfn-interation-map-api",
+        "Name": "dev--api",
         "ProtocolType": "HTTP",
         "Tags": {
           "env": "dev",
-          "name": "task-sfn-interation-map",
+          "name": "",
         },
       },
       "Type": "AWS::ApiGatewayV2::Api",
@@ -1387,7 +1953,17 @@ exports[`snapshot test for InfraStack 1`] = `
               "Ref": "apigwclientE7D084A5",
             },
           ],
-          "Issuer": "https://cognito-idp.ap-northeast-1.amazonaws.com/ap-northeast-1_NfyqKTjPS",
+          "Issuer": {
+            "Fn::Join": [
+              "",
+              [
+                "https://cognito-idp.ap-northeast-1.amazonaws.com/",
+                {
+                  "Ref": "devuserpool23B1805F",
+                },
+              ],
+            ],
+          },
         },
         "Name": "CognitoAuthorizer",
       },
@@ -1467,7 +2043,7 @@ exports[`snapshot test for InfraStack 1`] = `
         "StageName": "$default",
         "Tags": {
           "env": "dev",
-          "name": "task-sfn-interation-map",
+          "name": "",
         },
       },
       "Type": "AWS::ApiGatewayV2::Stage",
@@ -1793,13 +2369,13 @@ exports[`snapshot test for InfraStack 1`] = `
           "arm64",
         ],
         "CompatibleRuntimes": [
-          "nodejs18.x",
+          "nodejs20.x",
         ],
         "Content": {
           "S3Bucket": "cdk-hnb659fds-assets-101010101010-ap-northeast-1",
           "S3Key": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx.zip",
         },
-        "LayerName": "dev-task-sfn-interation-map-main-layer",
+        "LayerName": "dev--main-layer",
       },
       "Type": "AWS::Lambda::LayerVersion",
     },
@@ -1812,17 +2388,17 @@ exports[`snapshot test for InfraStack 1`] = `
           },
           {
             "Key": "name",
-            "Value": "task-sfn-interation-map",
+            "Value": "",
           },
         ],
-        "TopicName": "dev-task-sfn-interation-map-main-sns",
+        "TopicName": "dev--main-sns",
       },
       "Type": "AWS::SNS::Topic",
     },
     "notifysqsEC095A61": {
       "DeletionPolicy": "Delete",
       "Properties": {
-        "QueueName": "dev-task-sfn-interation-map-notification-queue",
+        "QueueName": "dev--notification-queue",
         "Tags": [
           {
             "Key": "env",
@@ -1830,7 +2406,7 @@ exports[`snapshot test for InfraStack 1`] = `
           },
           {
             "Key": "name",
-            "Value": "task-sfn-interation-map",
+            "Value": "",
           },
         ],
       },
@@ -1900,7 +2476,7 @@ exports[`snapshot test for InfraStack 1`] = `
     "publicbucket0D82CFFB": {
       "DeletionPolicy": "Delete",
       "Properties": {
-        "BucketName": "dev-task-sfn-interation-map-public",
+        "BucketName": "dev--public",
         "CorsConfiguration": {
           "CorsRules": [
             {
@@ -1932,7 +2508,7 @@ exports[`snapshot test for InfraStack 1`] = `
           },
           {
             "Key": "name",
-            "Value": "task-sfn-interation-map",
+            "Value": "",
           },
         ],
       },
@@ -2048,7 +2624,7 @@ exports[`snapshot test for InfraStack 1`] = `
           },
           {
             "Key": "name",
-            "Value": "task-sfn-interation-map",
+            "Value": "",
           },
         ],
       },
@@ -2064,12 +2640,14 @@ exports[`snapshot test for InfraStack 1`] = `
             "AuthenticationType": "AMAZON_COGNITO_USER_POOLS",
             "UserPoolConfig": {
               "AwsRegion": "ap-northeast-1",
-              "UserPoolId": "ap-northeast-1_NfyqKTjPS",
+              "UserPoolId": {
+                "Ref": "devuserpool23B1805F",
+              },
             },
           },
         ],
         "AuthenticationType": "API_KEY",
-        "Name": "dev-task-sfn-interation-map-realtime",
+        "Name": "dev--realtime",
         "Tags": [
           {
             "Key": "env",
@@ -2077,7 +2655,7 @@ exports[`snapshot test for InfraStack 1`] = `
           },
           {
             "Key": "name",
-            "Value": "task-sfn-interation-map",
+            "Value": "",
           },
         ],
         "XrayEnabled": true,
@@ -2110,18 +2688,18 @@ exports[`snapshot test for InfraStack 1`] = `
             "ApiId",
           ],
         },
-        "DomainName": "task-sfn-infra-appsync.developer-pionero.mbc-dev.com",
+        "DomainName": "",
       },
       "Type": "AWS::AppSync::DomainNameApiAssociation",
     },
     "realtimeDomainName01674B94": {
       "Properties": {
-        "CertificateArn": "arn:aws:acm:us-east-1:465316005105:certificate/495946ea-1231-47cb-b09d-0ae7305866fb",
+        "CertificateArn": "arn:aws:acm:us-east-1:101010101010:certificate/test-appsync",
         "Description": {
           "Fn::Join": [
             "",
             [
-              "domain for dev-task-sfn-interation-map-realtime at ",
+              "domain for dev--realtime at ",
               {
                 "Fn::GetAtt": [
                   "realtime0CF38FF2",
@@ -2131,7 +2709,17 @@ exports[`snapshot test for InfraStack 1`] = `
             ],
           ],
         },
-        "DomainName": "task-sfn-infra-appsync.developer-pionero.mbc-dev.com",
+        "DomainName": "",
+        "Tags": [
+          {
+            "Key": "env",
+            "Value": "dev",
+          },
+          {
+            "Key": "name",
+            "Value": "",
+          },
+        ],
       },
       "Type": "AWS::AppSync::DomainName",
     },
@@ -2219,7 +2807,7 @@ schema {
         "samplecommanddecsCustomResourcePolicyE6F75ED3",
       ],
       "Properties": {
-        "Create": "{"service":"DynamoDB","action":"describeTable","parameters":{"TableName":"dev-task-sfn-interation-map-sample-command"},"physicalResourceId":{"responsePath":"Table.TableArn"}}",
+        "Create": "{"service":"DynamoDB","action":"describeTable","parameters":{"TableName":"dev--sample-command"},"physicalResourceId":{"responsePath":"Table.TableArn"}}",
         "InstallLatestAwsSdk": true,
         "ServiceToken": {
           "Fn::GetAtt": [
@@ -2255,7 +2843,7 @@ schema {
     "subtaskstatussqs337C4C1A": {
       "DeletionPolicy": "Delete",
       "Properties": {
-        "QueueName": "dev-task-sfn-interation-map-sub-task-status-queue",
+        "QueueName": "dev--sub-task-status-queue",
         "Tags": [
           {
             "Key": "env",
@@ -2263,7 +2851,7 @@ schema {
           },
           {
             "Key": "name",
-            "Value": "task-sfn-interation-map",
+            "Value": "",
           },
         ],
       },
@@ -2332,7 +2920,7 @@ schema {
     "taskdeadlettersqs91D16094": {
       "DeletionPolicy": "Delete",
       "Properties": {
-        "QueueName": "dev-task-sfn-interation-map-task-dead-letter-queue",
+        "QueueName": "dev--task-dead-letter-queue",
         "Tags": [
           {
             "Key": "env",
@@ -2340,7 +2928,7 @@ schema {
           },
           {
             "Key": "name",
-            "Value": "task-sfn-interation-map",
+            "Value": "",
           },
         ],
       },
@@ -2404,7 +2992,7 @@ schema {
     "taskhandlersfnlogB2666A7A": {
       "DeletionPolicy": "Delete",
       "Properties": {
-        "LogGroupName": "/aws/vendedlogs/states/dev-task-sfn-interation-map-task-handler-state-machine-Logs",
+        "LogGroupName": "/aws/vendedlogs/states/dev--task-handler-state-machine-Logs",
         "RetentionInDays": 180,
         "Tags": [
           {
@@ -2413,7 +3001,7 @@ schema {
           },
           {
             "Key": "name",
-            "Value": "task-sfn-interation-map",
+            "Value": "",
           },
         ],
       },
@@ -2467,7 +3055,7 @@ schema {
             "Arn",
           ],
         },
-        "StateMachineName": "dev-task-sfn-interation-map-sfn-task-handler",
+        "StateMachineName": "dev--sfn-task-handler",
         "Tags": [
           {
             "Key": "env",
@@ -2475,7 +3063,7 @@ schema {
           },
           {
             "Key": "name",
-            "Value": "task-sfn-interation-map",
+            "Value": "",
           },
         ],
         "TracingConfiguration": {
@@ -2506,7 +3094,7 @@ schema {
           },
           {
             "Key": "name",
-            "Value": "task-sfn-interation-map",
+            "Value": "",
           },
         ],
       },
@@ -2584,7 +3172,7 @@ schema {
         "tasksdecsCustomResourcePolicy766680A1",
       ],
       "Properties": {
-        "Create": "{"service":"DynamoDB","action":"describeTable","parameters":{"TableName":"dev-task-sfn-interation-map-tasks"},"physicalResourceId":{"responsePath":"Table.TableArn"}}",
+        "Create": "{"service":"DynamoDB","action":"describeTable","parameters":{"TableName":"dev--tasks"},"physicalResourceId":{"responsePath":"Table.TableArn"}}",
         "InstallLatestAwsSdk": true,
         "ServiceToken": {
           "Fn::GetAtt": [
@@ -2620,7 +3208,7 @@ schema {
     "tasksqs12D9B615": {
       "DeletionPolicy": "Delete",
       "Properties": {
-        "QueueName": "dev-task-sfn-interation-map-task-action-queue",
+        "QueueName": "dev--task-action-queue",
         "RedrivePolicy": {
           "deadLetterTargetArn": {
             "Fn::GetAtt": [
@@ -2637,7 +3225,7 @@ schema {
           },
           {
             "Key": "name",
-            "Value": "task-sfn-interation-map",
+            "Value": "",
           },
         ],
       },
