@@ -46,6 +46,6 @@
     "@mbc-cqrs-serverless/core": "^0.1.74-beta.0",
     "@mbc-cqrs-serverless/sequence": "^0.1.74-beta.0",
     "@mbc-cqrs-serverless/task": "^0.1.74-beta.0",
-    "ulid": "^2.3.0"
+    "ulid": "^3.0.2"
   }
 }

@@ -43,6 +43,6 @@
   "dependencies": {
     "@mbc-cqrs-serverless/core": "^0.1.74-beta.0",
     "@mbc-cqrs-serverless/master": "^0.1.74-beta.0",
-    "ulid": "^2.3.0"
+    "ulid": "^3.0.2"
   }
 }
