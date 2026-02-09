@@ -4,7 +4,7 @@
  * This test suite validates the zod package's input/output behavior
  * to ensure compatibility with the MBC CQRS Serverless framework.
  *
- * Package: zod (^3.23.0)
+ * Package: zod (^4.3.6)
  * Purpose: TypeScript-first schema validation with static type inference
  *
  * Test coverage:
@@ -781,9 +781,12 @@ describe('zod Integration Tests', () => {
 
   describe('Error Message Customization', () => {
     it('should use custom error message', () => {
+      // v4: unified 'error' param replaces required_error/invalid_type_error
       const schema = z.string({
-        required_error: 'Name is required',
-        invalid_type_error: 'Name must be a string',
+        error: (issue) =>
+          issue.input === undefined
+            ? 'Name is required'
+            : 'Name must be a string',
       })
 
       try {
@@ -839,7 +842,7 @@ describe('zod Integration Tests', () => {
         name: z.string(),
         email: z.string().email(),
         role: z.enum(['admin', 'user']),
-        metadata: z.record(z.string()).optional(),
+        metadata: z.record(z.string(), z.string()).optional(),
       })
 
       // Type inference
@@ -920,8 +923,8 @@ describe('zod Integration Tests', () => {
       const requestSchema = z.object({
         method: z.enum(['GET', 'POST', 'PUT', 'DELETE']),
         path: z.string().startsWith('/'),
-        body: z.record(z.unknown()).optional(),
-        headers: z.record(z.string()).optional(),
+        body: z.record(z.string(), z.unknown()).optional(),
+        headers: z.record(z.string(), z.string()).optional(),
       })
 
       const request = {
@@ -991,13 +994,13 @@ describe('zod Integration Tests', () => {
     })
   })
 
-  describe('Breaking Change Detection', () => {
+  describe('Zod v4 API Verification', () => {
     /**
-     * These tests verify behaviors that are known to change between
-     * major zod versions. If any of these tests fail after a zod upgrade,
-     * it indicates a breaking change that may require code updates.
+     * These tests verify zod v4 API behavior and ensure compatibility
+     * with the MBC CQRS Serverless framework. They document the key
+     * API changes from v3 to v4 and verify the new patterns work correctly.
      *
-     * Key breaking changes in zod v4:
+     * Key changes in zod v4:
      * - z.record() requires 2 arguments (key, value)
      * - Error params: required_error/invalid_type_error replaced with error
      * - z.string().email/url/uuid() deprecated in favor of z.email/url/uuid()
@@ -1005,11 +1008,10 @@ describe('zod Integration Tests', () => {
      * - .refine()/.min()/.max() message param replaced with error param
      */
 
-    describe('z.record() single-argument form', () => {
-      it('should accept single argument z.record(valueSchema)', () => {
-        // v3: z.record(z.string()) means Record<string, string>
-        // v4: requires 2 arguments z.record(z.string(), z.string())
-        const schema = z.record(z.string())
+    describe('z.record() two-argument form', () => {
+      it('should require key and value schemas for z.record()', () => {
+        // v4: z.record(keySchema, valueSchema) is required
+        const schema = z.record(z.string(), z.string())
 
         expect(schema.parse({ a: 'hello', b: 'world' })).toEqual({
           a: 'hello',
@@ -1018,8 +1020,8 @@ describe('zod Integration Tests', () => {
         expect(() => schema.parse({ a: 123 })).toThrow(ZodError)
       })
 
-      it('should accept single argument z.record(z.unknown())', () => {
-        const schema = z.record(z.unknown())
+      it('should support z.record(z.string(), z.unknown())', () => {
+        const schema = z.record(z.string(), z.unknown())
 
         expect(schema.parse({ a: 1, b: 'two', c: true })).toEqual({
           a: 1,
@@ -1029,13 +1031,14 @@ describe('zod Integration Tests', () => {
       })
     })
 
-    describe('Error customization params', () => {
-      it('should support required_error param', () => {
-        // v3: z.string({ required_error: '...' })
-        // v4: replaced with z.string({ error: (issue) => ... })
+    describe('Error customization with error param', () => {
+      it('should support unified error param with function', () => {
+        // v4: z.string({ error: (issue) => ... }) replaces required_error/invalid_type_error
         const schema = z.string({
-          required_error: 'Field is required',
-          invalid_type_error: 'Must be a string',
+          error: (issue) =>
+            issue.input === undefined
+              ? 'Field is required'
+              : 'Must be a string',
         })
 
         const result1 = schema.safeParse(undefined)
@@ -1051,9 +1054,19 @@ describe('zod Integration Tests', () => {
         }
       })
 
-      it('should support message param in .min()', () => {
-        // v3: .min(5, { message: '...' })
-        // v4: replaced with .min(5, { error: '...' })
+      it('should support error param as string', () => {
+        // v4: simple string form of error param
+        const schema = z.string({ error: 'Invalid value' })
+
+        const result = schema.safeParse(123)
+        expect(result.success).toBe(false)
+        if (!result.success) {
+          expect(result.error.issues[0].message).toBe('Invalid value')
+        }
+      })
+
+      it('should support message param in .min() (backward compat)', () => {
+        // { message: '...' } still works at runtime in v4
         const schema = z.string().min(5, { message: 'Too short' })
 
         const result = schema.safeParse('abc')
@@ -1063,7 +1076,7 @@ describe('zod Integration Tests', () => {
         }
       })
 
-      it('should support message param in .max()', () => {
+      it('should support message param in .max() (backward compat)', () => {
         const schema = z.string().max(3, { message: 'Too long' })
 
         const result = schema.safeParse('abcde')
@@ -1073,9 +1086,7 @@ describe('zod Integration Tests', () => {
         }
       })
 
-      it('should support message param in .refine()', () => {
-        // v3: .refine(fn, { message: '...' })
-        // v4: replaced with .refine(fn, { error: '...' })
+      it('should support message param in .refine() (backward compat)', () => {
         const schema = z.string().refine((val) => val.startsWith('MBC'), {
           message: 'Must start with MBC',
         })
@@ -1088,8 +1099,6 @@ describe('zod Integration Tests', () => {
       })
 
       it('should support string message shorthand in .email()', () => {
-        // v3: .email('Custom message') or .email({ message: '...' })
-        // v4: .email({ error: '...' })
         const schema = z.string().email('Invalid email format')
 
         const result = schema.safeParse('bad')
@@ -1100,24 +1109,21 @@ describe('zod Integration Tests', () => {
       })
     })
 
-    describe('Optional + default interaction', () => {
-      it('should not apply default when field is optional and missing', () => {
-        // v3: defaults are NOT applied to optional fields when missing
+    describe('Optional + default interaction (v4 behavior)', () => {
+      it('should apply default even when field is optional and missing', () => {
         // v4: defaults ARE applied even within optional fields
+        // (v3 did NOT apply defaults to optional missing fields)
         const schema = z.object({
           name: z.string().default('anonymous').optional(),
         })
 
         const result = schema.parse({})
-        // v3 behavior: {} (default not applied because field is optional)
-        // v4 behavior: { name: 'anonymous' } (default is applied)
-        expect(result).toEqual({})
+        expect(result).toEqual({ name: 'anonymous' })
       })
     })
 
-    describe('z.string() format method chaining', () => {
+    describe('z.string() format method chaining (deprecated but functional)', () => {
       it('should support .email() as method on z.string()', () => {
-        // v3: z.string().email() is the standard way
         // v4: z.email() is preferred, z.string().email() deprecated but still works
         const schema = z.string().email()
 
@@ -1180,8 +1186,6 @@ describe('zod Integration Tests', () => {
 
     describe('ZodIssueCode constants', () => {
       it('should expose ZodIssueCode.custom', () => {
-        // v3: z.ZodIssueCode.custom
-        // v4: may change internal structure
         expect(z.ZodIssueCode.custom).toBe('custom')
       })
 
