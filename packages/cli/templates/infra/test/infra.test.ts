@@ -7,6 +7,20 @@ import { Template } from 'aws-cdk-lib/assertions'
 import { getConfig } from '../config'
 import { InfraStack } from '../libs/infra-stack'
 
+jest.mock('../config/constant', () => ({
+  PIPELINE_NAME: 'test-pipeline',
+  GIT_REPO: 'test-repo',
+  GIT_CONNECTION_ARN:
+    'arn:aws:codestar-connections:ap-northeast-1:101010101010:connection/test',
+  ACM_HTTP_CERTIFICATE_ARN:
+    'arn:aws:acm:us-east-1:101010101010:certificate/test-http',
+  ACM_APPSYNC_CERTIFICATE_ARN:
+    'arn:aws:acm:us-east-1:101010101010:certificate/test-appsync',
+  HOSTED_ZONE_ID: 'Z0123456789ABCDEFGHIJ',
+  HOSTED_ZONE_NAME: 'example.com',
+  COGNITO_URL: 'https://cognito-idp.ap-northeast-1.amazonaws.com/test',
+}))
+
 jest.mock('crypto', () => ({
   ...jest.requireActual('crypto'),
   randomBytes: jest.fn(() => Buffer.from('e380014717dda68f930961c8fdcde7')),

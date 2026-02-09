@@ -4,7 +4,7 @@
  * This test suite validates the zod package's input/output behavior
  * to ensure compatibility with the MBC CQRS Serverless framework.
  *
- * Package: zod (^3.23.0)
+ * Package: zod (^4.3.6)
  * Purpose: TypeScript-first schema validation with static type inference
  *
  * Test coverage:
@@ -20,6 +20,7 @@
  * - z.refine() custom validation
  * - parse() vs safeParse() behavior
  * - Error message customization
+ * - Breaking change detection for major version upgrades
  */
 
 import { z, ZodError } from 'zod'
@@ -73,7 +74,9 @@ describe('zod Integration Tests', () => {
       const schema = z.string().url()
 
       expect(schema.parse('https://example.com')).toBe('https://example.com')
-      expect(schema.parse('http://localhost:3000')).toBe('http://localhost:3000')
+      expect(schema.parse('http://localhost:3000')).toBe(
+        'http://localhost:3000',
+      )
       expect(() => schema.parse('not-a-url')).toThrow(ZodError)
     })
 
@@ -578,16 +581,22 @@ describe('zod Integration Tests', () => {
     it('should validate discriminated union', () => {
       const schema = z.discriminatedUnion('type', [
         z.object({ type: z.literal('user'), name: z.string() }),
-        z.object({ type: z.literal('admin'), name: z.string(), level: z.number() }),
+        z.object({
+          type: z.literal('admin'),
+          name: z.string(),
+          level: z.number(),
+        }),
       ])
 
       expect(schema.parse({ type: 'user', name: 'John' })).toEqual({
         type: 'user',
         name: 'John',
       })
-      expect(
-        schema.parse({ type: 'admin', name: 'Admin', level: 5 }),
-      ).toEqual({ type: 'admin', name: 'Admin', level: 5 })
+      expect(schema.parse({ type: 'admin', name: 'Admin', level: 5 })).toEqual({
+        type: 'admin',
+        name: 'Admin',
+        level: 5,
+      })
       expect(() => schema.parse({ type: 'guest', name: 'Guest' })).toThrow(
         ZodError,
       )
@@ -689,18 +698,20 @@ describe('zod Integration Tests', () => {
     })
 
     it('should validate with superRefine for multiple errors', () => {
-      const schema = z.object({
-        password: z.string(),
-        confirmPassword: z.string(),
-      }).superRefine((data, ctx) => {
-        if (data.password !== data.confirmPassword) {
-          ctx.addIssue({
-            code: z.ZodIssueCode.custom,
-            message: 'Passwords do not match',
-            path: ['confirmPassword'],
-          })
-        }
-      })
+      const schema = z
+        .object({
+          password: z.string(),
+          confirmPassword: z.string(),
+        })
+        .superRefine((data, ctx) => {
+          if (data.password !== data.confirmPassword) {
+            ctx.addIssue({
+              code: z.ZodIssueCode.custom,
+              message: 'Passwords do not match',
+              path: ['confirmPassword'],
+            })
+          }
+        })
 
       expect(
         schema.parse({ password: 'secret', confirmPassword: 'secret' }),
@@ -770,9 +781,12 @@ describe('zod Integration Tests', () => {
 
   describe('Error Message Customization', () => {
     it('should use custom error message', () => {
+      // v4: unified 'error' param replaces required_error/invalid_type_error
       const schema = z.string({
-        required_error: 'Name is required',
-        invalid_type_error: 'Name must be a string',
+        error: (issue) =>
+          issue.input === undefined
+            ? 'Name is required'
+            : 'Name must be a string',
       })
 
       try {
@@ -828,7 +842,7 @@ describe('zod Integration Tests', () => {
         name: z.string(),
         email: z.string().email(),
         role: z.enum(['admin', 'user']),
-        metadata: z.record(z.string()).optional(),
+        metadata: z.record(z.string(), z.string()).optional(),
       })
 
       // Type inference
@@ -869,7 +883,10 @@ describe('zod Integration Tests', () => {
     it('should match generate module schema pattern', () => {
       const GenerateModuleSchema = z.object({
         name: z.string().describe('Name of the module to generate'),
-        mode: z.enum(['async', 'sync']).optional().describe('Command processing mode'),
+        mode: z
+          .enum(['async', 'sync'])
+          .optional()
+          .describe('Command processing mode'),
       })
 
       const validInput = { name: 'order', mode: 'async' }
@@ -883,10 +900,12 @@ describe('zod Integration Tests', () => {
       // Pattern for generating JSON Schema from Zod
       const schema = z.object({
         name: z.string(),
-        options: z.object({
-          enabled: z.boolean().default(true),
-          count: z.number().int().positive().optional(),
-        }).optional(),
+        options: z
+          .object({
+            enabled: z.boolean().default(true),
+            count: z.number().int().positive().optional(),
+          })
+          .optional(),
       })
 
       const input = {
@@ -904,8 +923,8 @@ describe('zod Integration Tests', () => {
       const requestSchema = z.object({
         method: z.enum(['GET', 'POST', 'PUT', 'DELETE']),
         path: z.string().startsWith('/'),
-        body: z.record(z.unknown()).optional(),
-        headers: z.record(z.string()).optional(),
+        body: z.record(z.string(), z.unknown()).optional(),
+        headers: z.record(z.string(), z.string()).optional(),
       })
 
       const request = {
@@ -959,7 +978,9 @@ describe('zod Integration Tests', () => {
 
       expect(schema.parse(['hello', 42, true])).toEqual(['hello', 42, true])
       expect(() => schema.parse(['hello', 42])).toThrow(ZodError)
-      expect(() => schema.parse(['hello', 'not number', true])).toThrow(ZodError)
+      expect(() => schema.parse(['hello', 'not number', true])).toThrow(
+        ZodError,
+      )
     })
 
     it('should use preprocess for input normalization', () => {
@@ -970,6 +991,337 @@ describe('zod Integration Tests', () => {
 
       expect(schema.parse('  HELLO  ')).toBe('hello')
       expect(() => schema.parse('   ')).toThrow(ZodError)
+    })
+  })
+
+  describe('Zod v4 API Verification', () => {
+    /**
+     * These tests verify zod v4 API behavior and ensure compatibility
+     * with the MBC CQRS Serverless framework. They document the key
+     * API changes from v3 to v4 and verify the new patterns work correctly.
+     *
+     * Key changes in zod v4:
+     * - z.record() requires 2 arguments (key, value)
+     * - Error params: required_error/invalid_type_error replaced with error
+     * - z.string().email/url/uuid() deprecated in favor of z.email/url/uuid()
+     * - Default + optional behavior change: defaults apply even in optional
+     * - .refine()/.min()/.max() message param replaced with error param
+     */
+
+    describe('z.record() two-argument form', () => {
+      it('should require key and value schemas for z.record()', () => {
+        // v4: z.record(keySchema, valueSchema) is required
+        const schema = z.record(z.string(), z.string())
+
+        expect(schema.parse({ a: 'hello', b: 'world' })).toEqual({
+          a: 'hello',
+          b: 'world',
+        })
+        expect(() => schema.parse({ a: 123 })).toThrow(ZodError)
+      })
+
+      it('should support z.record(z.string(), z.unknown())', () => {
+        const schema = z.record(z.string(), z.unknown())
+
+        expect(schema.parse({ a: 1, b: 'two', c: true })).toEqual({
+          a: 1,
+          b: 'two',
+          c: true,
+        })
+      })
+    })
+
+    describe('Error customization with error param', () => {
+      it('should support unified error param with function', () => {
+        // v4: z.string({ error: (issue) => ... }) replaces required_error/invalid_type_error
+        const schema = z.string({
+          error: (issue) =>
+            issue.input === undefined
+              ? 'Field is required'
+              : 'Must be a string',
+        })
+
+        const result1 = schema.safeParse(undefined)
+        expect(result1.success).toBe(false)
+        if (!result1.success) {
+          expect(result1.error.issues[0].message).toBe('Field is required')
+        }
+
+        const result2 = schema.safeParse(123)
+        expect(result2.success).toBe(false)
+        if (!result2.success) {
+          expect(result2.error.issues[0].message).toBe('Must be a string')
+        }
+      })
+
+      it('should support error param as string', () => {
+        // v4: simple string form of error param
+        const schema = z.string({ error: 'Invalid value' })
+
+        const result = schema.safeParse(123)
+        expect(result.success).toBe(false)
+        if (!result.success) {
+          expect(result.error.issues[0].message).toBe('Invalid value')
+        }
+      })
+
+      it('should support message param in .min() (backward compat)', () => {
+        // { message: '...' } still works at runtime in v4
+        const schema = z.string().min(5, { message: 'Too short' })
+
+        const result = schema.safeParse('abc')
+        expect(result.success).toBe(false)
+        if (!result.success) {
+          expect(result.error.issues[0].message).toBe('Too short')
+        }
+      })
+
+      it('should support message param in .max() (backward compat)', () => {
+        const schema = z.string().max(3, { message: 'Too long' })
+
+        const result = schema.safeParse('abcde')
+        expect(result.success).toBe(false)
+        if (!result.success) {
+          expect(result.error.issues[0].message).toBe('Too long')
+        }
+      })
+
+      it('should support message param in .refine() (backward compat)', () => {
+        const schema = z.string().refine((val) => val.startsWith('MBC'), {
+          message: 'Must start with MBC',
+        })
+
+        const result = schema.safeParse('hello')
+        expect(result.success).toBe(false)
+        if (!result.success) {
+          expect(result.error.issues[0].message).toBe('Must start with MBC')
+        }
+      })
+
+      it('should support string message shorthand in .email()', () => {
+        const schema = z.string().email('Invalid email format')
+
+        const result = schema.safeParse('bad')
+        expect(result.success).toBe(false)
+        if (!result.success) {
+          expect(result.error.issues[0].message).toBe('Invalid email format')
+        }
+      })
+    })
+
+    describe('Optional + default interaction (v4 behavior)', () => {
+      it('should apply default even when field is optional and missing', () => {
+        // v4: defaults ARE applied even within optional fields
+        // (v3 did NOT apply defaults to optional missing fields)
+        const schema = z.object({
+          name: z.string().default('anonymous').optional(),
+        })
+
+        const result = schema.parse({})
+        expect(result).toEqual({ name: 'anonymous' })
+      })
+    })
+
+    describe('z.string() format method chaining (deprecated but functional)', () => {
+      it('should support .email() as method on z.string()', () => {
+        // v4: z.email() is preferred, z.string().email() deprecated but still works
+        const schema = z.string().email()
+
+        expect(schema.parse('test@example.com')).toBe('test@example.com')
+        expect(() => schema.parse('bad')).toThrow(ZodError)
+      })
+
+      it('should support .url() as method on z.string()', () => {
+        const schema = z.string().url()
+
+        expect(schema.parse('https://example.com')).toBe('https://example.com')
+        expect(() => schema.parse('bad')).toThrow(ZodError)
+      })
+
+      it('should support .uuid() as method on z.string()', () => {
+        const schema = z.string().uuid()
+
+        expect(schema.parse('550e8400-e29b-41d4-a716-446655440000')).toBe(
+          '550e8400-e29b-41d4-a716-446655440000',
+        )
+        expect(() => schema.parse('bad')).toThrow(ZodError)
+      })
+    })
+
+    describe('ZodError structure', () => {
+      it('should expose issues array on ZodError', () => {
+        const schema = z.string()
+
+        try {
+          schema.parse(123)
+          fail('Expected ZodError')
+        } catch (error) {
+          expect(error).toBeInstanceOf(ZodError)
+          const zodError = error as ZodError
+          expect(Array.isArray(zodError.issues)).toBe(true)
+          expect(zodError.issues.length).toBeGreaterThan(0)
+          expect(zodError.issues[0]).toHaveProperty('code')
+          expect(zodError.issues[0]).toHaveProperty('message')
+          expect(zodError.issues[0]).toHaveProperty('path')
+        }
+      })
+
+      it('should support flatten() on ZodError', () => {
+        const schema = z.object({
+          name: z.string(),
+          age: z.number(),
+        })
+
+        const result = schema.safeParse({ name: 123, age: 'bad' })
+        expect(result.success).toBe(false)
+        if (!result.success) {
+          const flattened = result.error.flatten()
+          expect(flattened).toHaveProperty('fieldErrors')
+          expect(flattened).toHaveProperty('formErrors')
+          expect(flattened.fieldErrors).toHaveProperty('name')
+          expect(flattened.fieldErrors).toHaveProperty('age')
+        }
+      })
+    })
+
+    describe('ZodIssueCode constants', () => {
+      it('should expose ZodIssueCode.custom', () => {
+        expect(z.ZodIssueCode.custom).toBe('custom')
+      })
+
+      it('should support ZodIssueCode in superRefine', () => {
+        const schema = z
+          .object({
+            start: z.number(),
+            end: z.number(),
+          })
+          .superRefine((data, ctx) => {
+            if (data.end <= data.start) {
+              ctx.addIssue({
+                code: z.ZodIssueCode.custom,
+                message: 'End must be after start',
+                path: ['end'],
+              })
+            }
+          })
+
+        const result = schema.safeParse({ start: 10, end: 5 })
+        expect(result.success).toBe(false)
+        if (!result.success) {
+          expect(result.error.issues[0].message).toBe('End must be after start')
+          expect(result.error.issues[0].path).toEqual(['end'])
+        }
+      })
+    })
+
+    describe('Actual usage patterns from MBC MCP Server source', () => {
+      it('should match ValidateCqrsSchema pattern (validate.ts)', () => {
+        // Exact pattern from packages/mcp-server/src/tools/validate.ts
+        const ValidateCqrsSchema = z.object({
+          path: z
+            .string()
+            .optional()
+            .describe('Path to validate (defaults to project root)'),
+        })
+
+        expect(ValidateCqrsSchema.parse({})).toEqual({})
+        expect(ValidateCqrsSchema.parse({ path: '/src' })).toEqual({
+          path: '/src',
+        })
+      })
+
+      it('should match AnalyzeProjectSchema pattern (analyze.ts)', () => {
+        // Exact pattern from packages/mcp-server/src/tools/analyze.ts
+        const AnalyzeProjectSchema = z.object({
+          path: z
+            .string()
+            .optional()
+            .describe('Path to analyze (defaults to project root)'),
+        })
+
+        expect(AnalyzeProjectSchema.parse({})).toEqual({})
+        expect(AnalyzeProjectSchema.parse({ path: '/project' })).toEqual({
+          path: '/project',
+        })
+      })
+
+      it('should match LookupErrorSchema pattern (analyze.ts)', () => {
+        const LookupErrorSchema = z.object({
+          error_message: z.string().describe('The error message to look up'),
+        })
+
+        expect(
+          LookupErrorSchema.parse({ error_message: 'some error' }),
+        ).toEqual({ error_message: 'some error' })
+        expect(() => LookupErrorSchema.parse({})).toThrow(ZodError)
+      })
+
+      it('should match CheckAntiPatternsSchema pattern (analyze.ts)', () => {
+        const CheckAntiPatternsSchema = z.object({
+          path: z
+            .string()
+            .optional()
+            .describe('Path to check (defaults to src/)'),
+        })
+
+        expect(CheckAntiPatternsSchema.parse({})).toEqual({})
+      })
+
+      it('should match HealthCheckSchema pattern (analyze.ts)', () => {
+        const HealthCheckSchema = z.object({})
+
+        expect(HealthCheckSchema.parse({})).toEqual({})
+      })
+
+      it('should match ExplainCodeSchema pattern (analyze.ts)', () => {
+        const ExplainCodeSchema = z.object({
+          file_path: z.string().describe('Path to the file to explain'),
+          start_line: z.number().optional().describe('Starting line number'),
+          end_line: z.number().optional().describe('Ending line number'),
+        })
+
+        expect(ExplainCodeSchema.parse({ file_path: '/src/main.ts' })).toEqual({
+          file_path: '/src/main.ts',
+        })
+        expect(
+          ExplainCodeSchema.parse({
+            file_path: '/src/main.ts',
+            start_line: 1,
+            end_line: 10,
+          }),
+        ).toEqual({ file_path: '/src/main.ts', start_line: 1, end_line: 10 })
+      })
+
+      it('should match GenerateModuleSchema pattern (generate.ts)', () => {
+        const GenerateModuleSchema = z.object({
+          name: z
+            .string()
+            .describe(
+              'Name of the module to generate (e.g., "order", "product")',
+            ),
+          mode: z
+            .enum(['async', 'sync'])
+            .optional()
+            .describe('Command processing mode: async (default) or sync'),
+        })
+
+        expect(GenerateModuleSchema.parse({ name: 'order' })).toEqual({
+          name: 'order',
+        })
+        expect(
+          GenerateModuleSchema.parse({ name: 'order', mode: 'sync' }),
+        ).toEqual({ name: 'order', mode: 'sync' })
+      })
+
+      it('should match GenerateComponentSchema pattern (generate.ts)', () => {
+        const GenerateComponentSchema = z.object({
+          name: z.string().describe('Name of the component to generate'),
+        })
+
+        expect(GenerateComponentSchema.parse({ name: 'my-service' })).toEqual({
+          name: 'my-service',
+        })
+      })
     })
   })
 })
