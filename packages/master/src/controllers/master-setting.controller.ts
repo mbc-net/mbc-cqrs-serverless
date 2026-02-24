@@ -133,7 +133,7 @@ export class MasterSettingController {
     @Body() createDto: CommonSettingBulkDto,
     @INVOKE_CONTEXT() invokeContext: IInvoke,
   ) {
-    return this.masterSettingService.createBulk(createDto, invokeContext)
+    return this.masterSettingService.upsertBulk(createDto, invokeContext)
   }
 
   @Put('/:id')

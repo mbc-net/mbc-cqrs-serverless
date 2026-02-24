@@ -67,6 +67,7 @@ export class CommandService implements OnModuleInit, ICommandService {
     )
     this.logger = new Logger(`${CommandService.name}:${this.tableName}`)
   }
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   publishItem(key: DetailKey): Promise<any | null> {
     throw new Error('Method not implemented.')
   }
@@ -159,9 +160,7 @@ export class CommandService implements OnModuleInit, ICommandService {
       })
     }
     if (!item) {
-      throw new BadRequestException(
-        'Invalid input key: item not found',
-      )
+      throw new BadRequestException('Invalid input key: item not found')
     }
     if (!Object.keys(input).includes('ttl')) {
       delete item.ttl
@@ -289,9 +288,7 @@ export class CommandService implements OnModuleInit, ICommandService {
   async duplicate(key: DetailKey, options: ICommandOptions) {
     const item = await this.getItem(key)
     if (!item) {
-      throw new BadRequestException(
-        'Invalid input key: item not found',
-      )
+      throw new BadRequestException('Invalid input key: item not found')
     }
     const userContext = getUserContext(options.invokeContext)
 
@@ -414,10 +411,15 @@ export class CommandService implements OnModuleInit, ICommandService {
       'attributes',
     ]
 
-    return isDeepStrictEqual(
-      structuredClone(pickKeys(item, comparedKeys)),
-      structuredClone(pickKeys(input, comparedKeys)),
-    )
+    const itemPicked = structuredClone(pickKeys(item, comparedKeys))
+    const inputPicked = structuredClone(pickKeys(input, comparedKeys))
+    // Normalize null/undefined: treat missing keys as null for comparison
+    for (const key of comparedKeys) {
+      if (!(key in itemPicked)) itemPicked[key] = null
+      if (!(key in inputPicked)) inputPicked[key] = null
+    }
+
+    return isDeepStrictEqual(itemPicked, inputPicked)
   }
 
   async updateTtl(key: DetailKey) {

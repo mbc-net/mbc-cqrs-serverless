@@ -115,7 +115,7 @@ export class MasterDataController {
     @Body() createDto: MasterDataCreateBulkDto,
     @INVOKE_CONTEXT() invokeContext: IInvoke,
   ) {
-    return this.masterDataService.createBulk(createDto, invokeContext)
+    return this.masterDataService.upsertBulk(createDto, invokeContext)
   }
 
   @Put('/:id')

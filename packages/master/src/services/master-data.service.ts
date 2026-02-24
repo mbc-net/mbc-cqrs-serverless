@@ -168,14 +168,29 @@ export class MasterDataService implements IMasterDataService {
     createDto: CreateMasterDataDto,
     opts: { invokeContext: IInvoke },
   ) {
+    return this.createOrUpsert(createDto, opts, { throwIfExists: true })
+  }
+
+  async upsert(
+    createDto: CreateMasterDataDto,
+    opts: { invokeContext: IInvoke },
+  ) {
+    return this.createOrUpsert(createDto, opts, { throwIfExists: false })
+  }
+
+  private async createOrUpsert(
+    createDto: CreateMasterDataDto,
+    opts: { invokeContext: IInvoke },
+    { throwIfExists }: { throwIfExists: boolean },
+  ): Promise<MasterDataEntity> {
     const { settingCode, code, tenantCode } = createDto
     const pk = generateMasterPk(tenantCode)
     const sk = generateMasterDataSk(settingCode, code)
     const id = generateId(pk, sk)
 
-    const dataSetting = await this.dataService.getItem({ pk, sk })
+    const existingData = await this.dataService.getItem({ pk, sk })
 
-    if (dataSetting && dataSetting.isDeleted == false) {
+    if (throwIfExists && existingData && existingData.isDeleted == false) {
       throw new BadRequestException('Master data already exists')
     }
 
@@ -183,7 +198,7 @@ export class MasterDataService implements IMasterDataService {
       id,
       pk,
       sk,
-      version: dataSetting?.version ?? VERSION_FIRST,
+      version: existingData?.version ?? VERSION_FIRST,
       type: MASTER_PK_PREFIX,
       tenantCode,
       isDeleted: false,
@@ -193,6 +208,14 @@ export class MasterDataService implements IMasterDataService {
     const item = await this.commandService.publishAsync(createCmd, {
       invokeContext: opts.invokeContext,
     })
+
+    if (!item) {
+      // No changes detected - return existing data without requestId
+      // to indicate that no new command was created
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
+      const { requestId, ...rest } = existingData
+      return new MasterDataEntity(rest)
+    }
 
     return new MasterDataEntity(item)
   }
@@ -282,6 +305,25 @@ export class MasterDataService implements IMasterDataService {
   }
 
   async createSetting(createDto: MasterDataCreateDto, invokeContext: IInvoke) {
+    const prepared = await this.prepareSettingDto(createDto, invokeContext)
+    return this.create(prepared, { invokeContext })
+  }
+
+  async createBulk(createDto: MasterDataCreateBulkDto, invokeContext: IInvoke) {
+    return Promise.all(
+      createDto.items.map((item) => this.createSetting(item, invokeContext)),
+    )
+  }
+
+  async upsertSetting(createDto: MasterDataCreateDto, invokeContext: IInvoke) {
+    const prepared = await this.prepareSettingDto(createDto, invokeContext)
+    return this.upsert(prepared, { invokeContext })
+  }
+
+  private async prepareSettingDto(
+    createDto: MasterDataCreateDto,
+    invokeContext: IInvoke,
+  ): Promise<CreateMasterDataDto> {
     const userContext = getUserContext(invokeContext)
     let seq = createDto?.seq
     if (!seq) {
@@ -299,22 +341,19 @@ export class MasterDataService implements IMasterDataService {
       createDto.attributes['seq'] = seq
     }
 
-    return await this.create(
-      {
-        code: createDto.code ?? ulid(),
-        tenantCode: createDto.tenantCode ?? userContext.tenantCode,
-        name: createDto.name,
-        settingCode: createDto.settingCode,
-        attributes: createDto.attributes ?? {},
-        seq,
-      },
-      { invokeContext },
-    )
+    return {
+      code: createDto.code ?? ulid(),
+      tenantCode: createDto.tenantCode ?? userContext.tenantCode,
+      name: createDto.name,
+      settingCode: createDto.settingCode,
+      attributes: createDto.attributes ?? {},
+      seq,
+    }
   }
 
-  async createBulk(createDto: MasterDataCreateBulkDto, invokeContext: IInvoke) {
+  async upsertBulk(createDto: MasterDataCreateBulkDto, invokeContext: IInvoke) {
     return Promise.all(
-      createDto.items.map((item) => this.createSetting(item, invokeContext)),
+      createDto.items.map((item) => this.upsertSetting(item, invokeContext)),
     )
   }
 
