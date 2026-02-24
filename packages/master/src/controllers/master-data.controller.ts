@@ -115,6 +115,12 @@ export class MasterDataController {
     @Body() createDto: MasterDataCreateBulkDto,
     @INVOKE_CONTEXT() invokeContext: IInvoke,
   ) {
+    const userContext = getUserContext(invokeContext)
+    for (const item of createDto.items) {
+      if (item.tenantCode && item.tenantCode !== userContext.tenantCode) {
+        throw new BadRequestException(`Invalid tenant code: ${item.tenantCode}`)
+      }
+    }
     return this.masterDataService.upsertBulk(createDto, invokeContext)
   }
 

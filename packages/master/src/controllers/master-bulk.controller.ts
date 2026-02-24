@@ -23,7 +23,7 @@ export class MasterBulkController {
   ) {}
 
   @Post('/')
-  async createBulk(
+  async upsertBulk(
     @Body() bulkDto: MasterBulkDto,
     @INVOKE_CONTEXT() invokeContext: IInvoke,
   ) {

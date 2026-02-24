@@ -69,7 +69,7 @@ describe('MasterBulkController', () => {
     expect(controller).toBeDefined()
   })
 
-  describe('createBulk', () => {
+  describe('upsertBulk', () => {
     it('should route items with settingCode to dataService.upsertBulk', async () => {
       const bulkDto = {
         items: [
@@ -99,7 +99,7 @@ describe('MasterBulkController', () => {
         .spyOn(dataService, 'upsertBulk')
         .mockResolvedValue(dataResults as any)
 
-      const result = await controller.createBulk(
+      const result = await controller.upsertBulk(
         bulkDto as any,
         mockInvokeContext,
       )
@@ -146,7 +146,7 @@ describe('MasterBulkController', () => {
         .spyOn(settingService, 'upsertBulk')
         .mockResolvedValue(settingResults as any)
 
-      const result = await controller.createBulk(
+      const result = await controller.upsertBulk(
         bulkDto as any,
         mockInvokeContext,
       )
@@ -200,7 +200,7 @@ describe('MasterBulkController', () => {
         .spyOn(dataService, 'upsertBulk')
         .mockResolvedValue(dataResults as any)
 
-      const result = await controller.createBulk(
+      const result = await controller.upsertBulk(
         bulkDto as any,
         mockInvokeContext,
       )
@@ -229,11 +229,11 @@ describe('MasterBulkController', () => {
       }
 
       await expect(
-        controller.createBulk(bulkDto as any, mockInvokeContext),
+        controller.upsertBulk(bulkDto as any, mockInvokeContext),
       ).rejects.toThrow(BadRequestException)
 
       await expect(
-        controller.createBulk(bulkDto as any, mockInvokeContext),
+        controller.upsertBulk(bulkDto as any, mockInvokeContext),
       ).rejects.toThrow('Invalid tenant code: other-tenant')
     })
 
@@ -253,7 +253,7 @@ describe('MasterBulkController', () => {
         .spyOn(settingService, 'upsertBulk')
         .mockResolvedValue([{ name: 'Setting 1' }] as any)
 
-      const result = await controller.createBulk(
+      const result = await controller.upsertBulk(
         bulkDto as any,
         mockInvokeContext,
       )
@@ -286,7 +286,7 @@ describe('MasterBulkController', () => {
         .spyOn(settingService, 'upsertBulk')
         .mockResolvedValue([{ name: 'Setting 1' }] as any)
 
-      const result = await controller.createBulk(
+      const result = await controller.upsertBulk(
         bulkDto as any,
         mockInvokeContext,
       )
@@ -322,7 +322,7 @@ describe('MasterBulkController', () => {
         .mockRejectedValue(new Error('Database error'))
 
       await expect(
-        controller.createBulk(bulkDto as any, mockInvokeContext),
+        controller.upsertBulk(bulkDto as any, mockInvokeContext),
       ).rejects.toThrow('Database error')
     })
   })
