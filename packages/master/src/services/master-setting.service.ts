@@ -401,7 +401,7 @@ export class MasterSettingService implements IMasterSettingService {
       // No changes detected - return existing data without requestId
       // to indicate that no new command was created
       if (!setting) {
-        throw new BadRequestException('Setting not found')
+        throw new NotFoundException('Setting not found')
       }
       // eslint-disable-next-line @typescript-eslint/no-unused-vars
       const { requestId, ...rest } = setting
@@ -423,9 +423,11 @@ export class MasterSettingService implements IMasterSettingService {
   }
 
   async upsertBulk(createDto: CommonSettingBulkDto, invokeContext: IInvoke) {
-    return Promise.all(
-      createDto.items.map((item) => this.upsertSetting(item, invokeContext)),
-    )
+    const results = []
+    for (const item of createDto.items) {
+      results.push(await this.upsertSetting(item, invokeContext))
+    }
+    return results
   }
 
   async update(

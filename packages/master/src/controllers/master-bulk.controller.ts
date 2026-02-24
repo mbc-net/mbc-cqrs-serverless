@@ -22,16 +22,18 @@ export class MasterBulkController {
     private readonly masterDataService: MasterDataService,
   ) {}
 
-  @Post('/bulk')
+  @Post('/')
   async createBulk(
     @Body() bulkDto: MasterBulkDto,
     @INVOKE_CONTEXT() invokeContext: IInvoke,
   ) {
     const userContext = getUserContext(invokeContext)
-    const settingItems: CommonSettingDto[] = []
-    const dataItems: MasterDataCreateDto[] = []
+    const settingItems: { index: number; item: CommonSettingDto }[] = []
+    const dataItems: { index: number; item: MasterDataCreateDto }[] = []
 
-    for (const item of bulkDto.items) {
+    for (let i = 0; i < bulkDto.items.length; i++) {
+      const item = bulkDto.items[i]
+
       // Validate tenantCode: if specified, must match the user's tenant
       if (item.tenantCode && item.tenantCode !== userContext.tenantCode) {
         throw new BadRequestException(`Invalid tenant code: ${item.tenantCode}`)
@@ -40,48 +42,54 @@ export class MasterBulkController {
       if (item.settingCode) {
         // Has settingCode → master data
         dataItems.push({
-          settingCode: item.settingCode,
-          name: item.name,
-          code: item.code,
-          tenantCode: item.tenantCode,
-          seq: item.seq,
-          attributes: item.attributes,
+          index: i,
+          item: {
+            settingCode: item.settingCode,
+            name: item.name,
+            code: item.code,
+            tenantCode: item.tenantCode,
+            seq: item.seq,
+            attributes: item.attributes,
+          },
         })
       } else {
         // No settingCode → master setting
         settingItems.push({
-          name: item.name,
-          code: item.code,
-          tenantCode: item.tenantCode,
-          settingValue: item.attributes,
+          index: i,
+          item: {
+            name: item.name,
+            code: item.code,
+            tenantCode: item.tenantCode,
+            settingValue: item.attributes,
+          },
         })
       }
     }
 
-    const promises: Promise<any[]>[] = []
+    const settingBulkDto = new CommonSettingBulkDto()
+    settingBulkDto.items = settingItems.map((s) => s.item)
 
-    if (settingItems.length > 0) {
-      const settingBulkDto = new CommonSettingBulkDto()
-      settingBulkDto.items = settingItems
-      promises.push(
-        this.masterSettingService.upsertBulk(settingBulkDto, invokeContext),
-      )
-    } else {
-      promises.push(Promise.resolve([]))
-    }
+    const dataBulkDto = new MasterDataCreateBulkDto()
+    dataBulkDto.items = dataItems.map((d) => d.item)
 
-    if (dataItems.length > 0) {
-      const dataBulkDto = new MasterDataCreateBulkDto()
-      dataBulkDto.items = dataItems
-      promises.push(
-        this.masterDataService.upsertBulk(dataBulkDto, invokeContext),
-      )
-    } else {
-      promises.push(Promise.resolve([]))
-    }
+    const [settingResults, dataResults] = await Promise.all([
+      settingItems.length > 0
+        ? this.masterSettingService.upsertBulk(settingBulkDto, invokeContext)
+        : Promise.resolve([]),
+      dataItems.length > 0
+        ? this.masterDataService.upsertBulk(dataBulkDto, invokeContext)
+        : Promise.resolve([]),
+    ])
 
-    const [settingResults, dataResults] = await Promise.all(promises)
+    // Restore original input order
+    const results = new Array(bulkDto.items.length)
+    settingItems.forEach((s, idx) => {
+      results[s.index] = settingResults[idx]
+    })
+    dataItems.forEach((d, idx) => {
+      results[d.index] = dataResults[idx]
+    })
 
-    return [...settingResults, ...dataResults]
+    return results
   }
 }

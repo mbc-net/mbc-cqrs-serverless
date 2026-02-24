@@ -18,7 +18,7 @@ jest.mock('@mbc-cqrs-serverless/core', () => ({
   getUserContext: jest.fn(),
 }))
 
-describe('Master Data Upsert E2E', () => {
+describe('Master Data Upsert Integration', () => {
   let service: MasterDataService
   let prismaService: any
   let commandService: jest.Mocked<CommandService>

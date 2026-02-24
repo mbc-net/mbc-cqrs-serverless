@@ -39,7 +39,7 @@ const mockInvokeContext = {
   },
 }
 
-describe('Master Setting Upsert E2E', () => {
+describe('Master Setting Upsert Integration', () => {
   let service: MasterSettingService
   let dataService: jest.Mocked<DataService>
   let commandService: jest.Mocked<CommandService>

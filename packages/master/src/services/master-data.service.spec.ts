@@ -747,7 +747,14 @@ describe('MasterDataService', () => {
           masterTypeCode: createDto.settingCode,
         },
       })
-      expect(createDto.attributes['seq']).toBe(6)
+      // Verify seq is passed to publishAsync without mutating the original DTO
+      expect(commandService.publishAsync).toHaveBeenCalledWith(
+        expect.objectContaining({
+          attributes: expect.objectContaining({ seq: 6 }),
+          seq: 6,
+        }),
+        expect.anything(),
+      )
     })
 
     it('should create setting with provided sequence', async () => {
@@ -813,7 +820,14 @@ describe('MasterDataService', () => {
 
       await service.createSetting(createDto, mockInvokeContext)
 
-      expect(createDto.attributes['seq']).toBe(1)
+      // Verify seq is passed to publishAsync without mutating the original DTO
+      expect(commandService.publishAsync).toHaveBeenCalledWith(
+        expect.objectContaining({
+          attributes: expect.objectContaining({ seq: 1 }),
+          seq: 1,
+        }),
+        expect.anything(),
+      )
     })
   })
 

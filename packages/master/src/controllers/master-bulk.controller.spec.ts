@@ -167,7 +167,7 @@ describe('MasterBulkController', () => {
       expect(result).toEqual(settingResults)
     })
 
-    it('should route mixed items to both services', async () => {
+    it('should route mixed items to both services and preserve input order', async () => {
       const bulkDto = {
         items: [
           {
@@ -182,10 +182,15 @@ describe('MasterBulkController', () => {
             seq: 1,
             attributes: { key: 'value1' },
           },
+          {
+            name: 'Setting 2',
+            code: 'SET2',
+            attributes: { description: 'Another setting' },
+          },
         ],
       }
 
-      const settingResults = [{ name: 'Setting 1' }]
+      const settingResults = [{ name: 'Setting 1' }, { name: 'Setting 2' }]
       const dataResults = [{ name: 'Data 1' }]
 
       jest
@@ -202,7 +207,13 @@ describe('MasterBulkController', () => {
 
       expect(settingService.upsertBulk).toHaveBeenCalled()
       expect(dataService.upsertBulk).toHaveBeenCalled()
-      expect(result).toEqual([...settingResults, ...dataResults])
+      // Results should maintain original input order:
+      // index 0: Setting 1, index 1: Data 1, index 2: Setting 2
+      expect(result).toEqual([
+        { name: 'Setting 1' },
+        { name: 'Data 1' },
+        { name: 'Setting 2' },
+      ])
     })
 
     it('should throw BadRequestException for mismatching tenant code', async () => {

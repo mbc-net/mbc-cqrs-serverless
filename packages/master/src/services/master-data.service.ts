@@ -329,6 +329,7 @@ export class MasterDataService implements IMasterDataService {
   ): Promise<CreateMasterDataDto> {
     const userContext = getUserContext(invokeContext)
     let seq = createDto?.seq
+    const attributes = { ...(createDto.attributes ?? {}) }
     if (seq == null) {
       const maxSeq = await this.prismaService.master.aggregate({
         _max: {
@@ -341,7 +342,7 @@ export class MasterDataService implements IMasterDataService {
         },
       })
       seq = (maxSeq._max.seq ?? 0) + 1
-      createDto.attributes['seq'] = seq
+      attributes['seq'] = seq
     }
 
     return {
@@ -349,15 +350,17 @@ export class MasterDataService implements IMasterDataService {
       tenantCode: createDto.tenantCode ?? userContext.tenantCode,
       name: createDto.name,
       settingCode: createDto.settingCode,
-      attributes: createDto.attributes ?? {},
+      attributes,
       seq,
     }
   }
 
   async upsertBulk(createDto: MasterDataCreateBulkDto, invokeContext: IInvoke) {
-    return Promise.all(
-      createDto.items.map((item) => this.upsertSetting(item, invokeContext)),
-    )
+    const results = []
+    for (const item of createDto.items) {
+      results.push(await this.upsertSetting(item, invokeContext))
+    }
+    return results
   }
 
   async updateSetting(
