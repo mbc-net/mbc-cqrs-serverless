@@ -400,12 +400,12 @@ export class MasterSettingService implements IMasterSettingService {
     if (!item) {
       // No changes detected - return existing data without requestId
       // to indicate that no new command was created
-      if (setting) {
-        // eslint-disable-next-line @typescript-eslint/no-unused-vars
-        const { requestId, ...rest } = setting
-        return rest as CommandModel
+      if (!setting) {
+        throw new BadRequestException('Setting not found')
       }
-      return {} as CommandModel
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
+      const { requestId, ...rest } = setting
+      return rest as CommandModel
     }
 
     return item

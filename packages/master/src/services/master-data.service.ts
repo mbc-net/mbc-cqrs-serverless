@@ -212,12 +212,12 @@ export class MasterDataService implements IMasterDataService {
     if (!item) {
       // No changes detected - return existing data without requestId
       // to indicate that no new command was created
-      if (existingData) {
-        // eslint-disable-next-line @typescript-eslint/no-unused-vars
-        const { requestId, ...rest } = existingData
-        return new MasterDataEntity(rest)
+      if (!existingData) {
+        throw new NotFoundException('Master data not found')
       }
-      return new MasterDataEntity({})
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
+      const { requestId, ...rest } = existingData
+      return new MasterDataEntity(rest)
     }
 
     return new MasterDataEntity(item)
