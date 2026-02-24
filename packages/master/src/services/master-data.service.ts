@@ -190,7 +190,7 @@ export class MasterDataService implements IMasterDataService {
 
     const existingData = await this.dataService.getItem({ pk, sk })
 
-    if (throwIfExists && existingData && existingData.isDeleted == false) {
+    if (throwIfExists && existingData && existingData.isDeleted === false) {
       throw new BadRequestException('Master data already exists')
     }
 
@@ -212,9 +212,12 @@ export class MasterDataService implements IMasterDataService {
     if (!item) {
       // No changes detected - return existing data without requestId
       // to indicate that no new command was created
-      // eslint-disable-next-line @typescript-eslint/no-unused-vars
-      const { requestId, ...rest } = existingData
-      return new MasterDataEntity(rest)
+      if (existingData) {
+        // eslint-disable-next-line @typescript-eslint/no-unused-vars
+        const { requestId, ...rest } = existingData
+        return new MasterDataEntity(rest)
+      }
+      return new MasterDataEntity({})
     }
 
     return new MasterDataEntity(item)
@@ -326,7 +329,7 @@ export class MasterDataService implements IMasterDataService {
   ): Promise<CreateMasterDataDto> {
     const userContext = getUserContext(invokeContext)
     let seq = createDto?.seq
-    if (!seq) {
+    if (seq == null) {
       const maxSeq = await this.prismaService.master.aggregate({
         _max: {
           seq: true,

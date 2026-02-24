@@ -1,5 +1,9 @@
-import { IInvoke, INVOKE_CONTEXT } from '@mbc-cqrs-serverless/core'
-import { Body, Controller, Logger, Post } from '@nestjs/common'
+import {
+  getUserContext,
+  IInvoke,
+  INVOKE_CONTEXT,
+} from '@mbc-cqrs-serverless/core'
+import { BadRequestException, Body, Controller, Post } from '@nestjs/common'
 import { ApiTags } from '@nestjs/swagger'
 
 import { MasterBulkDto } from '../dto/master-bulk'
@@ -13,8 +17,6 @@ import { MasterSettingService } from '../services/master-setting.service'
 @Controller('api/master-bulk')
 @ApiTags('master-bulk')
 export class MasterBulkController {
-  private readonly logger = new Logger(MasterBulkController.name)
-
   constructor(
     private readonly masterSettingService: MasterSettingService,
     private readonly masterDataService: MasterDataService,
@@ -25,10 +27,16 @@ export class MasterBulkController {
     @Body() bulkDto: MasterBulkDto,
     @INVOKE_CONTEXT() invokeContext: IInvoke,
   ) {
+    const userContext = getUserContext(invokeContext)
     const settingItems: CommonSettingDto[] = []
     const dataItems: MasterDataCreateDto[] = []
 
     for (const item of bulkDto.items) {
+      // Validate tenantCode: if specified, must match the user's tenant
+      if (item.tenantCode && item.tenantCode !== userContext.tenantCode) {
+        throw new BadRequestException(`Invalid tenant code: ${item.tenantCode}`)
+      }
+
       if (item.settingCode) {
         // Has settingCode → master data
         dataItems.push({
