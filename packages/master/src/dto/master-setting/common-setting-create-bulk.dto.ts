@@ -1,5 +1,10 @@
 import { Type } from 'class-transformer'
-import { ArrayNotEmpty, IsArray, ValidateNested } from 'class-validator'
+import {
+  ArrayMaxSize,
+  ArrayNotEmpty,
+  IsArray,
+  ValidateNested,
+} from 'class-validator'
 
 import { CommonSettingDto } from './common-setting-create.dto'
 
@@ -8,5 +13,6 @@ export class CommonSettingBulkDto {
   @ValidateNested({ each: true })
   @Type(() => CommonSettingDto)
   @ArrayNotEmpty()
+  @ArrayMaxSize(100)
   items: CommonSettingDto[]
 }

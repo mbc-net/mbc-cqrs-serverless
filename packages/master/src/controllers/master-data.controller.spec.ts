@@ -10,6 +10,7 @@ import {
   MasterDataCreateDto,
   MasterDataUpdateDto,
 } from '../dto'
+import { MasterDataCreateBulkDto } from '../dto/master-copy/master-data-create-bulk.dto'
 import { CreateMasterDataDto } from '../dto/master-data/data-create.dto'
 import { MasterDataSearchDto } from '../dto/master-data/data-search.dto'
 import { UpdateDataSettingDto } from '../dto/master-data/data-update.dto'
@@ -55,6 +56,8 @@ describe('MasterDataController', () => {
       checkExistCode: jest.fn(),
       listByRds: jest.fn(),
       createSetting: jest.fn(),
+      createBulk: jest.fn(),
+      upsertBulk: jest.fn(),
       updateSetting: jest.fn(),
       deleteSetting: jest.fn(),
     }
@@ -290,7 +293,10 @@ describe('MasterDataController', () => {
 
   describe('list', () => {
     it('should list by RDS successfully', async () => {
-      const searchDto: CustomMasterDataSearchDto = { settingCode: 'TEST_SETTING', code: 'TEST_CODE' }
+      const searchDto: CustomMasterDataSearchDto = {
+        settingCode: 'TEST_SETTING',
+        code: 'TEST_CODE',
+      }
       const expectedResult = { items: [], total: 0 }
 
       jest.spyOn(service, 'listByRds').mockResolvedValue(expectedResult)
@@ -336,6 +342,49 @@ describe('MasterDataController', () => {
       const result = await controller.create(createDto, mockInvokeContext)
 
       expect(service.createSetting).toHaveBeenCalledWith(
+        createDto,
+        mockInvokeContext,
+      )
+      expect(result).toEqual(expectedResult)
+    })
+  })
+
+  describe('createBulk', () => {
+    it('should call upsertBulk', async () => {
+      const createDto = {
+        items: [
+          {
+            settingCode: 'TEST_SETTING',
+            name: 'Item 1',
+            code: 'CODE1',
+            seq: 1,
+            attributes: { key: 'value1' },
+          },
+        ],
+      }
+      const expectedResult = [
+        new MasterDataEntity({
+          pk: 'MASTER#test-tenant',
+          sk: 'TEST_SETTING#CODE1',
+          id: 'data-1',
+          tenantCode: 'test-tenant',
+          name: 'Item 1',
+          code: 'CODE1',
+          type: 'MASTER',
+          seq: 1,
+          attributes: { key: 'value1' },
+          version: 1,
+          isDeleted: false,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        }),
+      ]
+
+      jest.spyOn(service, 'upsertBulk').mockResolvedValue(expectedResult)
+
+      const result = await controller.createBulk(createDto, mockInvokeContext)
+
+      expect(service.upsertBulk).toHaveBeenCalledWith(
         createDto,
         mockInvokeContext,
       )
@@ -412,19 +461,16 @@ describe('MasterDataController', () => {
 
       const result = await controller.delete(key, mockInvokeContext)
 
-      expect(service.deleteSetting).toHaveBeenCalledWith(
-        key,
-        mockInvokeContext,
-      )
+      expect(service.deleteSetting).toHaveBeenCalledWith(key, mockInvokeContext)
       expect(result).toEqual(expectedResult)
     })
 
     it('should throw BadRequestException for invalid tenant code', async () => {
       const key: DetailDto = { pk: 'other-tenant#setting-1', sk: 'test-sk' }
 
-      await expect(
-        controller.delete(key, mockInvokeContext),
-      ).rejects.toThrow(BadRequestException)
+      await expect(controller.delete(key, mockInvokeContext)).rejects.toThrow(
+        BadRequestException,
+      )
     })
   })
 })

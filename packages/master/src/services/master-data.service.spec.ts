@@ -2,15 +2,15 @@ import { Test, TestingModule } from '@nestjs/testing'
 import { createMock } from '@golevelup/ts-jest'
 import { BadRequestException, NotFoundException } from '@nestjs/common'
 import { MasterDataService } from './master-data.service'
-import { 
-  CommandService, 
-  DataService, 
-  getUserContext, 
+import {
+  CommandService,
+  DataService,
+  getUserContext,
   UserContext,
   DataModel,
   CommandModel,
   DataListEntity,
-  DataEntity
+  DataEntity,
 } from '@mbc-cqrs-serverless/core'
 import { PRISMA_SERVICE } from '../master.module-definition'
 import {
@@ -56,7 +56,9 @@ describe('MasterDataService', () => {
       },
     }
 
-    mockGetUserContext = getUserContext as jest.MockedFunction<typeof getUserContext>
+    mockGetUserContext = getUserContext as jest.MockedFunction<
+      typeof getUserContext
+    >
     mockGetUserContext.mockReturnValue(mockUserContext)
 
     const module: TestingModule = await Test.createTestingModule({
@@ -119,7 +121,9 @@ describe('MasterDataService', () => {
         .mockResolvedValueOnce(mockItems)
       prismaService.master.count.mockResolvedValue(1)
 
-      const result = await service.listByRds(searchDto, { invokeContext: mockInvokeContext })
+      const result = await service.listByRds(searchDto, {
+        invokeContext: mockInvokeContext,
+      })
 
       expect(result).toBeInstanceOf(MasterRdsListEntity)
       expect(result.total).toBe(1)
@@ -140,7 +144,9 @@ describe('MasterDataService', () => {
         .mockResolvedValueOnce([])
       prismaService.master.count.mockResolvedValue(0)
 
-      const result = await service.listByRds(searchDto, { invokeContext: mockInvokeContext })
+      const result = await service.listByRds(searchDto, {
+        invokeContext: mockInvokeContext,
+      })
 
       expect(result.total).toBe(0)
       expect(result.items).toHaveLength(0)
@@ -173,7 +179,7 @@ describe('MasterDataService', () => {
             },
             isDeleted: false,
           }),
-        })
+        }),
       )
     })
   })
@@ -216,7 +222,7 @@ describe('MasterDataService', () => {
               ':settingCode': 'SETTING_CODE#',
             },
           }),
-        })
+        }),
       )
     })
 
@@ -225,7 +231,7 @@ describe('MasterDataService', () => {
         settingCode: 'SETTING_CODE',
       }
 
-      const mockResponse: DataListEntity = { 
+      const mockResponse: DataListEntity = {
         items: [],
       }
       dataService.listItemsByPk.mockResolvedValue(mockResponse)
@@ -234,7 +240,7 @@ describe('MasterDataService', () => {
 
       expect(dataService.listItemsByPk).toHaveBeenCalledWith(
         'MASTER#common',
-        expect.any(Object)
+        expect.any(Object),
       )
     })
   })
@@ -293,7 +299,9 @@ describe('MasterDataService', () => {
       }
       commandService.publishAsync.mockResolvedValue(mockCommandResult)
 
-      const result = await service.create(createDto, { invokeContext: mockInvokeContext })
+      const result = await service.create(createDto, {
+        invokeContext: mockInvokeContext,
+      })
 
       expect(result).toBeInstanceOf(MasterDataEntity)
       expect(commandService.publishAsync).toHaveBeenCalledWith(
@@ -311,7 +319,7 @@ describe('MasterDataService', () => {
           settingCode: 'SETTING_CODE',
           tenantCode: 'TEST_TENANT',
         }),
-        { invokeContext: mockInvokeContext }
+        { invokeContext: mockInvokeContext },
       )
     })
 
@@ -339,8 +347,9 @@ describe('MasterDataService', () => {
       }
       dataService.getItem.mockResolvedValue(existingData)
 
-      await expect(service.create(createDto, { invokeContext: mockInvokeContext }))
-        .rejects.toThrow('Master data already exists')
+      await expect(
+        service.create(createDto, { invokeContext: mockInvokeContext }),
+      ).rejects.toThrow('Master data already exists')
       expect(commandService.publishAsync).not.toHaveBeenCalled()
     })
 
@@ -385,14 +394,16 @@ describe('MasterDataService', () => {
       }
       commandService.publishAsync.mockResolvedValue(mockCommandResult)
 
-      const result = await service.create(createDto, { invokeContext: mockInvokeContext })
+      const result = await service.create(createDto, {
+        invokeContext: mockInvokeContext,
+      })
 
       expect(result).toBeInstanceOf(MasterDataEntity)
       expect(commandService.publishAsync).toHaveBeenCalledWith(
         expect.objectContaining({
           version: 2,
         }),
-        { invokeContext: mockInvokeContext }
+        { invokeContext: mockInvokeContext },
       )
     })
   })
@@ -430,9 +441,13 @@ describe('MasterDataService', () => {
         attributes: updateDto.attributes!,
         updatedAt: new Date(),
       }
-      commandService.publishPartialUpdateAsync.mockResolvedValue(mockUpdateResult)
+      commandService.publishPartialUpdateAsync.mockResolvedValue(
+        mockUpdateResult,
+      )
 
-      const result = await service.update(key, updateDto, { invokeContext: mockInvokeContext })
+      const result = await service.update(key, updateDto, {
+        invokeContext: mockInvokeContext,
+      })
 
       expect(result).toBeInstanceOf(MasterDataEntity)
       expect(commandService.publishPartialUpdateAsync).toHaveBeenCalledWith(
@@ -445,7 +460,7 @@ describe('MasterDataService', () => {
           seq: updateDto.seq,
           attributes: updateDto.attributes,
         }),
-        { invokeContext: mockInvokeContext }
+        { invokeContext: mockInvokeContext },
       )
     })
 
@@ -457,8 +472,9 @@ describe('MasterDataService', () => {
 
       dataService.getItem.mockResolvedValue(null)
 
-      await expect(service.update(key, updateDto, { invokeContext: mockInvokeContext }))
-        .rejects.toThrow('Master data not found')
+      await expect(
+        service.update(key, updateDto, { invokeContext: mockInvokeContext }),
+      ).rejects.toThrow('Master data not found')
       expect(commandService.publishPartialUpdateAsync).not.toHaveBeenCalled()
     })
 
@@ -490,7 +506,9 @@ describe('MasterDataService', () => {
         seq: updateDto.seq!,
         updatedAt: new Date(),
       }
-      commandService.publishPartialUpdateAsync.mockResolvedValue(mockUpdateResult)
+      commandService.publishPartialUpdateAsync.mockResolvedValue(
+        mockUpdateResult,
+      )
 
       await service.update(key, updateDto, { invokeContext: mockInvokeContext })
 
@@ -501,7 +519,7 @@ describe('MasterDataService', () => {
           isDeleted: existingData.isDeleted,
           attributes: existingData.attributes,
         }),
-        { invokeContext: mockInvokeContext }
+        { invokeContext: mockInvokeContext },
       )
     })
   })
@@ -529,9 +547,13 @@ describe('MasterDataService', () => {
         isDeleted: true,
         updatedAt: new Date(),
       }
-      commandService.publishPartialUpdateAsync.mockResolvedValue(mockDeleteResult)
+      commandService.publishPartialUpdateAsync.mockResolvedValue(
+        mockDeleteResult,
+      )
 
-      const result = await service.delete(key, { invokeContext: mockInvokeContext })
+      const result = await service.delete(key, {
+        invokeContext: mockInvokeContext,
+      })
 
       expect(result).toBeInstanceOf(MasterDataEntity)
       expect(commandService.publishPartialUpdateAsync).toHaveBeenCalledWith(
@@ -539,7 +561,7 @@ describe('MasterDataService', () => {
           ...existingData,
           isDeleted: true,
         }),
-        { invokeContext: mockInvokeContext }
+        { invokeContext: mockInvokeContext },
       )
     })
 
@@ -548,8 +570,9 @@ describe('MasterDataService', () => {
 
       dataService.getItem.mockResolvedValue(null)
 
-      await expect(service.delete(key, { invokeContext: mockInvokeContext }))
-        .rejects.toThrow('Master data not found')
+      await expect(
+        service.delete(key, { invokeContext: mockInvokeContext }),
+      ).rejects.toThrow('Master data not found')
       expect(commandService.publishPartialUpdateAsync).not.toHaveBeenCalled()
     })
 
@@ -571,8 +594,9 @@ describe('MasterDataService', () => {
 
       dataService.getItem.mockResolvedValue(existingData)
 
-      await expect(service.delete(key, { invokeContext: mockInvokeContext }))
-        .rejects.toThrow('This master data is already deleted')
+      await expect(
+        service.delete(key, { invokeContext: mockInvokeContext }),
+      ).rejects.toThrow('This master data is already deleted')
       expect(commandService.publishPartialUpdateAsync).not.toHaveBeenCalled()
     })
   })
@@ -595,7 +619,11 @@ describe('MasterDataService', () => {
 
       dataService.getItem.mockResolvedValue(mockData)
 
-      const result = await service.checkExistCode('TEST_TENANT', 'SETTING_TYPE', 'CODE1')
+      const result = await service.checkExistCode(
+        'TEST_TENANT',
+        'SETTING_TYPE',
+        'CODE1',
+      )
 
       expect(result).toBe(true)
       expect(dataService.getItem).toHaveBeenCalledWith({
@@ -607,7 +635,11 @@ describe('MasterDataService', () => {
     it('should return false when code does not exist', async () => {
       dataService.getItem.mockResolvedValue(null)
 
-      const result = await service.checkExistCode('TEST_TENANT', 'SETTING_TYPE', 'CODE1')
+      const result = await service.checkExistCode(
+        'TEST_TENANT',
+        'SETTING_TYPE',
+        'CODE1',
+      )
 
       expect(result).toBe(false)
     })
@@ -629,7 +661,11 @@ describe('MasterDataService', () => {
 
       dataService.getItem.mockResolvedValue(mockData)
 
-      const result = await service.checkExistCode('TEST_TENANT', 'SETTING_TYPE', 'CODE1')
+      const result = await service.checkExistCode(
+        'TEST_TENANT',
+        'SETTING_TYPE',
+        'CODE1',
+      )
 
       expect(result).toBe(false)
     })
@@ -664,7 +700,9 @@ describe('MasterDataService', () => {
 
       dataService.getItem.mockResolvedValue(null)
 
-      await expect(service.getDetail(key)).rejects.toThrow('Master data not found')
+      await expect(service.getDetail(key)).rejects.toThrow(
+        'Master data not found',
+      )
     })
   })
 
@@ -709,7 +747,14 @@ describe('MasterDataService', () => {
           masterTypeCode: createDto.settingCode,
         },
       })
-      expect(createDto.attributes['seq']).toBe(6)
+      // Verify seq is passed to publishAsync without mutating the original DTO
+      expect(commandService.publishAsync).toHaveBeenCalledWith(
+        expect.objectContaining({
+          attributes: expect.objectContaining({ seq: 6 }),
+          seq: 6,
+        }),
+        expect.anything(),
+      )
     })
 
     it('should create setting with provided sequence', async () => {
@@ -775,7 +820,14 @@ describe('MasterDataService', () => {
 
       await service.createSetting(createDto, mockInvokeContext)
 
-      expect(createDto.attributes['seq']).toBe(1)
+      // Verify seq is passed to publishAsync without mutating the original DTO
+      expect(commandService.publishAsync).toHaveBeenCalledWith(
+        expect.objectContaining({
+          attributes: expect.objectContaining({ seq: 1 }),
+          seq: 1,
+        }),
+        expect.anything(),
+      )
     })
   })
 
@@ -809,15 +861,284 @@ describe('MasterDataService', () => {
         seq: updateDto.seq!,
         updatedAt: new Date(),
       }
-      commandService.publishPartialUpdateAsync.mockResolvedValue(mockUpdateResult)
+      commandService.publishPartialUpdateAsync.mockResolvedValue(
+        mockUpdateResult,
+      )
 
-      const result = await service.updateSetting(key, updateDto, mockInvokeContext)
+      const result = await service.updateSetting(
+        key,
+        updateDto,
+        mockInvokeContext,
+      )
 
       expect(result).toBeInstanceOf(MasterDataEntity)
       expect(commandService.publishPartialUpdateAsync).toHaveBeenCalledWith(
         expect.objectContaining(updateDto),
-        { invokeContext: mockInvokeContext }
+        { invokeContext: mockInvokeContext },
       )
+    })
+  })
+
+  describe('upsert', () => {
+    it('should create new data when not exists', async () => {
+      const createDto: CreateMasterDataDto = {
+        settingCode: 'SETTING_CODE',
+        code: 'DATA_CODE',
+        tenantCode: 'TEST_TENANT',
+        name: 'Test Data',
+        seq: 1,
+        attributes: { key: 'value' },
+      }
+
+      dataService.getItem.mockResolvedValue(null)
+      const mockCommandResult: CommandModel = {
+        id: 'MASTER#TEST_TENANT#SETTING_CODE#DATA_CODE',
+        pk: 'MASTER#TEST_TENANT',
+        sk: 'SETTING_CODE#DATA_CODE',
+        version: 1,
+        type: 'MASTER',
+        tenantCode: 'TEST_TENANT',
+        name: createDto.name,
+        code: createDto.code,
+        seq: createDto.seq,
+        attributes: createDto.attributes,
+        isDeleted: false,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      }
+      commandService.publishAsync.mockResolvedValue(mockCommandResult)
+
+      const result = await service.upsert(createDto, {
+        invokeContext: mockInvokeContext,
+      })
+
+      expect(result).toBeInstanceOf(MasterDataEntity)
+      expect(commandService.publishAsync).toHaveBeenCalledWith(
+        expect.objectContaining({
+          version: 0,
+          isDeleted: false,
+        }),
+        { invokeContext: mockInvokeContext },
+      )
+    })
+
+    it('should update existing data when exists with changes', async () => {
+      const createDto: CreateMasterDataDto = {
+        settingCode: 'SETTING_CODE',
+        code: 'DATA_CODE',
+        tenantCode: 'TEST_TENANT',
+        name: 'Updated Data',
+        seq: 2,
+        attributes: { key: 'new-value' },
+      }
+
+      const existingData: DataModel = {
+        id: 'existing-id',
+        pk: 'MASTER#TEST_TENANT',
+        sk: 'SETTING_CODE#DATA_CODE',
+        code: 'DATA_CODE',
+        name: 'Original Data',
+        version: 2,
+        type: 'MASTER',
+        tenantCode: 'TEST_TENANT',
+        isDeleted: false,
+        attributes: { key: 'old-value' },
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      }
+
+      dataService.getItem.mockResolvedValue(existingData)
+      const mockCommandResult: CommandModel = {
+        id: 'MASTER#TEST_TENANT#SETTING_CODE#DATA_CODE',
+        pk: 'MASTER#TEST_TENANT',
+        sk: 'SETTING_CODE#DATA_CODE',
+        version: 3,
+        type: 'MASTER',
+        tenantCode: 'TEST_TENANT',
+        name: createDto.name,
+        code: createDto.code,
+        seq: createDto.seq,
+        attributes: createDto.attributes,
+        isDeleted: false,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      }
+      commandService.publishAsync.mockResolvedValue(mockCommandResult)
+
+      const result = await service.upsert(createDto, {
+        invokeContext: mockInvokeContext,
+      })
+
+      expect(result).toBeInstanceOf(MasterDataEntity)
+      expect(result.name).toBe('Updated Data')
+      expect(commandService.publishAsync).toHaveBeenCalledWith(
+        expect.objectContaining({
+          version: 2,
+          isDeleted: false,
+        }),
+        { invokeContext: mockInvokeContext },
+      )
+    })
+
+    it('should return existing data when data is identical (not dirty)', async () => {
+      const createDto: CreateMasterDataDto = {
+        settingCode: 'SETTING_CODE',
+        code: 'DATA_CODE',
+        tenantCode: 'TEST_TENANT',
+        name: 'Same Data',
+        seq: 1,
+        attributes: { key: 'value' },
+      }
+
+      const existingData: DataModel = {
+        id: 'existing-id',
+        pk: 'MASTER#TEST_TENANT',
+        sk: 'SETTING_CODE#DATA_CODE',
+        code: 'DATA_CODE',
+        name: 'Same Data',
+        version: 2,
+        type: 'MASTER',
+        tenantCode: 'TEST_TENANT',
+        isDeleted: false,
+        attributes: { key: 'value' },
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      }
+
+      dataService.getItem.mockResolvedValue(existingData)
+      // publishAsync returns null when not dirty
+      commandService.publishAsync.mockResolvedValue(null)
+
+      const result = await service.upsert(createDto, {
+        invokeContext: mockInvokeContext,
+      })
+
+      expect(result).toBeInstanceOf(MasterDataEntity)
+      expect(result.name).toBe('Same Data')
+    })
+
+    it('should recreate when existing data is deleted', async () => {
+      const createDto: CreateMasterDataDto = {
+        settingCode: 'SETTING_CODE',
+        code: 'DATA_CODE',
+        tenantCode: 'TEST_TENANT',
+        name: 'Recreated Data',
+        seq: 1,
+        attributes: { recreated: true },
+      }
+
+      const existingDeletedData: DataModel = {
+        id: 'existing-id',
+        pk: 'MASTER#TEST_TENANT',
+        sk: 'SETTING_CODE#DATA_CODE',
+        code: 'DATA_CODE',
+        name: 'Deleted Data',
+        version: 3,
+        type: 'MASTER',
+        tenantCode: 'TEST_TENANT',
+        isDeleted: true,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      }
+
+      dataService.getItem.mockResolvedValue(existingDeletedData)
+      const mockCommandResult: CommandModel = {
+        id: 'MASTER#TEST_TENANT#SETTING_CODE#DATA_CODE',
+        pk: 'MASTER#TEST_TENANT',
+        sk: 'SETTING_CODE#DATA_CODE',
+        version: 3,
+        type: 'MASTER',
+        tenantCode: 'TEST_TENANT',
+        name: createDto.name,
+        code: createDto.code,
+        seq: createDto.seq,
+        attributes: createDto.attributes,
+        isDeleted: false,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      }
+      commandService.publishAsync.mockResolvedValue(mockCommandResult)
+
+      const result = await service.upsert(createDto, {
+        invokeContext: mockInvokeContext,
+      })
+
+      expect(result).toBeInstanceOf(MasterDataEntity)
+      expect(result.isDeleted).toBe(false)
+      expect(commandService.publishAsync).toHaveBeenCalledWith(
+        expect.objectContaining({
+          version: 3,
+          isDeleted: false,
+        }),
+        { invokeContext: mockInvokeContext },
+      )
+    })
+  })
+
+  describe('upsertBulk', () => {
+    it('should upsert multiple items', async () => {
+      const createDto1: MasterDataCreateDto = {
+        settingCode: 'SETTING_CODE',
+        name: 'Item 1',
+        code: 'CODE1',
+        seq: 1,
+        attributes: { key: 'value1' },
+      }
+      const createDto2: MasterDataCreateDto = {
+        settingCode: 'SETTING_CODE',
+        name: 'Item 2',
+        code: 'CODE2',
+        seq: 2,
+        attributes: { key: 'value2' },
+      }
+
+      prismaService.master.aggregate.mockResolvedValue({
+        _max: { seq: null },
+      })
+
+      dataService.getItem.mockResolvedValue(null)
+      const mockResult1: CommandModel = {
+        id: 'id1',
+        pk: `MASTER#${mockUserContext.tenantCode}`,
+        sk: 'SETTING_CODE#CODE1',
+        version: 1,
+        type: 'MASTER',
+        tenantCode: mockUserContext.tenantCode,
+        name: 'Item 1',
+        code: 'CODE1',
+        seq: 1,
+        attributes: { key: 'value1' },
+        isDeleted: false,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      }
+      const mockResult2: CommandModel = {
+        id: 'id2',
+        pk: `MASTER#${mockUserContext.tenantCode}`,
+        sk: 'SETTING_CODE#CODE2',
+        version: 1,
+        type: 'MASTER',
+        tenantCode: mockUserContext.tenantCode,
+        name: 'Item 2',
+        code: 'CODE2',
+        seq: 2,
+        attributes: { key: 'value2' },
+        isDeleted: false,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      }
+      commandService.publishAsync
+        .mockResolvedValueOnce(mockResult1)
+        .mockResolvedValueOnce(mockResult2)
+
+      const result = await service.upsertBulk(
+        { items: [createDto1, createDto2] },
+        mockInvokeContext,
+      )
+
+      expect(result).toHaveLength(2)
+      expect(result[0]).toBeInstanceOf(MasterDataEntity)
+      expect(result[1]).toBeInstanceOf(MasterDataEntity)
     })
   })
 
@@ -844,7 +1165,9 @@ describe('MasterDataService', () => {
         isDeleted: true,
         updatedAt: new Date(),
       }
-      commandService.publishPartialUpdateAsync.mockResolvedValue(mockDeleteResult)
+      commandService.publishPartialUpdateAsync.mockResolvedValue(
+        mockDeleteResult,
+      )
 
       const result = await service.deleteSetting(key, mockInvokeContext)
 
@@ -854,7 +1177,7 @@ describe('MasterDataService', () => {
           ...existingData,
           isDeleted: true,
         }),
-        { invokeContext: mockInvokeContext }
+        { invokeContext: mockInvokeContext },
       )
     })
   })
@@ -879,8 +1202,9 @@ describe('MasterDataService', () => {
         dbError.name = 'PrismaClientKnownRequestError'
         dataService.getItem.mockRejectedValue(dbError)
 
-        await expect(service.create(createDto, { invokeContext: mockInvokeContext }))
-          .rejects.toThrow('Database connection failed')
+        await expect(
+          service.create(createDto, { invokeContext: mockInvokeContext }),
+        ).rejects.toThrow('Database connection failed')
         expect(commandService.publishAsync).not.toHaveBeenCalled()
       })
 
@@ -897,8 +1221,9 @@ describe('MasterDataService', () => {
         const commandError = new Error('Command publish failed')
         commandService.publishAsync.mockRejectedValue(commandError)
 
-        await expect(service.create(createDto, { invokeContext: mockInvokeContext }))
-          .rejects.toThrow('Command publish failed')
+        await expect(
+          service.create(createDto, { invokeContext: mockInvokeContext }),
+        ).rejects.toThrow('Command publish failed')
       })
 
       it('should handle concurrent creation attempts with version conflicts', async () => {
@@ -915,8 +1240,9 @@ describe('MasterDataService', () => {
         versionError.name = 'ConditionalCheckFailedException'
         commandService.publishAsync.mockRejectedValue(versionError)
 
-        await expect(service.create(createDto, { invokeContext: mockInvokeContext }))
-          .rejects.toThrow('Version conflict')
+        await expect(
+          service.create(createDto, { invokeContext: mockInvokeContext }),
+        ).rejects.toThrow('Version conflict')
       })
     })
 
@@ -932,8 +1258,9 @@ describe('MasterDataService', () => {
         timeoutError.name = 'PrismaClientKnownRequestError'
         dataService.getItem.mockRejectedValue(timeoutError)
 
-        await expect(service.update(key, updateDto, { invokeContext: mockInvokeContext }))
-          .rejects.toThrow('Query timeout')
+        await expect(
+          service.update(key, updateDto, { invokeContext: mockInvokeContext }),
+        ).rejects.toThrow('Query timeout')
         expect(commandService.publishPartialUpdateAsync).not.toHaveBeenCalled()
       })
 
@@ -962,8 +1289,9 @@ describe('MasterDataService', () => {
         const updateError = new Error('Update command failed')
         commandService.publishPartialUpdateAsync.mockRejectedValue(updateError)
 
-        await expect(service.update(key, updateDto, { invokeContext: mockInvokeContext }))
-          .rejects.toThrow('Update command failed')
+        await expect(
+          service.update(key, updateDto, { invokeContext: mockInvokeContext }),
+        ).rejects.toThrow('Update command failed')
       })
     })
 
@@ -975,8 +1303,9 @@ describe('MasterDataService', () => {
         accessError.name = 'PrismaClientKnownRequestError'
         dataService.getItem.mockRejectedValue(accessError)
 
-        await expect(service.delete(key, { invokeContext: mockInvokeContext }))
-          .rejects.toThrow('Access denied')
+        await expect(
+          service.delete(key, { invokeContext: mockInvokeContext }),
+        ).rejects.toThrow('Access denied')
         expect(commandService.publishPartialUpdateAsync).not.toHaveBeenCalled()
       })
 
@@ -1000,8 +1329,9 @@ describe('MasterDataService', () => {
         const deleteError = new Error('Delete command failed')
         commandService.publishPartialUpdateAsync.mockRejectedValue(deleteError)
 
-        await expect(service.delete(key, { invokeContext: mockInvokeContext }))
-          .rejects.toThrow('Delete command failed')
+        await expect(
+          service.delete(key, { invokeContext: mockInvokeContext }),
+        ).rejects.toThrow('Delete command failed')
       })
     })
   })
@@ -1041,7 +1371,9 @@ describe('MasterDataService', () => {
         }
         commandService.publishAsync.mockResolvedValue(mockCommandResult)
 
-        const result = await service.create(createDto, { invokeContext: mockInvokeContext })
+        const result = await service.create(createDto, {
+          invokeContext: mockInvokeContext,
+        })
 
         expect(result).toBeInstanceOf(MasterDataEntity)
         expect(result.name).toBe('')
@@ -1055,10 +1387,10 @@ describe('MasterDataService', () => {
           tenantCode: 'TEST_TENANT',
           name: 'Test Data with 特殊文字 & symbols!',
           seq: 1,
-          attributes: { 
+          attributes: {
             specialKey: 'value with 特殊文字',
             unicodeKey: '🚀🎉',
-            jsonString: '{"nested": "value"}' 
+            jsonString: '{"nested": "value"}',
           },
         }
 
@@ -1080,7 +1412,9 @@ describe('MasterDataService', () => {
         }
         commandService.publishAsync.mockResolvedValue(mockCommandResult)
 
-        const result = await service.create(createDto, { invokeContext: mockInvokeContext })
+        const result = await service.create(createDto, {
+          invokeContext: mockInvokeContext,
+        })
 
         expect(result).toBeInstanceOf(MasterDataEntity)
         expect(result.code).toBe('DATA_CODE_特殊文字@#$%')
@@ -1120,7 +1454,9 @@ describe('MasterDataService', () => {
         }
         commandService.publishAsync.mockResolvedValue(mockCommandResult)
 
-        const result = await service.create(createDto, { invokeContext: mockInvokeContext })
+        const result = await service.create(createDto, {
+          invokeContext: mockInvokeContext,
+        })
 
         expect(result).toBeInstanceOf(MasterDataEntity)
         expect(Object.keys(result.attributes)).toHaveLength(100)
@@ -1152,7 +1488,9 @@ describe('MasterDataService', () => {
         }
         commandService.publishAsync.mockResolvedValue(mockCommandResult)
 
-        const result = await service.create(createDto, { invokeContext: mockInvokeContext })
+        const result = await service.create(createDto, {
+          invokeContext: mockInvokeContext,
+        })
 
         expect(result).toBeInstanceOf(MasterDataEntity)
         expect(result.seq).toBe(-1)
@@ -1189,9 +1527,13 @@ describe('MasterDataService', () => {
           attributes: null,
           updatedAt: new Date(),
         }
-        commandService.publishPartialUpdateAsync.mockResolvedValue(mockUpdateResult)
+        commandService.publishPartialUpdateAsync.mockResolvedValue(
+          mockUpdateResult,
+        )
 
-        const result = await service.update(key, updateDto, { invokeContext: mockInvokeContext })
+        const result = await service.update(key, updateDto, {
+          invokeContext: mockInvokeContext,
+        })
 
         expect(result).toBeInstanceOf(MasterDataEntity)
         expect(result.attributes).toBeNull()
@@ -1224,9 +1566,13 @@ describe('MasterDataService', () => {
           name: longName,
           updatedAt: new Date(),
         }
-        commandService.publishPartialUpdateAsync.mockResolvedValue(mockUpdateResult)
+        commandService.publishPartialUpdateAsync.mockResolvedValue(
+          mockUpdateResult,
+        )
 
-        const result = await service.update(key, updateDto, { invokeContext: mockInvokeContext })
+        const result = await service.update(key, updateDto, {
+          invokeContext: mockInvokeContext,
+        })
 
         expect(result).toBeInstanceOf(MasterDataEntity)
         expect(result.name).toBe(longName)
@@ -1285,7 +1631,9 @@ describe('MasterDataService', () => {
         }
         commandService.publishAsync.mockResolvedValue(mockCommandResult)
 
-        const result = await service.create(createDto, { invokeContext: mockInvokeContext })
+        const result = await service.create(createDto, {
+          invokeContext: mockInvokeContext,
+        })
 
         expect(result).toBeInstanceOf(MasterDataEntity)
         expect(result.version).toBe(3)
@@ -1299,7 +1647,7 @@ describe('MasterDataService', () => {
             name: 'Recreated Data',
             attributes: { recreated: true },
           }),
-          { invokeContext: mockInvokeContext }
+          { invokeContext: mockInvokeContext },
         )
       })
 
@@ -1346,7 +1694,9 @@ describe('MasterDataService', () => {
         }
         commandService.publishAsync.mockResolvedValue(mockCommandResult)
 
-        const result = await service.create(createDto, { invokeContext: mockInvokeContext })
+        const result = await service.create(createDto, {
+          invokeContext: mockInvokeContext,
+        })
 
         expect(result).toBeInstanceOf(MasterDataEntity)
         expect(result.version).toBe(5)
@@ -1395,7 +1745,9 @@ describe('MasterDataService', () => {
         }
         commandService.publishAsync.mockResolvedValue(mockCommandResult)
 
-        const result = await service.create(createDto, { invokeContext: mockInvokeContext })
+        const result = await service.create(createDto, {
+          invokeContext: mockInvokeContext,
+        })
 
         expect(result).toBeInstanceOf(MasterDataEntity)
         expect(result.createdAt).toEqual(originalCreatedAt)
@@ -1428,7 +1780,9 @@ describe('MasterDataService', () => {
         }
         commandService.publishAsync.mockResolvedValue(mockCommandResult)
 
-        const result = await service.create(createDto, { invokeContext: mockInvokeContext })
+        const result = await service.create(createDto, {
+          invokeContext: mockInvokeContext,
+        })
 
         expect(result).toBeInstanceOf(MasterDataEntity)
         expect(result.tenantCode).toBe('NEW_TENANT')
@@ -1454,7 +1808,11 @@ describe('MasterDataService', () => {
 
         dataService.getItem.mockResolvedValue(mockDeletedData)
 
-        const result = await service.checkExistCode('TEST_TENANT', 'SETTING_CODE', 'DATA_CODE')
+        const result = await service.checkExistCode(
+          'TEST_TENANT',
+          'SETTING_CODE',
+          'DATA_CODE',
+        )
 
         expect(result).toBe(false)
         expect(dataService.getItem).toHaveBeenCalledWith({
@@ -1466,7 +1824,11 @@ describe('MasterDataService', () => {
       it('should handle null data when checking existence', async () => {
         dataService.getItem.mockResolvedValue(null)
 
-        const result = await service.checkExistCode('TEST_TENANT', 'SETTING_CODE', 'NONEXISTENT_CODE')
+        const result = await service.checkExistCode(
+          'TEST_TENANT',
+          'SETTING_CODE',
+          'NONEXISTENT_CODE',
+        )
 
         expect(result).toBe(false)
       })
@@ -1498,7 +1860,7 @@ describe('MasterDataService', () => {
         }
 
         dataService.getItem.mockResolvedValue(null)
-        
+
         const mockCommandResult1: CommandModel = {
           id: 'MASTER#TEST_TENANT#SETTING_CODE#DATA_CODE',
           pk: 'MASTER#TEST_TENANT',
@@ -1521,10 +1883,13 @@ describe('MasterDataService', () => {
           .mockResolvedValueOnce(mockCommandResult1)
           .mockRejectedValueOnce(versionConflictError)
 
-        const result1 = await service.create(createDto1, { invokeContext: mockInvokeContext })
-        
-        await expect(service.create(createDto2, { invokeContext: mockInvokeContext }))
-          .rejects.toThrow('Version conflict')
+        const result1 = await service.create(createDto1, {
+          invokeContext: mockInvokeContext,
+        })
+
+        await expect(
+          service.create(createDto2, { invokeContext: mockInvokeContext }),
+        ).rejects.toThrow('Version conflict')
 
         expect(result1).toBeInstanceOf(MasterDataEntity)
         expect(result1.name).toBe('First Creation')
@@ -1578,15 +1943,19 @@ describe('MasterDataService', () => {
           updatedAt: new Date(),
         }
 
-        commandService.publishPartialUpdateAsync.mockResolvedValue(mockDeleteResult)
+        commandService.publishPartialUpdateAsync.mockResolvedValue(
+          mockDeleteResult,
+        )
         commandService.publishAsync.mockResolvedValue(mockRecreateResult)
 
         const deleteResult = await service.delete(
           { pk: existingData.pk, sk: existingData.sk },
-          { invokeContext: mockInvokeContext }
+          { invokeContext: mockInvokeContext },
         )
-        
-        const recreateResult = await service.create(createDto, { invokeContext: mockInvokeContext })
+
+        const recreateResult = await service.create(createDto, {
+          invokeContext: mockInvokeContext,
+        })
 
         expect(deleteResult.isDeleted).toBe(true)
         expect(recreateResult.isDeleted).toBe(false)
@@ -1637,10 +2006,13 @@ describe('MasterDataService', () => {
           .mockResolvedValueOnce(mockUpdateResult1)
           .mockRejectedValueOnce(versionConflictError)
 
-        const result1 = await service.update(key, updateDto1, { invokeContext: mockInvokeContext })
-        
-        await expect(service.update(key, updateDto2, { invokeContext: mockInvokeContext }))
-          .rejects.toThrow('Version conflict')
+        const result1 = await service.update(key, updateDto1, {
+          invokeContext: mockInvokeContext,
+        })
+
+        await expect(
+          service.update(key, updateDto2, { invokeContext: mockInvokeContext }),
+        ).rejects.toThrow('Version conflict')
 
         expect(result1.name).toBe('First Update')
         expect(result1.version).toBe(2)
