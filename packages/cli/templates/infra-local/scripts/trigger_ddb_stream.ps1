@@ -88,7 +88,7 @@ while ($true) {
 $start = Get-Date
 while ($true) {
     $elapsed = (New-TimeSpan -Start $start).TotalSeconds
-    if ($elapsed -gt 100) {
+    if ($elapsed -gt 10) {
         Write-Host "Timeout"
         exit 1
     }
