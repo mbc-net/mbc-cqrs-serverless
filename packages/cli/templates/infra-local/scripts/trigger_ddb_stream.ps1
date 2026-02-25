@@ -117,6 +117,46 @@ while ($true) {
 }
 
 
+# Register Step Functions state machines before triggering streams
+$sfnPort = if ($env:LOCAL_SFN_PORT) { $env:LOCAL_SFN_PORT } else { "8083" }
+$sfnEndpoint = "http://localhost:$sfnPort"
+$lambdaArn = "arn:aws:lambda:ap-northeast-1:101010101010:function:serverless-example-dev-main"
+
+Write-Host "Registering Step Functions state machines..."
+
+$stateMachines = @("command", "sfn-task", "import-csv")
+foreach ($smName in $stateMachines) {
+    Write-Host "Checking state machine: $smName"
+    $existing = $null
+    try {
+        $existing = aws stepfunctions list-state-machines `
+            --endpoint-url $sfnEndpoint `
+            --region ap-northeast-1 `
+            --query "stateMachines[?name=='$smName'].name" `
+            --output text 2>&1
+    } catch {
+        $existing = $null
+    }
+
+    if (-not $existing -or $existing -match "error|Error") {
+        Write-Host "Creating state machine: $smName"
+        $definition = "{`"Comment`":`"$smName`",`"StartAt`":`"init`",`"States`":{`"init`":{`"Type`":`"Task`",`"Resource`":`"arn:aws:states:::lambda:invoke`",`"Parameters`":{`"FunctionName`":`"$lambdaArn`",`"Payload`":{`"input.$`":`"$`",`"context.$`":`"$$`"}},`"End`":true}}}"
+        try {
+            aws stepfunctions create-state-machine `
+                --endpoint-url $sfnEndpoint `
+                --region ap-northeast-1 `
+                --name $smName `
+                --role-arn "arn:aws:iam::101010101010:role/DummyRole" `
+                --definition $definition 2>&1
+            Write-Host "Created $smName"
+        } catch {
+            Write-Host "Failed to create $smName"
+        }
+    } else {
+        Write-Host "State machine $smName already exists"
+    }
+}
+
 # Trigger command stream
 $timestamp = [math]::Round((Get-Date).Subtract((Get-Date "01/01/1970")).TotalSeconds)
 foreach ($table in $tables) {

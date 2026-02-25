@@ -95,6 +95,34 @@ while true; do
 	fi
 done
 
+# Register Step Functions state machines before triggering streams
+SFN_PORT="${LOCAL_SFN_PORT:-8083}"
+SFN_ENDPOINT="http://localhost:${SFN_PORT}"
+LAMBDA_ARN="arn:aws:lambda:ap-northeast-1:101010101010:function:serverless-example-dev-main"
+
+echo "Registering Step Functions state machines..."
+
+for sm_name in command sfn-task import-csv; do
+	echo "Checking state machine: ${sm_name}"
+	existing=$(aws stepfunctions list-state-machines \
+		--endpoint-url ${SFN_ENDPOINT} \
+		--region ap-northeast-1 \
+		--query "stateMachines[?name=='${sm_name}'].name" \
+		--output text 2>&1)
+	if [ -z "${existing}" ] || echo "${existing}" | grep -q "error\|Error"; then
+		echo "Creating state machine: ${sm_name}"
+		aws stepfunctions create-state-machine \
+			--endpoint-url ${SFN_ENDPOINT} \
+			--region ap-northeast-1 \
+			--name "${sm_name}" \
+			--role-arn "arn:aws:iam::101010101010:role/DummyRole" \
+			--definition "{\"Comment\":\"${sm_name}\",\"StartAt\":\"init\",\"States\":{\"init\":{\"Type\":\"Task\",\"Resource\":\"arn:aws:states:::lambda:invoke\",\"Parameters\":{\"FunctionName\":\"${LAMBDA_ARN}\",\"Payload\":{\"input.$\":\"$\",\"context.$\":\"$$\"}},\"End\":true}}}" \
+			2>&1 && echo "Created ${sm_name}" || echo "Failed to create ${sm_name}"
+	else
+		echo "State machine ${sm_name} already exists"
+	fi
+done
+
 # Trigger command stream
 timestamp=$(date +%s)
 for table in "${tables[@]}"; do
