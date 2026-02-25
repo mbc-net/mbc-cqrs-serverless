@@ -149,7 +149,7 @@ export class CommandEventHandler {
       result: -1,
       error: 'version is not match',
       cause:
-        'next version must be ' + nextVersion + ' but got ' + new String(1),
+        'next version must be ' + nextVersion + ' but got ' + commandVersion,
     }
 
     await this.publishAlarm(event, errorDetails)
