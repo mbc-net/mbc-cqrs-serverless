@@ -86,7 +86,5 @@ services:
       dockerfile: Dockerfile
     ports:
       - ${LOCAL_COGNITO_PORT:-9229}:9229
-    environment:
-      - COGNITO_ISSUER_DOMAIN=http://localhost:${LOCAL_COGNITO_PORT:-9229}
     volumes:
       - ./docker-data/.cognito:/app/.cognito
