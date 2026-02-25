@@ -60,7 +60,6 @@ services:
     image: localstack/localstack
     ports:
       - '${LOCAL_S3_PORT:-4566}:4566'
-      - '4510-4559:4510-4559'
     environment:
       - SERVICES=s3
       - AWS_DEFAULT_REGION=ap-northeast-1
@@ -87,5 +86,7 @@ services:
       dockerfile: Dockerfile
     ports:
       - ${LOCAL_COGNITO_PORT:-9229}:9229
+    environment:
+      - COGNITO_ISSUER_DOMAIN=http://localhost:${LOCAL_COGNITO_PORT:-9229}
     volumes:
       - ./docker-data/.cognito:/app/.cognito
