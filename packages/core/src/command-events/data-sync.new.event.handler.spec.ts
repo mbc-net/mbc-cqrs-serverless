@@ -108,4 +108,34 @@ describe('DataSyncNewCommandEventHandler', () => {
       input: JSON.stringify(dynamoInsertEvent),
     })
   })
+
+  it('should warn and return undefined when state machine does not exist', async () => {
+    // Arrange
+    const error = new Error('State Machine Does Not Exist')
+    error.name = 'StateMachineDoesNotExist'
+    sfnMock.on(StartExecutionCommand).rejects(error)
+
+    const warnSpy = jest.spyOn(handler['logger'], 'warn')
+
+    // Action
+    const result = await handler.execute(dynamoInsertEvent)
+
+    // Assert
+    expect(result).toBeUndefined()
+    expect(warnSpy).toHaveBeenCalledWith(
+      expect.stringContaining('State machine not found'),
+    )
+  })
+
+  it('should rethrow other errors', async () => {
+    // Arrange
+    const error = new Error('Some other error')
+    error.name = 'InternalError'
+    sfnMock.on(StartExecutionCommand).rejects(error)
+
+    // Action & Assert
+    await expect(handler.execute(dynamoInsertEvent)).rejects.toThrow(
+      'Some other error',
+    )
+  })
 })

@@ -35,6 +35,22 @@ export class DataSyncNewCommandEventHandler
       )
 
     const sfnExecName = `${moduleName}-${ddbRecordId}-${Date.now()}`
-    return await this.sfnService.startExecution(this.sfnArn, event, sfnExecName)
+    try {
+      return await this.sfnService.startExecution(
+        this.sfnArn,
+        event,
+        sfnExecName,
+      )
+    } catch (error: any) {
+      if (error?.name === 'StateMachineDoesNotExist') {
+        this.logger.warn(
+          `State machine not found (ARN: ${this.sfnArn}). ` +
+            'This may happen during local development if the state machine is not yet registered. ' +
+            `Skipping execution for: ${sfnExecName}`,
+        )
+        return
+      }
+      throw error
+    }
   }
 }

@@ -95,6 +95,47 @@ while true; do
 	fi
 done
 
+# Register Step Functions state machines before triggering streams
+SFN_PORT="${LOCAL_SFN_PORT:-8083}"
+SFN_ENDPOINT="http://localhost:${SFN_PORT}"
+
+echo "Registering Step Functions state machines..."
+
+# Extract state machine names and definitions from serverless.yml using Node.js
+node -e "
+const fs = require('fs');
+const yaml = require('js-yaml');
+let content = fs.readFileSync('./infra-local/serverless.yml', 'utf8');
+// Replace Serverless Framework variable syntax to avoid YAML parse errors
+content = content.replace(/\\\$\{[^}]+\}/g, 'PLACEHOLDER');
+const data = yaml.load(content);
+const sms = (data.stepFunctions || {}).stateMachines || {};
+for (const [key, sm] of Object.entries(sms)) {
+  const name = sm.name || key;
+  const definition = JSON.stringify(sm.definition);
+  console.log(name + '\t' + definition);
+}
+" | while IFS=$'\t' read -r sm_name sm_definition; do
+	echo "Checking state machine: ${sm_name}"
+	existing=$(aws stepfunctions list-state-machines \
+		--endpoint-url ${SFN_ENDPOINT} \
+		--region ap-northeast-1 \
+		--query "stateMachines[?name=='${sm_name}'].name" \
+		--output text 2>&1)
+	if [ -z "${existing}" ] || echo "${existing}" | grep -q "error\|Error"; then
+		echo "Creating state machine: ${sm_name}"
+		aws stepfunctions create-state-machine \
+			--endpoint-url ${SFN_ENDPOINT} \
+			--region ap-northeast-1 \
+			--name "${sm_name}" \
+			--role-arn "arn:aws:iam::101010101010:role/DummyRole" \
+			--definition "${sm_definition}" \
+			2>&1 && echo "Created ${sm_name}" || echo "Failed to create ${sm_name}"
+	else
+		echo "State machine ${sm_name} already exists"
+	fi
+done
+
 # Trigger command stream
 timestamp=$(date +%s)
 for table in "${tables[@]}"; do
@@ -103,4 +144,4 @@ for table in "${tables[@]}"; do
 done
 
 echo "Send a command to trigger command stream tasks"
-aws --endpoint=${endpoint} dynamodb put-item --table-name ${TABLE_PREFIX}-tasks --item "{\"input\":{\"M\":{}},\"sk\":{\"S\":\"${timestamp}\"},\"pk\":{\"S\":\"test\"}}"
+aws --endpoint=${endpoint} dynamodb put-item --table-name ${TABLE_PREFIX}-tasks --item "{\"input\":{\"M\":{\"action\":{\"S\":\"trigger\"}}},\"sk\":{\"S\":\"${timestamp}\"},\"pk\":{\"S\":\"test\"}}"
