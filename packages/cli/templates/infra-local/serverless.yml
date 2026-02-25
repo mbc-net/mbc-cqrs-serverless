@@ -24,9 +24,9 @@ custom:
   sesPort: ${env:LOCAL_SES_PORT, 8005}
   cognitoPort: ${env:LOCAL_COGNITO_PORT, 9229}
 
-  # serverless-offline-lambda plugin reads custom.lambda (highest priority)
+  # serverless-offline-lambda plugin (external Lambda invoke, separate from serverless-offline lambdaPort)
   lambda:
-    port: ${self:custom.lambdaPort}
+    port: ${env:LOCAL_OFFLINE_LAMBDA_PORT, 4000}
     host: 0.0.0.0
 
   serverless-offline:
