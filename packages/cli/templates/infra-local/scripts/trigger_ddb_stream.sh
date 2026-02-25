@@ -98,11 +98,24 @@ done
 # Register Step Functions state machines before triggering streams
 SFN_PORT="${LOCAL_SFN_PORT:-8083}"
 SFN_ENDPOINT="http://localhost:${SFN_PORT}"
-LAMBDA_ARN="arn:aws:lambda:ap-northeast-1:101010101010:function:serverless-example-dev-main"
 
 echo "Registering Step Functions state machines..."
 
-for sm_name in command sfn-task import-csv; do
+# Extract state machine names and definitions from serverless.yml using Node.js
+node -e "
+const fs = require('fs');
+const yaml = require('js-yaml');
+let content = fs.readFileSync('./infra-local/serverless.yml', 'utf8');
+// Replace Serverless Framework variable syntax to avoid YAML parse errors
+content = content.replace(/\\\$\{[^}]+\}/g, 'PLACEHOLDER');
+const data = yaml.load(content);
+const sms = (data.stepFunctions || {}).stateMachines || {};
+for (const [key, sm] of Object.entries(sms)) {
+  const name = sm.name || key;
+  const definition = JSON.stringify(sm.definition);
+  console.log(name + '\t' + definition);
+}
+" | while IFS=$'\t' read -r sm_name sm_definition; do
 	echo "Checking state machine: ${sm_name}"
 	existing=$(aws stepfunctions list-state-machines \
 		--endpoint-url ${SFN_ENDPOINT} \
@@ -116,7 +129,7 @@ for sm_name in command sfn-task import-csv; do
 			--region ap-northeast-1 \
 			--name "${sm_name}" \
 			--role-arn "arn:aws:iam::101010101010:role/DummyRole" \
-			--definition "{\"Comment\":\"${sm_name}\",\"StartAt\":\"init\",\"States\":{\"init\":{\"Type\":\"Task\",\"Resource\":\"arn:aws:states:::lambda:invoke\",\"Parameters\":{\"FunctionName\":\"${LAMBDA_ARN}\",\"Payload\":{\"input.$\":\"$\",\"context.$\":\"$$\"}},\"End\":true}}}" \
+			--definition "${sm_definition}" \
 			2>&1 && echo "Created ${sm_name}" || echo "Failed to create ${sm_name}"
 	else
 		echo "State machine ${sm_name} already exists"
