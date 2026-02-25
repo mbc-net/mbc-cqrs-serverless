@@ -197,6 +197,6 @@ foreach ($table in $tables) {
 # Trigger tasks stream
 Write-Host  "Send a command to trigger command stream tasks"
 $command = @"
-aws dynamodb put-item --endpoint $endpoint --table-name "$tablePrefix-tasks" --item '{\"input\":{\"M\":{}},\"sk\":{\"S\":\"$timestamp\"},\"pk\":{\"S\":\"test\"}}'
+aws dynamodb put-item --endpoint $endpoint --table-name "$tablePrefix-tasks" --item '{\"input\":{\"M\":{\"action\":{\"S\":\"trigger\"}}},\"sk\":{\"S\":\"$timestamp\"},\"pk\":{\"S\":\"test\"}}'
 "@
 Invoke-Expression $command

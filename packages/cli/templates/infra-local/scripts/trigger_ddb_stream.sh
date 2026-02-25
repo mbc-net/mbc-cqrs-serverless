@@ -144,4 +144,4 @@ for table in "${tables[@]}"; do
 done
 
 echo "Send a command to trigger command stream tasks"
-aws --endpoint=${endpoint} dynamodb put-item --table-name ${TABLE_PREFIX}-tasks --item "{\"input\":{\"M\":{}},\"sk\":{\"S\":\"${timestamp}\"},\"pk\":{\"S\":\"test\"}}"
+aws --endpoint=${endpoint} dynamodb put-item --table-name ${TABLE_PREFIX}-tasks --item "{\"input\":{\"M\":{\"action\":{\"S\":\"trigger\"}}},\"sk\":{\"S\":\"${timestamp}\"},\"pk\":{\"S\":\"test\"}}"
