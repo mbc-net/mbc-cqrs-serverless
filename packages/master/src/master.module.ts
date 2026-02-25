@@ -7,7 +7,11 @@ import { SequencesModule } from '@mbc-cqrs-serverless/sequence'
 import { DynamicModule, Module } from '@nestjs/common'
 
 import { TABLE_NAME } from './constants'
-import { MasterDataController, MasterSettingController } from './controllers'
+import {
+  MasterBulkController,
+  MasterDataController,
+  MasterSettingController,
+} from './controllers'
 import { CustomTaskModule } from './custom-task/custom-task.module'
 import { MasterSfnTaskEventHandler } from './handler/master-sfn-task.handler'
 import {
@@ -35,6 +39,7 @@ export class MasterModule extends ConfigurableModuleClass {
       if (!module.controllers) {
         module.controllers = []
       }
+      module.controllers.push(MasterBulkController)
       module.controllers.push(MasterDataController)
       module.controllers.push(MasterSettingController)
 
