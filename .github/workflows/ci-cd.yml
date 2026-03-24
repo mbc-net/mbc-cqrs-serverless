@@ -298,7 +298,7 @@ jobs:
           git commit -m "chore: version packages for release" || echo "No changes to commit"
 
           # Then publish the versioned packages
-          npx lerna publish from-package --yes --dist-tag ${{ steps.release-type.outputs.tag }} --no-git-tag-version --no-push
+          npx lerna publish from-package --yes --dist-tag ${{ steps.release-type.outputs.tag }} --no-git-tag-version --no-push --provenance
 
       - name: Publish to npm (Production)
         if: steps.release-type.outputs.prerelease == 'false' && steps.prod-changes.outputs.changed_count != '0'
@@ -315,7 +315,7 @@ jobs:
           git commit -m "chore: version packages for release" || echo "No changes to commit"
 
           # Then publish the versioned packages
-          npx lerna publish from-package --yes --no-git-tag-version --no-push
+          npx lerna publish from-package --yes --no-git-tag-version --no-push --provenance
 
       - name: Skip publish (no changes)
         if: |
