@@ -1,25 +1,12 @@
 {
-	"tasksRunnerOptions": {
-		"default": {
-			"runner": "nx/tasks-runners/default",
-			"options": {
-				"cacheableOperations": [
-					"test",
-					"build"
-				]
-			}
-		}
-	},
-	"targetDefaults": {
-		"test": {
-			"dependsOn": [
-				"^test"
-			]
-		},
-		"build": {
-			"dependsOn": [
-				"^build"
-			]
-		}
-	}
+  "targetDefaults": {
+    "test": {
+      "dependsOn": ["^test"],
+      "cache": true
+    },
+    "build": {
+      "dependsOn": ["^build"],
+      "cache": true
+    }
+  }
 }
