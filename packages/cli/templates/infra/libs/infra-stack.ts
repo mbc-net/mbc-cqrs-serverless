@@ -889,6 +889,7 @@ export class InfraStack extends cdk.Stack {
 
     const sfnImportCsvDefinition = new DistributedMap(this, 'import-csv', {
       maxConcurrency: 50,
+      resultPath: cdk.aws_stepfunctions.JsonPath.DISCARD,
     })
       .setLabel('import-csv')
       .setItemReader({

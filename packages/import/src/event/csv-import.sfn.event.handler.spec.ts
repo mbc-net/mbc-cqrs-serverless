@@ -140,7 +140,7 @@ describe('CsvImportSfnEventHandler', () => {
           pk: `CSV_IMPORT#${mockTenantCode}`,
           sk: 'building#01PARENT123',
         }),
-        { set: { totalRows: 1 } }, // FIX: totalRows từ countCsvRows, không phải MapResult.length
+        { set: { totalRows: 1 } }, // FIX: totalRows from countCsvRows, not MapResult.length
       )
       expect(importService.updateStatus).toHaveBeenCalledWith(
         expect.objectContaining({
