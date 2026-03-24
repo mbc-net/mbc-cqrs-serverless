@@ -160,6 +160,9 @@ jobs:
           node-version: 22
           cache: npm
           registry-url: 'https://registry.npmjs.org'
+      - name: Upgrade npm for Trusted Publisher support
+        run: npm install -g npm@latest
+
       - name: Sync lockfile
         run: npm install --package-lock-only --ignore-scripts
 
@@ -297,6 +300,9 @@ jobs:
           git add -A
           git commit -m "chore: version packages for release" || echo "No changes to commit"
 
+          # Remove token-based auth from .npmrc so npm falls back to OIDC
+          sed -i '/_authToken/d' "$NPM_CONFIG_USERCONFIG"
+
           # Then publish the versioned packages
           npx lerna publish from-package --yes --dist-tag ${{ steps.release-type.outputs.tag }} --no-git-tag-version --no-push
         env:
@@ -315,6 +321,9 @@ jobs:
           # Commit the version changes to avoid uncommitted changes error
           git add -A
           git commit -m "chore: version packages for release" || echo "No changes to commit"
+
+          # Remove token-based auth from .npmrc so npm falls back to OIDC
+          sed -i '/_authToken/d' "$NPM_CONFIG_USERCONFIG"
 
           # Then publish the versioned packages
           npx lerna publish from-package --yes --no-git-tag-version --no-push
