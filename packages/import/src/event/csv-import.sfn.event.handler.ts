@@ -21,9 +21,6 @@ import { ImportService } from '../import.service'
 import { IImportStrategy } from '../interface'
 import { CsvImportSfnEvent } from './csv-import.sfn.event'
 
-interface MapResultPayload {
-  MapResult: any[]
-}
 @EventHandler(CsvImportSfnEvent)
 export class CsvImportSfnEventHandler
   implements IEventHandler<CsvImportSfnEvent>
@@ -90,7 +87,7 @@ export class CsvImportSfnEventHandler
     }
 
     if (event.context.State.Name === 'finalize_parent_job') {
-      const finalizeEvent = event.input as CreateCsvImportDto & MapResultPayload
+      const finalizeEvent = event.input as CreateCsvImportDto
       return this.finalizeParentJob(finalizeEvent)
     }
 
@@ -223,11 +220,13 @@ export class CsvImportSfnEventHandler
     })
   }
 
-  private async finalizeParentJob(
-    event: CreateCsvImportDto & MapResultPayload,
-  ): Promise<void> {
+  private async finalizeParentJob(event: CreateCsvImportDto): Promise<void> {
     const parentKey = parseId(event.sourceId)
-    const totalRows = event.MapResult.length
+
+    this.logger.log(
+      `Counting total rows from S3 for parent job ${event.sourceId}.`,
+    )
+    const totalRows = await this.countCsvRows(event)
 
     this.logger.log(
       `Setting totalRows=${totalRows} for parent job ${event.sourceId}.`,
