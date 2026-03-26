@@ -38,6 +38,10 @@ export class DefaultEventFactory implements IEventFactory {
         record.eventSourceARN.includes(COMMAND_TABLE_SUFFIX + '/stream/')
       ) {
         if (record.eventName === 'INSERT') {
+          // Local development does not support complex filter patterns
+          if (record.dynamodb?.NewImage?.syncMode?.S === 'SYNC') {
+            return undefined
+          }
           return new DataSyncNewCommandEvent().fromDynamoDBRecord(record)
         }
       }

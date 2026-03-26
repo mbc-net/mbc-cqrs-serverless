@@ -37,6 +37,7 @@ import { MODULE_OPTIONS_TOKEN } from './command.module-definition'
 import { DataService } from './data.service'
 import { TableType } from './enums'
 import { DataSyncDdsHandler } from './handlers/data-sync-dds.handler'
+import { HistoryService } from './history.service'
 import { TtlService } from './ttl.service'
 
 const TABLE_NAME = Symbol('command')
@@ -60,6 +61,7 @@ export class CommandService implements OnModuleInit, ICommandService {
     private readonly dataSyncDdsHandler: DataSyncDdsHandler,
     private readonly dataService: DataService,
     private readonly ttlService: TtlService,
+    private readonly historyService: HistoryService,
   ) {
     this.tableName = this.dynamoDbService.getTableName(
       this.options.tableName,
@@ -146,7 +148,7 @@ export class CommandService implements OnModuleInit, ICommandService {
   async publishPartialUpdateAsync(
     input: CommandPartialInputModel,
     options: ICommandOptions,
-  ): Promise<CommandModel> {
+  ): Promise<CommandModel | null> {
     let item: CommandModel
     if (input.version > VERSION_FIRST) {
       item = await this.getItem({
@@ -167,6 +169,8 @@ export class CommandService implements OnModuleInit, ICommandService {
     }
     const fullInput = mergeDeep({}, item, input, { version: item.version })
 
+    delete fullInput['syncMode']
+
     this.logger.debug('publishPartialUpdate::', fullInput)
     return await this.publishAsync(fullInput, options)
   }
@@ -174,7 +178,7 @@ export class CommandService implements OnModuleInit, ICommandService {
   async publishSync(
     input: CommandInputModel,
     options: ICommandOptions,
-  ): Promise<CommandModel> {
+  ): Promise<CommandModel | null> {
     const item = await this.dataService.getItem({ pk: input.pk, sk: input.sk })
 
     let inputVersion = input.version ?? VERSION_FIRST
@@ -187,12 +191,19 @@ export class CommandService implements OnModuleInit, ICommandService {
       )
     }
 
+    if (item && this.isNotCommandDirty(item, input)) {
+      this.logger.debug('publishSync:: command is not dirty, skipping update')
+      return null
+    }
+
     const userContext = getUserContext(options.invokeContext)
     const requestId =
       options?.requestId || options.invokeContext?.context?.awsRequestId
     const sourceIp =
       options.invokeContext?.event?.requestContext?.http?.sourceIp
     const version = (item?.version ?? inputVersion) + 1
+
+    const versionedSk = addSortKeyVersion(input.sk, version)
 
     const command: CommandModel = {
       ttl: await this.ttlService.calculateTtl(
@@ -201,6 +212,7 @@ export class CommandService implements OnModuleInit, ICommandService {
       ),
       ...input,
       version,
+      syncMode: 'SYNC',
       source: options?.source,
       requestId,
       createdAt: new Date(),
@@ -212,15 +224,47 @@ export class CommandService implements OnModuleInit, ICommandService {
     }
     this.logger.debug('publishSync::', command)
 
-    await this.dataService.publish(command)
-
-    const targetSyncHandlers = this.dataSyncHandlers?.filter(
-      (handler) => handler.type !== 'dynamodb',
+    // 1. Write to Command table first (Immutable Audit Log)
+    await this.dynamoDbService.putItem(
+      this.tableName,
+      { ...command, sk: versionedSk },
+      'attribute_not_exists(pk) AND attribute_not_exists(sk)',
     )
 
-    await Promise.all(targetSyncHandlers.map((handler) => handler.up(command)))
+    try {
+      // 2. Write to Data table
+      await this.dataService.publish(command)
 
-    return command
+      // 3. Write to History table (Matching the Step Function flow)
+      await this.historyService.publish({ pk: command.pk, sk: input.sk })
+
+      // 4. Execute custom data sync handlers
+      const targetSyncHandlers = this.dataSyncHandlers?.filter(
+        (handler) => handler.type !== 'dynamodb',
+      )
+      await Promise.all(
+        targetSyncHandlers.map((handler) => handler.up(command)),
+      )
+
+      // 5. Update Status to FINISHED and broadcast SNS notification
+      await this.updateStatus(
+        { pk: command.pk, sk: versionedSk },
+        'finish:FINISHED',
+        requestId,
+      )
+
+      command.status = 'finish:FINISHED'
+      command.sk = versionedSk
+      return command
+    } catch (error) {
+      // Mark as failed if the synchronous pipeline breaks
+      await this.updateStatus(
+        { pk: command.pk, sk: versionedSk },
+        'publish_sync:FAILED',
+        requestId,
+      )
+      throw error
+    }
   }
 
   async publishAsync(

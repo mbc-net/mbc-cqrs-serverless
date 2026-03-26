@@ -28,4 +28,6 @@ export interface CommandModel extends CommandInputModel {
   updatedIp?: string
   /** Step Functions task token for async workflows */
   taskToken?: string
+  /** Indicates the mode of publication (e.g., 'SYNC') to bypass async event triggers */
+  syncMode?: string
 }
