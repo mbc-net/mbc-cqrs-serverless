@@ -15,12 +15,19 @@ import {
 } from '@mbc-cqrs-serverless/core'
 import { Inject, Logger } from '@nestjs/common'
 
-import { CSV_IMPORT_PK_PREFIX, IMPORT_PK_PREFIX } from '../constant'
+import {
+  CSV_IMPORT_PK_PREFIX,
+  IMPORT_PK_PREFIX,
+  ImportPublishMode,
+} from '../constant'
 import { ImportEntity } from '../entity'
 import { ComparisonStatus } from '../enum/comparison-status.enum'
 import { ImportStatusEnum } from '../enum/import-status.enum'
 import { parseId } from '../helpers'
-import { PROCESS_STRATEGY_MAP } from '../import.module-definition'
+import {
+  PROCESS_STRATEGY_MAP,
+  PUBLISH_MODE_MAP,
+} from '../import.module-definition'
 import { ImportService } from '../import.service'
 import { IProcessStrategy } from '../interface/processing-strategy.interface'
 import { ImportQueueEvent } from './import.queue.event'
@@ -35,6 +42,8 @@ export class ImportQueueEventHandler
     private readonly importService: ImportService,
     @Inject(PROCESS_STRATEGY_MAP)
     private readonly strategyMap: Map<string, IProcessStrategy<any, any>>,
+    @Inject(PUBLISH_MODE_MAP)
+    private readonly publishModeMap: Map<string, ImportPublishMode>,
   ) {}
 
   async execute(event: ImportQueueEvent): Promise<any> {
@@ -151,7 +160,7 @@ export class ImportQueueEventHandler
     }
 
     if (compareResult.status === ComparisonStatus.EQUAL) {
-      this.logger.log(
+      this.logger.debug(
         `No changes for import job ${importEntity.id}, marking as completed.`,
       )
       await this.importService.updateStatus(
@@ -183,6 +192,8 @@ export class ImportQueueEventHandler
     )
 
     const commandService = strategy.getCommandService()
+    const publishMode =
+      this.publishModeMap.get(importEntity.type) ?? ImportPublishMode.ASYNC
     let result: any
 
     // 3. Execute the appropriate command
@@ -192,28 +203,43 @@ export class ImportQueueEventHandler
       source: importEntity.id,
     }
     if (compareResult.status === ComparisonStatus.NOT_EXIST) {
-      result = await commandService.publishAsync(
-        mappedData as CommandInputModel,
-        options,
-      )
+      result =
+        publishMode === ImportPublishMode.SYNC
+          ? await commandService.publishSync(
+              mappedData as CommandInputModel,
+              options,
+            )
+          : await commandService.publishAsync(
+              mappedData as CommandInputModel,
+              options,
+            )
       // 4. Finalize the import status as COMPLETED
       await this.importService.updateStatus(
         importKey,
         ImportStatusEnum.PROCESSING,
         { result: result },
       )
-      this.logger.log(
-        `Successfully completed import job: ${importKey.pk}#${importKey.sk}`,
+      this.logger.debug(
+        `Successfully completed import job: ${importKey.pk}#${importKey.sk} with publish mode: ${publishMode}`,
       )
     } else {
-      result = await commandService.publishPartialUpdateAsync(
-        mappedData as CommandPartialInputModel,
-        options,
-      )
+      result =
+        publishMode === ImportPublishMode.SYNC
+          ? await commandService.publishPartialUpdateSync(
+              mappedData as CommandPartialInputModel,
+              options,
+            )
+          : await commandService.publishPartialUpdateAsync(
+              mappedData as CommandPartialInputModel,
+              options,
+            )
       await this.importService.updateStatus(
         importKey,
         ImportStatusEnum.PROCESSING,
         { result: result },
+      )
+      this.logger.debug(
+        `Successfully completed import job: ${importKey.pk}#${importKey.sk} with publish mode: ${publishMode}`,
       )
     }
   }

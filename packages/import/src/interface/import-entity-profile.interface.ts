@@ -1,5 +1,6 @@
 import { Type } from '@nestjs/common'
 
+import type { ImportPublishMode } from '../constant/import-publish'
 import { IImportStrategy } from './import-strategy.interface'
 import { IProcessStrategy } from './processing-strategy.interface'
 
@@ -25,4 +26,10 @@ export interface ImportEntityProfile {
    * Must be a class that adheres to the IProcessStrategy interface.
    */
   processStrategy: Type<IProcessStrategy<any, any>>
+
+  /**
+   * How commands are published for this entity. Defaults to ASYNC when omitted.
+   * @see ImportPublishMode
+   */
+  publishMode?: ImportPublishMode
 }

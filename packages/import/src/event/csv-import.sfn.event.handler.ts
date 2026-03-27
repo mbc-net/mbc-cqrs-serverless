@@ -56,9 +56,9 @@ export class CsvImportSfnEventHandler
       const parentKey = parseId(input.sourceId)
 
       // 2. Count the total rows in the CSV
-      this.logger.log(`Counting rows for file: ${input.key}`)
+      this.logger.debug(`Counting rows for file: ${input.key}`)
       const totalRows = await this.countCsvRows(input)
-      this.logger.log(`Found ${totalRows} rows. Updating parent job.`)
+      this.logger.debug(`Found ${totalRows} rows. Updating parent job.`)
 
       // 3. Update the parent job with the total count
       const updatedEntity = await this.importService.updateImportJob(
@@ -69,7 +69,7 @@ export class CsvImportSfnEventHandler
       )
 
       if (updatedEntity.processedRows >= totalRows) {
-        this.logger.log(
+        this.logger.debug(
           `Job ${input.sourceId} already finished. Setting final status.`,
         )
         // Set status to FAILED if any child job failed, otherwise COMPLETED
@@ -223,12 +223,12 @@ export class CsvImportSfnEventHandler
   private async finalizeParentJob(event: CreateCsvImportDto): Promise<void> {
     const parentKey = parseId(event.sourceId)
 
-    this.logger.log(
+    this.logger.debug(
       `Counting total rows from S3 for parent job ${event.sourceId}.`,
     )
     const totalRows = await this.countCsvRows(event)
 
-    this.logger.log(
+    this.logger.debug(
       `Setting totalRows=${totalRows} for parent job ${event.sourceId}.`,
     )
 
@@ -238,7 +238,7 @@ export class CsvImportSfnEventHandler
 
     const { processedRows, failedRows } = updatedEntity
     if (totalRows > 0 && processedRows >= totalRows) {
-      this.logger.log(
+      this.logger.debug(
         `Finalizing parent CSV job ${parentKey.pk}#${parentKey.sk}`,
       )
       // Set status to FAILED if any child job failed, otherwise COMPLETED
