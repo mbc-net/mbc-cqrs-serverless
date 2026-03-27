@@ -12,7 +12,7 @@ export interface ICommandService {
    *
    * @param {CommandInputModel} input - The complete command data to be published.
    * @param {ICommandOptions} options - Options for command execution, including context and additional parameters.
-   * @returns {Promise<CommandModel>} The published command model.
+   * @returns {Promise<CommandModel|null>} The published command model, or `null` if the command was not updated (not dirty).
    * @throws {BadRequestException} If the item does not exist or the input version is invalid.
    */
   publishSync(
@@ -38,7 +38,7 @@ export interface ICommandService {
    *
    * @param {CommandPartialInputModel} input - The partial data used to update the command item.
    * @param {ICommandOptions} options - Options for command execution, including context and additional parameters.
-   * @returns {Promise<CommandModel>} The updated command model after the publish operation.
+   * @returns {Promise<CommandModel|null>} The updated command model, or `null` if the command was not updated (not dirty).
    * @throws {BadRequestException} If the item does not exist for the provided keys.
    */
   publishPartialUpdateSync(
