@@ -3,6 +3,14 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## Unreleased
+
+### Breaking Changes
+
+- **BREAKING:** `CommandService.publishSync()` and `publishPartialUpdateSync()` return `Promise<CommandModel | null>` instead of `Promise<CommandModel>`
+  - `null` is returned when the command is not dirty (same semantics as `publishAsync` / `publishPartialUpdateAsync`)
+  - Consumers must null-check the result before accessing fields such as `pk` or `version`
+
 ## [0.1.74-beta.0](https://github.com/mbc-net/mbc-cqrs-serverless/compare/v0.1.73-beta.0...v0.1.74-beta.0) (2025-08-25)
 
 **Note:** Version bump only for package @mbc-cqrs-serverless/core

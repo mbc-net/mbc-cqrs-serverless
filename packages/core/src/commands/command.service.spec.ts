@@ -11,6 +11,9 @@
  * - Optimistic locking via version numbers
  * - Sort key versioning (sk@version format)
  * - Command deduplication to prevent redundant writes
+ * - syncMode='SYNC' marker written by publishSync to prevent SFN re-trigger
+ * - publishSync writes command table, updateTtl (SET_TTL_COMMAND), history then data, handlers
+ * - publishPartialUpdateAsync strips syncMode before delegating to publishAsync
  */
 import { createMock } from '@golevelup/ts-jest'
 import { Test } from '@nestjs/testing'
@@ -18,8 +21,10 @@ import { ModuleMocker, MockFunctionMetadata } from 'jest-mock'
 
 import { DynamoDbService } from '../data-store/dynamodb.service'
 import { CommandModel, DataModel, DetailKey } from '../interfaces'
+import { CommandSyncMode } from './enums/command-sync-mode.enum'
 import { CommandService } from './command.service'
 import { DataService } from './data.service'
+import { HistoryService } from './history.service'
 import { addSortKeyVersion } from '../helpers/key'
 import { BadRequestException } from '@nestjs/common'
 import { TtlService } from './ttl.service'
@@ -31,6 +36,7 @@ import {
 } from '@aws-sdk/client-dynamodb'
 import { MODULE_OPTIONS_TOKEN } from './command.module-definition'
 import { ConfigService } from '@nestjs/config'
+import { SnsService } from '../queue/sns.service'
 import 'aws-sdk-client-mock-jest'
 import { mockClient } from 'aws-sdk-client-mock'
 
@@ -62,11 +68,20 @@ const config = {
 describe('CommandService', () => {
   let commandService: CommandService
 
+  /**
+   * In-memory dataset simulating DynamoDB tables.
+   * command: 11 versioned records for pk=master sk=max_value
+   * data:    current projected state at version 5
+   * history: initially empty, populated by historyService.publish mock
+   */
+  let dataSet: {
+    command: CommandModel[]
+    data: DataModel[]
+    history: DataModel[]
+  }
+
   beforeEach(async () => {
-    const dataSet: {
-      command: CommandModel[]
-      data: DataModel[]
-    } = {
+    dataSet = {
       command: [
         buildItem({ pk: 'master', sk: 'max_value@1' }, 1),
         buildItem({ pk: 'master', sk: 'max_value@2' }, 2),
@@ -81,6 +96,7 @@ describe('CommandService', () => {
         buildItem({ pk: 'master', sk: 'max_value@11' }, 11),
       ],
       data: [buildItem({ pk: 'master', sk: 'max_value' }, 5)],
+      history: [],
     }
 
     const moduleRef = await Test.createTestingModule({
@@ -97,15 +113,14 @@ describe('CommandService', () => {
             getTableName: jest.fn((_: string, type: string) => type),
             getItem: jest.fn((tableName: string, key: DetailKey) => {
               console.log('DynamoDbService.getItem', tableName, key)
-
-              const item = dataSet[tableName].find(
-                ({ pk, sk }) => pk === key.pk && sk === key.sk,
-              )
-              return item
+              const table = dataSet[tableName] as any[]
+              if (!table) return undefined
+              return table.find(({ pk, sk }) => pk === key.pk && sk === key.sk)
             }),
             putItem: jest.fn((tableName: string, item: any) => {
               console.log('DynamoDbService.putItem', tableName, item)
               const table = dataSet[tableName] as any[]
+              if (!table) return { ...item }
               const index = table.findIndex(
                 ({ pk, sk }) => pk === item.pk && sk === item.sk,
               )
@@ -116,6 +131,46 @@ describe('CommandService', () => {
               }
               return { ...item }
             }),
+            updateItem: jest.fn(
+              (tableName: string, key: DetailKey, update: any) => {
+                console.log(
+                  'DynamoDbService.updateItem',
+                  tableName,
+                  key,
+                  update,
+                )
+                const table = dataSet[tableName] as any[]
+                if (!table) return undefined
+                const item = table.find(
+                  ({ pk, sk }) => pk === key.pk && sk === key.sk,
+                )
+                if (!item) return undefined
+                Object.assign(item, update.set || {})
+                return { ...item }
+              },
+            ),
+          }
+        }
+
+        if (token === HistoryService) {
+          return {
+            publish: jest.fn((key: DetailKey) => {
+              const dataItem = dataSet.data.find(
+                ({ pk, sk }) => pk === key.pk && sk === key.sk,
+              )
+              if (dataItem) {
+                dataSet.history.push({ ...dataItem })
+              }
+              return Promise.resolve(dataItem || null)
+            }),
+          }
+        }
+
+        // SnsService must be explicitly mocked so updateStatus does not throw
+        // when snsService.publish is called at the end of publishSync
+        if (token === SnsService) {
+          return {
+            publish: jest.fn().mockResolvedValue(undefined),
           }
         }
 
@@ -232,6 +287,16 @@ describe('CommandService', () => {
       })
       expect(item).toBeNull()
     })
+
+    /** publishAsync must NOT set syncMode — field must remain absent */
+    it('should not set syncMode on the command record', async () => {
+      const key = { pk: 'master', sk: 'new_item_async' }
+      const inputItem = buildItem(key, 0)
+      const item = await commandService.publishAsync(inputItem, {
+        invokeContext: {},
+      })
+      expect(item?.syncMode).toBeUndefined()
+    })
   })
 
   /**
@@ -276,6 +341,34 @@ describe('CommandService', () => {
       expect(call).rejects.toThrow(
         new BadRequestException('Invalid input key: item not found'),
       )
+    })
+
+    /**
+     * syncMode must be stripped before delegating to publishAsync.
+     * If a previous publishSync wrote syncMode='SYNC' onto the command record
+     * and that record is used as the base for a partial update, syncMode must
+     * not carry forward — the new async record must be visible to the SFN.
+     */
+    it('should strip syncMode before delegating to publishAsync', async () => {
+      // Seed a command record that has syncMode='SYNC' (as written by publishSync)
+      dataSet.command.push({
+        ...buildItem({ pk: 'master', sk: 'max_value@12' }, 12),
+        syncMode: CommandSyncMode.SYNC,
+      } as any)
+      // Advance the data table so getLatestItem resolves to @12
+      dataSet.data[0] = buildItem({ pk: 'master', sk: 'max_value' }, 12)
+
+      const key = { pk: 'master', sk: 'max_value' }
+      const inputItem = {
+        ...key,
+        version: -1,
+        name: 'should not carry syncMode',
+      }
+      const item = await commandService.publishPartialUpdateAsync(inputItem, {
+        invokeContext: {},
+      })
+      expect(item).toBeDefined()
+      expect(item?.syncMode).toBeUndefined()
     })
   })
 
@@ -324,6 +417,18 @@ describe('CommandService', () => {
       const input = { ...item, attributes: new MasterAttributes('abcdd') }
       expect(commandService.isNotCommandDirty(item, input)).toBe(false)
     })
+
+    /**
+     * syncMode is infrastructure metadata, not domain data.
+     * It must not affect the dirty check regardless of its value.
+     */
+    it('should ignore syncMode when checking dirty state', () => {
+      const item = buildItem({ pk: 'master', sk: 'max_value@5' }, 5)
+      const inputWithSyncMode = { ...item, syncMode: CommandSyncMode.SYNC }
+      expect(commandService.isNotCommandDirty(item, inputWithSyncMode)).toBe(
+        true,
+      )
+    })
   })
 
   /**
@@ -350,7 +455,19 @@ describe('CommandService', () => {
       expect(item).toMatchObject({
         ...inputItem,
         version: 6,
+        sk: addSortKeyVersion(inputItem.sk, 6),
       })
+    })
+
+    /** Carries syncMode=SYNC and status=finish:FINISHED from publishSync delegation */
+    it('should carry syncMode=SYNC and status=finish:FINISHED from publishSync', async () => {
+      const key = { pk: 'master', sk: 'max_value' }
+      const inputItem = { ...key, version: 5, name: 'partial sync' }
+      const item = await commandService.publishPartialUpdateSync(inputItem, {
+        invokeContext: {},
+      })
+      expect(item?.syncMode).toBe('SYNC')
+      expect(item?.status).toBe('finish:FINISHED')
     })
 
     /** Throws error when version doesn't match - prevents stale writes */
@@ -398,13 +515,31 @@ describe('CommandService', () => {
 
   /**
    * Tests for publishSync method
-   * Scenario: Full synchronous publish with version validation
-   * Use case: Creating or updating entire command record synchronously
+   * Scenario: Full synchronous pipeline — writes command table, snapshots history
+   * before data (matching SFN), then data table, handlers, and SNS notification.
+   *
+   * Key invariants:
+   * - syncMode='SYNC' must be present on the command record so
+   *   DefaultEventFactory filters it out and does NOT create a
+   *   DataSyncNewCommandEvent (preventing duplicate SFN execution).
+   * - Initial status publish_sync:STARTED on insert; finish:FINISHED on return.
+   * - The versioned sk (sk@version) is written to the command table.
+   * - Returns null when the command is not dirty.
    */
   describe('publishSync', () => {
+    const maxValueKey = { pk: 'master', sk: 'max_value' }
+    /**
+     * Seeded data row uses empty `name`; any change makes isNotCommandDirty false.
+     * Matches the pattern in publishAsync ("should update with the latest version when version is -1").
+     */
+    const dirtyPublishSyncInput = () => ({
+      ...buildItem(maxValueKey, -1),
+      name: 'updated',
+    })
+
     /** Successfully publishes with version=-1 (auto-increment) */
     it('should update with the latest version item', async () => {
-      const inputItem = buildItem({ pk: 'master', sk: 'max_value' }, -1)
+      const inputItem = dirtyPublishSyncInput()
 
       const item = await commandService.publishSync(inputItem, {
         invokeContext: {},
@@ -413,6 +548,7 @@ describe('CommandService', () => {
       expect(item).toMatchObject({
         ...inputItem,
         version: 6,
+        sk: addSortKeyVersion(inputItem.sk, 6),
       })
     })
 
@@ -427,6 +563,79 @@ describe('CommandService', () => {
           'Invalid input version. The input version must be equal to the latest version',
         ),
       )
+    })
+
+    /** Writes command record with syncMode=SYNC to block SFN re-trigger */
+    it('should set syncMode=SYNC on the command record', async () => {
+      const inputItem = dirtyPublishSyncInput()
+      const item = await commandService.publishSync(inputItem, {
+        invokeContext: {},
+      })
+      expect(item).toBeDefined()
+      expect(item?.syncMode).toBe('SYNC')
+    })
+
+    /** Returns status=finish:FINISHED matching the SFN terminal state */
+    it('should set status=finish:FINISHED on the returned command', async () => {
+      const inputItem = dirtyPublishSyncInput()
+      const item = await commandService.publishSync(inputItem, {
+        invokeContext: {},
+      })
+      expect(item?.status).toBe('finish:FINISHED')
+    })
+
+    /** Versioned sk (sk@version) must be written to the command table */
+    it('should write versioned sk to the command table', async () => {
+      const inputItem = dirtyPublishSyncInput()
+      const item = await commandService.publishSync(inputItem, {
+        invokeContext: {},
+      })
+      // data table was at version 5, so next version is 6
+      expect(item?.sk).toBe(addSortKeyVersion('max_value', 6))
+      expect(item?.version).toBe(6)
+
+      // the versioned record in the command table must carry syncMode=SYNC
+      const commandRecord = dataSet.command.find(
+        (r) => r.pk === 'master' && r.sk === 'max_value@6',
+      )
+      expect(commandRecord).toBeDefined()
+      expect((commandRecord as any)?.syncMode).toBe('SYNC')
+    })
+
+    /** Creates a new item at version 1 when none exists yet */
+    it('should create new item at version 1 when item does not exist', async () => {
+      const key = { pk: 'master', sk: 'brand_new_item' }
+      const inputItem = buildItem(key, 0)
+      const item = await commandService.publishSync(inputItem, {
+        invokeContext: {},
+      })
+      expect(item).toBeDefined()
+      expect(item?.version).toBe(1)
+      expect(item?.syncMode).toBe('SYNC')
+      expect(item?.status).toBe('finish:FINISHED')
+    })
+
+    /** Returns null when the command data has not changed (dirty check) */
+    it('should return null when command is not dirty', async () => {
+      const inputItem = dirtyPublishSyncInput()
+      await commandService.publishSync(inputItem, { invokeContext: {} })
+      // Reuse the persisted data row so optional fields (e.g. seq) match
+      // explicit `undefined` vs missing — same pattern as publishAsync not-dirty test.
+      const dataRow = dataSet.data.find(
+        (d) => d.pk === 'master' && d.sk === 'max_value',
+      )!
+      const second = await commandService.publishSync(
+        { ...dataRow, version: -1 },
+        { invokeContext: {} },
+      )
+      expect(second).toBeNull()
+    })
+
+    /** historyService.publish is called so history table receives a copy */
+    it('should copy the record to the history table', async () => {
+      const inputItem = dirtyPublishSyncInput()
+      await commandService.publishSync(inputItem, { invokeContext: {} })
+      expect(dataSet.history.length).toBeGreaterThan(0)
     })
   })
 })
