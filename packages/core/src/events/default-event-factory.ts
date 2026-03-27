@@ -8,6 +8,7 @@ import {
 
 import { DataSyncNewCommandEvent } from '../command-events/data-sync.new.event'
 import { DataSyncCommandSfnEvent } from '../command-events/data-sync.sfn.event'
+import { CommandSyncMode } from '../commands/enums/command-sync-mode.enum'
 import { COMMAND_TABLE_SUFFIX, DEFAULT_NOTIFICATION_QUEUE } from '../constants'
 import { IEvent, IEventFactory, StepFunctionsEvent } from '../interfaces'
 import { NotificationEvent } from '../notifications/event/notification.event'
@@ -39,7 +40,7 @@ export class DefaultEventFactory implements IEventFactory {
       ) {
         if (record.eventName === 'INSERT') {
           // Local development does not support complex filter patterns
-          if (record.dynamodb?.NewImage?.syncMode?.S === 'SYNC') {
+          if (record.dynamodb?.NewImage?.syncMode?.S === CommandSyncMode.SYNC) {
             return undefined
           }
           return new DataSyncNewCommandEvent().fromDynamoDBRecord(record)

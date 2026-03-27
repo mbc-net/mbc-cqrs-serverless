@@ -18,7 +18,7 @@ export interface ICommandService {
   publishSync(
     input: CommandInputModel,
     options: ICommandOptions,
-  ): Promise<CommandModel>
+  ): Promise<CommandModel | null>
 
   /**
    * Publishes a command and processes it asynchronously.
@@ -44,7 +44,7 @@ export interface ICommandService {
   publishPartialUpdateSync(
     input: CommandPartialInputModel,
     options: ICommandOptions,
-  ): Promise<CommandModel>
+  ): Promise<CommandModel | null>
 
   /**
    * Publishes a partial command and processes it asynchronously.

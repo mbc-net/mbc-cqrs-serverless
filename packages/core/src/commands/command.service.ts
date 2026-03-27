@@ -36,6 +36,8 @@ import { ExplorerService } from '../services'
 import { MODULE_OPTIONS_TOKEN } from './command.module-definition'
 import { DataService } from './data.service'
 import { TableType } from './enums'
+import { CommandSyncMode } from './enums/command-sync-mode.enum'
+import { CommandStatus, getCommandStatus } from './enums/status.enum'
 import { DataSyncDdsHandler } from './handlers/data-sync-dds.handler'
 import { HistoryService } from './history.service'
 import { TtlService } from './ttl.service'
@@ -125,7 +127,7 @@ export class CommandService implements OnModuleInit, ICommandService {
   async publishPartialUpdateSync(
     input: CommandPartialInputModel,
     options: ICommandOptions,
-  ): Promise<CommandModel> {
+  ): Promise<CommandModel | null> {
     const item: CommandModel = await this.dataService.getItem({
       pk: input.pk,
       sk: input.sk,
@@ -212,7 +214,8 @@ export class CommandService implements OnModuleInit, ICommandService {
       ),
       ...input,
       version,
-      syncMode: 'SYNC',
+      status: getCommandStatus('publish_sync', CommandStatus.STATUS_STARTED),
+      syncMode: CommandSyncMode.SYNC,
       source: options?.source,
       requestId,
       createdAt: new Date(),
@@ -232,13 +235,21 @@ export class CommandService implements OnModuleInit, ICommandService {
     )
 
     try {
-      // 2. Write to Data table
+      // 2. SET_TTL_COMMAND: set TTL on the previous command version (matches SFN)
+      await this.updateTtl({ pk: command.pk, sk: versionedSk })
+
+      // 3. Write to History table before Data (matches SFN: HISTORY_COPY → SYNC_DATA).
+      //    historyService.publish reads the current data row; it must run before
+      //    dataService.publish so the snapshot is the pre-transition state.
+      await this.historyService.publish({
+        pk: command.pk,
+        sk: removeSortKeyVersion(input.sk),
+      })
+
+      // 4. Write to Data table (same role as DataSyncDdsHandler in SYNC_DATA)
       await this.dataService.publish(command)
 
-      // 3. Write to History table (Matching the Step Function flow)
-      await this.historyService.publish({ pk: command.pk, sk: input.sk })
-
-      // 4. Execute custom data sync handlers
+      // 5. Execute custom data sync handlers
       const targetSyncHandlers = this.dataSyncHandlers?.filter(
         (handler) => handler.type !== 'dynamodb',
       )
@@ -246,21 +257,21 @@ export class CommandService implements OnModuleInit, ICommandService {
         targetSyncHandlers.map((handler) => handler.up(command)),
       )
 
-      // 5. Update Status to FINISHED and broadcast SNS notification
+      // 6. Update Status to FINISHED and broadcast SNS notification
       await this.updateStatus(
         { pk: command.pk, sk: versionedSk },
-        'finish:FINISHED',
+        getCommandStatus('finish', CommandStatus.STATUS_FINISHED),
         requestId,
       )
 
-      command.status = 'finish:FINISHED'
+      command.status = getCommandStatus('finish', CommandStatus.STATUS_FINISHED)
       command.sk = versionedSk
       return command
     } catch (error) {
       // Mark as failed if the synchronous pipeline breaks
       await this.updateStatus(
         { pk: command.pk, sk: versionedSk },
-        'publish_sync:FAILED',
+        getCommandStatus('publish_sync', CommandStatus.STATUS_FAILED),
         requestId,
       )
       throw error

@@ -12,7 +12,7 @@
  * - Sort key versioning (sk@version format)
  * - Command deduplication to prevent redundant writes
  * - syncMode='SYNC' marker written by publishSync to prevent SFN re-trigger
- * - publishSync writes command table, data table, history table in one pipeline
+ * - publishSync writes command table, updateTtl (SET_TTL_COMMAND), history then data, handlers
  * - publishPartialUpdateAsync strips syncMode before delegating to publishAsync
  */
 import { createMock } from '@golevelup/ts-jest'
@@ -21,6 +21,7 @@ import { ModuleMocker, MockFunctionMetadata } from 'jest-mock'
 
 import { DynamoDbService } from '../data-store/dynamodb.service'
 import { CommandModel, DataModel, DetailKey } from '../interfaces'
+import { CommandSyncMode } from './enums/command-sync-mode.enum'
 import { CommandService } from './command.service'
 import { DataService } from './data.service'
 import { HistoryService } from './history.service'
@@ -352,7 +353,7 @@ describe('CommandService', () => {
       // Seed a command record that has syncMode='SYNC' (as written by publishSync)
       dataSet.command.push({
         ...buildItem({ pk: 'master', sk: 'max_value@12' }, 12),
-        syncMode: 'SYNC',
+        syncMode: CommandSyncMode.SYNC,
       } as any)
       // Advance the data table so getLatestItem resolves to @12
       dataSet.data[0] = buildItem({ pk: 'master', sk: 'max_value' }, 12)
@@ -423,7 +424,7 @@ describe('CommandService', () => {
      */
     it('should ignore syncMode when checking dirty state', () => {
       const item = buildItem({ pk: 'master', sk: 'max_value@5' }, 5)
-      const inputWithSyncMode = { ...item, syncMode: 'SYNC' }
+      const inputWithSyncMode = { ...item, syncMode: CommandSyncMode.SYNC }
       expect(commandService.isNotCommandDirty(item, inputWithSyncMode)).toBe(
         true,
       )
@@ -514,14 +515,14 @@ describe('CommandService', () => {
 
   /**
    * Tests for publishSync method
-   * Scenario: Full synchronous pipeline — writes command table, data table,
-   * history table and fires SNS notification all in-process, bypassing SFN.
+   * Scenario: Full synchronous pipeline — writes command table, snapshots history
+   * before data (matching SFN), then data table, handlers, and SNS notification.
    *
    * Key invariants:
    * - syncMode='SYNC' must be present on the command record so
    *   DefaultEventFactory filters it out and does NOT create a
    *   DataSyncNewCommandEvent (preventing duplicate SFN execution).
-   * - status='finish:FINISHED' must be set on return.
+   * - Initial status publish_sync:STARTED on insert; finish:FINISHED on return.
    * - The versioned sk (sk@version) is written to the command table.
    * - Returns null when the command is not dirty.
    */
