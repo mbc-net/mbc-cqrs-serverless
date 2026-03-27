@@ -1,5 +1,7 @@
 import { GetObjectCommand } from '@aws-sdk/client-s3'
 import {
+  CommandInputModel,
+  CommandPartialInputModel,
   EventHandler,
   extractInvokeContext,
   ICommandOptions,
@@ -11,15 +13,23 @@ import { ConfigService } from '@nestjs/config'
 import csv from 'csv-parser'
 import { Readable } from 'stream'
 
+import { ImportPublishMode } from '../constant/import-publish'
 import { CreateCsvImportDto } from '../dto/create-csv-import.dto'
-import { CreateImportDto } from '../dto/create-import.dto'
 import { ICsvRowImport } from '../dto/csv-import-row.interface'
-import { ImportStatusEnum } from '../enum'
+import { ComparisonStatus, ImportStatusEnum } from '../enum'
 import { parseId } from '../helpers'
-import { IMPORT_STRATEGY_MAP } from '../import.module-definition'
+import {
+  IMPORT_STRATEGY_MAP,
+  PROCESS_STRATEGY_MAP,
+  PUBLISH_MODE_MAP,
+} from '../import.module-definition'
 import { ImportService } from '../import.service'
-import { IImportStrategy } from '../interface'
-import { CsvImportSfnEvent } from './csv-import.sfn.event'
+import { IImportStrategy, IProcessStrategy } from '../interface'
+import {
+  CsvBatchProcessingSummary,
+  CsvFinalizeParentJobInput,
+  CsvImportSfnEvent,
+} from './csv-import.sfn.event'
 
 @EventHandler(CsvImportSfnEvent)
 export class CsvImportSfnEventHandler
@@ -34,6 +44,13 @@ export class CsvImportSfnEventHandler
     private readonly importStrategyMap: Map<string, IImportStrategy<any, any>>,
     private readonly configService: ConfigService,
     private readonly s3Service: S3Service,
+    @Inject(PROCESS_STRATEGY_MAP)
+    private readonly processStrategyMap: Map<
+      string,
+      IProcessStrategy<any, any>
+    >,
+    @Inject(PUBLISH_MODE_MAP)
+    private readonly publishModeMap: Map<string, ImportPublishMode>,
   ) {
     this.alarmTopicArn = this.configService.get<string>('SNS_ALARM_TOPIC_ARN')
   }
@@ -87,49 +104,105 @@ export class CsvImportSfnEventHandler
     }
 
     if (event.context.State.Name === 'finalize_parent_job') {
-      const finalizeEvent = event.input as CreateCsvImportDto
-      return this.finalizeParentJob(finalizeEvent)
+      return this.finalizeParentJob(
+        event.input as CsvFinalizeParentJobInput,
+        event.context.Execution.Input.sourceId as string,
+      )
     }
 
     const input = event.input as ICsvRowImport
     const items = input.Items
     const attributes = input.BatchInput.Attributes
-    const createImportDtos: CreateImportDto[] = []
 
-    const strategy = this.importStrategyMap.get(attributes.tableName)
-    if (!strategy) {
-      throw new Error(
-        `No import strategy found for table: ${attributes.tableName}`,
-      )
+    const importStrategy = this.importStrategyMap.get(attributes.tableName)
+    const processStrategy = this.processStrategyMap.get(attributes.tableName)
+    const publishMode =
+      this.publishModeMap.get(attributes.tableName) ?? ImportPublishMode.ASYNC
+
+    if (!importStrategy || !processStrategy) {
+      throw new Error(`Strategies not found for table: ${attributes.tableName}`)
     }
 
-    for (const [index, item] of items.entries()) {
-      try {
-        const transformedData = await strategy.transform(item)
-        await strategy.validate(transformedData)
-        const createImport: CreateImportDto = {
-          tableName: attributes.tableName,
-          tenantCode: attributes.tenantCode,
-          attributes: transformedData,
-          sourceId: attributes.sourceId,
-          s3Key: attributes.key,
-        }
-        createImportDtos.push(createImport)
-      } catch (error) {
-        this.logger.warn(`Row ${index + 1} failed mapping.`, { item, error })
-        throw error
-      }
-    }
+    let succeededRows = 0
+    let failedRows = 0
 
     const invokeContext = extractInvokeContext()
     const options: ICommandOptions = {
       invokeContext,
+      source: 'CSV_BATCH_PROCESSOR',
     }
-    if (createImportDtos.length > 0) {
-      const importPromises = createImportDtos.map((dto) =>
-        this.importService.createImport(dto, options),
-      )
-      await Promise.all(importPromises)
+    const commandService = processStrategy.getCommandService()
+
+    // Process chunk of 1,000 rows
+    for (const [index, item] of items.entries()) {
+      try {
+        // 1. Transform & Validate
+        const transformedData = await importStrategy.transform(item)
+        await importStrategy.validate(transformedData)
+
+        // 2. Compare against existing data
+        const compareResult = await processStrategy.compare(
+          { ...transformedData, __s3Key: input.BatchInput.Attributes.key },
+          attributes.tenantCode,
+        )
+
+        if (compareResult.status === ComparisonStatus.EQUAL) {
+          succeededRows++
+          continue // Skip identical data
+        }
+
+        // 3. Map to Command Input
+        const mappedData = await processStrategy.map(
+          compareResult.status,
+          { ...transformedData, __s3Key: input.BatchInput.Attributes.key },
+          attributes.tenantCode,
+          compareResult.existingData,
+        )
+
+        // 4. Publish to CommandService
+        if (compareResult.status === ComparisonStatus.NOT_EXIST) {
+          if (publishMode === ImportPublishMode.SYNC) {
+            await commandService.publishSync(
+              mappedData as CommandInputModel,
+              options,
+            )
+          } else {
+            await commandService.publishAsync(
+              mappedData as CommandInputModel,
+              options,
+            )
+          }
+        } else {
+          if (publishMode === ImportPublishMode.SYNC) {
+            await commandService.publishPartialUpdateSync(
+              mappedData as CommandPartialInputModel,
+              options,
+            )
+          } else {
+            await commandService.publishPartialUpdateAsync(
+              mappedData as CommandPartialInputModel,
+              options,
+            )
+          }
+        }
+
+        succeededRows++
+      } catch (error) {
+        this.logger.warn(`Row ${index + 1} failed processing.`, {
+          item,
+          errorMessage: (error as Error).message,
+          stack: (error as Error).stack,
+        })
+        failedRows++
+      }
+    }
+
+    // Return the summary for Step Functions aggregation
+    return {
+      totalRows: items.length,
+      processedRows: items.length,
+      succeededRows,
+      failedRows,
     }
   }
 
@@ -220,40 +293,62 @@ export class CsvImportSfnEventHandler
     })
   }
 
-  private async finalizeParentJob(event: CreateCsvImportDto): Promise<void> {
-    const parentKey = parseId(event.sourceId)
-
-    this.logger.debug(
-      `Counting total rows from S3 for parent job ${event.sourceId}.`,
-    )
-    const totalRows = await this.countCsvRows(event)
-
-    this.logger.debug(
-      `Setting totalRows=${totalRows} for parent job ${event.sourceId}.`,
-    )
-
-    const updatedEntity = await this.importService.updateImportJob(parentKey, {
-      set: { totalRows },
-    })
-
-    const { processedRows, failedRows } = updatedEntity
-    if (totalRows > 0 && processedRows >= totalRows) {
-      this.logger.debug(
-        `Finalizing parent CSV job ${parentKey.pk}#${parentKey.sk}`,
-      )
-      // Set status to FAILED if any child job failed, otherwise COMPLETED
-      // 子ジョブが1つでも失敗していればFAILED、そうでなければCOMPLETED
-      const finalStatus =
-        failedRows > 0 ? ImportStatusEnum.FAILED : ImportStatusEnum.COMPLETED
-
-      await this.importService.updateStatus(parentKey, finalStatus, {
-        result: {
-          message: 'All child jobs have been processed.',
-          total: totalRows,
-          succeeded: updatedEntity.succeededRows || 0,
-          failed: failedRows || 0,
-        },
-      })
+  /**
+   * Normalizes Step Functions payloads: Map merges `processingResults`, or
+   * legacy shape stores the batch array at index 0.
+   */
+  private resolveFinalizeProcessingResults(
+    input: CsvFinalizeParentJobInput,
+  ): readonly CsvBatchProcessingSummary[] {
+    if (this.isCsvFinalizeNestedBatchArray(input)) {
+      const first = input[0]
+      return Array.isArray(first) ? first : []
     }
+    return input.processingResults ?? []
+  }
+
+  private isCsvFinalizeNestedBatchArray(
+    input: CsvFinalizeParentJobInput,
+  ): input is readonly CsvBatchProcessingSummary[][] {
+    return Array.isArray(input)
+  }
+
+  private async finalizeParentJob(
+    input: CsvFinalizeParentJobInput,
+    sourceId: string,
+  ): Promise<void> {
+    const parentKey = parseId(sourceId)
+    const results = this.resolveFinalizeProcessingResults(input)
+
+    // Sum up the output of all 300 Lambda batches
+    const finalSummary = results.reduce(
+      (acc, batch: CsvBatchProcessingSummary) => {
+        acc.totalRows += batch.totalRows || 0
+        acc.processedRows += batch.processedRows || 0
+        acc.succeededRows += batch.succeededRows || 0
+        acc.failedRows += batch.failedRows || 0
+        return acc
+      },
+      { totalRows: 0, processedRows: 0, succeededRows: 0, failedRows: 0 },
+    )
+
+    this.logger.log(
+      `Finalizing parent CSV job ${parentKey.pk}#${parentKey.sk}`,
+      finalSummary,
+    )
+
+    const finalStatus =
+      finalSummary.failedRows > 0
+        ? ImportStatusEnum.FAILED
+        : ImportStatusEnum.COMPLETED
+
+    await this.importService.updateStatus(parentKey, finalStatus, {
+      result: {
+        message: 'All batches have been processed.',
+        total: finalSummary.totalRows,
+        succeeded: finalSummary.succeededRows,
+        failed: finalSummary.failedRows,
+      },
+    })
   }
 }

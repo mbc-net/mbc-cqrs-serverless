@@ -889,7 +889,7 @@ export class InfraStack extends cdk.Stack {
 
     const sfnImportCsvDefinition = new DistributedMap(this, 'import-csv', {
       maxConcurrency: 50,
-      resultPath: cdk.aws_stepfunctions.JsonPath.DISCARD,
+      resultPath: '$.processingResults',
     })
       .setLabel('import-csv')
       .setItemReader({
@@ -904,7 +904,7 @@ export class InfraStack extends cdk.Stack {
         },
       })
       .setItemBatcher({
-        MaxInputBytesPerBatch: 10,
+        MaxItemsPerBatch: 100,
         BatchInput: {
           'Attributes.$': '$',
         },
