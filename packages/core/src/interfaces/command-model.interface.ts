@@ -1,3 +1,4 @@
+import { CommandSyncMode } from '../commands/enums/command-sync-mode.enum'
 import { CommandInputModel } from './command-input-model.interface'
 
 /**
@@ -28,4 +29,6 @@ export interface CommandModel extends CommandInputModel {
   updatedIp?: string
   /** Step Functions task token for async workflows */
   taskToken?: string
+  /** Synchronous publish marker — bypasses async Step Functions triggers when set */
+  syncMode?: CommandSyncMode
 }

@@ -1000,6 +1000,11 @@ export class InfraStack extends cdk.Stack {
           filters: [
             cdk.aws_lambda.FilterCriteria.filter({
               eventName: cdk.aws_lambda.FilterRule.isEqual('INSERT'),
+              dynamodb: {
+                NewImage: {
+                  syncMode: cdk.aws_lambda.FilterRule.notExists(),
+                },
+              },
             }),
           ],
         }),
