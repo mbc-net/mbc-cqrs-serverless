@@ -32,20 +32,22 @@ These affect public APIs, export names, or property names. Fixing them may break
 
 ---
 
-## Configuration Files (Environment Variables) - NOT FIXED
+## Configuration Files (Environment Variables) - FIXED
 
 **Critical**: Environment variable name typo affecting multiple files.
 
 | File | Line | Issue | Correct | Status |
 |------|------|-------|---------|--------|
-| `packages/core/.env.example` | 35 | `COGNITO_USER_POLL_CLIENT_ID` | `COGNITO_USER_POOL_CLIENT_ID` | ⚠️ Pending |
-| `packages/core/.env` | 34 | `COGNITO_USER_POLL_CLIENT_ID` | `COGNITO_USER_POOL_CLIENT_ID` | ⚠️ Pending |
-| `packages/core/test/infra-local/.env` | 34 | `COGNITO_USER_POLL_CLIENT_ID` | `COGNITO_USER_POOL_CLIENT_ID` | ⚠️ Pending |
-| `packages/cli/templates/.env.local` | 38 | `COGNITO_USER_POLL_CLIENT_ID` | `COGNITO_USER_POOL_CLIENT_ID` | ⚠️ Pending |
-| `examples/seq/.env` | 34 | `COGNITO_USER_POLL_CLIENT_ID` | `COGNITO_USER_POOL_CLIENT_ID` | ⚠️ Pending |
-| `examples/master/.env` | 38 | `COGNITO_USER_POLL_CLIENT_ID` | `COGNITO_USER_POOL_CLIENT_ID` | ⚠️ Pending |
+| `packages/core/.env.example` | 35 | `COGNITO_USER_POLL_CLIENT_ID` | `COGNITO_USER_POOL_CLIENT_ID` | ✅ Fixed (deprecated with fallback) |
+| `packages/core/.env` | 34 | `COGNITO_USER_POLL_CLIENT_ID` | `COGNITO_USER_POOL_CLIENT_ID` | ⚠️ Not tracked by git |
+| `packages/core/test/infra-local/.env` | 34 | `COGNITO_USER_POLL_CLIENT_ID` | `COGNITO_USER_POOL_CLIENT_ID` | ⚠️ Not tracked by git |
+| `packages/cli/templates/.env.local` | 38 | `COGNITO_USER_POLL_CLIENT_ID` | `COGNITO_USER_POOL_CLIENT_ID` | ✅ Fixed (deprecated with fallback) |
+| `examples/seq/.env` | 34 | `COGNITO_USER_POLL_CLIENT_ID` | `COGNITO_USER_POOL_CLIENT_ID` | ✅ Fixed (deprecated with fallback) |
+| `examples/master/.env` | 38 | `COGNITO_USER_POLL_CLIENT_ID` | `COGNITO_USER_POOL_CLIENT_ID` | ✅ Fixed (deprecated with fallback) |
 
 **Note**: `POLL` should be `POOL` (Cognito User Pool, not Poll)
+
+**Backward Compatibility**: `env.validation.ts` automatically migrates `COGNITO_USER_POLL_CLIENT_ID` to `COGNITO_USER_POOL_CLIENT_ID` with a deprecation warning. Existing users with the old variable name will continue to work.
 
 ---
 

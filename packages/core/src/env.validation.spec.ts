@@ -499,6 +499,59 @@ describe('EnvironmentVariables', () => {
     })
   })
 
+  describe('Deprecated Environment Variable Migration', () => {
+    it('should migrate COGNITO_USER_POLL_CLIENT_ID to COGNITO_USER_POOL_CLIENT_ID', () => {
+      const config = createValidEnv({
+        COGNITO_USER_POLL_CLIENT_ID: 'test-client-id',
+      })
+
+      const validate = getValidateConfig()
+      const result = validate(config)
+
+      expect(
+        (result as unknown as Record<string, unknown>)[
+          'COGNITO_USER_POOL_CLIENT_ID'
+        ],
+      ).toBe('test-client-id')
+    })
+
+    it('should not overwrite COGNITO_USER_POOL_CLIENT_ID if already set', () => {
+      const config = createValidEnv({
+        COGNITO_USER_POLL_CLIENT_ID: 'old-value',
+        COGNITO_USER_POOL_CLIENT_ID: 'new-value',
+      })
+
+      const validate = getValidateConfig()
+      const result = validate(config)
+
+      expect(
+        (result as unknown as Record<string, unknown>)[
+          'COGNITO_USER_POOL_CLIENT_ID'
+        ],
+      ).toBe('new-value')
+    })
+
+    it('should log a deprecation warning when migrating old variable name', () => {
+      const config = createValidEnv({
+        COGNITO_USER_POLL_CLIENT_ID: 'test-client-id',
+      })
+
+      const warnSpy = jest.spyOn(
+        jest.requireActual('@nestjs/common').Logger.prototype,
+        'warn',
+      )
+
+      const validate = getValidateConfig()
+      validate(config)
+
+      expect(warnSpy).toHaveBeenCalledWith(
+        expect.stringContaining('COGNITO_USER_POLL_CLIENT_ID'),
+      )
+
+      warnSpy.mockRestore()
+    })
+  })
+
   describe('getValidateConfig Function', () => {
     it('should return a function', () => {
       const validate = getValidateConfig()

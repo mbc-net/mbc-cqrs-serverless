@@ -24,6 +24,11 @@ custom:
   sesPort: ${env:LOCAL_SES_PORT, 8005}
   cognitoPort: ${env:LOCAL_COGNITO_PORT, 9229}
 
+  # serverless-offline-lambda plugin (external Lambda invoke, separate from serverless-offline lambdaPort)
+  lambda:
+    port: ${env:LOCAL_OFFLINE_LAMBDA_PORT, 4000}
+    host: 0.0.0.0
+
   serverless-offline:
     corsAllowOrigin: '*'
     corsAllowHeaders: '*'
@@ -125,7 +130,9 @@ provider:
       localAuthorizer:
         type: jwt
         identitySource: $request.header.Authorization
-        issuerUrl: http://localhost:${self:custom.cognitoPort}/local_2G7noHgW
+        # NOTE: Use the internal port (9229) because cognito-local always generates
+        # JWT iss claim with its internal listen port, regardless of Docker port mapping.
+        issuerUrl: http://localhost:9229/local_2G7noHgW
         audience:
           - dnk8y7ii3wled35p3lw0l2cd7
       # keycloakAuthorizer:
