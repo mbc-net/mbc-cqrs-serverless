@@ -3,12 +3,15 @@ import { IEvent, StepFunctionsContext } from '@mbc-cqrs-serverless/core'
 import { CreateCsvImportDto } from '../dto/create-csv-import.dto'
 import { ICsvRowImport } from '../dto/csv-import-row.interface'
 
-/** Per-batch metrics emitted by each csv_rows_handler Map iteration. */
+/**
+ * Per-batch metrics emitted by each csv_rows_handler Map iteration.
+ * `totalRows` is the row count in this batch; each row is either counted in
+ * `succeededRows` (including skipped-equal rows) or `failedRows`.
+ */
 export interface CsvBatchProcessingSummary {
-  totalRows?: number
-  processedRows?: number
-  succeededRows?: number
-  failedRows?: number
+  totalRows: number
+  succeededRows: number
+  failedRows: number
 }
 
 /** Map state output merged via `resultPath: '$.processingResults'`. */

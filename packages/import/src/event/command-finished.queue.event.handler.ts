@@ -81,19 +81,6 @@ export class CommandFinishedHandler
         result,
         error,
       })
-
-      // const skParts = importKey.sk.split(KEY_SEPARATOR)
-      // const parentId = skParts.slice(0, -1).join(KEY_SEPARATOR) // Everything except the last part (the child's own ULID)
-
-      // if (parentId.startsWith(CSV_IMPORT_PK_PREFIX)) {
-      //   const parentKey = parseId(parentId)
-      //   const childSucceeded = newStatus === ImportStatusEnum.COMPLETED
-      //   // This call will handle incrementing and finalizing the parent job.
-      //   await this.importService.incrementParentJobCounters(
-      //     parentKey,
-      //     childSucceeded,
-      //   )
-      // }
     } catch (error) {
       this.logger.error('Failed to process command notification event', error)
       throw error

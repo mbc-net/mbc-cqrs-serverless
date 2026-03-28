@@ -17,7 +17,6 @@ import {
   PUBLISH_MODE_MAP,
 } from '../import.module-definition'
 import { IImportStrategy, IProcessStrategy } from '../interface'
-import { ImportPublishMode } from '../constant/import-publish'
 
 /**
  * Helper: creates a Readable stream simulating CSV content
@@ -56,7 +55,7 @@ describe('CsvImportSfnEventHandler', () => {
         },
         {
           provide: PUBLISH_MODE_MAP,
-          useValue: new Map<string, ImportPublishMode>(),
+          useValue: new Map(),
         },
         {
           provide: ConfigService,
@@ -97,13 +96,11 @@ describe('CsvImportSfnEventHandler', () => {
           processingResults: [
             {
               totalRows: 1000,
-              processedRows: 1000,
               succeededRows: 1000,
               failedRows: 0,
             },
             {
               totalRows: 500,
-              processedRows: 500,
               succeededRows: 500,
               failedRows: 0,
             },
@@ -144,13 +141,11 @@ describe('CsvImportSfnEventHandler', () => {
           processingResults: [
             {
               totalRows: 1000,
-              processedRows: 1000,
               succeededRows: 998,
               failedRows: 2,
             },
             {
               totalRows: 500,
-              processedRows: 500,
               succeededRows: 500,
               failedRows: 0,
             },
@@ -190,7 +185,6 @@ describe('CsvImportSfnEventHandler', () => {
           [
             {
               totalRows: 10,
-              processedRows: 10,
               succeededRows: 10,
               failedRows: 0,
             },
@@ -212,6 +206,30 @@ describe('CsvImportSfnEventHandler', () => {
             total: 10,
           }),
         }),
+      )
+    })
+
+    it('should mark FAILED when processingResults is empty', async () => {
+      const mockEvent: CsvImportSfnEvent = {
+        context: {
+          State: { Name: 'finalize_parent_job' },
+          Execution: {
+            Input: { sourceId: mockSourceId },
+          },
+        },
+        input: { processingResults: [] },
+      } as any
+
+      importService.updateStatus.mockResolvedValue(undefined)
+
+      await handler.execute(mockEvent)
+
+      expect(importService.updateStatus).toHaveBeenCalledWith(
+        { pk: `CSV_IMPORT#${mockTenantCode}`, sk: 'building#01PARENT123' },
+        ImportStatusEnum.FAILED,
+        {
+          result: { message: 'No batch processing results received.' },
+        },
       )
     })
   })

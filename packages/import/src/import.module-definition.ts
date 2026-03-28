@@ -9,7 +9,7 @@ import { ImportEntityProfile, IZipFinalizationHook } from './interface'
 export const IMPORT_STRATEGY_MAP = 'ImportStrategyMapInjectToken'
 export const PROCESS_STRATEGY_MAP = 'ProcessStrategyMapInjectToken'
 export const ZIP_FINALIZATION_HOOKS = 'ZipFinalizationHooksInjectToken'
-/** Injected value: map from `tableName` to publish mode (SYNC | ASYNC). */
+/** Injected value: map from `tableName` to publish mode — see `import-publish.ts`. */
 export const PUBLISH_MODE_MAP = 'PublishModeMapInjectToken'
 
 /**

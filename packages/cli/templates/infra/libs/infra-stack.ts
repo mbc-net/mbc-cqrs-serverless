@@ -887,6 +887,20 @@ export class InfraStack extends cdk.Stack {
       cdk.aws_stepfunctions.IntegrationPattern.REQUEST_RESPONSE,
     )
 
+    const importCsvSuccess = new cdk.aws_stepfunctions.Succeed(
+      this,
+      'ImportCsvSuccess',
+      {
+        stateName: 'success',
+      },
+    )
+
+    const finalizeParentJobState = lambdaInvoke(
+      'finalize_parent_job',
+      importCsvSuccess,
+      cdk.aws_stepfunctions.IntegrationPattern.REQUEST_RESPONSE,
+    )
+
     const sfnImportCsvDefinition = new DistributedMap(this, 'import-csv', {
       maxConcurrency: 50,
       resultPath: '$.processingResults',
@@ -903,6 +917,8 @@ export class InfraStack extends cdk.Stack {
           'Key.$': '$.key',
         },
       })
+      // For ImportPublishMode.SYNC tables, keep MaxItemsPerBatch low enough that sequential
+      // publishSync per row stays within the Lambda timeout (see import package import-publish.ts).
       .setItemBatcher({
         MaxItemsPerBatch: 100,
         BatchInput: {
@@ -912,6 +928,7 @@ export class InfraStack extends cdk.Stack {
       .itemProcessor(csvRowsHandlerState, {
         executionType: cdk.aws_stepfunctions.ProcessorType.EXPRESS,
       })
+      .next(finalizeParentJobState)
 
     const sfnImportCsvLogGroup = new cdk.aws_logs.LogGroup(
       this,

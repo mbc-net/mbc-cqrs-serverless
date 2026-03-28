@@ -29,6 +29,8 @@ export interface ImportEntityProfile {
 
   /**
    * How commands are published for this entity. Defaults to ASYNC when omitted.
+   * For CSV Step Functions, prefer ASYNC for large imports; SYNC implies sequential
+   * `publishSync` per row — see `ImportPublishMode` docs in `import-publish.ts`.
    * @see ImportPublishMode
    */
   publishMode?: ImportPublishMode

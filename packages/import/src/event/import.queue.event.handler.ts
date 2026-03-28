@@ -192,8 +192,9 @@ export class ImportQueueEventHandler
     )
 
     const commandService = strategy.getCommandService()
+    const { type: tableName } = importEntity
     const publishMode =
-      this.publishModeMap.get(importEntity.type) ?? ImportPublishMode.ASYNC
+      this.publishModeMap.get(tableName) ?? ImportPublishMode.ASYNC
     let result: any
 
     // 3. Execute the appropriate command

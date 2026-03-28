@@ -133,7 +133,7 @@ export class CsvImportSfnEventHandler
     }
     const commandService = processStrategy.getCommandService()
 
-    // Process chunk of 1,000 rows
+    // Rows run sequentially; SYNC awaits publishSync per row (see ImportPublishMode).
     for (const [index, item] of items.entries()) {
       try {
         // 1. Transform & Validate
@@ -200,7 +200,6 @@ export class CsvImportSfnEventHandler
     // Return the summary for Step Functions aggregation
     return {
       totalRows: items.length,
-      processedRows: items.length,
       succeededRows,
       failedRows,
     }
@@ -320,16 +319,25 @@ export class CsvImportSfnEventHandler
     const parentKey = parseId(sourceId)
     const results = this.resolveFinalizeProcessingResults(input)
 
-    // Sum up the output of all 300 Lambda batches
+    if (results.length === 0) {
+      this.logger.warn(
+        `No batch results found for parent job ${sourceId}. Marking as FAILED.`,
+      )
+      await this.importService.updateStatus(parentKey, ImportStatusEnum.FAILED, {
+        result: { message: 'No batch processing results received.' },
+      })
+      return
+    }
+
+    // Sum up the output of all Map / Lambda batches
     const finalSummary = results.reduce(
       (acc, batch: CsvBatchProcessingSummary) => {
-        acc.totalRows += batch.totalRows || 0
-        acc.processedRows += batch.processedRows || 0
-        acc.succeededRows += batch.succeededRows || 0
-        acc.failedRows += batch.failedRows || 0
+        acc.totalRows += batch.totalRows
+        acc.succeededRows += batch.succeededRows
+        acc.failedRows += batch.failedRows
         return acc
       },
-      { totalRows: 0, processedRows: 0, succeededRows: 0, failedRows: 0 },
+      { totalRows: 0, succeededRows: 0, failedRows: 0 },
     )
 
     this.logger.log(
