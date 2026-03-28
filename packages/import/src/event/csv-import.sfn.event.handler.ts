@@ -126,6 +126,7 @@ export class CsvImportSfnEventHandler
     let succeededRows = 0
     let failedRows = 0
 
+    // CommandService publish* requires ICommandOptions.invokeContext; extract from this Lambda invocation.
     const invokeContext = extractInvokeContext()
     const options: ICommandOptions = {
       invokeContext,
