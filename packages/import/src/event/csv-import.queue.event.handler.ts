@@ -46,7 +46,7 @@ export class CsvImportQueueEventHandler
     const importKey = event.importEvent.importKey
     const { key, tableName, tenantCode } =
       importEntity.attributes as CreateCsvImportDto
-    this.logger.log(
+    this.logger.debug(
       `Received master CSV job from queue: ${importEntity.id} for file ${key}`,
     )
 
@@ -71,7 +71,7 @@ export class CsvImportQueueEventHandler
         `${tenantCode}-${tableName}-${Date.now()}`,
       )
 
-      this.logger.log(
+      this.logger.debug(
         `Started Step Function execution for master job ${importEntity.id}`,
       )
       // The master job's status will now be updated by the Step Function itself upon completion/failure.

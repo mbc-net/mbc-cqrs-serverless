@@ -1,33 +1,22 @@
 /**
  * CsvImportSfnEventHandler Unit Tests
- *
- * 概要 / Overview:
- * CsvImportSfnEventHandlerのユニットテストスイート。Step Functions経由の
- * CSVインポート処理とステータス決定ロジックを検証します。
- *
- * Unit test suite for CsvImportSfnEventHandler. Verifies CSV import
- * processing via Step Functions and status determination logic.
- *
- * 目的 / Purpose:
- * - finalizeParentJobで子ジョブ失敗時にFAILEDステータスが設定されることを検証
- * - csv_loaderで子ジョブ失敗時にFAILEDステータスが設定されることを検証
- * - 正常処理時はCOMPLETEDステータスが設定されることを検証
- *
- * - Verify FAILED status is set when child jobs fail in finalizeParentJob
- * - Verify FAILED status is set when child jobs fail in csv_loader
- * - Verify COMPLETED status is set on successful processing
  */
 import { Test, TestingModule } from '@nestjs/testing'
 import { createMock } from '@golevelup/ts-jest'
 import { S3Service } from '@mbc-cqrs-serverless/core'
 import { ConfigService } from '@nestjs/config'
 import { Readable } from 'stream'
+
 import { CsvImportSfnEventHandler } from './csv-import.sfn.event.handler'
 import { ImportService } from '../import.service'
 import { CsvImportSfnEvent } from './csv-import.sfn.event'
 import { ImportStatusEnum } from '../enum'
-import { IMPORT_STRATEGY_MAP } from '../import.module-definition'
-import { IImportStrategy } from '../interface'
+import {
+  IMPORT_STRATEGY_MAP,
+  PROCESS_STRATEGY_MAP,
+  PUBLISH_MODE_MAP,
+} from '../import.module-definition'
+import { IImportStrategy, IProcessStrategy } from '../interface'
 
 /**
  * Helper: creates a Readable stream simulating CSV content
@@ -42,7 +31,6 @@ describe('CsvImportSfnEventHandler', () => {
   let handler: CsvImportSfnEventHandler
   let importService: jest.Mocked<ImportService>
   let s3Service: jest.Mocked<S3Service>
-  let strategyMap: Map<string, IImportStrategy<any, any>>
 
   const mockTenantCode = 'tenant001'
   const mockSourceId = `CSV_IMPORT#${mockTenantCode}#building#01PARENT123`
@@ -50,8 +38,6 @@ describe('CsvImportSfnEventHandler', () => {
   const mockKey = 'test.csv'
 
   beforeEach(async () => {
-    strategyMap = new Map()
-
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         CsvImportSfnEventHandler,
@@ -61,7 +47,15 @@ describe('CsvImportSfnEventHandler', () => {
         },
         {
           provide: IMPORT_STRATEGY_MAP,
-          useValue: strategyMap,
+          useValue: new Map<string, IImportStrategy<any, any>>(),
+        },
+        {
+          provide: PROCESS_STRATEGY_MAP,
+          useValue: new Map<string, IProcessStrategy<any, any>>(),
+        },
+        {
+          provide: PUBLISH_MODE_MAP,
+          useValue: new Map(),
         },
         {
           provide: ConfigService,
@@ -87,47 +81,32 @@ describe('CsvImportSfnEventHandler', () => {
     expect(handler).toBeDefined()
   })
 
-  /**
-   * finalize_parent_job ステータス決定ロジックのテスト
-   * Tests for finalize_parent_job status determination logic
-   *
-   * FIX: MapResult.length の代わりに countCsvRows() で totalRows を取得するように変更
-   * FIX: totalRows is now derived from countCsvRows() instead of MapResult.length
-   */
   describe('finalize_parent_job status determination', () => {
-    /**
-     * テスト: 子ジョブが失敗した場合はFAILEDステータスを設定する
-     * Test: Should set FAILED status when child jobs have failed
-     */
-    it('should set FAILED status when failedRows > 0', async () => {
+    it('should aggregate batch results and set COMPLETED status', async () => {
       // Arrange
-      // FIX: input はもう MapResult を含まない。bucket/key が必須。
-      // FIX: input no longer contains MapResult. bucket/key are required.
       const mockEvent: CsvImportSfnEvent = {
         context: {
           State: { Name: 'finalize_parent_job' },
+          Execution: {
+            Input: { sourceId: mockSourceId },
+          },
         },
+        // Simulate output from Distributed Map
         input: {
-          sourceId: mockSourceId,
-          bucket: mockBucket,
-          key: mockKey,
-          tenantCode: mockTenantCode,
-          tableName: 'building',
+          processingResults: [
+            {
+              totalRows: 1000,
+              succeededRows: 1000,
+              failedRows: 0,
+            },
+            {
+              totalRows: 500,
+              succeededRows: 500,
+              failedRows: 0,
+            },
+          ],
         },
       } as any
-
-      // FIX: S3からCSVを読み込んでrow数を返すモック (1 row → totalRows=1)
-      // FIX: mock S3 to return a CSV stream with 1 data row → totalRows=1
-      s3Service.client.send = jest.fn().mockResolvedValue({
-        Body: makeCsvStream(['val1,val2']),
-      })
-
-      importService.updateImportJob.mockResolvedValue({
-        processedRows: 1,
-        failedRows: 1,
-        succeededRows: 0,
-        totalRows: 1,
-      } as any)
 
       importService.updateStatus.mockResolvedValue(undefined)
 
@@ -135,114 +114,44 @@ describe('CsvImportSfnEventHandler', () => {
       await handler.execute(mockEvent)
 
       // Assert
-      expect(importService.updateImportJob).toHaveBeenCalledWith(
-        expect.objectContaining({
-          pk: `CSV_IMPORT#${mockTenantCode}`,
-          sk: 'building#01PARENT123',
-        }),
-        { set: { totalRows: 1 } }, // FIX: totalRows from countCsvRows, not MapResult.length
-      )
       expect(importService.updateStatus).toHaveBeenCalledWith(
-        expect.objectContaining({
-          pk: `CSV_IMPORT#${mockTenantCode}`,
-          sk: 'building#01PARENT123',
-        }),
-        ImportStatusEnum.FAILED,
-        expect.objectContaining({
-          result: expect.objectContaining({
-            failed: 1,
-            succeeded: 0,
-          }),
-        }),
-      )
-    })
-
-    /**
-     * テスト: 全ての子ジョブが成功した場合はCOMPLETEDステータスを設定する
-     * Test: Should set COMPLETED status when all child jobs succeeded
-     */
-    it('should set COMPLETED status when failedRows = 0', async () => {
-      // Arrange
-      const mockEvent: CsvImportSfnEvent = {
-        context: {
-          State: { Name: 'finalize_parent_job' },
-        },
-        input: {
-          sourceId: mockSourceId,
-          bucket: mockBucket,
-          key: mockKey,
-          tenantCode: mockTenantCode,
-          tableName: 'building',
-        },
-      } as any
-
-      // FIX: 2 data rows → totalRows=2
-      s3Service.client.send = jest.fn().mockResolvedValue({
-        Body: makeCsvStream(['val1,val2', 'val3,val4']),
-      })
-
-      importService.updateImportJob.mockResolvedValue({
-        processedRows: 2,
-        failedRows: 0,
-        succeededRows: 2,
-        totalRows: 2,
-      } as any)
-
-      importService.updateStatus.mockResolvedValue(undefined)
-
-      // Act
-      await handler.execute(mockEvent)
-
-      // Assert
-      expect(importService.updateImportJob).toHaveBeenCalledWith(
-        expect.any(Object),
-        { set: { totalRows: 2 } },
-      )
-      expect(importService.updateStatus).toHaveBeenCalledWith(
-        expect.objectContaining({
-          pk: `CSV_IMPORT#${mockTenantCode}`,
-          sk: 'building#01PARENT123',
-        }),
+        { pk: `CSV_IMPORT#${mockTenantCode}`, sk: 'building#01PARENT123' },
         ImportStatusEnum.COMPLETED,
         expect.objectContaining({
           result: expect.objectContaining({
+            total: 1500,
+            succeeded: 1500,
             failed: 0,
-            succeeded: 2,
           }),
         }),
       )
     })
 
-    /**
-     * テスト: 一部の子ジョブが失敗した場合はFAILEDステータスを設定する
-     * Test: Should set FAILED status when some child jobs failed
-     */
-    it('should set FAILED status when some child jobs failed', async () => {
+    it('should aggregate batch results and set FAILED status if any row failed', async () => {
       // Arrange
       const mockEvent: CsvImportSfnEvent = {
         context: {
           State: { Name: 'finalize_parent_job' },
+          Execution: {
+            Input: { sourceId: mockSourceId },
+          },
         },
+        // Simulate output from Distributed Map with failures
         input: {
-          sourceId: mockSourceId,
-          bucket: mockBucket,
-          key: mockKey,
-          tenantCode: mockTenantCode,
-          tableName: 'building',
+          processingResults: [
+            {
+              totalRows: 1000,
+              succeededRows: 998,
+              failedRows: 2,
+            },
+            {
+              totalRows: 500,
+              succeededRows: 500,
+              failedRows: 0,
+            },
+          ],
         },
       } as any
-
-      // FIX: 3 data rows → totalRows=3
-      s3Service.client.send = jest.fn().mockResolvedValue({
-        Body: makeCsvStream(['r1c1,r1c2', 'r2c1,r2c2', 'r3c1,r3c2']),
-      })
-
-      importService.updateImportJob.mockResolvedValue({
-        processedRows: 3,
-        failedRows: 1,
-        succeededRows: 2,
-        totalRows: 3,
-      } as any)
 
       importService.updateStatus.mockResolvedValue(undefined)
 
@@ -250,98 +159,83 @@ describe('CsvImportSfnEventHandler', () => {
       await handler.execute(mockEvent)
 
       // Assert
-      expect(importService.updateImportJob).toHaveBeenCalledWith(
-        expect.any(Object),
-        { set: { totalRows: 3 } },
-      )
       expect(importService.updateStatus).toHaveBeenCalledWith(
-        expect.any(Object),
-        ImportStatusEnum.FAILED,
-        expect.any(Object),
+        { pk: `CSV_IMPORT#${mockTenantCode}`, sk: 'building#01PARENT123' },
+        ImportStatusEnum.FAILED, // Status should be FAILED because failedRows > 0
+        expect.objectContaining({
+          result: expect.objectContaining({
+            total: 1500,
+            succeeded: 1498,
+            failed: 2,
+          }),
+        }),
       )
     })
 
-    /**
-     * テスト: processedRows < totalRows の場合はステータスを更新しない
-     * Test: Should NOT update status when processing is not yet complete
-     */
-    it('should NOT call updateStatus when processedRows < totalRows', async () => {
-      // Arrange — CSV has 5 rows but only 3 processed so far
+    it('should handle alternative local mock payload shape (nested array)', async () => {
+      // Arrange - local mock wraps the output in an array
       const mockEvent: CsvImportSfnEvent = {
         context: {
           State: { Name: 'finalize_parent_job' },
+          Execution: {
+            Input: { sourceId: mockSourceId },
+          },
         },
-        input: {
-          sourceId: mockSourceId,
-          bucket: mockBucket,
-          key: mockKey,
-          tenantCode: mockTenantCode,
-          tableName: 'building',
-        },
+        input: [
+          [
+            {
+              totalRows: 10,
+              succeededRows: 10,
+              failedRows: 0,
+            },
+          ],
+        ],
       } as any
 
-      s3Service.client.send = jest.fn().mockResolvedValue({
-        Body: makeCsvStream(['r1,v1', 'r2,v2', 'r3,v3', 'r4,v4', 'r5,v5']),
-      })
-
-      importService.updateImportJob.mockResolvedValue({
-        processedRows: 3,
-        failedRows: 0,
-        succeededRows: 3,
-        totalRows: 5,
-      } as any)
+      importService.updateStatus.mockResolvedValue(undefined)
 
       // Act
       await handler.execute(mockEvent)
 
       // Assert
-      expect(importService.updateImportJob).toHaveBeenCalledWith(
+      expect(importService.updateStatus).toHaveBeenCalledWith(
         expect.any(Object),
-        { set: { totalRows: 5 } },
+        ImportStatusEnum.COMPLETED,
+        expect.objectContaining({
+          result: expect.objectContaining({
+            total: 10,
+          }),
+        }),
       )
-      expect(importService.updateStatus).not.toHaveBeenCalled()
     })
 
-    /**
-     * テスト: S3ストリームが取得できない場合はエラーをスローする
-     * Test: Should throw error when S3 stream is not readable
-     */
-    it('should throw error when S3 Body is not a Readable stream', async () => {
-      // Arrange
+    it('should mark FAILED when processingResults is empty', async () => {
       const mockEvent: CsvImportSfnEvent = {
         context: {
           State: { Name: 'finalize_parent_job' },
+          Execution: {
+            Input: { sourceId: mockSourceId },
+          },
         },
-        input: {
-          sourceId: mockSourceId,
-          bucket: mockBucket,
-          key: mockKey,
-          tenantCode: mockTenantCode,
-          tableName: 'building',
-        },
+        input: { processingResults: [] },
       } as any
 
-      s3Service.client.send = jest.fn().mockResolvedValue({
-        Body: null, // not a Readable
-      })
+      importService.updateStatus.mockResolvedValue(undefined)
 
-      // Act & Assert
-      await expect(handler.execute(mockEvent)).rejects.toThrow(
-        'Failed to get a readable stream from S3 object.',
+      await handler.execute(mockEvent)
+
+      expect(importService.updateStatus).toHaveBeenCalledWith(
+        { pk: `CSV_IMPORT#${mockTenantCode}`, sk: 'building#01PARENT123' },
+        ImportStatusEnum.FAILED,
+        {
+          result: { message: 'No batch processing results received.' },
+        },
       )
     })
   })
 
-  /**
-   * csv_loader ステータス決定ロジックのテスト（既に処理済みの場合）
-   * Tests for csv_loader status determination logic (when already processed)
-   */
-  describe('csv_loader early finalization status determination', () => {
-    /**
-     * テスト: csv_loaderで既に処理済みで失敗がある場合はFAILEDを設定
-     * Test: Should set FAILED in csv_loader when already processed with failures
-     */
-    it('should set FAILED status in csv_loader when processedRows >= totalRows and failedRows > 0', async () => {
+  describe('csv_loader state', () => {
+    it('should count rows and load first batch', async () => {
       // Arrange
       const mockEvent: CsvImportSfnEvent = {
         context: {
@@ -356,43 +250,30 @@ describe('CsvImportSfnEventHandler', () => {
         },
       } as any
 
-      // countCsvRows call → 5 rows
-      // loadCsv call → also reads from S3 (limit=10, returns items)
+      // S3 streams for countCsvRows and loadCsv
       s3Service.client.send = jest
         .fn()
         .mockResolvedValueOnce({
-          Body: makeCsvStream(['r1,v1', 'r2,v2', 'r3,v3', 'r4,v4', 'r5,v5']),
-        }) // first call: countCsvRows
+          Body: makeCsvStream(['r1,v1', 'r2,v2', 'r3,v3']),
+        })
         .mockResolvedValueOnce({
-          Body: makeCsvStream(['r1,v1', 'r2,v2', 'r3,v3', 'r4,v4', 'r5,v5']),
-        }) // second call: loadCsv
+          Body: makeCsvStream(['r1,v1', 'r2,v2', 'r3,v3']),
+        })
 
       importService.updateImportJob.mockResolvedValue({
-        processedRows: 5,
-        failedRows: 2,
-        succeededRows: 3,
-        totalRows: 5,
+        processedRows: 0,
+        failedRows: 0,
+        succeededRows: 0,
+        totalRows: 3,
       } as any)
-
-      importService.updateStatus.mockResolvedValue(undefined)
 
       // Act
       await handler.execute(mockEvent)
 
       // Assert
       expect(importService.updateImportJob).toHaveBeenCalledWith(
-        expect.objectContaining({
-          pk: `CSV_IMPORT#${mockTenantCode}`,
-          sk: 'building#01PARENT123',
-        }),
-        { set: { totalRows: 5 } },
-      )
-      expect(importService.updateStatus).toHaveBeenCalledWith(
-        expect.objectContaining({
-          pk: `CSV_IMPORT#${mockTenantCode}`,
-          sk: 'building#01PARENT123',
-        }),
-        ImportStatusEnum.FAILED,
+        { pk: `CSV_IMPORT#${mockTenantCode}`, sk: 'building#01PARENT123' },
+        { set: { totalRows: 3 } },
       )
     })
   })

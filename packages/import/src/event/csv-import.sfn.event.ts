@@ -3,10 +3,35 @@ import { IEvent, StepFunctionsContext } from '@mbc-cqrs-serverless/core'
 import { CreateCsvImportDto } from '../dto/create-csv-import.dto'
 import { ICsvRowImport } from '../dto/csv-import-row.interface'
 
+/**
+ * Per-batch metrics emitted by each csv_rows_handler Map iteration.
+ * `totalRows` is the row count in this batch; each row is either counted in
+ * `succeededRows` (including skipped-equal rows) or `failedRows`.
+ */
+export interface CsvBatchProcessingSummary {
+  totalRows: number
+  succeededRows: number
+  failedRows: number
+}
+
+/** Map state output merged via `resultPath: '$.processingResults'`. */
+export interface CsvFinalizeParentJobMapOutput {
+  readonly processingResults?: readonly CsvBatchProcessingSummary[]
+}
+
+/**
+ * Payload for the `finalize_parent_job` state after Distributed Map.
+ * Primary shape: Map `resultPath: '$.processingResults'` (see infra stack).
+ * Alternate: array whose first element is the batch summaries array.
+ */
+export type CsvFinalizeParentJobInput =
+  | CsvFinalizeParentJobMapOutput
+  | readonly CsvBatchProcessingSummary[][]
+
 export class CsvImportSfnEvent implements IEvent {
   source: string
   context: StepFunctionsContext
-  input: CreateCsvImportDto | ICsvRowImport
+  input: CreateCsvImportDto | ICsvRowImport | CsvFinalizeParentJobInput
 
   constructor(event?: Partial<CsvImportSfnEvent>) {
     Object.assign(this, event)
