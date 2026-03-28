@@ -887,9 +887,45 @@ export class InfraStack extends cdk.Stack {
       cdk.aws_stepfunctions.IntegrationPattern.REQUEST_RESPONSE,
     )
 
+    const importCsvSuccess = new cdk.aws_stepfunctions.Succeed(
+      this,
+      'ImportCsvSuccess',
+      {
+        stateName: 'success',
+      },
+    )
+
+    const finalizeParentJobInvoke = new cdk.aws_stepfunctions_tasks.LambdaInvoke(
+      this,
+      'finalize_parent_job',
+      {
+        lambdaFunction: lambdaApi,
+        payload: cdk.aws_stepfunctions.TaskInput.fromObject({
+          'input.$': '$',
+          'context.$': '$$',
+        }),
+        stateName: 'finalize_parent_job',
+        outputPath: '$.Payload[0][0]',
+        integrationPattern:
+          cdk.aws_stepfunctions.IntegrationPattern.REQUEST_RESPONSE,
+        retryOnServiceExceptions: false,
+      },
+    )
+    finalizeParentJobInvoke.addRetry({
+      errors: [
+        'Lambda.ServiceException',
+        'Lambda.AWSLambdaException',
+        'Lambda.SdkClientException',
+      ],
+      interval: cdk.Duration.seconds(2),
+      maxAttempts: 5,
+      backoffRate: 2,
+    })
+    const finalizeParentJobState = finalizeParentJobInvoke.next(importCsvSuccess)
+
     const sfnImportCsvDefinition = new DistributedMap(this, 'import-csv', {
       maxConcurrency: 50,
-      resultPath: cdk.aws_stepfunctions.JsonPath.DISCARD,
+      resultPath: '$.processingResults',
     })
       .setLabel('import-csv')
       .setItemReader({
@@ -903,8 +939,10 @@ export class InfraStack extends cdk.Stack {
           'Key.$': '$.key',
         },
       })
+      // For ImportPublishMode.SYNC tables, keep MaxItemsPerBatch low enough that sequential
+      // publishSync per row stays within the Lambda timeout (see import package import-publish.ts).
       .setItemBatcher({
-        MaxInputBytesPerBatch: 10,
+        MaxItemsPerBatch: 100,
         BatchInput: {
           'Attributes.$': '$',
         },
@@ -912,6 +950,7 @@ export class InfraStack extends cdk.Stack {
       .itemProcessor(csvRowsHandlerState, {
         executionType: cdk.aws_stepfunctions.ProcessorType.EXPRESS,
       })
+      .next(finalizeParentJobState)
 
     const sfnImportCsvLogGroup = new cdk.aws_logs.LogGroup(
       this,

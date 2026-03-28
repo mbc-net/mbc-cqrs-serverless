@@ -1,5 +1,6 @@
 import { Type } from '@nestjs/common'
 
+import type { ImportPublishMode } from '../constant/import-publish'
 import { IImportStrategy } from './import-strategy.interface'
 import { IProcessStrategy } from './processing-strategy.interface'
 
@@ -25,4 +26,12 @@ export interface ImportEntityProfile {
    * Must be a class that adheres to the IProcessStrategy interface.
    */
   processStrategy: Type<IProcessStrategy<any, any>>
+
+  /**
+   * How commands are published for this entity. Defaults to ASYNC when omitted.
+   * For CSV Step Functions, prefer ASYNC for large imports; SYNC implies sequential
+   * `publishSync` per row — see `ImportPublishMode` docs in `import-publish.ts`.
+   * @see ImportPublishMode
+   */
+  publishMode?: ImportPublishMode
 }

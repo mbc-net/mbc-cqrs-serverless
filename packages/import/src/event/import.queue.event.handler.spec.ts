@@ -2,38 +2,44 @@
  * ImportQueueEventHandler Unit Tests
  *
  * 概要 / Overview:
- * ImportQueueEventHandlerのユニットテストスイート。エラーハンドリングと
- * 親ジョブカウンター更新の正確性を検証します。
+ * ImportQueueEventHandlerのユニットテストスイート。エラーハンドリング、
+ * 親ジョブカウンター更新の正確性、および同期・非同期モードのルーティングを検証します。
  *
- * Unit test suite for ImportQueueEventHandler. Verifies error handling
- * and parent job counter update accuracy.
+ * Unit test suite for ImportQueueEventHandler. Verifies error handling,
+ * parent job counter update accuracy, and Sync/Async mode routing.
  *
  * 目的 / Purpose:
  * - エラー発生時に親ジョブのカウンターが更新されることを検証
- * - エラー発生時にLambdaがクラッシュしないことを検証
- * - 正常処理時の動作を検証
+ * - 正常処理時の動作を検証（EQUALステータス）
+ * - publishModeの設定に応じてSYNC/ASYNCの正しいメソッドが呼ばれることを検証
  *
  * - Verify parent job counters are updated when errors occur
- * - Verify Lambda doesn't crash on errors
- * - Verify normal processing behavior
+ * - Verify normal processing behavior (EQUAL status)
+ * - Verify correct SYNC/ASYNC methods are called based on publishMode configuration
  */
-import { Test, TestingModule } from '@nestjs/testing'
 import { createMock } from '@golevelup/ts-jest'
 import { KEY_SEPARATOR } from '@mbc-cqrs-serverless/core'
-import { ImportQueueEventHandler } from './import.queue.event.handler'
-import { ImportService } from '../import.service'
-import { ImportQueueEvent } from './import.queue.event'
-import { ImportStatusEnum } from '../enum'
+import { Test, TestingModule } from '@nestjs/testing'
+
 import { CSV_IMPORT_PK_PREFIX, IMPORT_PK_PREFIX } from '../constant'
-import { PROCESS_STRATEGY_MAP } from '../import.module-definition'
-import { IProcessStrategy } from '../interface/processing-strategy.interface'
+import { ImportStatusEnum } from '../enum'
 import { ComparisonStatus } from '../enum/comparison-status.enum'
+import {
+  PROCESS_STRATEGY_MAP,
+  PUBLISH_MODE_MAP,
+} from '../import.module-definition'
+import { ImportService } from '../import.service'
+import { IProcessStrategy } from '../interface/processing-strategy.interface'
+import { ImportQueueEvent } from './import.queue.event'
+import { ImportQueueEventHandler } from './import.queue.event.handler'
 
 describe('ImportQueueEventHandler', () => {
   let handler: ImportQueueEventHandler
   let importService: jest.Mocked<ImportService>
   let mockStrategy: jest.Mocked<IProcessStrategy<any, any>>
   let strategyMap: Map<string, IProcessStrategy<any, any>>
+  let publishModeMap: Map<string, 'SYNC' | 'ASYNC'>
+  let mockCommandService: any
 
   const mockTenantCode = 'tenant001'
   const mockParentPk = `${CSV_IMPORT_PK_PREFIX}${KEY_SEPARATOR}${mockTenantCode}`
@@ -42,14 +48,30 @@ describe('ImportQueueEventHandler', () => {
   const mockChildSk = `${mockParentPk}${KEY_SEPARATOR}${mockParentSk}${KEY_SEPARATOR}01CHILD456`
 
   beforeEach(async () => {
+    // Mock the CommandService with both Sync and Async methods
+    mockCommandService = {
+      publishAsync: jest.fn().mockResolvedValue({ id: 'async-result' }),
+      publishSync: jest.fn().mockResolvedValue({ id: 'sync-result' }),
+      publishPartialUpdateAsync: jest
+        .fn()
+        .mockResolvedValue({ id: 'async-partial-result' }),
+      publishPartialUpdateSync: jest
+        .fn()
+        .mockResolvedValue({ id: 'sync-partial-result' }),
+    }
+
     mockStrategy = {
       compare: jest.fn(),
-      map: jest.fn(),
-      getCommandService: jest.fn(),
+      map: jest.fn().mockResolvedValue({ pk: 'test', sk: 'test' }),
+      getCommandService: jest.fn().mockReturnValue(mockCommandService),
     } as any
 
     strategyMap = new Map()
     strategyMap.set('building', mockStrategy)
+
+    // Setup the Publish Mode Map (Default to ASYNC for test isolation)
+    publishModeMap = new Map()
+    publishModeMap.set('building', 'ASYNC')
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -61,6 +83,10 @@ describe('ImportQueueEventHandler', () => {
         {
           provide: PROCESS_STRATEGY_MAP,
           useValue: strategyMap,
+        },
+        {
+          provide: PUBLISH_MODE_MAP,
+          useValue: publishModeMap,
         },
       ],
     }).compile()
@@ -76,10 +102,6 @@ describe('ImportQueueEventHandler', () => {
   })
 
   describe('execute', () => {
-    /**
-     * Test: Should skip non-IMPORT jobs
-     * IMPORT以外のジョブはスキップすること
-     */
     it('should skip jobs that do not start with IMPORT prefix', async () => {
       const event = createMockEvent({
         pk: 'OTHER_PREFIX#tenant001',
@@ -92,10 +114,6 @@ describe('ImportQueueEventHandler', () => {
       expect(importService.updateStatus).not.toHaveBeenCalled()
     })
 
-    /**
-     * Test: Should handle missing strategy gracefully
-     * ストラテジーが見つからない場合のエラーハンドリング
-     */
     it('should mark job as FAILED when no strategy found', async () => {
       const event = createMockEvent({
         pk: mockChildPk,
@@ -109,17 +127,15 @@ describe('ImportQueueEventHandler', () => {
         { pk: mockChildPk, sk: mockChildSk },
         ImportStatusEnum.FAILED,
         expect.objectContaining({
-          error: expect.stringContaining('No import strategies registered'),
+          error: expect.stringContaining(
+            'No import strategies registered for table: unknown_table',
+          ),
         }),
       )
     })
   })
 
   describe('handleImport - error handling', () => {
-    /**
-     * Test: Should call incrementParentJobCounters when strategy throws error
-     * ストラテジーがエラーを投げた時にincrementParentJobCountersが呼ばれること
-     */
     it('should call incrementParentJobCounters with false when error occurs', async () => {
       const event = createMockEvent({
         pk: mockChildPk,
@@ -127,23 +143,17 @@ describe('ImportQueueEventHandler', () => {
         tableName: 'building',
       })
 
-      // Mock strategy to throw error
-      const error = new Error('ConditionalCheckFailedException: The conditional request failed')
+      const error = new Error('ConditionalCheckFailedException')
       mockStrategy.compare.mockRejectedValue(error)
 
       await handler.execute(event)
 
-      // Verify incrementParentJobCounters was called with false (failure)
       expect(importService.incrementParentJobCounters).toHaveBeenCalledWith(
         { pk: mockParentPk, sk: mockParentSk },
         false,
       )
     })
 
-    /**
-     * Test: Should not throw error after handling (prevent Lambda crash)
-     * エラーハンドリング後に例外を投げないこと（Lambdaクラッシュ防止）
-     */
     it('should not throw error after handling - prevents Lambda crash', async () => {
       const event = createMockEvent({
         pk: mockChildPk,
@@ -151,17 +161,11 @@ describe('ImportQueueEventHandler', () => {
         tableName: 'building',
       })
 
-      // Mock strategy to throw error
       mockStrategy.compare.mockRejectedValue(new Error('Test error'))
 
-      // Should not throw
       await expect(handler.execute(event)).resolves.not.toThrow()
     })
 
-    /**
-     * Test: Should update child job status to FAILED when error occurs
-     * エラー発生時に子ジョブのステータスがFAILEDに更新されること
-     */
     it('should update child job status to FAILED when error occurs', async () => {
       const event = createMockEvent({
         pk: mockChildPk,
@@ -174,7 +178,6 @@ describe('ImportQueueEventHandler', () => {
 
       await handler.execute(event)
 
-      // Verify child job status was set to FAILED
       expect(importService.updateStatus).toHaveBeenCalledWith(
         { pk: mockChildPk, sk: mockChildSk },
         ImportStatusEnum.FAILED,
@@ -186,10 +189,6 @@ describe('ImportQueueEventHandler', () => {
       )
     })
 
-    /**
-     * Test: Should publish alarm when error occurs
-     * エラー発生時にアラームが発行されること
-     */
     it('should publish alarm when error occurs', async () => {
       const event = createMockEvent({
         pk: mockChildPk,
@@ -206,12 +205,8 @@ describe('ImportQueueEventHandler', () => {
     })
   })
 
-  describe('handleImport - success path', () => {
-    /**
-     * Test: Should update status to PROCESSING when starting
-     * 処理開始時にステータスがPROCESSINGに更新されること
-     */
-    it('should update status to PROCESSING when starting', async () => {
+  describe('handleImport - logic and routing paths', () => {
+    it('should handle EQUAL status by marking completed and skipping publish', async () => {
       const event = createMockEvent({
         pk: mockChildPk,
         sk: mockChildSk,
@@ -227,15 +222,23 @@ describe('ImportQueueEventHandler', () => {
 
       expect(importService.updateStatus).toHaveBeenCalledWith(
         { pk: mockChildPk, sk: mockChildSk },
-        ImportStatusEnum.PROCESSING,
+        ImportStatusEnum.COMPLETED,
+        expect.objectContaining({
+          result: expect.objectContaining({ status: 'EQUAL' }),
+        }),
       )
+      expect(importService.incrementParentJobCounters).toHaveBeenCalledWith(
+        { pk: mockParentPk, sk: mockParentSk },
+        true,
+      )
+      expect(mockCommandService.publishAsync).not.toHaveBeenCalled()
+      expect(mockCommandService.publishSync).not.toHaveBeenCalled()
     })
 
-    /**
-     * Test: Should call incrementParentJobCounters with true on success (EQUAL status)
-     * 成功時（EQUAL）にincrementParentJobCountersがtrueで呼ばれること
-     */
-    it('should call incrementParentJobCounters with true when EQUAL', async () => {
+    // --- ASYNC ROUTING (Default) ---
+    it('should call publishAsync when mode is ASYNC and status is NOT_EXIST', async () => {
+      publishModeMap.set('building', 'ASYNC')
+
       const event = createMockEvent({
         pk: mockChildPk,
         sk: mockChildSk,
@@ -243,16 +246,106 @@ describe('ImportQueueEventHandler', () => {
       })
 
       mockStrategy.compare.mockResolvedValue({
-        status: ComparisonStatus.EQUAL,
-        existingData: {},
+        status: ComparisonStatus.NOT_EXIST,
       })
 
       await handler.execute(event)
 
-      expect(importService.incrementParentJobCounters).toHaveBeenCalledWith(
-        { pk: mockParentPk, sk: mockParentSk },
-        true,
+      expect(mockCommandService.publishAsync).toHaveBeenCalled()
+      expect(mockCommandService.publishSync).not.toHaveBeenCalled()
+      expect(importService.updateStatus).toHaveBeenCalledWith(
+        { pk: mockChildPk, sk: mockChildSk },
+        ImportStatusEnum.PROCESSING,
+        expect.objectContaining({ result: { id: 'async-result' } }),
       )
+    })
+
+    it('should call publishPartialUpdateAsync when mode is ASYNC and status is CHANGED', async () => {
+      publishModeMap.set('building', 'ASYNC')
+
+      const event = createMockEvent({
+        pk: mockChildPk,
+        sk: mockChildSk,
+        tableName: 'building',
+      })
+
+      mockStrategy.compare.mockResolvedValue({
+        status: ComparisonStatus.CHANGED,
+        existingData: { version: 1 },
+      })
+
+      await handler.execute(event)
+
+      expect(mockCommandService.publishPartialUpdateAsync).toHaveBeenCalled()
+      expect(mockCommandService.publishPartialUpdateSync).not.toHaveBeenCalled()
+    })
+
+    // --- SYNC ROUTING ---
+    it('should call publishSync when mode is SYNC and status is NOT_EXIST', async () => {
+      publishModeMap.set('building', 'SYNC') // Switch to SYNC
+
+      const event = createMockEvent({
+        pk: mockChildPk,
+        sk: mockChildSk,
+        tableName: 'building',
+      })
+
+      mockStrategy.compare.mockResolvedValue({
+        status: ComparisonStatus.NOT_EXIST,
+      })
+
+      await handler.execute(event)
+
+      expect(mockCommandService.publishSync).toHaveBeenCalled()
+      expect(mockCommandService.publishAsync).not.toHaveBeenCalled()
+      expect(importService.updateStatus).toHaveBeenCalledWith(
+        { pk: mockChildPk, sk: mockChildSk },
+        ImportStatusEnum.PROCESSING,
+        expect.objectContaining({ result: { id: 'sync-result' } }),
+      )
+    })
+
+    it('should call publishPartialUpdateSync when mode is SYNC and status is CHANGED', async () => {
+      publishModeMap.set('building', 'SYNC') // Switch to SYNC
+
+      const event = createMockEvent({
+        pk: mockChildPk,
+        sk: mockChildSk,
+        tableName: 'building',
+      })
+
+      mockStrategy.compare.mockResolvedValue({
+        status: ComparisonStatus.CHANGED,
+        existingData: { version: 1 },
+      })
+
+      await handler.execute(event)
+
+      expect(mockCommandService.publishPartialUpdateSync).toHaveBeenCalled()
+      expect(
+        mockCommandService.publishPartialUpdateAsync,
+      ).not.toHaveBeenCalled()
+    })
+
+    // --- FALLBACK ROUTING ---
+    it('should safely default to publishAsync when mode is not defined in the map', async () => {
+      publishModeMap.delete('building') // Remove config entirely
+
+      const event = createMockEvent({
+        pk: mockChildPk,
+        sk: mockChildSk,
+        tableName: 'building',
+      })
+
+      mockStrategy.compare.mockResolvedValue({
+        status: ComparisonStatus.NOT_EXIST,
+      })
+
+      await handler.execute(event)
+
+      // Assert it fell back to ASYNC
+      expect(mockCommandService.publishAsync).toHaveBeenCalled()
+      expect(mockCommandService.publishSync).not.toHaveBeenCalled()
     })
   })
 })
@@ -282,7 +375,6 @@ function createMockEvent(params: {
     sk: params.sk,
   }
 
-  // Create a mock that provides importEvent property directly
   const mockEvent = {
     source: 'test-source',
     messageId: 'test-message-id',

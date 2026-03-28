@@ -47,7 +47,7 @@ export class ImportStatusHandler
       return
     }
 
-    this.logger.log(
+    this.logger.debug(
       `Received ${status} master CSV job event for: ${notification.id}`,
     )
 
@@ -64,7 +64,7 @@ export class ImportStatusHandler
       // 3. Check if a taskToken was saved in its attributes.
       const taskToken = importJob.attributes?.taskToken
       if (taskToken) {
-        this.logger.log(
+        this.logger.debug(
           `Found task token. Sending ${status} signal to Step Function.`,
         )
 
@@ -79,7 +79,7 @@ export class ImportStatusHandler
           )
         }
       } else {
-        this.logger.log(
+        this.logger.debug(
           'No task token found in import job attributes. Nothing to do.',
         )
       }
@@ -95,7 +95,7 @@ export class ImportStatusHandler
    * @param output The JSON output to send back to the state machine.
    */
   async sendTaskSuccess(taskToken: string, output: any) {
-    this.logger.log(`Sending task success for token: ${taskToken}`)
+    this.logger.debug(`Sending task success for token: ${taskToken}`)
     return this.sfnService.client.send(
       new SendTaskSuccessCommand({
         taskToken: taskToken,
@@ -111,7 +111,7 @@ export class ImportStatusHandler
    * @param cause The detailed cause of the failure (will be JSON stringified).
    */
   async sendTaskFailure(taskToken: string, error: string, cause: any) {
-    this.logger.log(`Sending task failure for token: ${taskToken}`)
+    this.logger.debug(`Sending task failure for token: ${taskToken}`)
     return this.sfnService.client.send(
       new SendTaskFailureCommand({
         taskToken: taskToken,

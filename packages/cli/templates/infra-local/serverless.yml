@@ -435,7 +435,76 @@ stepFunctions:
                 IntervalSeconds: 2
                 MaxAttempts: 5
                 BackoffRate: 2
-            OutputPath: $.Payload[0][0]
+            OutputPath: $.Payload
+            Next: finalize_parent_job
+          finalize_parent_job:
+            Type: Task
+            Resource: arn:aws:states:::lambda:invoke
+            Parameters:
+              FunctionName: arn:aws:lambda:ap-northeast-1:101010101010:function:serverless-example-dev-main
+              Payload:
+                input.$: $
+                context.$: $$
+            Retry:
+              - ErrorEquals:
+                  - Lambda.ServiceException
+                  - Lambda.AWSLambdaException
+                  - Lambda.SdkClientException
+                IntervalSeconds: 2
+                MaxAttempts: 5
+                BackoffRate: 2
+            OutputPath: $.Payload
+            End: true
+    import-zip:
+      name: import-zip
+      definition:
+        Comment: 'Orchestrates the sequential processing of CSV files from a ZIP
+          archive.'
+        StartAt: ProcessFilesSequentially
+        States:
+          ProcessFilesSequentially:
+            Type: Map
+            ItemsPath: $.sortedS3Keys # The sorted array of S3 keys from the trigger
+            MaxConcurrency: 1 # Enforces sequential processing
+            Iterator:
+              StartAt: trigger_single_csv_and_wait
+              States:
+                trigger_single_csv_and_wait:
+                  Type: Task
+                  Resource: 'arn:aws:states:::lambda:invoke.waitForTaskToken'
+                  Parameters:
+                    FunctionName: 'arn:aws:lambda:ap-northeast-1:101010101010:function:serverless-example-dev-main'
+                    Payload:
+                      input.$: '$' # Passes the current S3 key to the Lambda
+                      context.$: '$$' # Passes the full state machine context
+                      taskToken.$: '$$.Task.Token'
+                  Retry:
+                    - ErrorEquals:
+                        - Lambda.ServiceException
+                        - Lambda.AWSLambdaException
+                        - Lambda.SdkClientException
+                      IntervalSeconds: 2
+                      MaxAttempts: 5
+                      BackoffRate: 2
+                  End: true
+            Next: finalize_zip_job
+          finalize_zip_job:
+            Type: Task
+            Resource: arn:aws:states:::lambda:invoke
+            Parameters:
+              FunctionName: arn:aws:lambda:ap-northeast-1:101010101010:function:serverless-example-dev-main
+              Payload:
+                input.$: $
+                context.$: $$
+            Retry:
+              - ErrorEquals:
+                  - Lambda.ServiceException
+                  - Lambda.AWSLambdaException
+                  - Lambda.SdkClientException
+                IntervalSeconds: 2
+                MaxAttempts: 5
+                BackoffRate: 2
+            OutputPath: $.Payload
             End: true
 resources:
   Resources:

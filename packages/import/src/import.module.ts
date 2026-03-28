@@ -1,6 +1,7 @@
 import { DataStoreModule, QueueModule } from '@mbc-cqrs-serverless/core'
 import { DynamicModule, Module, Provider, Type } from '@nestjs/common'
 
+import { ImportPublishMode } from './constant/import-publish'
 import { CommandFinishedHandler } from './event/command-finished.queue.event.handler'
 import { CsvImportQueueEventHandler } from './event/csv-import.queue.event.handler'
 import { CsvImportSfnEventHandler } from './event/csv-import.sfn.event.handler'
@@ -15,6 +16,7 @@ import {
   IMPORT_STRATEGY_MAP,
   OPTIONS_TYPE,
   PROCESS_STRATEGY_MAP,
+  PUBLISH_MODE_MAP,
   ZIP_FINALIZATION_HOOKS,
 } from './import.module-definition'
 import { ImportService } from './import.service'
@@ -57,6 +59,16 @@ export class ImportModule extends ConfigurableModuleClass {
         profiles,
         (p) => p.processStrategy,
       ),
+      {
+        provide: PUBLISH_MODE_MAP,
+        useFactory: () => {
+          const map = new Map<string, ImportPublishMode>()
+          profiles.forEach((p) =>
+            map.set(p.tableName, p.publishMode ?? ImportPublishMode.ASYNC),
+          )
+          return map
+        },
+      },
     ]
 
     // Add hooks provider
