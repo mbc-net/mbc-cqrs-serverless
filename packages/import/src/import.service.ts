@@ -514,12 +514,16 @@ export class ImportService {
     await this.snsService.publish<INotification>(alarm, this.alarmTopicArn)
   }
 
-  async getImportByKey(key: DetailKey): Promise<ImportEntity> {
+  /**
+   * Loads a single import record from DynamoDB by primary key.
+   *
+   * @returns The import entity when the item exists, or `null` when no row matches
+   * the key
+   */
+  async getImportByKey(key: DetailKey): Promise<ImportEntity | null> {
     const item = await this.dynamoDbService.getItem(this.tableName, key)
     if (!item) {
-      throw new BadRequestException(
-        `Import item not found for key: ${key.pk}#${key.sk}`,
-      )
+      return null
     }
     return new ImportEntity(item)
   }
