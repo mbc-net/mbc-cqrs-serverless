@@ -12,6 +12,7 @@ import { ImportService } from '../import.service'
 import {
   IZipFinalizationHook,
   ZipFinalizationContext,
+  ZipFinalizationResults,
 } from '../interface/zip-finalization-hook.interface'
 import { ZipImportSfnEvent } from './zip-import.sfn.event'
 
@@ -106,17 +107,28 @@ export class ZipImportSfnEventHandler
     this.logger.debug('Aggregated results:', resultsFromMapState)
 
     // Aggregate the results from each CSV file's processing.
-    const finalSummary = resultsFromMapState.reduce(
+    const finalSummary = resultsFromMapState.reduce<ZipFinalizationResults>(
       (acc, result) => {
         const res = result?.result || result || {}
+        if (res.importJobStatus === ImportStatusEnum.FAILED) {
+          acc.csvTaskFailureCount += 1
+        }
         acc.totalRows += res.total || res.totalRows || 0
         acc.processedRows += res.succeeded || res.processedRows || 0
         acc.failedRows += res.failed || res.failedRows || 0
         return acc
       },
-      { totalRows: 0, processedRows: 0, failedRows: 0 },
+      {
+        totalRows: 0,
+        processedRows: 0,
+        failedRows: 0,
+        csvTaskFailureCount: 0,
+      },
     )
-    const finalStatus = ImportStatusEnum.COMPLETED
+    const finalStatus =
+      finalSummary.csvTaskFailureCount > 0
+        ? ImportStatusEnum.FAILED
+        : ImportStatusEnum.COMPLETED
 
     // Execute finalization hooks in parallel
     await this.executeFinalizationHooks(
@@ -131,7 +143,7 @@ export class ZipImportSfnEventHandler
     })
 
     this.logger.debug(
-      `Successfully finalized ZIP master job ${masterJobKey.pk}#${masterJobKey.sk} with status ${finalStatus}`,
+      `Finalized ZIP master job ${masterJobKey.pk}#${masterJobKey.sk} with status ${finalStatus}`,
     )
   }
 
@@ -142,7 +154,7 @@ export class ZipImportSfnEventHandler
   private async executeFinalizationHooks(
     event: ZipImportSfnEvent,
     masterJobKey: DetailKey,
-    results: { totalRows: number; processedRows: number; failedRows: number },
+    results: ZipFinalizationResults,
     status: ImportStatusEnum,
   ): Promise<void> {
     if (!this.finalizationHooks || this.finalizationHooks.length === 0) {
