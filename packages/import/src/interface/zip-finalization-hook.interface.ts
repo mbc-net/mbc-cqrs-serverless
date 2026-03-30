@@ -32,8 +32,10 @@ import { ZipImportSfnEvent } from '../event/zip-import.sfn.event'
 export interface ZipFinalizationResults {
   totalRows: number
   processedRows: number
+  /** Total number of failed *rows* across all CSV files (row-level granularity). */
   failedRows: number
-  /** Count of CSV master jobs that finished with status FAILED (task success + importJobStatus) */
+  /** Number of CSV master jobs that completed with FAILED status (file-level granularity).
+   * Use this field — not failedRows — to determine the final ZIP-level status. */
   csvTaskFailureCount: number
 }
 

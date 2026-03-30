@@ -128,6 +128,12 @@ export class ImportStatusHandler
 
   /**
    * Sends a failure signal to a waiting Step Function task.
+   *
+   * NOTE: As of this PR, this method is no longer called from execute().
+   * The ZIP orchestrator uses SendTaskSuccess with importJobStatus instead (Option B),
+   * so the Map state can continue processing remaining files even when one CSV fails.
+   * Kept public for potential use cases outside ZIP orchestration.
+   *
    * @param taskToken The unique token of the paused task.
    * @param error The error code to send back to the state machine.
    * @param cause The detailed cause of the failure (will be JSON stringified).
