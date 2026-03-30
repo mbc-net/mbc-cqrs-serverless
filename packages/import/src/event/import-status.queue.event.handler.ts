@@ -65,17 +65,20 @@ export class ImportStatusHandler
       const taskToken = importJob.attributes?.taskToken
       if (taskToken) {
         this.logger.debug(
-          `Found task token. Sending ${status} signal to Step Function.`,
+          status === ImportStatusEnum.FAILED
+            ? 'Found task token. Sending SendTaskSuccess with importJobStatus FAILED (ZIP orchestrator).'
+            : `Found task token. Sending ${status} signal to Step Function.`,
         )
 
-        // 4. Send the appropriate signal based on status.
+        // 4. Send the callback so the ZIP orchestrator Map can continue (option B).
+        // Always use SendTaskSuccess; include importJobStatus when the CSV master job failed
+        // so finalize_zip_job can mark the ZIP FAILED after aggregating all files.
         if (status === ImportStatusEnum.COMPLETED) {
           await this.sendTaskSuccess(taskToken, importJob.result)
         } else if (status === ImportStatusEnum.FAILED) {
-          await this.sendTaskFailure(
+          await this.sendTaskSuccess(
             taskToken,
-            'ImportFailed',
-            importJob.result,
+            this.buildZipOrchestratorFailureOutput(importJob.result),
           )
         }
       } else {
@@ -87,6 +90,25 @@ export class ImportStatusHandler
       this.logger.error('Error in ImportStatusHandler:', error)
       throw error
     }
+  }
+
+  /**
+   * Merges the import job result with FAILED status for ZIP orchestrator callbacks.
+   */
+  private buildZipOrchestratorFailureOutput(
+    result: unknown,
+  ): Record<string, unknown> {
+    if (
+      result != null &&
+      typeof result === 'object' &&
+      !Array.isArray(result)
+    ) {
+      return {
+        ...(result as Record<string, unknown>),
+        importJobStatus: ImportStatusEnum.FAILED,
+      }
+    }
+    return { result, importJobStatus: ImportStatusEnum.FAILED }
   }
 
   /**

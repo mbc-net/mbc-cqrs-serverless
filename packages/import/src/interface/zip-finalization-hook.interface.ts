@@ -10,7 +10,7 @@ import { ZipImportSfnEvent } from '../event/zip-import.sfn.event'
 //     source: 'arn:aws:states:ap-northeast-1:101010101010:execution:import-zip:builshiru-zip-import-1768379462736'
 //   },
 //   masterJobKey: { sk: 'ZIP#01KEXT1YS584YJJKRW30V5S0XZ', pk: 'ZIP_IMPORT#builshiru' },
-//   results: { totalRows: 1, processedRows: 1, failedRows: 0 },
+//   results: { totalRows: 1, processedRows: 1, failedRows: 0, csvTaskFailureCount: 0 },
 //   status: 'COMPLETED',
 //   executionInput: {
 //     masterJobKey: {
@@ -27,6 +27,17 @@ import { ZipImportSfnEvent } from '../event/zip-import.sfn.event'
 // }
 
 /**
+ * Aggregated row and failure counts from all CSV files in a ZIP import.
+ */
+export interface ZipFinalizationResults {
+  totalRows: number
+  processedRows: number
+  failedRows: number
+  /** Count of CSV master jobs that finished with status FAILED (task success + importJobStatus) */
+  csvTaskFailureCount: number
+}
+
+/**
  * Context passed to ZIP finalization hooks containing all relevant job information.
  */
 export interface ZipFinalizationContext {
@@ -35,11 +46,7 @@ export interface ZipFinalizationContext {
   /** The key of the master ZIP job */
   masterJobKey: DetailKey
   /** Aggregated results from all CSV files */
-  results: {
-    totalRows: number
-    processedRows: number
-    failedRows: number
-  }
+  results: ZipFinalizationResults
   /** Final status of the job */
   status: ImportStatusEnum
   /** The original execution input from Step Functions */

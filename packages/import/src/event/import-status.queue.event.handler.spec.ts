@@ -45,7 +45,9 @@ describe('ImportStatusHandler', () => {
 
     handler = module.get<ImportStatusHandler>(ImportStatusHandler)
     importService = module.get(ImportService) as jest.Mocked<ImportService>
-    sfnService = module.get(StepFunctionService) as jest.Mocked<StepFunctionService>
+    sfnService = module.get(
+      StepFunctionService,
+    ) as jest.Mocked<StepFunctionService>
 
     jest.clearAllMocks()
   })
@@ -183,9 +185,12 @@ describe('ImportStatusHandler', () => {
       })
     })
 
-    describe('sendTaskFailure', () => {
-      it('should send task failure when FAILED with taskToken', async () => {
-        const mockResult = { error: 'Import failed', details: 'Validation error' }
+    describe('FAILED with taskToken (ZIP orchestrator)', () => {
+      it('should send task success with importJobStatus FAILED so the Map continues', async () => {
+        const mockResult = {
+          error: 'Import failed',
+          details: 'Validation error',
+        }
         const event = createMockEvent({
           pk: mockPk,
           sk: mockSk,
@@ -204,13 +209,15 @@ describe('ImportStatusHandler', () => {
         expect(mockSfnClient.send).toHaveBeenCalledWith(
           expect.objectContaining({
             taskToken: mockTaskToken,
-            error: 'ImportFailed',
-            cause: JSON.stringify(mockResult),
+            output: JSON.stringify({
+              ...mockResult,
+              importJobStatus: ImportStatusEnum.FAILED,
+            }),
           }),
         )
       })
 
-      it('should not send failure callback when no taskToken present', async () => {
+      it('should not send callback when FAILED and no taskToken present', async () => {
         const event = createMockEvent({
           pk: mockPk,
           sk: mockSk,
@@ -275,7 +282,9 @@ describe('ImportStatusHandler', () => {
         const sfnError = new Error('Step Function error')
         mockSfnClient.send.mockRejectedValue(sfnError)
 
-        await expect(handler.execute(event)).rejects.toThrow('Step Function error')
+        await expect(handler.execute(event)).rejects.toThrow(
+          'Step Function error',
+        )
       })
     })
   })
