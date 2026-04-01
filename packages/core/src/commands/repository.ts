@@ -172,8 +172,6 @@ export class Repository {
 
       if (cmd.isDeleted) {
         itemMap.delete(itemId)
-      } else if (itemMap.has(itemId)) {
-        itemMap.set(itemId, new DataEntity(transformed))
       } else {
         itemMap.set(itemId, new DataEntity(transformed))
       }
