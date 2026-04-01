@@ -371,13 +371,17 @@ export class CommandService implements OnModuleInit, ICommandService {
       return
     }
 
-    await this.sessionService.put(
-      userId,
-      tenantCode,
-      this.options.tableName,
-      command.id,
-      command.version,
-    )
+    try {
+      await this.sessionService.put(
+        userId,
+        tenantCode,
+        this.options.tableName,
+        command.id,
+        command.version,
+      )
+    } catch (err) {
+      this.logger.warn('RYW session write failed (non-fatal)', err)
+    }
   }
 
   async duplicate(key: DetailKey, options: ICommandOptions) {
