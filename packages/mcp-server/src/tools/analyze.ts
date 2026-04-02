@@ -563,6 +563,25 @@ const ANTI_PATTERNS = [
     recommendation:
       'TENANT_COMMON changed from "COMMON" to "common" (lowercase) in v1.1.0. Update partition keys and migrate existing DynamoDB data.',
   },
+  {
+    code: 'AP013',
+    name: 'publishSync Null Return Unchecked',
+    severity: 'high' as const,
+    // Detect direct property access on publishSync/publishPartialUpdateSync result without null check
+    pattern:
+      /(?:publishSync|publishPartialUpdateSync)\s*\([^)]*\)[^;{]*\.\s*(?:pk|sk|id|version|code|name|tenantCode|type|attributes)/,
+    recommendation:
+      'publishSync() and publishPartialUpdateSync() return null when the command is not dirty (no-op) since v1.2.0. Always null-check the result before accessing properties.',
+  },
+  {
+    code: 'AP014',
+    name: 'Deprecated genNewSequence',
+    severity: 'high' as const,
+    // Detect usage of removed SequenceService.genNewSequence() method
+    pattern: /\.genNewSequence\s*\(/,
+    recommendation:
+      'SequenceService.genNewSequence() was removed in v1.2.0. Use generateSequenceItem() or generateSequenceItemWithProvideSetting() instead.',
+  },
 ]
 
 /**

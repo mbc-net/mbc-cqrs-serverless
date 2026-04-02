@@ -1,19 +1,20 @@
+/* eslint-disable no-console */
 import { Server } from '@modelcontextprotocol/sdk/server/index.js'
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js'
 import {
   CallToolRequestSchema,
+  ErrorCode,
+  GetPromptRequestSchema,
+  ListPromptsRequestSchema,
   ListResourcesRequestSchema,
   ListToolsRequestSchema,
-  ReadResourceRequestSchema,
-  ListPromptsRequestSchema,
-  GetPromptRequestSchema,
-  ErrorCode,
   McpError,
+  ReadResourceRequestSchema,
 } from '@modelcontextprotocol/sdk/types.js'
 
-import { registerResources, handleResourceRead } from './resources/index.js'
-import { registerTools, handleToolCall } from './tools/index.js'
-import { registerPrompts, handlePromptGet } from './prompts/index.js'
+import { handlePromptGet, registerPrompts } from './prompts/index.js'
+import { handleResourceRead, registerResources } from './resources/index.js'
+import { handleToolCall, registerTools } from './tools/index.js'
 
 /**
  * MCP Server for MBC CQRS Serverless framework.
@@ -37,7 +38,7 @@ export class McpServer {
           tools: {},
           prompts: {},
         },
-      }
+      },
     )
 
     this.setupHandlers()
@@ -48,10 +49,6 @@ export class McpServer {
     this.server.onerror = (error) => {
       console.error('[MCP Server Error]', error)
     }
-
-    process.on('unhandledRejection', (reason, promise) => {
-      console.error('[Unhandled Rejection]', reason)
-    })
   }
 
   private setupHandlers(): void {
@@ -63,18 +60,27 @@ export class McpServer {
         }
       } catch (error) {
         console.error('[ListResources Error]', error)
-        throw new McpError(ErrorCode.InternalError, `Failed to list resources: ${error}`)
+        throw new McpError(
+          ErrorCode.InternalError,
+          `Failed to list resources: ${error}`,
+        )
       }
     })
 
-    this.server.setRequestHandler(ReadResourceRequestSchema, async (request) => {
-      try {
-        return await handleResourceRead(request.params.uri, this.projectPath)
-      } catch (error) {
-        console.error('[ReadResource Error]', error)
-        throw new McpError(ErrorCode.InternalError, `Failed to read resource: ${error}`)
-      }
-    })
+    this.server.setRequestHandler(
+      ReadResourceRequestSchema,
+      async (request) => {
+        try {
+          return await handleResourceRead(request.params.uri, this.projectPath)
+        } catch (error) {
+          console.error('[ReadResource Error]', error)
+          throw new McpError(
+            ErrorCode.InternalError,
+            `Failed to read resource: ${error}`,
+          )
+        }
+      },
+    )
 
     // Tool handlers
     this.server.setRequestHandler(ListToolsRequestSchema, async () => {
@@ -84,7 +90,10 @@ export class McpServer {
         }
       } catch (error) {
         console.error('[ListTools Error]', error)
-        throw new McpError(ErrorCode.InternalError, `Failed to list tools: ${error}`)
+        throw new McpError(
+          ErrorCode.InternalError,
+          `Failed to list tools: ${error}`,
+        )
       }
     })
 
@@ -93,7 +102,7 @@ export class McpServer {
         return await handleToolCall(
           request.params.name,
           request.params.arguments || {},
-          this.projectPath
+          this.projectPath,
         )
       } catch (error) {
         console.error('[CallTool Error]', error)
@@ -112,16 +121,25 @@ export class McpServer {
         }
       } catch (error) {
         console.error('[ListPrompts Error]', error)
-        throw new McpError(ErrorCode.InternalError, `Failed to list prompts: ${error}`)
+        throw new McpError(
+          ErrorCode.InternalError,
+          `Failed to list prompts: ${error}`,
+        )
       }
     })
 
     this.server.setRequestHandler(GetPromptRequestSchema, async (request) => {
       try {
-        return handlePromptGet(request.params.name, request.params.arguments || {})
+        return handlePromptGet(
+          request.params.name,
+          request.params.arguments || {},
+        )
       } catch (error) {
         console.error('[GetPrompt Error]', error)
-        throw new McpError(ErrorCode.InternalError, `Failed to get prompt: ${error}`)
+        throw new McpError(
+          ErrorCode.InternalError,
+          `Failed to get prompt: ${error}`,
+        )
       }
     })
   }
