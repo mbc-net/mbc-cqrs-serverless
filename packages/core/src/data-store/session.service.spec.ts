@@ -91,6 +91,8 @@ describe('SessionService', () => {
         skExpression: 'begins_with(sk, :skPrefix)',
         skAttributeValues: { ':skPrefix': 'my-data-table#' },
       },
+      undefined, // startFromSk
+      1000, // MAX_SESSION_ENTRIES
     )
   })
 
