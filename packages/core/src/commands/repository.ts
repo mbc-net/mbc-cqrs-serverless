@@ -7,7 +7,7 @@ import {
   addSortKeyVersion,
   generateId,
   getTenantCode,
-  parsePkSkFromId,
+  parseTwoSegmentPkSkFromId,
   removeSortKeyVersion,
   sortKeyBaseFromId,
 } from '../helpers/key'
@@ -26,17 +26,17 @@ import { CommandService } from './command.service'
 import { DataService } from './data.service'
 
 export interface IMergeOptions<TItem extends { id: string }> {
-  /** * Set true to merge pending async commands into the result. 
-   * If false/undefined -> acts as a simple passthrough. 
+  /** * Set true to merge pending async commands into the result.
+   * If false/undefined -> acts as a simple passthrough.
    */
   latestFlg?: boolean
-  
+
   /**
    * Transform a CommandModel into the same shape as a TItem returned by the query.
    * The `existing` parameter is provided for update cases to merge unchanged fields.
    */
   transformCommand: (cmd: CommandModel, existing?: TItem) => TItem
-  
+
   /**
    * Optional filter applied AFTER transformCommand for "create-new" rows.
    * Prevents newly created items from appearing in lists where they don't match the current search criteria.
@@ -86,7 +86,7 @@ export class Repository {
           pk: key.pk,
           sk: addSortKeyVersion(key.sk, session.version),
         })
-        
+
         if (cmd) {
           const existing = await this.dataService.getItem(key)
           return transformCommandToData(cmd, existing)
@@ -99,6 +99,21 @@ export class Repository {
 
   /**
    * List items from the DynamoDB data table with an optional merge of pending async commands.
+   *
+   * When `mergeOptions.latestFlg` is true, the result is augmented with any
+   * pending writes the current user has not yet seen reflected in the data table:
+   *
+   * - **update** — the existing item is replaced in-place, preserving its
+   *   position in the list.
+   * - **delete** — the item is removed from the result.
+   * - **create-new** — the item is prepended to the top of the list, sorted by
+   *   `updatedAt` descending when there are multiple pending creates.
+   *
+   * > **Sort-order note**: Prepended create-new items are not integrated into
+   * > the caller's sort order (e.g. by `name` or `code`). They will appear
+   * > at the top of the result until the async DynamoDB Stream sync completes and
+   * > the next read returns fully sorted data. This is intentional — the
+   * > guarantee is visibility, not sort position.
    */
   async listItemsByPk(
     pk: string,
@@ -145,7 +160,7 @@ export class Repository {
     const itemMap = new Map<string, DataEntity>(
       baseResult.items.map((item) => [item.id, item]),
     )
-    
+
     // Separate array to collect newly created items so they can be prepended
     const newItems: DataEntity[] = []
     const skPrefix = `${this.moduleTableName}${KEY_SEPARATOR}`
@@ -157,13 +172,13 @@ export class Repository {
       const itemId = session.sk.slice(skPrefix.length)
 
       const existing = itemMap.get(itemId) as DataModel | undefined
-      let cmdPk = pk
+      const cmdPk = pk
       let skBase: string | undefined
 
       if (existing?.sk) {
         skBase = removeSortKeyVersion(existing.sk)
       } else {
-        // Since we already know the exact PK from the method parameter, 
+        // Since we already know the exact PK from the method parameter,
         // we can safely extract the skBase without strict 2-segment assumptions.
         skBase = sortKeyBaseFromId(pk, itemId)
         if (!skBase) {
@@ -194,8 +209,8 @@ export class Repository {
     // Sort newly created items by createdAt descending
     if (newItems.length > 1) {
       newItems.sort((a, b) => {
-        const timeA = a.createdAt ? new Date(a.createdAt).getTime() : 0
-        const timeB = b.createdAt ? new Date(b.createdAt).getTime() : 0
+        const timeA = a.updatedAt ? new Date(a.updatedAt).getTime() : 0
+        const timeB = b.updatedAt ? new Date(b.updatedAt).getTime() : 0
         return timeB - timeA
       })
     }
@@ -208,8 +223,32 @@ export class Repository {
   }
 
   /**
-   * List items from an external source (e.g., RDS/Elasticsearch) 
-   * with an optional merge of pending async commands.
+   * List items from an external source (e.g., RDS/Elasticsearch) with an
+   * optional merge of pending async commands.
+   *
+   * When `mergeOptions.latestFlg` is true, the result is augmented with any
+   * pending writes the current user has not yet seen reflected in the query
+   * source:
+   *
+   * - **update** — the existing item is replaced in-place via `transformCommand`,
+   *   preserving its position. `existing` is passed to the transformer so join
+   *   data (e.g. related RDS rows) can be carried over.
+   * - **delete** — the item is removed and `total` is decremented.
+   * - **create-new** — the item is transformed, optionally filtered by
+   *   `matchesFilter`, and prepended to the top of the result sorted by
+   *   `updatedAt` descending. `total` is incremented.
+   *
+   * > **Sort-order note**: Prepended create-new items are not integrated into
+   * > the caller's sort order (e.g. by `name` or `code`). They will appear
+   * > at the top of the result until the async Stream → RDS sync completes and
+   * > the next read returns fully sorted data. This is intentional — the
+   * > guarantee is visibility, not sort position.
+   *
+   * > **Pagination note**: `total` reflects the adjusted count after merge.
+   * > However, prepended items sit outside the RDS `LIMIT`/`OFFSET` window, so
+   * > on page 2+ the caller may see a one-item overlap or gap until sync
+   * > completes. For most UX patterns (redirect-after-write, optimistic UI)
+   * > this is not noticeable.
    */
   async listItems<TItem extends { id: string }>(
     query: () => Promise<{ total: number; items: TItem[] }>,
@@ -257,7 +296,7 @@ export class Repository {
 
       let cmdPk: string | undefined
       let skBase: string | undefined
-      
+
       const existingSk = (existing as unknown as { sk?: string })?.sk
       const existingPk = (existing as unknown as { pk?: string })?.pk
 
@@ -266,14 +305,14 @@ export class Repository {
         skBase = removeSortKeyVersion(existingSk)
       } else {
         // Fallback: Strictly parse the ID assuming a 2-segment PK format ({type}#{tenantCode})
-        const parsed = parsePkSkFromId(itemId)
+        const parsed = parseTwoSegmentPkSkFromId(itemId)
         if (!parsed) {
           continue
         }
         cmdPk = parsed.pk
         skBase = parsed.skBase
       }
-      
+
       if (!cmdPk || !skBase) {
         continue
       }
@@ -310,15 +349,15 @@ export class Repository {
     // Sort newly created items by createdAt descending (safely fallback to 0 if field is missing)
     if (newItems.length > 1) {
       newItems.sort((a: any, b: any) => {
-        const timeA = a.createdAt ? new Date(a.createdAt).getTime() : 0
-        const timeB = b.createdAt ? new Date(b.createdAt).getTime() : 0
+        const timeA = a.updatedAt ? new Date(a.updatedAt).getTime() : 0
+        const timeB = b.updatedAt ? new Date(b.updatedAt).getTime() : 0
         return timeB - timeA
       })
     }
 
-    return { 
-      total: adjustedTotal, 
-      items: [...newItems, ...itemMap.values()] 
+    return {
+      total: adjustedTotal,
+      items: [...newItems, ...itemMap.values()],
     }
   }
 }
