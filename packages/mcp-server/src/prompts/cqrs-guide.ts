@@ -186,7 +186,8 @@ export class ${featureName}DataEntity extends DataEntity implements DataModel {
 ## Using CommandService
 
 \`\`\`typescript
-import { CommandService } from '@mbc-cqrs-serverless/core'
+import { CommandService, getUserContext, IInvoke } from '@mbc-cqrs-serverless/core'
+import { ulid } from 'ulid'
 
 @Injectable()
 export class ${featureName}Service {
