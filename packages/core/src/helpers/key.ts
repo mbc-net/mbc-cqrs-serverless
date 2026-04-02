@@ -44,7 +44,7 @@ export function sortKeyBaseFromId(
  * `{type}#{tenantCode}` (exactly two `#`-separated segments). The remainder of
  * `itemId` after that prefix is `skBase` (may contain `#`).
  */
-export function parsePkSkFromId(
+export function parseTwoSegmentPkSkFromId(
   itemId: string,
 ): { pk: string; skBase: string } | undefined {
   const parts = itemId.split(KEY_SEPARATOR)
