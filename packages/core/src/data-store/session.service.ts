@@ -48,14 +48,6 @@ export class SessionService {
   }
 
   /**
-   * `true` when `RYW_SESSION_TTL_MINUTES` is set to a positive number.
-   * If unset, optional env — no session writes after async publish.
-   */
-  isSessionWriteEnabled(): boolean {
-    return this.sessionWritesEnabled
-  }
-
-  /**
    * Build session pk: {userId}#{tenantCode}
    */
   private buildPk(userId: string, tenantCode: string): string {
@@ -76,6 +68,7 @@ export class SessionService {
   /**
    * Write a session entry after a successful async command publish.
    * Called by CommandService after publishAsync only.
+   * No-ops when RYW session TTL is not configured (`sessionWritesEnabled` is false).
    */
   async put(
     userId: string,
@@ -84,6 +77,12 @@ export class SessionService {
     itemId: string,
     version: number,
   ): Promise<void> {
+    if (!this.sessionWritesEnabled) {
+      this.logger.debug(
+        'session put skipped: RYW_SESSION_TTL_MINUTES not enabled',
+      )
+      return
+    }
     const item: SessionItem = {
       pk: this.buildPk(userId, tenantCode),
       sk: this.buildSk(moduleTableName, itemId),
@@ -96,6 +95,7 @@ export class SessionService {
 
   /**
    * Get a single session entry for a specific item.
+   * Returns `null` without querying DynamoDB when session writes are disabled.
    */
   async get(
     userId: string,
@@ -103,6 +103,9 @@ export class SessionService {
     moduleTableName: string,
     itemId: string,
   ): Promise<SessionItem | null> {
+    if (!this.sessionWritesEnabled) {
+      return null
+    }
     const result = await this.dynamoDbService.getItem(this.sessionTableName, {
       pk: this.buildPk(userId, tenantCode),
       sk: this.buildSk(moduleTableName, itemId),
@@ -135,6 +138,9 @@ export class SessionService {
     moduleTableName: string,
     limit = MAX_SESSION_ENTRIES,
   ): Promise<SessionItem[]> {
+    if (!this.sessionWritesEnabled) {
+      return []
+    }
     const pk = this.buildPk(userId, tenantCode)
     const skPrefix = `${moduleTableName}${KEY_SEPARATOR}`
 

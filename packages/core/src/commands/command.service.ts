@@ -352,10 +352,6 @@ export class CommandService implements OnModuleInit, ICommandService {
     command: CommandModel,
     options: ICommandOptions,
   ): Promise<void> {
-    if (!this.sessionService.isSessionWriteEnabled()) {
-      return
-    }
-
     let userId: string | undefined
     try {
       userId = getUserContext(options.invokeContext)?.userId

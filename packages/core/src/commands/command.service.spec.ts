@@ -70,7 +70,6 @@ const config = {
 describe('CommandService', () => {
   let commandService: CommandService
   let sessionPut: jest.Mock
-  let sessionIsWriteEnabled: jest.Mock
 
   /**
    * In-memory dataset simulating DynamoDB tables.
@@ -86,7 +85,6 @@ describe('CommandService', () => {
 
   beforeEach(async () => {
     sessionPut = jest.fn().mockResolvedValue(undefined)
-    sessionIsWriteEnabled = jest.fn().mockReturnValue(true)
     dataSet = {
       command: [
         buildItem({ pk: 'master', sk: 'max_value@1' }, 1),
@@ -183,7 +181,6 @@ describe('CommandService', () => {
         if (token === SessionService) {
           return {
             put: sessionPut,
-            isSessionWriteEnabled: sessionIsWriteEnabled,
           }
         }
 
@@ -339,32 +336,6 @@ describe('CommandService', () => {
         inputItem.id,
         1,
       )
-    })
-
-    it('should not call SessionService.put when session writes are disabled', async () => {
-      sessionIsWriteEnabled.mockReturnValue(false)
-      sessionPut.mockClear()
-      const key = { pk: 'AGG#tenant-x', sk: 'ryw_item_disabled' }
-      const inputItem = buildItem(key, 0)
-      const invokeContext = {
-        event: {
-          requestContext: {
-            authorizer: {
-              jwt: {
-                claims: {
-                  sub: 'user-1',
-                  'custom:roles': '[]',
-                },
-              },
-            },
-          },
-          headers: {},
-        },
-        context: {},
-      } as IInvoke
-      await commandService.publishAsync(inputItem, { invokeContext })
-      expect(sessionPut).not.toHaveBeenCalled()
-      sessionIsWriteEnabled.mockReturnValue(true)
     })
   })
 
