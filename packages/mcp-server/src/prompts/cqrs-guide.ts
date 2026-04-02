@@ -559,7 +559,7 @@ import { Repository } from '@mbc-cqrs-serverless/core'
 export class OrderService {
   constructor(private readonly repository: Repository) {}
 
-  async getOrder(key: DetailKey, options: ICommandOptions) {
+  async getOrder(key: DetailKey, options: IInvoke) {
     // Returns pending command data if session exists
     return this.repository.getItem(key, options)
   }
