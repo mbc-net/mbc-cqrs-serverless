@@ -5,6 +5,13 @@ import { KEY_SEPARATOR } from '../constants'
 import { DynamoDbService } from './dynamodb.service'
 import { SessionItem } from './session.interface'
 
+/**
+ * Upper-bound for session entries fetched per user/module in a single query.
+ * Sessions are short-lived (RYW_SESSION_TTL_MINUTES) so this stays cheap.
+ * Prevents silent truncation from DynamoDbService's default limit of 10.
+ */
+const MAX_SESSION_ENTRIES = 1000
+
 const SESSION_TABLE_SUFFIX = 'session'
 
 @Injectable()
@@ -106,12 +113,27 @@ export class SessionService {
 
   /**
    * List session entries for a user scoped to a command module.
-   * sk begins_with {moduleTableName}#
+   *
+   * Queries the session table by `{userId}#{tenantCode}` and filters to entries
+   * whose sort key begins with `{moduleTableName}#`, returning only sessions
+   * that belong to the given module.
+   *
+   * @param userId - The ID of the requesting user (from JWT `sub` claim).
+   * @param tenantCode - The tenant the user is operating under.
+   * @param moduleTableName - The `tableName` from `CommandModuleOptions` — used
+   *   as the sort key prefix to scope results to a single command module.
+   * @param limit - Maximum number of session entries to fetch. Defaults to
+   *   `MAX_SESSION_ENTRIES` to prevent silent truncation from the underlying
+   *   DynamoDB query's default limit of 10. Callers should rarely need to
+   *   override this.
+   * @returns The matching session entries, or an empty array if none exist or
+   *   session writes are disabled.
    */
   async listByUser(
     userId: string,
     tenantCode: string,
     moduleTableName: string,
+    limit = MAX_SESSION_ENTRIES,
   ): Promise<SessionItem[]> {
     const pk = this.buildPk(userId, tenantCode)
     const skPrefix = `${moduleTableName}${KEY_SEPARATOR}`
@@ -123,6 +145,8 @@ export class SessionService {
         skExpression: 'begins_with(sk, :skPrefix)',
         skAttributeValues: { ':skPrefix': skPrefix },
       },
+      undefined,
+      limit,
     )
 
     return (result?.items as SessionItem[]) ?? []
