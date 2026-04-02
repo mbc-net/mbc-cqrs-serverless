@@ -204,12 +204,15 @@ export class ${featureName}Service {
   }
 
   // Create (Sync - waits for completion, writes full audit trail since v1.1.4)
+  // Note: returns null when command is not dirty (no-op) since v1.2.0
   async createSync(dto: Create${featureName}Dto, options: IInvoke) {
     const { tenantCode } = getUserContext(options)
     const entity = new ${featureName}CommandEntity()
     // ... same setup
 
-    return this.commandService.publishSync(entity, options)
+    const result = await this.commandService.publishSync(entity, options)
+    if (!result) return null // no-op (not dirty)
+    return result
   }
 
   // Update with optimistic locking
@@ -515,6 +518,56 @@ Step Functions state machine changes required:
 - Row-level progress tracking via \`import_tmp\` table is removed
 - Counters (\`processedRows\`, \`succeededRows\`, \`failedRows\`) are aggregated at completion
 - Update both CDK and \`serverless.yml\` Step Functions definitions
+
+## v1.2.x Migration Notes
+
+### v1.2.0 — Breaking Changes
+
+**1. publishSync / publishPartialUpdateSync return type change**
+\`\`\`typescript
+// Before (v1.1.x) — always returned CommandModel
+const result = await commandService.publishSync(entity, options)
+console.log(result.pk) // safe
+
+// After (v1.2.0+) — returns null when command is not dirty (no-op)
+const result = await commandService.publishSync(entity, options)
+if (!result) return // no-op: command was not dirty, nothing was written
+console.log(result.pk) // safe after null check
+\`\`\`
+- Same semantics as \`publishAsync()\` / \`publishPartialUpdateAsync()\`
+- **Migration:** Add null check before accessing any property on the result
+
+**2. SequenceService.genNewSequence() removed**
+\`\`\`typescript
+// Removed — compilation error in v1.2.0+
+await sequenceService.genNewSequence(...)
+
+// Use instead
+await sequenceService.generateSequenceItem(...)
+// or
+await sequenceService.generateSequenceItemWithProvideSetting(...)
+\`\`\`
+
+**3. Read-Your-Writes (RYW) consistency (new feature)**
+
+After \`publishAsync\`, the same user's subsequent reads now return the pending command data before the DynamoDB Stream sync completes:
+\`\`\`typescript
+// Repository is now exported from CommandModule
+import { Repository } from '@mbc-cqrs-serverless/core'
+
+@Injectable()
+export class OrderService {
+  constructor(private readonly repository: Repository) {}
+
+  async getOrder(key: DetailKey, options: ICommandOptions) {
+    // Returns pending command data if session exists
+    return this.repository.getItem(key, options)
+  }
+}
+\`\`\`
+- Enable by setting \`RYW_SESSION_TTL_MINUTES\` env var (e.g. \`5\`)
+- No effect if unset — zero impact on existing projects
+- Session table \`{NODE_ENV}-{APP_NAME}-session\` must be created (see \`dynamodbs/session.json\`)
 
 ## Common Migration Issues
 
