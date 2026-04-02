@@ -33,8 +33,30 @@ Generate code and analyze projects:
 | `mbc_generate_entity` | Generate an entity |
 | `mbc_generate_dto` | Generate a DTO |
 | `mbc_validate_cqrs` | Validate CQRS pattern implementation |
-| `mbc_analyze_project` | Analyze project structure |
-| `mbc_lookup_error` | Look up error solutions |
+| `mbc_analyze_project` | Analyze project structure and detect framework usage |
+| `mbc_lookup_error` | Look up error solutions from the error catalog |
+| `mbc_check_anti_patterns` | Detect anti-patterns (AP001–AP012) in project source files |
+| `mbc_health_check` | Health check for dependencies, structure, and configuration |
+| `mbc_explain_code` | Explain a file or code section in the MBC CQRS context |
+
+#### Anti-Pattern Detection (`mbc_check_anti_patterns`)
+
+Detects 12 anti-patterns including v1.1.x breaking changes:
+
+| Code | Name | Severity |
+|------|------|----------|
+| AP001 | Direct DynamoDB Write | Critical |
+| AP002 | Ignored Version Mismatch | High |
+| AP003 | N+1 Query Pattern | High |
+| AP004 | Full Table Scan | High |
+| AP005 | Hardcoded Tenant | Critical |
+| AP006 | Missing Tenant Validation | Critical |
+| AP007 | Throwing in Sync Handler | High |
+| AP008 | Hardcoded Secret | Critical |
+| AP009 | Manual JWT Parsing | Critical |
+| AP010 | Heavy Module Import | Medium |
+| AP011 | Deprecated Method Usage (`publish`, `publishPartialUpdate` removed in v1.1.0) | High |
+| AP012 | Uppercase COMMON Tenant Key (`#COMMON` → `#common` in v1.1.0) | Critical |
 
 ### Prompts
 
@@ -42,9 +64,17 @@ Get guided assistance:
 
 | Prompt | Description |
 |--------|-------------|
-| `cqrs_implementation_guide` | Step-by-step CQRS implementation |
+| `cqrs_implementation_guide` | Step-by-step CQRS implementation (module, entity, command, query, event) |
 | `debug_command_error` | Debug command-related errors |
-| `migration_guide` | Version migration guidance |
+| `migration_guide` | Version migration guidance including v1.1.x breaking changes |
+
+#### `migration_guide` coverage
+
+| Version | Changes |
+|---------|---------|
+| v1.1.0 | `TENANT_COMMON` renamed to lowercase `'common'`; `publish()` / `publishPartialUpdate()` removed |
+| v1.1.4 | `publishSync` now writes full audit trail to Command + History tables |
+| v1.1.5 | CSV import batch architecture — `finalize_parent_job` state required in Step Functions |
 
 ## Installation
 
@@ -98,7 +128,8 @@ Add to Cursor's MCP settings:
 
 | Variable | Description | Default |
 |----------|-------------|---------|
-| `MBC_PROJECT_PATH` | Path to the project directory | Current working directory |
+| `MBC_PROJECT_PATH` | Path to the user's project directory | Current working directory |
+| `MBC_FRAMEWORK_ROOT` | Path to the framework root (for installed packages). Set automatically by the CLI; override only if the default monorepo layout does not apply. | Auto-resolved from package location |
 
 ## Usage Examples
 
@@ -123,6 +154,12 @@ Claude Code will use the `mbc_analyze_project` tool to provide insights.
 ```
 
 Claude Code will use the `debug_command_error` prompt and `mbc_lookup_error` tool.
+
+```
+"Check my project for anti-patterns"
+```
+
+Claude Code will use the `mbc_check_anti_patterns` tool to report issues.
 
 ### Resource Access
 
@@ -185,7 +222,7 @@ Review the code in src/order/order.service.ts
 
 ```
 /mbc-migrate
-I need to upgrade from v1.0.20 to v1.0.23
+I need to upgrade from v1.0.x to v1.1.x
 ```
 
 ```
