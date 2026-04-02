@@ -26,7 +26,7 @@ export async function handleResourceRead(
   projectPath: string,
 ): Promise<{ contents: { uri: string; mimeType: string; text: string }[] }> {
   if (uri.startsWith('mbc://docs/errors')) {
-    return readErrorCatalog(uri)
+    return readErrorCatalog(uri, projectPath)
   }
 
   if (uri.startsWith('mbc://docs/')) {

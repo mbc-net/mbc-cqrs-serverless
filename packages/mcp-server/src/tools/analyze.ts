@@ -3,6 +3,8 @@ import * as fs from 'fs'
 import * as path from 'path'
 import { z } from 'zod'
 
+import { findFiles, readFileSafe } from '../utils/fs.js'
+
 /**
  * Analysis result interface.
  */
@@ -215,7 +217,7 @@ async function analyzeProject(projectPath: string): Promise<AnalysisResult> {
   // Check package.json
   const packageJsonPath = path.join(projectPath, 'package.json')
   if (fs.existsSync(packageJsonPath)) {
-    const packageJson = JSON.parse(fs.readFileSync(packageJsonPath, 'utf-8'))
+    const packageJson = JSON.parse(readFileSafe(packageJsonPath))
     result.projectName = packageJson.name || result.projectName
     const deps = { ...packageJson.dependencies, ...packageJson.devDependencies }
 
@@ -238,7 +240,7 @@ async function analyzeProject(projectPath: string): Promise<AnalysisResult> {
   // Analyze modules
   const moduleFiles = await findFiles(srcPath, '.module.ts')
   for (const file of moduleFiles) {
-    const content = fs.readFileSync(file, 'utf-8')
+    const content = readFileSafe(file)
     const classMatch = content.match(/export\s+class\s+(\w+Module)/)
     if (classMatch) {
       const imports: string[] = []
@@ -261,7 +263,7 @@ async function analyzeProject(projectPath: string): Promise<AnalysisResult> {
   // Analyze entities
   const entityFiles = await findFiles(srcPath, '.entity.ts')
   for (const file of entityFiles) {
-    const content = fs.readFileSync(file, 'utf-8')
+    const content = readFileSafe(file)
     const classMatch = content.match(/export\s+class\s+(\w+)/)
     if (classMatch) {
       const type: 'command' | 'data' | 'unknown' = content.includes(
@@ -308,7 +310,7 @@ async function analyzeProject(projectPath: string): Promise<AnalysisResult> {
   // Analyze CQRS patterns
   const allTsFiles = await findFiles(srcPath, '.ts')
   for (const file of allTsFiles) {
-    const content = fs.readFileSync(file, 'utf-8')
+    const content = readFileSafe(file)
     if (content.includes('@CommandHandler'))
       result.cqrsPatterns.commandHandlers++
     if (content.includes('@QueryHandler')) result.cqrsPatterns.queryHandlers++
@@ -317,30 +319,6 @@ async function analyzeProject(projectPath: string): Promise<AnalysisResult> {
   }
 
   return result
-}
-
-async function findFiles(dir: string, suffix: string): Promise<string[]> {
-  const files: string[] = []
-
-  if (!fs.existsSync(dir)) {
-    return files
-  }
-
-  const entries = fs.readdirSync(dir, { withFileTypes: true })
-  for (const entry of entries) {
-    const fullPath = path.join(dir, entry.name)
-    if (
-      entry.isDirectory() &&
-      entry.name !== 'node_modules' &&
-      entry.name !== 'dist'
-    ) {
-      files.push(...(await findFiles(fullPath, suffix)))
-    } else if (entry.isFile() && entry.name.endsWith(suffix)) {
-      files.push(fullPath)
-    }
-  }
-
-  return files
 }
 
 async function lookupError(
@@ -358,7 +336,7 @@ async function lookupError(
     }
   }
 
-  const catalog = fs.readFileSync(errorCatalogPath, 'utf-8')
+  const catalog = readFileSafe(errorCatalogPath)
   const lowerError = errorMessage.toLowerCase()
 
   // Find matching sections
@@ -514,7 +492,7 @@ const ANTI_PATTERNS = [
     severity: 'critical' as const,
     pattern: /['"`]TENANT#\w+['"`]/,
     recommendation:
-      'Use getUserContext(context).tenantCode to get tenant dynamically.',
+      'Use getUserContext(invokeContext).tenantCode to get the tenant code from the authenticated context.',
   },
   {
     code: 'AP006',
@@ -557,6 +535,25 @@ const ANTI_PATTERNS = [
       /^import\s+\*\s+as\s+\w+\s+from\s+['"`](?:aws-sdk|lodash|moment)['"`]/m,
     recommendation: 'Import only what you need to reduce cold start time.',
   },
+  {
+    code: 'AP011',
+    name: 'Deprecated Method Usage',
+    severity: 'high' as const,
+    // Match .publish( and .publishPartialUpdate( but not .publishAsync( or .publishPartialUpdateAsync(
+    pattern:
+      /\.publish(?!Async|Sync|PartialUpdateAsync|PartialUpdateSync)\s*\(|\.publishPartialUpdate(?!Async|Sync)\s*\(/,
+    recommendation:
+      'publish() and publishPartialUpdate() were removed in v1.1.0. Use publishAsync() or publishPartialUpdateAsync() instead.',
+  },
+  {
+    code: 'AP012',
+    name: 'Uppercase COMMON Tenant Key',
+    severity: 'critical' as const,
+    // Detect hardcoded uppercase COMMON in DynamoDB partition keys (pre-v1.1.0 format)
+    pattern: /['"`](?:MASTER_SETTING|MASTER_DATA|TENANT)#COMMON['"`#]/,
+    recommendation:
+      'TENANT_COMMON changed from "COMMON" to "common" (lowercase) in v1.1.0. Update partition keys and migrate existing DynamoDB data.',
+  },
 ]
 
 /**
@@ -586,11 +583,8 @@ async function checkAntiPatterns(
       continue
     }
 
-    let content: string
-    try {
-      content = fs.readFileSync(file, 'utf-8')
-    } catch (err) {
-      // Skip files that cannot be read (permission issues, etc.)
+    const content = readFileSafe(file)
+    if (content.startsWith('Error reading file:')) {
       skippedFiles.push(path.relative(projectPath, file))
       continue
     }
@@ -696,7 +690,7 @@ async function healthCheck(
       devDependencies?: Record<string, string>
     }
     try {
-      pkg = JSON.parse(fs.readFileSync(packageJsonPath, 'utf-8'))
+      pkg = JSON.parse(readFileSafe(packageJsonPath))
     } catch (err) {
       result.checks.push({
         name: 'package.json',
@@ -874,7 +868,7 @@ async function explainCode(
     }
   }
 
-  const content = fs.readFileSync(filePath, 'utf-8')
+  const content = readFileSafe(filePath)
   const lines = content.split('\n')
   const fileName = path.basename(filePath)
 

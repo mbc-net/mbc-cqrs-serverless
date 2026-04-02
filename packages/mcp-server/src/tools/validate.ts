@@ -3,6 +3,8 @@ import * as fs from 'fs'
 import * as path from 'path'
 import { z } from 'zod'
 
+import { findFiles } from '../utils/fs.js'
+
 /**
  * Validation result interface.
  */
@@ -184,30 +186,6 @@ async function validateCqrsPatterns(
     issues,
     suggestions,
   }
-}
-
-async function findFiles(dir: string, suffix: string): Promise<string[]> {
-  const files: string[] = []
-
-  if (!fs.existsSync(dir)) {
-    return files
-  }
-
-  const entries = fs.readdirSync(dir, { withFileTypes: true })
-  for (const entry of entries) {
-    const fullPath = path.join(dir, entry.name)
-    if (
-      entry.isDirectory() &&
-      entry.name !== 'node_modules' &&
-      entry.name !== 'dist'
-    ) {
-      files.push(...(await findFiles(fullPath, suffix)))
-    } else if (entry.isFile() && entry.name.endsWith(suffix)) {
-      files.push(fullPath)
-    }
-  }
-
-  return files
 }
 
 function formatValidationResult(result: ValidationResult): {
