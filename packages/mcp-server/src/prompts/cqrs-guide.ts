@@ -194,16 +194,18 @@ export class ${featureName}Service {
 
   // Create (Async - returns immediately, processes in background)
   async createAsync(dto: Create${featureName}Dto, options: IInvoke) {
+    const { tenantCode } = getUserContext(options)
     const entity = new ${featureName}CommandEntity()
-    entity.pk = \`${featureName.toUpperCase()}#\${options.tenantCode}\`
+    entity.pk = \`${featureName.toUpperCase()}#\${tenantCode}\`
     entity.sk = \`${featureName.toUpperCase()}#\${ulid()}\`
     // ... set other fields
 
     return this.commandService.publishAsync(entity, options)
   }
 
-  // Create (Sync - waits for completion)
+  // Create (Sync - waits for completion, writes full audit trail since v1.1.4)
   async createSync(dto: Create${featureName}Dto, options: IInvoke) {
+    const { tenantCode } = getUserContext(options)
     const entity = new ${featureName}CommandEntity()
     // ... same setup
 
@@ -415,9 +417,9 @@ await commandService.publishPartialUpdateAsync({
   name: 'Updated',
 }, options)
 
-// Or fetch and use latest (sync mode)
+// Or fetch and use latest version before updating
 const latest = await dataService.getItem({ pk, sk })
-await commandService.publishPartialUpdateSync({
+await commandService.publishPartialUpdateAsync({
   pk, sk,
   version: latest.version,
   name: 'Updated',
@@ -462,6 +464,57 @@ function getMigrationGuideMessages(
 3. **Update imports** if API has changed
 
 4. **Run tests** to verify everything works
+
+## v1.1.x Migration Notes
+
+### v1.1.0 — Breaking Changes (data migration required)
+
+**1. TENANT_COMMON renamed to lowercase**
+\`\`\`typescript
+// Before (v1.0.x)
+const pk = \`MASTER_SETTING#COMMON#\${settingCode}\`
+
+// After (v1.1.0+)
+const pk = \`MASTER_SETTING#common#\${settingCode}\`
+\`\`\`
+- All DynamoDB keys using \`#COMMON\` must be migrated to \`#common\`
+- New utilities: \`normalizeTenantCode()\`, \`isCommonTenant()\`
+
+**2. Deprecated methods removed**
+\`\`\`typescript
+// Removed — compilation error in v1.1.0+
+this.commandService.publish(...)
+this.commandService.publishPartialUpdate(...)
+
+// Use instead
+this.commandService.publishAsync(...)
+this.commandService.publishPartialUpdateAsync(...)
+\`\`\`
+
+### v1.1.4 — publishSync audit trail
+
+\`publishSync\` now writes a full audit trail to Command and History tables (parity with async pipeline):
+- Command table entry: \`syncMode: 'SYNC'\`, status \`publish_sync:STARTED\` → \`finish:FINISHED\`
+- History table is auto-populated
+- No code changes required; behavior is transparent
+
+### v1.1.5 — CSV Import v2 batch architecture
+
+Step Functions state machine changes required:
+\`\`\`json
+{
+  "finalize_parent_job": {
+    "Type": "Task",
+    "Parameters": {
+      "resultPath": "$.processingResults"
+    }
+  }
+}
+\`\`\`
+- \`finalize_parent_job\` state is now **required**
+- Row-level progress tracking via \`import_tmp\` table is removed
+- Counters (\`processedRows\`, \`succeededRows\`, \`failedRows\`) are aggregated at completion
+- Update both CDK and \`serverless.yml\` Step Functions definitions
 
 ## Common Migration Issues
 

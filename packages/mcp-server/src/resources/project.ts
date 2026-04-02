@@ -2,6 +2,8 @@ import { Resource } from '@modelcontextprotocol/sdk/types.js'
 import * as fs from 'fs'
 import * as path from 'path'
 
+import { findFiles, readFileSafe } from '../utils/fs.js'
+
 /**
  * Project-specific resources for analyzing user's MBC CQRS projects.
  */
@@ -72,79 +74,29 @@ export async function readProjectResource(
 async function findEntities(
   projectPath: string,
 ): Promise<{ name: string; path: string }[]> {
-  const entities: { name: string; path: string }[] = []
   const srcPath = path.join(projectPath, 'src')
+  const files = await findFiles(srcPath, '.entity.ts')
 
-  if (!fs.existsSync(srcPath)) {
-    return entities
-  }
-
-  await findFilesRecursive(srcPath, (filePath) => {
-    if (filePath.endsWith('.entity.ts')) {
-      const relativePath = path.relative(projectPath, filePath)
-      const content = fs.readFileSync(filePath, 'utf-8')
-      const classMatch = content.match(/export\s+class\s+(\w+)/)
-      if (classMatch) {
-        entities.push({
-          name: classMatch[1],
-          path: relativePath,
-        })
-      }
-    }
+  return files.flatMap((filePath) => {
+    const content = readFileSafe(filePath)
+    const classMatch = content.match(/export\s+class\s+(\w+)/)
+    if (!classMatch) return []
+    return [{ name: classMatch[1], path: path.relative(projectPath, filePath) }]
   })
-
-  return entities
 }
 
 async function findModules(
   projectPath: string,
 ): Promise<{ name: string; path: string }[]> {
-  const modules: { name: string; path: string }[] = []
   const srcPath = path.join(projectPath, 'src')
+  const files = await findFiles(srcPath, '.module.ts')
 
-  if (!fs.existsSync(srcPath)) {
-    return modules
-  }
-
-  await findFilesRecursive(srcPath, (filePath) => {
-    if (filePath.endsWith('.module.ts')) {
-      const relativePath = path.relative(projectPath, filePath)
-      const content = fs.readFileSync(filePath, 'utf-8')
-      const classMatch = content.match(/export\s+class\s+(\w+Module)/)
-      if (classMatch) {
-        modules.push({
-          name: classMatch[1],
-          path: relativePath,
-        })
-      }
-    }
+  return files.flatMap((filePath) => {
+    const content = readFileSafe(filePath)
+    const classMatch = content.match(/export\s+class\s+(\w+Module)/)
+    if (!classMatch) return []
+    return [{ name: classMatch[1], path: path.relative(projectPath, filePath) }]
   })
-
-  return modules
-}
-
-async function findFilesRecursive(
-  dir: string,
-  callback: (filePath: string) => void,
-): Promise<void> {
-  if (!fs.existsSync(dir)) {
-    return
-  }
-
-  const entries = fs.readdirSync(dir, { withFileTypes: true })
-
-  for (const entry of entries) {
-    const fullPath = path.join(dir, entry.name)
-    if (
-      entry.isDirectory() &&
-      entry.name !== 'node_modules' &&
-      entry.name !== 'dist'
-    ) {
-      await findFilesRecursive(fullPath, callback)
-    } else if (entry.isFile()) {
-      callback(fullPath)
-    }
-  }
 }
 
 async function getProjectStructure(projectPath: string): Promise<string> {
