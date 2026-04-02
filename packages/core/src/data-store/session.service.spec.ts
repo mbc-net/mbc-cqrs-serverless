@@ -96,13 +96,20 @@ describe('SessionService', () => {
     )
   })
 
-  it('should report session writes disabled when RYW_SESSION_TTL_MINUTES is unset', async () => {
+  it('should no-op put and skip Dynamo for get/listByUser when RYW_SESSION_TTL_MINUTES is unset', async () => {
+    const localPut = jest.fn().mockResolvedValue(undefined)
+    const localGet = jest.fn()
+    const localList = jest.fn()
     const mod = await Test.createTestingModule({
       providers: [
         SessionService,
         {
           provide: DynamoDbService,
-          useValue: { putItem, getItem, listItemsByPk },
+          useValue: {
+            putItem: localPut,
+            getItem: localGet,
+            listItemsByPk: localList,
+          },
         },
         {
           provide: ConfigService,
@@ -118,16 +125,29 @@ describe('SessionService', () => {
         },
       ],
     }).compile()
-    expect(mod.get(SessionService).isSessionWriteEnabled()).toBe(false)
+    const s = mod.get(SessionService)
+    await s.put('u1', 't1', 'user-tenant', 'item-a', 1)
+    expect(localPut).not.toHaveBeenCalled()
+    await expect(s.get('u1', 't1', 'tbl', 'id1')).resolves.toBeNull()
+    expect(localGet).not.toHaveBeenCalled()
+    await expect(s.listByUser('u1', 't1', 'mod')).resolves.toEqual([])
+    expect(localList).not.toHaveBeenCalled()
   })
 
-  it('should report session writes disabled when RYW_SESSION_TTL_MINUTES is not positive', async () => {
+  it('should no-op put and skip Dynamo for get/listByUser when RYW_SESSION_TTL_MINUTES is not positive', async () => {
+    const localPut = jest.fn().mockResolvedValue(undefined)
+    const localGet = jest.fn()
+    const localList = jest.fn()
     const mod = await Test.createTestingModule({
       providers: [
         SessionService,
         {
           provide: DynamoDbService,
-          useValue: { putItem, getItem, listItemsByPk },
+          useValue: {
+            putItem: localPut,
+            getItem: localGet,
+            listItemsByPk: localList,
+          },
         },
         {
           provide: ConfigService,
@@ -144,6 +164,12 @@ describe('SessionService', () => {
         },
       ],
     }).compile()
-    expect(mod.get(SessionService).isSessionWriteEnabled()).toBe(false)
+    const s = mod.get(SessionService)
+    await s.put('u1', 't1', 'user-tenant', 'item-a', 1)
+    expect(localPut).not.toHaveBeenCalled()
+    await expect(s.get('u1', 't1', 'tbl', 'id1')).resolves.toBeNull()
+    expect(localGet).not.toHaveBeenCalled()
+    await expect(s.listByUser('u1', 't1', 'mod')).resolves.toEqual([])
+    expect(localList).not.toHaveBeenCalled()
   })
 })
