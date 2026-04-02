@@ -35,7 +35,7 @@ Generate code and analyze projects:
 | `mbc_validate_cqrs` | Validate CQRS pattern implementation |
 | `mbc_analyze_project` | Analyze project structure and detect framework usage |
 | `mbc_lookup_error` | Look up error solutions from the error catalog |
-| `mbc_check_anti_patterns` | Detect anti-patterns (AP001–AP012) in project source files |
+| `mbc_check_anti_patterns` | Detect anti-patterns (AP001–AP014) in project source files |
 | `mbc_health_check` | Health check for dependencies, structure, and configuration |
 | `mbc_explain_code` | Explain a file or code section in the MBC CQRS context |
 

@@ -552,8 +552,8 @@ await sequenceService.generateSequenceItemWithProvideSetting(...)
 
 After \`publishAsync\`, the same user's subsequent reads now return the pending command data before the DynamoDB Stream sync completes:
 \`\`\`typescript
-// Repository is now exported from CommandModule
-import { Repository } from '@mbc-cqrs-serverless/core'
+// Repository and DetailKey are exported from CommandModule / core
+import { DetailKey, Repository } from '@mbc-cqrs-serverless/core'
 
 @Injectable()
 export class OrderService {
