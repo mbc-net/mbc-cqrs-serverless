@@ -19,7 +19,9 @@ import { createMock } from '@golevelup/ts-jest'
 import { Test } from '@nestjs/testing'
 import { ModuleMocker, MockFunctionMetadata } from 'jest-mock'
 
+import { IInvoke } from '../context'
 import { DynamoDbService } from '../data-store/dynamodb.service'
+import { SessionService } from '../data-store/session.service'
 import { CommandModel, DataModel, DetailKey } from '../interfaces'
 import { CommandSyncMode } from './enums/command-sync-mode.enum'
 import { CommandService } from './command.service'
@@ -67,6 +69,8 @@ const config = {
 
 describe('CommandService', () => {
   let commandService: CommandService
+  let sessionPut: jest.Mock
+  let sessionIsWriteEnabled: jest.Mock
 
   /**
    * In-memory dataset simulating DynamoDB tables.
@@ -81,6 +85,8 @@ describe('CommandService', () => {
   }
 
   beforeEach(async () => {
+    sessionPut = jest.fn().mockResolvedValue(undefined)
+    sessionIsWriteEnabled = jest.fn().mockReturnValue(true)
     dataSet = {
       command: [
         buildItem({ pk: 'master', sk: 'max_value@1' }, 1),
@@ -171,6 +177,13 @@ describe('CommandService', () => {
         if (token === SnsService) {
           return {
             publish: jest.fn().mockResolvedValue(undefined),
+          }
+        }
+
+        if (token === SessionService) {
+          return {
+            put: sessionPut,
+            isSessionWriteEnabled: sessionIsWriteEnabled,
           }
         }
 
@@ -296,6 +309,62 @@ describe('CommandService', () => {
         invokeContext: {},
       })
       expect(item?.syncMode).toBeUndefined()
+    })
+
+    /** RYW: writes session row after async publish when user and tenant are present */
+    it('should call SessionService.put after successful publishAsync', async () => {
+      const key = { pk: 'AGG#tenant-x', sk: 'ryw_item' }
+      const inputItem = buildItem(key, 0)
+      const invokeContext = {
+        event: {
+          requestContext: {
+            authorizer: {
+              jwt: {
+                claims: {
+                  sub: 'user-1',
+                  'custom:roles': '[]',
+                },
+              },
+            },
+          },
+          headers: {},
+        },
+        context: {},
+      } as IInvoke
+      await commandService.publishAsync(inputItem, { invokeContext })
+      expect(sessionPut).toHaveBeenCalledWith(
+        'user-1',
+        'tenant-x',
+        '',
+        inputItem.id,
+        1,
+      )
+    })
+
+    it('should not call SessionService.put when session writes are disabled', async () => {
+      sessionIsWriteEnabled.mockReturnValue(false)
+      sessionPut.mockClear()
+      const key = { pk: 'AGG#tenant-x', sk: 'ryw_item_disabled' }
+      const inputItem = buildItem(key, 0)
+      const invokeContext = {
+        event: {
+          requestContext: {
+            authorizer: {
+              jwt: {
+                claims: {
+                  sub: 'user-1',
+                  'custom:roles': '[]',
+                },
+              },
+            },
+          },
+          headers: {},
+        },
+        context: {},
+      } as IInvoke
+      await commandService.publishAsync(inputItem, { invokeContext })
+      expect(sessionPut).not.toHaveBeenCalled()
+      sessionIsWriteEnabled.mockReturnValue(true)
     })
   })
 
@@ -636,6 +705,14 @@ describe('CommandService', () => {
       const inputItem = dirtyPublishSyncInput()
       await commandService.publishSync(inputItem, { invokeContext: {} })
       expect(dataSet.history.length).toBeGreaterThan(0)
+    })
+
+    /** RYW: synchronous publish does not write session (data is updated in-request) */
+    it('should not call SessionService.put', async () => {
+      sessionPut.mockClear()
+      const inputItem = dirtyPublishSyncInput()
+      await commandService.publishSync(inputItem, { invokeContext: {} })
+      expect(sessionPut).not.toHaveBeenCalled()
     })
   })
 })

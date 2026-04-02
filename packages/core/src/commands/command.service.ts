@@ -12,6 +12,7 @@ import { isDeepStrictEqual } from 'util'
 import { VER_SEPARATOR, VERSION_FIRST, VERSION_LATEST } from '../constants'
 import { getUserContext } from '../context/user'
 import { DynamoDbService } from '../data-store/dynamodb.service'
+import { SessionService } from '../data-store/session.service'
 import { DATA_SYNC_HANDLER_METADATA } from '../decorators'
 import { mergeDeep, pickKeys } from '../helpers'
 import {
@@ -64,6 +65,7 @@ export class CommandService implements OnModuleInit, ICommandService {
     private readonly dataService: DataService,
     private readonly ttlService: TtlService,
     private readonly historyService: HistoryService,
+    private readonly sessionService: SessionService,
   ) {
     this.tableName = this.dynamoDbService.getTableName(
       this.options.tableName,
@@ -337,7 +339,49 @@ export class CommandService implements OnModuleInit, ICommandService {
       command,
       'attribute_not_exists(pk) AND attribute_not_exists(sk)',
     )
+    await this.writeRywSessionIfApplicable(command, options)
     return command
+  }
+
+  /**
+   * Records a short-lived session row so Repository can merge pending async
+   * commands before the data table catches up. Only used after publishAsync —
+   * publishSync writes data in the same request, so no session is needed.
+   */
+  private async writeRywSessionIfApplicable(
+    command: CommandModel,
+    options: ICommandOptions,
+  ): Promise<void> {
+    if (!this.sessionService.isSessionWriteEnabled()) {
+      return
+    }
+
+    let userId: string | undefined
+    try {
+      userId = getUserContext(options.invokeContext)?.userId
+    } catch {
+      return
+    }
+    if (!userId) {
+      return
+    }
+
+    const tenantCode = getTenantCode(command.pk)
+    if (!tenantCode) {
+      return
+    }
+
+    try {
+      await this.sessionService.put(
+        userId,
+        tenantCode,
+        this.options.tableName,
+        command.id,
+        command.version,
+      )
+    } catch (err) {
+      this.logger.warn('RYW session write failed (non-fatal)', err)
+    }
   }
 
   async duplicate(key: DetailKey, options: ICommandOptions) {

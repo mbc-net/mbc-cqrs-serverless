@@ -22,7 +22,8 @@ describe('EnvironmentVariables', () => {
       LOG_LEVEL: 'debug',
       ATTRIBUTE_LIMIT_SIZE: '1000',
       S3_BUCKET_NAME: 'test-bucket',
-      SFN_COMMAND_ARN: 'arn:aws:states:us-east-1:123456789012:stateMachine:test',
+      SFN_COMMAND_ARN:
+        'arn:aws:states:us-east-1:123456789012:stateMachine:test',
       SES_FROM_EMAIL: 'test@example.com',
       ...overrides,
     }
@@ -113,6 +114,14 @@ describe('EnvironmentVariables', () => {
     it('should validate without optional DYNAMODB_ENDPOINT', () => {
       const config = createValidEnv()
       // DYNAMODB_ENDPOINT is optional
+
+      const validate = getValidateConfig()
+
+      expect(() => validate(config)).not.toThrow()
+    })
+
+    it('should validate with optional RYW_SESSION_TTL_MINUTES', () => {
+      const config = createValidEnv({ RYW_SESSION_TTL_MINUTES: '15' })
 
       const validate = getValidateConfig()
 

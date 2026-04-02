@@ -25,6 +25,37 @@ export function generateId(pk: string, sk: string) {
   return `${pk}${KEY_SEPARATOR}${removeSortKeyVersion(sk)}`
 }
 
+/**
+ * Inverse of {@link generateId}: extracts the base sort key from a composite id (`pk#skBase`).
+ */
+export function sortKeyBaseFromId(
+  pk: string,
+  itemId: string,
+): string | undefined {
+  const prefix = `${pk}${KEY_SEPARATOR}`
+  if (!itemId.startsWith(prefix)) {
+    return undefined
+  }
+  return itemId.slice(prefix.length)
+}
+
+/**
+ * Parses a composite {@link generateId} when partition key is always
+ * `{type}#{tenantCode}` (exactly two `#`-separated segments). The remainder of
+ * `itemId` after that prefix is `skBase` (may contain `#`).
+ */
+export function parseTwoSegmentPkSkFromId(
+  itemId: string,
+): { pk: string; skBase: string } | undefined {
+  const parts = itemId.split(KEY_SEPARATOR)
+  if (parts.length < 3) {
+    return undefined
+  }
+  const pk = `${parts[0]}${KEY_SEPARATOR}${parts[1]}`
+  const skBase = parts.slice(2).join(KEY_SEPARATOR)
+  return { pk, skBase }
+}
+
 export function getTenantCode(pk: string) {
   const lastDivIdx = pk.lastIndexOf(KEY_SEPARATOR)
   if (lastDivIdx === -1) {

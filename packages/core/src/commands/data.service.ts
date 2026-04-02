@@ -2,6 +2,7 @@ import { Inject, Injectable, Logger } from '@nestjs/common'
 
 import { DynamoDbService } from '../data-store/dynamodb.service'
 import { removeSortKeyVersion } from '../helpers/key'
+import { transformCommandToData } from '../helpers/transform'
 import {
   CommandModel,
   CommandModuleOptions,
@@ -66,33 +67,9 @@ export class DataService {
    * @returns The published data model
    */
   async publish(cmd: CommandModel) {
-    const pk = cmd.pk
     const sk = removeSortKeyVersion(cmd.sk)
-    const data = await this.getItem({ pk, sk })
-    const dataModel: DataModel = {
-      ...data,
-      pk,
-      sk,
-      id: cmd.id,
-      code: cmd.code,
-      name: cmd.name,
-      version: cmd.version,
-      tenantCode: cmd.tenantCode,
-      type: cmd.type,
-      seq: cmd.seq,
-      attributes: cmd.attributes,
-      cpk: cmd.pk,
-      csk: cmd.sk,
-      isDeleted: cmd.isDeleted,
-      ttl: cmd.ttl,
-      requestId: cmd.requestId,
-      createdAt: data?.createdAt || cmd.createdAt,
-      updatedAt: cmd.updatedAt,
-      createdBy: data?.createdBy || cmd.createdBy,
-      updatedBy: cmd.updatedBy,
-      createdIp: data?.createdIp || cmd.createdIp,
-      updatedIp: cmd.updatedIp,
-    }
+    const existing = await this.getItem({ pk: cmd.pk, sk })
+    const dataModel = transformCommandToData(cmd, existing)
 
     this.logger.debug('publish::', dataModel)
     await this.dynamoDbService.putItem(this.tableName, dataModel)
