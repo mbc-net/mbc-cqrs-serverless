@@ -3,7 +3,7 @@ import * as fs from 'fs'
 import * as path from 'path'
 import { z } from 'zod'
 
-import { findFiles } from '../utils/fs.js'
+import { findFiles, readFileSafe } from '../utils/fs.js'
 
 /**
  * Validation result interface.
@@ -98,7 +98,7 @@ async function validateCqrsPatterns(
   // Check for package.json with @mbc-cqrs-serverless/core dependency
   const packageJsonPath = path.join(projectPath, 'package.json')
   if (fs.existsSync(packageJsonPath)) {
-    const packageJson = JSON.parse(fs.readFileSync(packageJsonPath, 'utf-8'))
+    const packageJson = JSON.parse(readFileSafe(packageJsonPath))
     const deps = { ...packageJson.dependencies, ...packageJson.devDependencies }
     if (!deps['@mbc-cqrs-serverless/core']) {
       issues.push({
@@ -115,7 +115,7 @@ async function validateCqrsPatterns(
   // Check for entities extending proper base classes
   const entityFiles = await findFiles(srcPath, '.entity.ts')
   for (const file of entityFiles) {
-    const content = fs.readFileSync(file, 'utf-8')
+    const content = readFileSafe(file)
     if (!content.includes('CommandEntity') && !content.includes('DataEntity')) {
       issues.push({
         severity: 'warning',
@@ -131,7 +131,7 @@ async function validateCqrsPatterns(
   // Check for modules with proper command module registration
   const moduleFiles = await findFiles(srcPath, '.module.ts')
   for (const file of moduleFiles) {
-    const content = fs.readFileSync(file, 'utf-8')
+    const content = readFileSafe(file)
     if (
       content.includes('@Module') &&
       !content.includes('CommandModule') &&
@@ -150,7 +150,7 @@ async function validateCqrsPatterns(
   // Check for services using proper patterns
   const serviceFiles = await findFiles(srcPath, '.service.ts')
   for (const file of serviceFiles) {
-    const content = fs.readFileSync(file, 'utf-8')
+    const content = readFileSafe(file)
     if (content.includes('CommandService') || content.includes('DataService')) {
       // Good - using CQRS services
     } else if (

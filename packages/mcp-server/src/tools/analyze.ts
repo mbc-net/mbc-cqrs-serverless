@@ -217,7 +217,16 @@ async function analyzeProject(projectPath: string): Promise<AnalysisResult> {
   // Check package.json
   const packageJsonPath = path.join(projectPath, 'package.json')
   if (fs.existsSync(packageJsonPath)) {
-    const packageJson = JSON.parse(readFileSafe(packageJsonPath))
+    let packageJson: {
+      name?: string
+      dependencies?: Record<string, string>
+      devDependencies?: Record<string, string>
+    }
+    try {
+      packageJson = JSON.parse(readFileSafe(packageJsonPath))
+    } catch {
+      packageJson = {}
+    }
     result.projectName = packageJson.name || result.projectName
     const deps = { ...packageJson.dependencies, ...packageJson.devDependencies }
 
@@ -539,7 +548,7 @@ const ANTI_PATTERNS = [
     code: 'AP011',
     name: 'Deprecated Method Usage',
     severity: 'high' as const,
-    // Match .publish( and .publishPartialUpdate( but not .publishAsync( or .publishPartialUpdateAsync(
+    // Match .publish( and .publishPartialUpdate( but not the Async/Sync variants
     pattern:
       /\.publish(?!Async|Sync|PartialUpdateAsync|PartialUpdateSync)\s*\(|\.publishPartialUpdate(?!Async|Sync)\s*\(/,
     recommendation:
