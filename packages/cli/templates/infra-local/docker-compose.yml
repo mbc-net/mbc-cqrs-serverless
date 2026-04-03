@@ -60,7 +60,6 @@ services:
     image: localstack/localstack
     ports:
       - '${LOCAL_S3_PORT:-4566}:4566'
-      - '4510-4559:4510-4559'
     environment:
       - SERVICES=s3
       - AWS_DEFAULT_REGION=ap-northeast-1
