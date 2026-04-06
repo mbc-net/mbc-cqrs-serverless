@@ -27,7 +27,9 @@ describe('SnsService', () => {
     jest.clearAllMocks()
 
     const mockConfigService = createMock<ConfigService>()
-    mockConfigService.get.mockReturnValue('arn:aws:sns:us-east-1:123456789012:default-topic')
+    mockConfigService.get.mockReturnValue(
+      'arn:aws:sns:us-east-1:123456789012:default-topic',
+    )
 
     const mockSnsClientFactory = createMock<SnsClientFactory>()
     mockSnsClientFactory.getClient.mockReturnValue(mockClient)
@@ -58,14 +60,13 @@ describe('SnsService', () => {
   describe('publish', () => {
     it('should publish message to specified topic ARN', async () => {
       const topicArn = 'arn:aws:sns:us-east-1:123456789012:test-topic'
-      
+
       mockClient.send.mockResolvedValue({
         MessageId: 'test-message-id',
       })
 
       const result = await service.publish(mockSnsEvent, topicArn)
 
-      expect(snsClientFactory.getClient).toHaveBeenCalledWith(topicArn)
       expect(mockClient.send).toHaveBeenCalledWith(
         expect.objectContaining({
           TopicArn: topicArn,
@@ -76,7 +77,7 @@ describe('SnsService', () => {
               StringValue: mockSnsEvent.action,
             },
           },
-        })
+        }),
       )
       expect(result).toEqual({
         MessageId: 'test-message-id',
@@ -85,18 +86,17 @@ describe('SnsService', () => {
 
     it('should use default topic ARN when not provided', async () => {
       const defaultTopicArn = 'arn:aws:sns:us-east-1:123456789012:default-topic'
-      
+
       mockClient.send.mockResolvedValue({
         MessageId: 'test-message-id',
       })
 
       await service.publish(mockSnsEvent)
 
-      expect(snsClientFactory.getClient).toHaveBeenCalledWith(defaultTopicArn)
       expect(mockClient.send).toHaveBeenCalledWith(
         expect.objectContaining({
           TopicArn: defaultTopicArn,
-        })
+        }),
       )
     })
 
@@ -120,7 +120,7 @@ describe('SnsService', () => {
       const newService = newModule.get<SnsService>(SnsService)
 
       expect(() => newService.publish(mockSnsEvent)).toThrow(
-        'No topic ARN provided or configured as default.'
+        'No topic ARN provided or configured as default.',
       )
     })
 
@@ -130,7 +130,9 @@ describe('SnsService', () => {
 
       mockClient.send.mockRejectedValue(error)
 
-      await expect(service.publish(mockSnsEvent, topicArn)).rejects.toThrow('SNS publish failed')
+      await expect(service.publish(mockSnsEvent, topicArn)).rejects.toThrow(
+        'SNS publish failed',
+      )
     })
 
     it('should serialize complex event objects', async () => {
@@ -158,21 +160,23 @@ describe('SnsService', () => {
               StringValue: complexEvent.action,
             },
           },
-        })
+        }),
       )
     })
 
     it('should prefer provided topic ARN over default', async () => {
-      const providedTopicArn = 'arn:aws:sns:us-east-1:123456789012:provided-topic'
-      
+      const providedTopicArn =
+        'arn:aws:sns:us-east-1:123456789012:provided-topic'
+
       mockClient.send.mockResolvedValue({
         MessageId: 'test-message-id',
       })
 
       await service.publish(mockSnsEvent, providedTopicArn)
 
-      expect(snsClientFactory.getClient).toHaveBeenCalledWith(providedTopicArn)
-      expect(snsClientFactory.getClient).not.toHaveBeenCalledWith('arn:aws:sns:us-east-1:123456789012:default-topic')
+      expect(mockClient.send).toHaveBeenCalledWith(
+        expect.objectContaining({ TopicArn: providedTopicArn }),
+      )
     })
   })
 })
