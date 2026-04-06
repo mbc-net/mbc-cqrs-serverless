@@ -895,23 +895,22 @@ export class InfraStack extends cdk.Stack {
       },
     )
 
-    const finalizeParentJobInvoke =
-      new cdk.aws_stepfunctions_tasks.LambdaInvoke(
-        this,
-        'finalize_parent_job',
-        {
-          lambdaFunction: lambdaApi,
-          payload: cdk.aws_stepfunctions.TaskInput.fromObject({
-            'input.$': '$',
-            'context.$': '$$',
-          }),
-          stateName: 'finalize_parent_job',
-          outputPath: '$.Payload[0][0]',
-          integrationPattern:
-            cdk.aws_stepfunctions.IntegrationPattern.REQUEST_RESPONSE,
-          retryOnServiceExceptions: false,
-        },
-      )
+    const finalizeParentJobInvoke = new cdk.aws_stepfunctions_tasks.LambdaInvoke(
+      this,
+      'finalize_parent_job',
+      {
+        lambdaFunction: lambdaApi,
+        payload: cdk.aws_stepfunctions.TaskInput.fromObject({
+          'input.$': '$',
+          'context.$': '$$',
+        }),
+        stateName: 'finalize_parent_job',
+        outputPath: '$.Payload[0][0]',
+        integrationPattern:
+          cdk.aws_stepfunctions.IntegrationPattern.REQUEST_RESPONSE,
+        retryOnServiceExceptions: false,
+      },
+    )
     finalizeParentJobInvoke.addRetry({
       errors: [
         'Lambda.ServiceException',
@@ -922,8 +921,7 @@ export class InfraStack extends cdk.Stack {
       maxAttempts: 5,
       backoffRate: 2,
     })
-    const finalizeParentJobState =
-      finalizeParentJobInvoke.next(importCsvSuccess)
+    const finalizeParentJobState = finalizeParentJobInvoke.next(importCsvSuccess)
 
     const sfnImportCsvDefinition = new DistributedMap(this, 'import-csv', {
       maxConcurrency: 50,
