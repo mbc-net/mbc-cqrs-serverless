@@ -4,18 +4,17 @@ import { ConfigService } from '@nestjs/config'
 
 @Injectable()
 export class SnsClientFactory {
-  private clients = new Map<string, SNSClient>()
+  private client: SNSClient | undefined
 
   constructor(private readonly config: ConfigService) {}
 
-  getClient(topicArn: string): SNSClient {
-    if (!this.clients.has(topicArn)) {
-      const snsClient = new SNSClient({
+  getClient(): SNSClient {
+    if (!this.client) {
+      this.client = new SNSClient({
         endpoint: this.config.get<string>('SNS_ENDPOINT'),
         region: this.config.get<string>('SNS_REGION'),
       })
-      this.clients.set(topicArn, snsClient)
     }
-    return this.clients.get(topicArn)
+    return this.client
   }
 }

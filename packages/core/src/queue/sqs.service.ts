@@ -38,12 +38,12 @@ export class SqsService {
       | 'MessageAttributes'
     >,
   ): Promise<SendMessageCommandOutput> {
-    const client = this.sqsClientFactory.getClient(queueUrl)
+    const client = this.sqsClientFactory.getClient()
     const result = await client.send(
       new SendMessageCommand({
+        ...opts,
         QueueUrl: queueUrl,
         MessageBody: body,
-        ...opts,
       }),
     )
     this.logger.debug(`sendMessage MessageId=${result.MessageId}`)
@@ -58,14 +58,13 @@ export class SqsService {
     queueUrl: string,
     entries: SendMessageBatchRequestEntry[],
   ): Promise<SendMessageBatchCommandOutput> {
-    const client = this.sqsClientFactory.getClient(queueUrl)
+    const client = this.sqsClientFactory.getClient()
     const result = await client.send(
       new SendMessageBatchCommand({
         QueueUrl: queueUrl,
         Entries: entries,
       }),
     )
-
     return result
   }
 
@@ -80,18 +79,18 @@ export class SqsService {
         | 'MaxNumberOfMessages'
         | 'WaitTimeSeconds'
         | 'VisibilityTimeout'
-        | 'AttributeNames'
+        | 'MessageSystemAttributeNames'
         | 'MessageAttributeNames'
       >
     >,
   ): Promise<ReceiveMessageCommandOutput> {
-    const client = this.sqsClientFactory.getClient(queueUrl)
+    const client = this.sqsClientFactory.getClient()
     const result = await client.send(
       new ReceiveMessageCommand({
-        QueueUrl: queueUrl,
-        MaxNumberOfMessages: opts?.MaxNumberOfMessages ?? 10,
-        WaitTimeSeconds: opts?.WaitTimeSeconds ?? 0,
+        MaxNumberOfMessages: 10,
+        WaitTimeSeconds: 0,
         ...opts,
+        QueueUrl: queueUrl,
       }),
     )
     return result
@@ -104,7 +103,7 @@ export class SqsService {
     queueUrl: string,
     receiptHandle: string,
   ): Promise<DeleteMessageCommandOutput> {
-    const client = this.sqsClientFactory.getClient(queueUrl)
+    const client = this.sqsClientFactory.getClient()
     const result = await client.send(
       new DeleteMessageCommand({
         QueueUrl: queueUrl,
@@ -124,14 +123,13 @@ export class SqsService {
     queueUrl: string,
     entries: DeleteMessageBatchRequestEntry[],
   ): Promise<DeleteMessageBatchCommandOutput> {
-    const client = this.sqsClientFactory.getClient(queueUrl)
+    const client = this.sqsClientFactory.getClient()
     const result = await client.send(
       new DeleteMessageBatchCommand({
         QueueUrl: queueUrl,
         Entries: entries,
       }),
     )
-
     return result
   }
 }

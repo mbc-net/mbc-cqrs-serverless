@@ -1,5 +1,4 @@
 import { Test, TestingModule } from '@nestjs/testing'
-import { ConfigService } from '@nestjs/config'
 import { mockClient } from 'aws-sdk-client-mock'
 import {
   DeleteMessageBatchCommand,
@@ -26,19 +25,18 @@ describe('SqsService', () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         SqsService,
-        SqsClientFactory,
         {
-          provide: ConfigService,
-          useValue: {
-            get: (key: string) =>
-              key === 'SQS_REGION' ? 'ap-northeast-1' : undefined,
-          },
+          provide: SqsClientFactory,
+          useValue: { getClient: () => sqsMock },
         },
       ],
     }).compile()
     service = module.get<SqsService>(SqsService)
   })
 
+  // ---------------------------------------------------------------------------
+  // sendMessage
+  // ---------------------------------------------------------------------------
   describe('sendMessage', () => {
     it('should send a single message and return the full output', async () => {
       sqsMock.on(SendMessageCommand).resolves({ MessageId: 'msg-001' })
@@ -65,6 +63,9 @@ describe('SqsService', () => {
     })
   })
 
+  // ---------------------------------------------------------------------------
+  // sendMessageBatch
+  // ---------------------------------------------------------------------------
   describe('sendMessageBatch', () => {
     it('should send batch and return the full output', async () => {
       sqsMock.on(SendMessageBatchCommand).resolves({
@@ -106,6 +107,9 @@ describe('SqsService', () => {
     })
   })
 
+  // ---------------------------------------------------------------------------
+  // receiveMessages
+  // ---------------------------------------------------------------------------
   describe('receiveMessages', () => {
     it('should return the full output including messages', async () => {
       sqsMock.on(ReceiveMessageCommand).resolves({
@@ -120,7 +124,7 @@ describe('SqsService', () => {
       expect(result.Messages![0].Body).toBe('hello')
     })
 
-    it('should apply default MaxNumberOfMessages and WaitTimeSeconds', async () => {
+    it('should apply default MaxNumberOfMessages=10 and WaitTimeSeconds=0', async () => {
       sqsMock.on(ReceiveMessageCommand).resolves({ Messages: [] })
 
       await service.receiveMessages(QUEUE_URL)
@@ -132,7 +136,7 @@ describe('SqsService', () => {
       })
     })
 
-    it('should forward opts overrides', async () => {
+    it('should allow opts to override defaults', async () => {
       sqsMock.on(ReceiveMessageCommand).resolves({ Messages: [] })
 
       await service.receiveMessages(QUEUE_URL, {
@@ -146,8 +150,37 @@ describe('SqsService', () => {
         WaitTimeSeconds: 20,
       })
     })
+
+    it('should not allow opts to override QueueUrl', async () => {
+      sqsMock.on(ReceiveMessageCommand).resolves({ Messages: [] })
+
+      // Even if opts somehow contained QueueUrl, the service's QueueUrl wins
+      await service.receiveMessages(QUEUE_URL, {
+        MaxNumberOfMessages: 3,
+      })
+
+      expect(sqsMock).toHaveReceivedCommandWith(ReceiveMessageCommand, {
+        QueueUrl: QUEUE_URL,
+      })
+    })
+
+    it('should accept MessageSystemAttributeNames (not deprecated AttributeNames)', async () => {
+      sqsMock.on(ReceiveMessageCommand).resolves({ Messages: [] })
+
+      await service.receiveMessages(QUEUE_URL, {
+        MessageSystemAttributeNames: ['All'],
+      })
+
+      expect(sqsMock).toHaveReceivedCommandWith(ReceiveMessageCommand, {
+        QueueUrl: QUEUE_URL,
+        MessageSystemAttributeNames: ['All'],
+      })
+    })
   })
 
+  // ---------------------------------------------------------------------------
+  // deleteMessage
+  // ---------------------------------------------------------------------------
   describe('deleteMessage', () => {
     it('should call DeleteMessageCommand and return output', async () => {
       sqsMock.on(DeleteMessageCommand).resolves({})
@@ -165,6 +198,9 @@ describe('SqsService', () => {
     })
   })
 
+  // ---------------------------------------------------------------------------
+  // deleteMessageBatch
+  // ---------------------------------------------------------------------------
   describe('deleteMessageBatch', () => {
     it('should call DeleteMessageBatchCommand and return output', async () => {
       sqsMock.on(DeleteMessageBatchCommand).resolves({

@@ -4,18 +4,17 @@ import { ConfigService } from '@nestjs/config'
 
 @Injectable()
 export class SqsClientFactory {
-  private clients = new Map<string, SQSClient>()
+  private client: SQSClient | undefined
 
   constructor(private readonly config: ConfigService) {}
 
-  getClient(queueUrl: string): SQSClient {
-    if (!this.clients.has(queueUrl)) {
-      const sqsClient = new SQSClient({
+  getClient(): SQSClient {
+    if (!this.client) {
+      this.client = new SQSClient({
         endpoint: this.config.get<string>('SQS_ENDPOINT'),
         region: this.config.get<string>('SQS_REGION'),
       })
-      this.clients.set(queueUrl, sqsClient)
     }
-    return this.clients.get(queueUrl)
+    return this.client
   }
 }
