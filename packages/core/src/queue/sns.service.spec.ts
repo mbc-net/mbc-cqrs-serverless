@@ -174,8 +174,8 @@ describe('SnsService', () => {
 
       await service.publish(mockSnsEvent, providedTopicArn)
 
-      expect(snsClientFactory.getClient).not.toHaveBeenCalledWith(
-        'arn:aws:sns:us-east-1:123456789012:default-topic',
+      expect(mockClient.send).toHaveBeenCalledWith(
+        expect.objectContaining({ TopicArn: providedTopicArn }),
       )
     })
   })
