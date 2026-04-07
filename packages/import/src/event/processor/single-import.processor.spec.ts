@@ -145,23 +145,22 @@ describe('SingleImportProcessor', () => {
         expect(mockCommandService.publishAsync).toHaveBeenCalled()
         expect(importService.updateStatus).toHaveBeenCalledWith(
           mockPayload.importKey,
-          ImportStatusEnum.PROCESSING,
+          ImportStatusEnum.COMPLETED,
           { result: { id: 'async-result' } },
         )
       })
 
       it('should map and publishPartialUpdateAsync when status is CHANGED', async () => {
-        mockStrategy.compare.mockResolvedValue({
-          status: ComparisonStatus.CHANGED,
-          existingData: {},
-        })
-        mockCommandService.publishPartialUpdateAsync.mockResolvedValue({
-          id: 'async-partial',
-        } as any)
+        mockStrategy.compare.mockResolvedValue({ status: ComparisonStatus.CHANGED, existingData: {} })
+        mockCommandService.publishPartialUpdateAsync.mockResolvedValue({ id: 'async-partial' } as any)
 
         await processor.process(mockPayload)
 
         expect(mockCommandService.publishPartialUpdateAsync).toHaveBeenCalled()
+        expect(importService.incrementParentJobCounters).toHaveBeenCalledWith(
+          { pk: mockParentPk, sk: mockParentSk },
+          true,
+        )
       })
     })
 
@@ -171,14 +170,22 @@ describe('SingleImportProcessor', () => {
       })
 
       it('should map and publishSync when status is NOT_EXIST', async () => {
-        mockStrategy.compare.mockResolvedValue({
-          status: ComparisonStatus.NOT_EXIST,
-        })
-
+        mockStrategy.compare.mockResolvedValue({ status: ComparisonStatus.NOT_EXIST })
+        
         await processor.process(mockPayload)
 
         expect(mockCommandService.publishSync).toHaveBeenCalled()
         expect(mockCommandService.publishAsync).not.toHaveBeenCalled()
+        
+        expect(importService.updateStatus).toHaveBeenCalledWith(
+          mockPayload.importKey,
+          ImportStatusEnum.COMPLETED,
+          expect.anything()
+        )
+        expect(importService.incrementParentJobCounters).toHaveBeenCalledWith(
+          { pk: mockParentPk, sk: mockParentSk },
+          true,
+        )
       })
     })
   })

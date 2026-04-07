@@ -317,7 +317,6 @@ export class CsvImportSfnEventHandler
       `Fetching ResultWriter manifest: s3://${details.Bucket}/${details.Key}`,
     )
 
-    // 1. Fetch and parse the tiny manifest file (Safe to do in memory)
     const manifestResponse = await this.s3Service.client.send(
       new GetObjectCommand({ Bucket: details.Bucket, Key: details.Key }),
     )
@@ -328,8 +327,15 @@ export class CsvImportSfnEventHandler
 
     const allBatchResults: CsvBatchProcessingSummary[] = []
 
-    // 2. Stream the massive result files
-    for (const file of manifest.ResultFiles?.SUCCEEDED || []) {
+    // ----------------------------------------------------------------
+    // THE FIX: Combine both SUCCEEDED and FAILED files from the manifest
+    // ----------------------------------------------------------------
+    const filesToProcess = [
+      ...(manifest.ResultFiles?.SUCCEEDED || []),
+      ...(manifest.ResultFiles?.FAILED || []),
+    ]
+
+    for (const file of filesToProcess) {
       this.logger.debug(`Streaming large result file: ${file.Key}`)
       const fileResponse = await this.s3Service.client.send(
         new GetObjectCommand({ Bucket: details.Bucket, Key: file.Key }),
@@ -340,13 +346,41 @@ export class CsvImportSfnEventHandler
 
       await new Promise<void>((resolve, reject) => {
         pipeline.on('data', (value: any) => {
-          // 'value' is the actual batch object from the SFN array
           if (value && value.Output) {
+            // Scenario A: A normal successful iteration
             try {
               allBatchResults.push(JSON.parse(value.Output))
             } catch (e) {
               this.logger.error(
                 'Failed to parse Step Functions Output string',
+                e,
+              )
+            }
+          } else if (value && value.Error) {
+            // Scenario B: A crashed Map state iteration (e.g., Lambda Timeout)
+            try {
+              let rowCount = 0
+              if (value.Input) {
+                // The Step Function logs the raw Input payload when an iteration fails.
+                // We parse it to find exactly how many items were in that doomed batch.
+                const inputObj =
+                  typeof value.Input === 'string'
+                    ? JSON.parse(value.Input)
+                    : value.Input
+                rowCount = inputObj?.Items?.length || 0
+              }
+              this.logger.warn(
+                `Found failed Map iteration with ${rowCount} rows. Error: ${value.Error}`,
+              )
+
+              allBatchResults.push({
+                totalRows: rowCount,
+                succeededRows: 0,
+                failedRows: rowCount, // Count all rows in this iteration as failed
+              })
+            } catch (e) {
+              this.logger.error(
+                'Failed to parse Step Functions Input string for failed iteration',
                 e,
               )
             }

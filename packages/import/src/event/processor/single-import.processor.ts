@@ -178,7 +178,7 @@ export class SingleImportProcessor {
 
     await this.importService.updateStatus(
       importKey,
-      ImportStatusEnum.PROCESSING,
+      ImportStatusEnum.COMPLETED,
       { result },
     )
   }

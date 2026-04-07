@@ -122,54 +122,54 @@ describe('CsvImportSfnEventHandler', () => {
   })
 
   describe('finalize_parent_job success flow (S3 ResultWriter)', () => {
-    it('should stream results from S3 and aggregate accurately without crashing memory', async () => {
+    it('should stream both SUCCEEDED and FAILED results from S3 and aggregate accurately', async () => {
       const mockEvent: CsvImportSfnEvent = {
-        context: {
-          State: { Name: 'finalize_parent_job' },
-          Execution: { Input: { sourceId: mockSourceId } },
-        },
+        context: { State: { Name: 'finalize_parent_job' }, Execution: { Input: { sourceId: mockSourceId } } },
         input: {
           mapOutput: {
-            ResultWriterDetails: {
-              Bucket: 'res-bucket',
-              Key: 'import-results/123/manifest.json',
-            },
+            ResultWriterDetails: { Bucket: 'res-bucket', Key: 'import-results/123/manifest.json' },
           },
         },
       } as any
 
+      // THE FIX: Mock manifest to include a FAILED file
       const manifestContent = JSON.stringify({
-        ResultFiles: {
+        ResultFiles: { 
           SUCCEEDED: [{ Key: 'import-results/123/SUCCEEDED_0.json' }],
+          FAILED: [{ Key: 'import-results/123/FAILED_0.json' }]
         },
       })
-
-      const resultFileContent = JSON.stringify([
-        { Output: '{"totalRows":100,"succeededRows":100,"failedRows":0}' },
-        { Output: '{"totalRows":50,"succeededRows":48,"failedRows":2}' },
+      
+      const successFileContent = JSON.stringify([
+        { Output: "{\"totalRows\":100,\"succeededRows\":100,\"failedRows\":0}" },
+        { Output: "{\"totalRows\":50,\"succeededRows\":48,\"failedRows\":2}" }
       ])
 
-      // SAFE MOCKING: Use jest.spyOn so we don't break the proxy wrapper
-      jest
-        .spyOn(s3Service.client, 'send')
-        .mockResolvedValueOnce({
-          Body: makeStringStream(manifestContent),
-        } as never)
-        .mockResolvedValueOnce({
-          Body: makeStringStream(resultFileContent),
-        } as never)
+      // THE FIX: Mock what Step Functions outputs when a Map iteration crashes
+      const failedFileContent = JSON.stringify([
+        { 
+          Error: "States.Timeout", 
+          Cause: "Lambda timed out", 
+          Input: "{\"Items\":[1, 2, 3, 4, 5]}" // 5 rows lost in this crash
+        }
+      ])
+
+      jest.spyOn(s3Service.client, 'send')
+        .mockResolvedValueOnce({ Body: makeStringStream(manifestContent) } as never)
+        .mockResolvedValueOnce({ Body: makeStringStream(successFileContent) } as never)
+        .mockResolvedValueOnce({ Body: makeStringStream(failedFileContent) } as never) // Add 3rd mock response
 
       await handler.execute(mockEvent)
 
+      // Expected calculation: 
+      // Total rows: 100 + 50 + 5 (from crash) = 155
+      // Succeeded: 100 + 48 + 0 = 148
+      // Failed: 0 + 2 + 5 (from crash) = 7
       expect(importService.updateStatus).toHaveBeenCalledWith(
         expect.any(Object),
-        ImportStatusEnum.FAILED, // Status is FAILED because failedRows (2) > 0
+        ImportStatusEnum.FAILED, 
         expect.objectContaining({
-          result: expect.objectContaining({
-            total: 150,
-            succeeded: 148,
-            failed: 2,
-          }),
+          result: expect.objectContaining({ total: 155, succeeded: 148, failed: 7 }),
         }),
       )
     })
