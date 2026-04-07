@@ -3,6 +3,7 @@ import { Upload } from '@aws-sdk/lib-storage'
 import {
   EventHandler,
   IEventHandler,
+  KEY_SEPARATOR,
   S3Service,
   StepFunctionService,
 } from '@mbc-cqrs-serverless/core'
@@ -36,9 +37,22 @@ export class ZipImportQueueEventHandler
   }
 
   async execute(event: ImportQueueEvent): Promise<any> {
-    const importEntity = event.importEvent.importEntity
+    if (event.isCsvBatch) {
+      this.logger.debug(
+        'Skipping batch processing payload in ZipImportQueueEventHandler',
+      )
+      return
+    }
 
-    if (!importEntity.pk.startsWith(ZIP_IMPORT_PK_PREFIX)) {
+    const importEntity = event.importEvent?.importEntity
+    if (!importEntity) return
+
+    if (
+      !importEntity.id.startsWith(`${ZIP_IMPORT_PK_PREFIX}${KEY_SEPARATOR}`)
+    ) {
+      this.logger.debug(
+        `Skipping other type import job in zip queue handler: ${importEntity.id}`,
+      )
       return
     }
 

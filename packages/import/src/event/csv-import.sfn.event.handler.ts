@@ -1,34 +1,37 @@
 import { GetObjectCommand } from '@aws-sdk/client-s3'
 import {
-  CommandInputModel,
-  CommandPartialInputModel,
   EventHandler,
-  extractInvokeContext,
-  ICommandOptions,
   IEventHandler,
   S3Service,
+  SqsService,
 } from '@mbc-cqrs-serverless/core'
 import { Inject, Logger } from '@nestjs/common'
 import { ConfigService } from '@nestjs/config'
+import { Buffer } from 'buffer'
+import { randomUUID } from 'crypto'
 import csv from 'csv-parser'
+import * as JSONStream from 'JSONStream'
 import { Readable } from 'stream'
 
-import { ImportPublishMode } from '../constant/import-publish'
+import {
+  ACTION_CSV_BATCH_PROCESS,
+  SQS_MAX_BATCH_SIZE,
+  SQS_PAYLOAD_ENVELOPE_BYTES,
+  SQS_SAFE_BODY_BYTES,
+  SqsBatchPayload,
+} from '../constant/sqs.constant'
 import { CreateCsvImportDto } from '../dto/create-csv-import.dto'
 import { ICsvRowImport } from '../dto/csv-import-row.interface'
-import { ComparisonStatus, ImportStatusEnum } from '../enum'
+import { ImportStatusEnum } from '../enum'
 import { parseId } from '../helpers'
-import {
-  IMPORT_STRATEGY_MAP,
-  PROCESS_STRATEGY_MAP,
-  PUBLISH_MODE_MAP,
-} from '../import.module-definition'
+import { IMPORT_STRATEGY_MAP } from '../import.module-definition'
 import { ImportService } from '../import.service'
-import { IImportStrategy, IProcessStrategy } from '../interface'
+import { IImportStrategy } from '../interface'
 import {
   CsvBatchProcessingSummary,
   CsvFinalizeParentJobInput,
   CsvImportSfnEvent,
+  SfnResultWriterDetails,
 } from './csv-import.sfn.event'
 
 @EventHandler(CsvImportSfnEvent)
@@ -36,7 +39,6 @@ export class CsvImportSfnEventHandler
   implements IEventHandler<CsvImportSfnEvent>
 {
   private readonly logger: Logger = new Logger(CsvImportSfnEventHandler.name)
-  private readonly alarmTopicArn: string
 
   constructor(
     private readonly importService: ImportService,
@@ -44,16 +46,8 @@ export class CsvImportSfnEventHandler
     private readonly importStrategyMap: Map<string, IImportStrategy<any, any>>,
     private readonly configService: ConfigService,
     private readonly s3Service: S3Service,
-    @Inject(PROCESS_STRATEGY_MAP)
-    private readonly processStrategyMap: Map<
-      string,
-      IProcessStrategy<any, any>
-    >,
-    @Inject(PUBLISH_MODE_MAP)
-    private readonly publishModeMap: Map<string, ImportPublishMode>,
-  ) {
-    this.alarmTopicArn = this.configService.get<string>('SNS_ALARM_TOPIC_ARN')
-  }
+    private readonly sqsService: SqsService,
+  ) {}
 
   async execute(event: CsvImportSfnEvent): Promise<any> {
     try {
@@ -65,19 +59,11 @@ export class CsvImportSfnEventHandler
   }
 
   async handleStepState(event: CsvImportSfnEvent): Promise<any> {
-    this.logger.debug('Processing event:::', JSON.stringify(event, null, 2))
     if (event.context.State.Name === 'csv_loader') {
       const input = event.input as CreateCsvImportDto
-
-      // 1. Get the parent job's key from the sourceId
       const parentKey = parseId(input.sourceId)
-
-      // 2. Count the total rows in the CSV
-      this.logger.debug(`Counting rows for file: ${input.key}`)
       const totalRows = await this.countCsvRows(input)
-      this.logger.debug(`Found ${totalRows} rows. Updating parent job.`)
 
-      // 3. Update the parent job with the total count
       const updatedEntity = await this.importService.updateImportJob(
         parentKey,
         {
@@ -86,20 +72,13 @@ export class CsvImportSfnEventHandler
       )
 
       if (updatedEntity.processedRows >= totalRows) {
-        this.logger.debug(
-          `Job ${input.sourceId} already finished. Setting final status.`,
-        )
-        // Set status to FAILED if any child job failed, otherwise COMPLETED
-        // 子ジョブが1つでも失敗していればFAILED、そうでなければCOMPLETED
         const finalStatus =
           updatedEntity.failedRows > 0
             ? ImportStatusEnum.FAILED
             : ImportStatusEnum.COMPLETED
-
         await this.importService.updateStatus(parentKey, finalStatus)
       }
 
-      // 4. Proceed to load the first batch of rows as before
       return this.loadCsv(input)
     }
 
@@ -110,95 +89,120 @@ export class CsvImportSfnEventHandler
       )
     }
 
+    // --- ROW PARSER & SQS PACKER ---
     const input = event.input as ICsvRowImport
     const items = input.Items
     const attributes = input.BatchInput.Attributes
 
-    const importStrategy = this.importStrategyMap.get(attributes.tableName)
-    const processStrategy = this.processStrategyMap.get(attributes.tableName)
-    const publishMode =
-      this.publishModeMap.get(attributes.tableName) ?? ImportPublishMode.ASYNC
-
-    if (!importStrategy || !processStrategy) {
-      throw new Error(`Strategies not found for table: ${attributes.tableName}`)
-    }
+    const strategy = this.importStrategyMap.get(attributes.tableName)
+    if (!strategy)
+      throw new Error(
+        `No import strategy found for table: ${attributes.tableName}`,
+      )
 
     let succeededRows = 0
     let failedRows = 0
 
-    // CommandService publish* requires ICommandOptions.invokeContext; extract from this Lambda invocation.
-    const invokeContext = extractInvokeContext()
-    const options: ICommandOptions = {
-      invokeContext,
-      source: 'CSV_BATCH_PROCESSOR',
-    }
-    const commandService = processStrategy.getCommandService()
+    let currentChunk: any[] = []
+    let currentBytes = 2
+    const sqsBatchEntries: any[] = []
+    const messageItemCounts = new Map<string, number>()
 
-    // Rows run sequentially; SYNC awaits publishSync per row (see ImportPublishMode).
+    const packChunkToEntry = () => {
+      if (currentChunk.length === 0) return
+
+      const payload: SqsBatchPayload = {
+        action: ACTION_CSV_BATCH_PROCESS,
+        tableName: attributes.tableName,
+        tenantCode: attributes.tenantCode,
+        sourceId: attributes.sourceId,
+        s3Key: attributes.key,
+        items: currentChunk,
+      }
+
+      const messageId = randomUUID().replace(/-/g, '')
+      sqsBatchEntries.push({
+        Id: messageId,
+        MessageBody: JSON.stringify(payload),
+      })
+      messageItemCounts.set(messageId, currentChunk.length)
+
+      currentChunk = []
+      currentBytes = 2
+    }
+
+    const sendBatchToSqs = async () => {
+      if (sqsBatchEntries.length === 0) return
+
+      const queueUrl = this.configService.get<string>('IMPORT_QUEUE_URL')
+      if (!queueUrl) throw new Error('IMPORT_QUEUE_URL is not configured.')
+
+      while (sqsBatchEntries.length > 0) {
+        const batch = sqsBatchEntries.splice(0, SQS_MAX_BATCH_SIZE)
+        const result = await this.sqsService.sendMessageBatch(queueUrl, batch)
+
+        for (const success of result.Successful || []) {
+          if (success.Id) {
+            succeededRows += messageItemCounts.get(success.Id) || 0
+            messageItemCounts.delete(success.Id)
+          }
+        }
+
+        for (const failure of result.Failed || []) {
+          if (failure.Id) {
+            const lostRowCount = messageItemCounts.get(failure.Id) || 0
+            failedRows += lostRowCount
+            this.logger.error(
+              `SQS send failed for message ${failure.Id}. Lost ${lostRowCount} rows. Reason: ${failure.Message}`,
+            )
+            messageItemCounts.delete(failure.Id)
+          }
+        }
+      }
+    }
+
     for (const [index, item] of items.entries()) {
       try {
-        // 1. Transform & Validate
-        const transformedData = await importStrategy.transform(item)
-        await importStrategy.validate(transformedData)
+        const transformedData = await strategy.transform(item)
+        await strategy.validate(transformedData)
 
-        // 2. Compare against existing data
-        const compareResult = await processStrategy.compare(
-          { ...transformedData, __s3Key: input.BatchInput.Attributes.key },
-          attributes.tenantCode,
-        )
+        const serialized = JSON.stringify(transformedData)
+        const itemBytes = Buffer.byteLength(serialized, 'utf8')
+        const separatorBytes = currentChunk.length > 0 ? 1 : 0
 
-        if (compareResult.status === ComparisonStatus.EQUAL) {
-          succeededRows++
-          continue // Skip identical data
+        if (itemBytes > SQS_SAFE_BODY_BYTES - SQS_PAYLOAD_ENVELOPE_BYTES) {
+          this.logger.warn(
+            `Row ${index + 1} exceeds SQS limits (${itemBytes} bytes). Skipping.`,
+          )
+          failedRows++
+          continue
         }
 
-        // 3. Map to Command Input
-        const mappedData = await processStrategy.map(
-          compareResult.status,
-          { ...transformedData, __s3Key: input.BatchInput.Attributes.key },
-          attributes.tenantCode,
-          compareResult.existingData,
-        )
-
-        // 4. Publish to CommandService
-        if (compareResult.status === ComparisonStatus.NOT_EXIST) {
-          if (publishMode === ImportPublishMode.SYNC) {
-            await commandService.publishSync(
-              mappedData as CommandInputModel,
-              options,
-            )
-          } else {
-            await commandService.publishAsync(
-              mappedData as CommandInputModel,
-              options,
-            )
-          }
-        } else {
-          if (publishMode === ImportPublishMode.SYNC) {
-            await commandService.publishPartialUpdateSync(
-              mappedData as CommandPartialInputModel,
-              options,
-            )
-          } else {
-            await commandService.publishPartialUpdateAsync(
-              mappedData as CommandPartialInputModel,
-              options,
-            )
-          }
+        if (
+          currentBytes +
+            separatorBytes +
+            itemBytes +
+            SQS_PAYLOAD_ENVELOPE_BYTES >
+          SQS_SAFE_BODY_BYTES
+        ) {
+          packChunkToEntry()
+          await sendBatchToSqs()
         }
 
-        succeededRows++
+        currentChunk.push(transformedData)
+        currentBytes += separatorBytes + itemBytes
       } catch (error) {
-        this.logger.warn(`Row ${index + 1} failed processing.`, {
+        this.logger.warn(`Row ${index + 1} failed transform/validate.`, {
           item,
-          errorMessage: (error as Error).message,
-          stack: (error as Error).stack,
+          error: (error as Error).message,
         })
         failedRows++
       }
     }
 
-    // Return the summary for Step Functions aggregation
+    packChunkToEntry()
+    await sendBatchToSqs()
+
     return {
       totalRows: items.length,
       succeededRows,
@@ -206,6 +210,8 @@ export class CsvImportSfnEventHandler
     }
   }
 
+  // Helper Methods
+  // ----------------------------------------------------------------
   private async loadCsv(
     input: CreateCsvImportDto,
     limit = 10,
@@ -293,24 +299,99 @@ export class CsvImportSfnEventHandler
     })
   }
 
-  /**
-   * Normalizes Step Functions payloads: Map merges `processingResults`, or
-   * legacy shape stores the batch array at index 0.
-   */
-  private resolveFinalizeProcessingResults(
-    input: CsvFinalizeParentJobInput,
-  ): readonly CsvBatchProcessingSummary[] {
-    if (this.isCsvFinalizeNestedBatchArray(input)) {
-      const first = input[0]
-      return Array.isArray(first) ? first : []
-    }
-    return input.processingResults ?? []
+  // Helper to safely read an S3 Stream into a JSON string
+  private async streamToString(stream: Readable): Promise<string> {
+    return new Promise((resolve, reject) => {
+      const chunks: any[] = []
+      stream.on('data', (chunk) => chunks.push(chunk))
+      stream.on('error', reject)
+      stream.on('end', () => resolve(Buffer.concat(chunks).toString('utf8')))
+    })
   }
 
-  private isCsvFinalizeNestedBatchArray(
-    input: CsvFinalizeParentJobInput,
-  ): input is readonly CsvBatchProcessingSummary[][] {
-    return Array.isArray(input)
+  // Helper to fetch and parse S3 ResultWriter files
+  private async getResultsFromS3Writer(
+    details: SfnResultWriterDetails,
+  ): Promise<CsvBatchProcessingSummary[]> {
+    this.logger.debug(
+      `Fetching ResultWriter manifest: s3://${details.Bucket}/${details.Key}`,
+    )
+
+    const manifestResponse = await this.s3Service.client.send(
+      new GetObjectCommand({ Bucket: details.Bucket, Key: details.Key }),
+    )
+    const manifestStr = await this.streamToString(
+      manifestResponse.Body as Readable,
+    )
+    const manifest = JSON.parse(manifestStr)
+
+    const allBatchResults: CsvBatchProcessingSummary[] = []
+
+    // ----------------------------------------------------------------
+    // THE FIX: Combine both SUCCEEDED and FAILED files from the manifest
+    // ----------------------------------------------------------------
+    const filesToProcess = [
+      ...(manifest.ResultFiles?.SUCCEEDED || []),
+      ...(manifest.ResultFiles?.FAILED || []),
+    ]
+
+    for (const file of filesToProcess) {
+      this.logger.debug(`Streaming large result file: ${file.Key}`)
+      const fileResponse = await this.s3Service.client.send(
+        new GetObjectCommand({ Bucket: details.Bucket, Key: file.Key }),
+      )
+
+      const readStream = fileResponse.Body as Readable
+      const pipeline = readStream.pipe(JSONStream.parse('*'))
+
+      await new Promise<void>((resolve, reject) => {
+        pipeline.on('data', (value: any) => {
+          if (value && value.Output) {
+            // Scenario A: A normal successful iteration
+            try {
+              allBatchResults.push(JSON.parse(value.Output))
+            } catch (e) {
+              this.logger.error(
+                'Failed to parse Step Functions Output string',
+                e,
+              )
+            }
+          } else if (value && value.Error) {
+            // Scenario B: A crashed Map state iteration (e.g., Lambda Timeout)
+            try {
+              let rowCount = 0
+              if (value.Input) {
+                // The Step Function logs the raw Input payload when an iteration fails.
+                // We parse it to find exactly how many items were in that doomed batch.
+                const inputObj =
+                  typeof value.Input === 'string'
+                    ? JSON.parse(value.Input)
+                    : value.Input
+                rowCount = inputObj?.Items?.length || 0
+              }
+              this.logger.warn(
+                `Found failed Map iteration with ${rowCount} rows. Error: ${value.Error}`,
+              )
+
+              allBatchResults.push({
+                totalRows: rowCount,
+                succeededRows: 0,
+                failedRows: rowCount, // Count all rows in this iteration as failed
+              })
+            } catch (e) {
+              this.logger.error(
+                'Failed to parse Step Functions Input string for failed iteration',
+                e,
+              )
+            }
+          }
+        })
+        pipeline.on('end', () => resolve())
+        pipeline.on('error', (error: Error) => reject(error))
+      })
+    }
+
+    return allBatchResults
   }
 
   private async finalizeParentJob(
@@ -318,21 +399,79 @@ export class CsvImportSfnEventHandler
     sourceId: string,
   ): Promise<void> {
     const parentKey = parseId(sourceId)
-    const results = this.resolveFinalizeProcessingResults(input)
 
-    if (results.length === 0) {
-      this.logger.warn(
-        `No batch results found for parent job ${sourceId}. Marking as FAILED.`,
+    // ----------------------------------------------------------------
+    // FAIL-SAFE: Handle any Step Function Map State crashes
+    // ----------------------------------------------------------------
+    if (input.errorOutput) {
+      const errorName = input.errorOutput.Error || 'UnknownError'
+      const cause = input.errorOutput.Cause || 'No cause provided by AWS.'
+
+      // Scenario A: The known "Empty CSV" edge case (Mark as COMPLETED)
+      if (
+        errorName === 'States.ItemReaderFailed' &&
+        cause.includes('only CSV headers')
+      ) {
+        this.logger.log(
+          `CSV file for ${parentKey.pk}#${parentKey.sk} contained only headers.`,
+        )
+        await this.importService.updateStatus(
+          parentKey,
+          ImportStatusEnum.COMPLETED,
+          {
+            result: {
+              message: 'CSV file contains only headers. No data to process.',
+              total: 0,
+              succeeded: 0,
+              failed: 0,
+            },
+          },
+        )
+        return
+      }
+
+      // Scenario B: Any other unexpected infrastructure/Step Function error (Mark as FAILED)
+      this.logger.error(
+        `Map state failed for ${parentKey.pk}#${parentKey.sk}. Error: ${errorName}`,
       )
-      await this.importService.updateStatus(parentKey, ImportStatusEnum.FAILED, {
-        result: { message: 'No batch processing results received.' },
-      })
+
+      await this.importService.updateStatus(
+        parentKey,
+        ImportStatusEnum.FAILED,
+        {
+          error: {
+            message: `Step Function execution failed: ${errorName}`,
+            stack: cause,
+          },
+        },
+      )
+
+      // Because we used updateStatus(), your framework will automatically trigger the
+      // DynamoDB stream -> ImportQueueEventHandler -> SingleImportProcessor logic,
+      // which safely increments the ZIP parent job's 'failed' counter!
       return
     }
 
-    // Sum up the output of all Map / Lambda batches
+    // ----------------------------------------------------------------
+    // NORMAL SUCCESSFUL FLOW (No errors)
+    // ----------------------------------------------------------------
+    let results: CsvBatchProcessingSummary[] = []
+
+    if (input.mapOutput?.ResultWriterDetails) {
+      results = await this.getResultsFromS3Writer(
+        input.mapOutput.ResultWriterDetails,
+      )
+    } else if (input.processingResults) {
+      const rawResults = input.processingResults
+      results = Array.isArray(rawResults)
+        ? Array.isArray(rawResults[0])
+          ? rawResults[0]
+          : rawResults
+        : []
+    }
+
     const finalSummary = results.reduce(
-      (acc, batch: CsvBatchProcessingSummary) => {
+      (acc, batch) => {
         acc.totalRows += batch.totalRows
         acc.succeededRows += batch.succeededRows
         acc.failedRows += batch.failedRows
@@ -341,19 +480,19 @@ export class CsvImportSfnEventHandler
       { totalRows: 0, succeededRows: 0, failedRows: 0 },
     )
 
-    this.logger.log(
-      `Finalizing parent CSV job ${parentKey.pk}#${parentKey.sk}`,
-      finalSummary,
-    )
+    let finalStatus = ImportStatusEnum.COMPLETED
+    let finalMessage = 'All items successfully transformed and queued to SQS.'
 
-    const finalStatus =
-      finalSummary.failedRows > 0
-        ? ImportStatusEnum.FAILED
-        : ImportStatusEnum.COMPLETED
+    if (results.length === 0) {
+      finalStatus = ImportStatusEnum.FAILED
+      finalMessage = 'No batch processing results received.'
+    } else if (finalSummary.failedRows > 0) {
+      finalStatus = ImportStatusEnum.FAILED
+    }
 
     await this.importService.updateStatus(parentKey, finalStatus, {
       result: {
-        message: 'All batches have been processed.',
+        message: finalMessage,
         total: finalSummary.totalRows,
         succeeded: finalSummary.succeededRows,
         failed: finalSummary.failedRows,
