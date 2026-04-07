@@ -19,15 +19,6 @@ export interface CsvFinalizeParentJobMapOutput {
   readonly processingResults?: readonly CsvBatchProcessingSummary[]
 }
 
-/**
- * Payload for the `finalize_parent_job` state after Distributed Map.
- * Primary shape: Map `resultPath: '$.processingResults'` (see infra stack).
- * Alternate: array whose first element is the batch summaries array.
- */
-export type CsvFinalizeParentJobInput =
-  | CsvFinalizeParentJobMapOutput
-  | readonly CsvBatchProcessingSummary[][]
-
 export class CsvImportSfnEvent implements IEvent {
   source: string
   context: StepFunctionsContext
@@ -37,6 +28,29 @@ export class CsvImportSfnEvent implements IEvent {
     Object.assign(this, event)
     this.source = event.context.Execution.Id
   }
+}
+
+export interface SfnResultWriterDetails {
+  Bucket: string
+  Key: string // This is the prefix path, e.g., 'sfn-results/import-csv/map-run-id/'
+}
+
+export interface SfnErrorOutput {
+  Error: string
+  Cause: string
+}
+
+export interface CsvFinalizeParentJobInput {
+  sourceId: string
+  mapOutput?: {
+    MapRunArn: string
+    ResultWriterDetails?: SfnResultWriterDetails
+  }
+  // Fallback for local serverless-offline (since it doesn't support ResultWriter)
+  processingResults?: CsvBatchProcessingSummary[]
+
+  // Present if the Map state crashed and was caught by States.ALL
+  errorOutput?: SfnErrorOutput
 }
 
 // {

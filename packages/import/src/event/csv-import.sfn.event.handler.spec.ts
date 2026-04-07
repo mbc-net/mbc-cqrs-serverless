@@ -1,78 +1,64 @@
-/**
- * CsvImportSfnEventHandler Unit Tests
- */
-import { Test, TestingModule } from '@nestjs/testing'
 import { createMock } from '@golevelup/ts-jest'
-import { S3Service } from '@mbc-cqrs-serverless/core'
+import { S3Service, SqsService } from '@mbc-cqrs-serverless/core'
 import { ConfigService } from '@nestjs/config'
+import { Test, TestingModule } from '@nestjs/testing'
+import { Buffer } from 'buffer'
 import { Readable } from 'stream'
 
-import { CsvImportSfnEventHandler } from './csv-import.sfn.event.handler'
-import { ImportService } from '../import.service'
-import { CsvImportSfnEvent } from './csv-import.sfn.event'
 import { ImportStatusEnum } from '../enum'
-import {
-  IMPORT_STRATEGY_MAP,
-  PROCESS_STRATEGY_MAP,
-  PUBLISH_MODE_MAP,
-} from '../import.module-definition'
-import { IImportStrategy, IProcessStrategy } from '../interface'
+import { IMPORT_STRATEGY_MAP } from '../import.module-definition'
+import { ImportService } from '../import.service'
+import { IImportStrategy } from '../interface'
+import { CsvImportSfnEvent } from './csv-import.sfn.event'
+import { CsvImportSfnEventHandler } from './csv-import.sfn.event.handler'
 
-/**
- * Helper: creates a Readable stream simulating CSV content
- */
-function makeCsvStream(rows: string[]): Readable {
-  const header = 'col1,col2'
-  const content = [header, ...rows].join('\n')
-  return Readable.from([content])
+// Helper: creates a Readable stream simulating S3 Buffer content (Required for Buffer.concat)
+function makeStringStream(content: string): Readable {
+  return Readable.from([Buffer.from(content, 'utf-8')])
 }
 
 describe('CsvImportSfnEventHandler', () => {
   let handler: CsvImportSfnEventHandler
   let importService: jest.Mocked<ImportService>
   let s3Service: jest.Mocked<S3Service>
+  let sqsService: jest.Mocked<SqsService>
+  let mockStrategy: jest.Mocked<IImportStrategy<any, any>>
 
   const mockTenantCode = 'tenant001'
   const mockSourceId = `CSV_IMPORT#${mockTenantCode}#building#01PARENT123`
-  const mockBucket = 'test-bucket'
-  const mockKey = 'test.csv'
 
   beforeEach(async () => {
+    mockStrategy = {
+      transform: jest.fn().mockImplementation((item) => Promise.resolve(item)),
+      validate: jest.fn().mockResolvedValue(undefined),
+    } as any
+
+    const strategyMap = new Map<string, IImportStrategy<any, any>>()
+    strategyMap.set('building', mockStrategy)
+
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         CsvImportSfnEventHandler,
-        {
-          provide: ImportService,
-          useValue: createMock<ImportService>(),
-        },
-        {
-          provide: IMPORT_STRATEGY_MAP,
-          useValue: new Map<string, IImportStrategy<any, any>>(),
-        },
-        {
-          provide: PROCESS_STRATEGY_MAP,
-          useValue: new Map<string, IProcessStrategy<any, any>>(),
-        },
-        {
-          provide: PUBLISH_MODE_MAP,
-          useValue: new Map(),
-        },
+        { provide: ImportService, useValue: createMock<ImportService>() },
+        { provide: IMPORT_STRATEGY_MAP, useValue: strategyMap },
         {
           provide: ConfigService,
           useValue: {
-            get: jest.fn().mockReturnValue('arn:aws:sns:test'),
+            get: jest.fn((key: string) => {
+              if (key === 'IMPORT_QUEUE_URL') return 'https://sqs.test'
+              return 'arn:aws:sns:test'
+            }),
           },
         },
-        {
-          provide: S3Service,
-          useValue: createMock<S3Service>(),
-        },
+        { provide: S3Service, useValue: createMock<S3Service>() },
+        { provide: SqsService, useValue: createMock<SqsService>() },
       ],
     }).compile()
 
     handler = module.get<CsvImportSfnEventHandler>(CsvImportSfnEventHandler)
     importService = module.get(ImportService) as jest.Mocked<ImportService>
     s3Service = module.get(S3Service) as jest.Mocked<S3Service>
+    sqsService = module.get(SqsService) as jest.Mocked<SqsService>
 
     jest.clearAllMocks()
   })
@@ -81,200 +67,189 @@ describe('CsvImportSfnEventHandler', () => {
     expect(handler).toBeDefined()
   })
 
-  describe('finalize_parent_job status determination', () => {
-    it('should aggregate batch results and set COMPLETED status', async () => {
-      // Arrange
+  describe('finalize_parent_job fail-safes (States.ALL)', () => {
+    it('should handle Empty CSV headers error gracefully (Mark COMPLETED)', async () => {
       const mockEvent: CsvImportSfnEvent = {
         context: {
           State: { Name: 'finalize_parent_job' },
-          Execution: {
-            Input: { sourceId: mockSourceId },
-          },
+          Execution: { Input: { sourceId: mockSourceId } },
         },
-        // Simulate output from Distributed Map
         input: {
-          processingResults: [
-            {
-              totalRows: 1000,
-              succeededRows: 1000,
-              failedRows: 0,
-            },
-            {
-              totalRows: 500,
-              succeededRows: 500,
-              failedRows: 0,
-            },
-          ],
-        },
-      } as any
-
-      importService.updateStatus.mockResolvedValue(undefined)
-
-      // Act
-      await handler.execute(mockEvent)
-
-      // Assert
-      expect(importService.updateStatus).toHaveBeenCalledWith(
-        { pk: `CSV_IMPORT#${mockTenantCode}`, sk: 'building#01PARENT123' },
-        ImportStatusEnum.COMPLETED,
-        expect.objectContaining({
-          result: expect.objectContaining({
-            total: 1500,
-            succeeded: 1500,
-            failed: 0,
-          }),
-        }),
-      )
-    })
-
-    it('should aggregate batch results and set FAILED status if any row failed', async () => {
-      // Arrange
-      const mockEvent: CsvImportSfnEvent = {
-        context: {
-          State: { Name: 'finalize_parent_job' },
-          Execution: {
-            Input: { sourceId: mockSourceId },
+          errorOutput: {
+            Error: 'States.ItemReaderFailed',
+            Cause: 'Input data cannot be only CSV headers',
           },
         },
-        // Simulate output from Distributed Map with failures
-        input: {
-          processingResults: [
-            {
-              totalRows: 1000,
-              succeededRows: 998,
-              failedRows: 2,
-            },
-            {
-              totalRows: 500,
-              succeededRows: 500,
-              failedRows: 0,
-            },
-          ],
-        },
       } as any
 
-      importService.updateStatus.mockResolvedValue(undefined)
-
-      // Act
       await handler.execute(mockEvent)
 
-      // Assert
-      expect(importService.updateStatus).toHaveBeenCalledWith(
-        { pk: `CSV_IMPORT#${mockTenantCode}`, sk: 'building#01PARENT123' },
-        ImportStatusEnum.FAILED, // Status should be FAILED because failedRows > 0
-        expect.objectContaining({
-          result: expect.objectContaining({
-            total: 1500,
-            succeeded: 1498,
-            failed: 2,
-          }),
-        }),
-      )
-    })
-
-    it('should handle alternative local mock payload shape (nested array)', async () => {
-      // Arrange - local mock wraps the output in an array
-      const mockEvent: CsvImportSfnEvent = {
-        context: {
-          State: { Name: 'finalize_parent_job' },
-          Execution: {
-            Input: { sourceId: mockSourceId },
-          },
-        },
-        input: [
-          [
-            {
-              totalRows: 10,
-              succeededRows: 10,
-              failedRows: 0,
-            },
-          ],
-        ],
-      } as any
-
-      importService.updateStatus.mockResolvedValue(undefined)
-
-      // Act
-      await handler.execute(mockEvent)
-
-      // Assert
       expect(importService.updateStatus).toHaveBeenCalledWith(
         expect.any(Object),
         ImportStatusEnum.COMPLETED,
         expect.objectContaining({
           result: expect.objectContaining({
-            total: 10,
+            message: expect.stringContaining('contains only headers'),
+            total: 0,
           }),
         }),
       )
     })
 
-    it('should mark FAILED when processingResults is empty', async () => {
+    it('should handle general Map State crashes and abort gracefully (Mark FAILED)', async () => {
       const mockEvent: CsvImportSfnEvent = {
         context: {
           State: { Name: 'finalize_parent_job' },
-          Execution: {
-            Input: { sourceId: mockSourceId },
-          },
+          Execution: { Input: { sourceId: mockSourceId } },
         },
-        input: { processingResults: [] },
+        input: {
+          errorOutput: { Error: 'States.TaskFailed', Cause: 'Lambda timeout' },
+        },
       } as any
-
-      importService.updateStatus.mockResolvedValue(undefined)
 
       await handler.execute(mockEvent)
 
       expect(importService.updateStatus).toHaveBeenCalledWith(
-        { pk: `CSV_IMPORT#${mockTenantCode}`, sk: 'building#01PARENT123' },
+        expect.any(Object),
         ImportStatusEnum.FAILED,
-        {
-          result: { message: 'No batch processing results received.' },
-        },
+        expect.objectContaining({
+          error: expect.objectContaining({
+            message: expect.stringContaining('States.TaskFailed'),
+          }),
+        }),
       )
     })
   })
 
-  describe('csv_loader state', () => {
-    it('should count rows and load first batch', async () => {
-      // Arrange
+  describe('finalize_parent_job success flow (S3 ResultWriter)', () => {
+    it('should stream both SUCCEEDED and FAILED results from S3 and aggregate accurately', async () => {
       const mockEvent: CsvImportSfnEvent = {
-        context: {
-          State: { Name: 'csv_loader' },
-        },
+        context: { State: { Name: 'finalize_parent_job' }, Execution: { Input: { sourceId: mockSourceId } } },
         input: {
-          sourceId: mockSourceId,
-          bucket: mockBucket,
-          key: mockKey,
-          tenantCode: mockTenantCode,
-          tableName: 'building',
+          mapOutput: {
+            ResultWriterDetails: { Bucket: 'res-bucket', Key: 'import-results/123/manifest.json' },
+          },
         },
       } as any
 
-      // S3 streams for countCsvRows and loadCsv
-      s3Service.client.send = jest
-        .fn()
-        .mockResolvedValueOnce({
-          Body: makeCsvStream(['r1,v1', 'r2,v2', 'r3,v3']),
-        })
-        .mockResolvedValueOnce({
-          Body: makeCsvStream(['r1,v1', 'r2,v2', 'r3,v3']),
-        })
+      // THE FIX: Mock manifest to include a FAILED file
+      const manifestContent = JSON.stringify({
+        ResultFiles: { 
+          SUCCEEDED: [{ Key: 'import-results/123/SUCCEEDED_0.json' }],
+          FAILED: [{ Key: 'import-results/123/FAILED_0.json' }]
+        },
+      })
+      
+      const successFileContent = JSON.stringify([
+        { Output: "{\"totalRows\":100,\"succeededRows\":100,\"failedRows\":0}" },
+        { Output: "{\"totalRows\":50,\"succeededRows\":48,\"failedRows\":2}" }
+      ])
 
-      importService.updateImportJob.mockResolvedValue({
-        processedRows: 0,
-        failedRows: 0,
-        succeededRows: 0,
-        totalRows: 3,
-      } as any)
+      // THE FIX: Mock what Step Functions outputs when a Map iteration crashes
+      const failedFileContent = JSON.stringify([
+        { 
+          Error: "States.Timeout", 
+          Cause: "Lambda timed out", 
+          Input: "{\"Items\":[1, 2, 3, 4, 5]}" // 5 rows lost in this crash
+        }
+      ])
 
-      // Act
+      jest.spyOn(s3Service.client, 'send')
+        .mockResolvedValueOnce({ Body: makeStringStream(manifestContent) } as never)
+        .mockResolvedValueOnce({ Body: makeStringStream(successFileContent) } as never)
+        .mockResolvedValueOnce({ Body: makeStringStream(failedFileContent) } as never) // Add 3rd mock response
+
       await handler.execute(mockEvent)
 
-      // Assert
-      expect(importService.updateImportJob).toHaveBeenCalledWith(
-        { pk: `CSV_IMPORT#${mockTenantCode}`, sk: 'building#01PARENT123' },
-        { set: { totalRows: 3 } },
+      // Expected calculation: 
+      // Total rows: 100 + 50 + 5 (from crash) = 155
+      // Succeeded: 100 + 48 + 0 = 148
+      // Failed: 0 + 2 + 5 (from crash) = 7
+      expect(importService.updateStatus).toHaveBeenCalledWith(
+        expect.any(Object),
+        ImportStatusEnum.FAILED, 
+        expect.objectContaining({
+          result: expect.objectContaining({ total: 155, succeeded: 148, failed: 7 }),
+        }),
       )
+    })
+  })
+
+  describe('Row Packer & SQS Delegator (Default Map State)', () => {
+    it('should transform, validate, and pack rows into an SQS batch safely', async () => {
+      const mockEvent: CsvImportSfnEvent = {
+        context: { State: { Name: 'csv_rows_handler' } },
+        input: {
+          BatchInput: {
+            Attributes: {
+              tableName: 'building',
+              tenantCode: 'tenant001',
+              key: 's3.csv',
+            },
+          },
+          Items: [{ data: 'A' }, { data: 'B' }],
+        },
+      } as any
+
+      // SAFE MOCKING: Use jest.spyOn
+      jest.spyOn(sqsService, 'sendMessageBatch').mockImplementation(
+        async (url, batch) =>
+          ({
+            $metadata: { httpStatusCode: 200 },
+            Successful: batch.map((b) => ({
+              Id: b.Id,
+              MessageId: 'mock-msg',
+              MD5OfMessageBody: 'md5',
+            })),
+            Failed: [],
+          }) as any,
+      )
+
+      const result = await handler.execute(mockEvent)
+
+      expect(mockStrategy.transform).toHaveBeenCalledTimes(2)
+      expect(mockStrategy.validate).toHaveBeenCalledTimes(2)
+      expect(sqsService.sendMessageBatch).toHaveBeenCalledTimes(1)
+      expect(result).toEqual({ totalRows: 2, succeededRows: 2, failedRows: 0 })
+    })
+
+    it('should count validation errors as failedRows and not send them to SQS', async () => {
+      const mockEvent: CsvImportSfnEvent = {
+        context: { State: { Name: 'csv_rows_handler' } },
+        input: {
+          BatchInput: {
+            Attributes: {
+              tableName: 'building',
+              tenantCode: 'tenant001',
+              key: 's3.csv',
+            },
+          },
+          Items: [{ data: 'Good' }, { data: 'Bad' }],
+        },
+      } as any
+
+      mockStrategy.validate
+        .mockResolvedValueOnce(undefined)
+        .mockRejectedValueOnce(new Error('Validation failed'))
+
+      jest.spyOn(sqsService, 'sendMessageBatch').mockImplementation(
+        async (url, batch) =>
+          ({
+            $metadata: { httpStatusCode: 200 },
+            Successful: batch.map((b) => ({
+              Id: b.Id,
+              MessageId: 'mock',
+              MD5OfMessageBody: 'md5',
+            })),
+            Failed: [],
+          }) as any,
+      )
+
+      const result = await handler.execute(mockEvent)
+
+      expect(mockStrategy.transform).toHaveBeenCalledTimes(2)
+      expect(sqsService.sendMessageBatch).toHaveBeenCalledTimes(1)
+      expect(result).toEqual({ totalRows: 2, succeededRows: 1, failedRows: 1 })
     })
   })
 })
