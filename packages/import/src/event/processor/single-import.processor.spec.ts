@@ -143,20 +143,38 @@ describe('SingleImportProcessor', () => {
         await processor.process(mockPayload)
 
         expect(mockCommandService.publishAsync).toHaveBeenCalled()
+
+        // Ensure child row is marked as COMPLETED
         expect(importService.updateStatus).toHaveBeenCalledWith(
           mockPayload.importKey,
           ImportStatusEnum.COMPLETED,
           { result: { id: 'async-result' } },
         )
+        // Ensure the parent CSV counter is successfully incremented
+        expect(importService.incrementParentJobCounters).toHaveBeenCalledWith(
+          { pk: mockParentPk, sk: mockParentSk },
+          true,
+        )
       })
 
       it('should map and publishPartialUpdateAsync when status is CHANGED', async () => {
-        mockStrategy.compare.mockResolvedValue({ status: ComparisonStatus.CHANGED, existingData: {} })
-        mockCommandService.publishPartialUpdateAsync.mockResolvedValue({ id: 'async-partial' } as any)
+        mockStrategy.compare.mockResolvedValue({
+          status: ComparisonStatus.CHANGED,
+          existingData: {},
+        })
+        mockCommandService.publishPartialUpdateAsync.mockResolvedValue({
+          id: 'async-partial',
+        } as any)
 
         await processor.process(mockPayload)
 
         expect(mockCommandService.publishPartialUpdateAsync).toHaveBeenCalled()
+
+        expect(importService.updateStatus).toHaveBeenCalledWith(
+          mockPayload.importKey,
+          ImportStatusEnum.COMPLETED,
+          { result: { id: 'async-partial' } },
+        )
         expect(importService.incrementParentJobCounters).toHaveBeenCalledWith(
           { pk: mockParentPk, sk: mockParentSk },
           true,
@@ -170,17 +188,22 @@ describe('SingleImportProcessor', () => {
       })
 
       it('should map and publishSync when status is NOT_EXIST', async () => {
-        mockStrategy.compare.mockResolvedValue({ status: ComparisonStatus.NOT_EXIST })
-        
+        mockStrategy.compare.mockResolvedValue({
+          status: ComparisonStatus.NOT_EXIST,
+        })
+        mockCommandService.publishSync.mockResolvedValue({
+          id: 'sync-result',
+        } as any)
+
         await processor.process(mockPayload)
 
         expect(mockCommandService.publishSync).toHaveBeenCalled()
         expect(mockCommandService.publishAsync).not.toHaveBeenCalled()
-        
+
         expect(importService.updateStatus).toHaveBeenCalledWith(
           mockPayload.importKey,
           ImportStatusEnum.COMPLETED,
-          expect.anything()
+          { result: { id: 'sync-result' } },
         )
         expect(importService.incrementParentJobCounters).toHaveBeenCalledWith(
           { pk: mockParentPk, sk: mockParentSk },
@@ -214,7 +237,7 @@ describe('SingleImportProcessor', () => {
         error.stack,
       )
 
-      // 3. Should inform the parent CSV job that this row failed
+      // 3. Should inform the parent CSV job that this row failed (incrementParentJobCounters called with false)
       expect(importService.incrementParentJobCounters).toHaveBeenCalledWith(
         { pk: mockParentPk, sk: mockParentSk },
         false,

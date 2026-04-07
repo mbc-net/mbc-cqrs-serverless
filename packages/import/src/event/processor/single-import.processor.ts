@@ -181,5 +181,13 @@ export class SingleImportProcessor {
       ImportStatusEnum.COMPLETED,
       { result },
     )
+
+    const skParts = importEntity.sk.split(KEY_SEPARATOR)
+    const parentId = skParts.slice(0, -1).join(KEY_SEPARATOR)
+
+    if (parentId.startsWith(CSV_IMPORT_PK_PREFIX)) {
+      const parentKey = parseId(parentId)
+      await this.importService.incrementParentJobCounters(parentKey, true)
+    }
   }
 }
