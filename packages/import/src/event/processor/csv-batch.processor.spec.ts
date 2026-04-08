@@ -79,6 +79,28 @@ describe('CsvBatchProcessor', () => {
     expect(mockCommandService.publishAsync).not.toHaveBeenCalled()
   })
 
+  // ----------------------------------------------------------------
+  // THE NEW IDEMPOTENCY TEST
+  // ----------------------------------------------------------------
+  it('should process the entire batch but throw at the end if any row fails', async () => {
+    // Setup mock to fail on the first item but succeed on the second
+    mockStrategy.compare
+      .mockRejectedValueOnce(new Error('Database validation failed')) // Item 1 fails
+      .mockResolvedValueOnce({ status: ComparisonStatus.NOT_EXIST }) // Item 2 succeeds
+
+    // The entire batch should reject at the end
+    await expect(processor.process(mockPayload)).rejects.toThrow(
+      'Batch processing completed with 1 error(s)',
+    )
+
+    // Strategy compare should be called twice despite the first error
+    expect(mockStrategy.compare).toHaveBeenCalledTimes(2)
+
+    // Strategy map and publishAsync should be called exactly once (for the second successful item)
+    expect(mockStrategy.map).toHaveBeenCalledTimes(1)
+    expect(mockCommandService.publishAsync).toHaveBeenCalledTimes(1)
+  })
+
   describe('ASYNC Publish Mode (Default)', () => {
     it('should call publishAsync when status is NOT_EXIST', async () => {
       mockStrategy.compare.mockResolvedValue({
