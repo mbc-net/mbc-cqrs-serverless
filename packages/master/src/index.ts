@@ -1,4 +1,5 @@
 export * from './controllers'
+export * from './custom-task/event/task-queue-event-factory'
 export * from './decorators'
 export * from './dto'
 export * from './master.module'
