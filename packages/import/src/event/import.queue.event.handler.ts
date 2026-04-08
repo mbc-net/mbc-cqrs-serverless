@@ -22,13 +22,12 @@ export class ImportQueueEventHandler
         await this.csvBatchProcessor.process(event.payload)
       } else {
         // Fallback to single import (or add more if/else for ZIP)
-        await this.singleImportProcessor.process(event.payload)
+        await this.singleImportProcessor.process(event.importEvent)
       }
     } catch (error) {
       this.logger.error(
-        'Failed to process message in ImportQueueEventHandler',
-        event,
-        error,
+        `Failed to process message in ImportQueueEventHandler. Event Payload: ${JSON.stringify(event.payload)}`,
+        error instanceof Error ? error.stack : String(error),
       )
       throw error // Ensure SQS retries
     }
