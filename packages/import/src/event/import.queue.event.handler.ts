@@ -26,9 +26,8 @@ export class ImportQueueEventHandler
       }
     } catch (error) {
       this.logger.error(
-        'Failed to process message in ImportQueueEventHandler',
-        event,
-        error,
+        `Failed to process message in ImportQueueEventHandler. Event Payload: ${JSON.stringify(event.payload)}`,
+        error instanceof Error ? error.stack : String(error),
       )
       throw error // Ensure SQS retries
     }
