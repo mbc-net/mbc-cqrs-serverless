@@ -22,7 +22,7 @@ export class ImportQueueEventHandler
         await this.csvBatchProcessor.process(event.payload)
       } else {
         // Fallback to single import (or add more if/else for ZIP)
-        await this.singleImportProcessor.process(event.payload)
+        await this.singleImportProcessor.process(event.importEvent)
       }
     } catch (error) {
       this.logger.error(
