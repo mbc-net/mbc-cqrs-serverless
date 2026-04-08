@@ -62,7 +62,7 @@
     "class-validator": "^0.14.0",
     "jwt-decode": "^4.0.0",
     "node-fetch": "^2.7.0",
-    "nodemailer": "^7.0.3",
+    "nodemailer": "^8.0.5",
     "reflect-metadata": "^0.2.2",
     "ulid": "^2.3.0"
   },
