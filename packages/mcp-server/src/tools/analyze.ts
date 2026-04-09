@@ -582,6 +582,16 @@ const ANTI_PATTERNS = [
     recommendation:
       'SequenceService.genNewSequence() was removed in v1.2.0. Use generateSequenceItem() or generateSequenceItemWithProvideSetting() instead.',
   },
+  {
+    code: 'AP015',
+    name: 'Duplicate TaskModule Registration',
+    severity: 'high' as const,
+    // Detect TaskModule.register() calls inside @Module imports — multiple registrations
+    // conflict because TASK_QUEUE_EVENT_FACTORY is a global singleton since v1.2.4.
+    pattern: /TaskModule\.register\s*\(/,
+    recommendation:
+      'TaskModule.register() is global since v1.2.4 and must be called exactly once in the host AppModule. Multiple calls cause conflicting TASK_QUEUE_EVENT_FACTORY bindings and result in "transformTask is not a function" at runtime. Remove all TaskModule.register() calls from feature modules and keep only the one in the host AppModule.',
+  },
 ]
 
 /**
@@ -1002,10 +1012,21 @@ async function explainCode(
     explanations.push(
       'Uses publishSync() for synchronous command execution (waits for Step Functions).',
     )
+    explanations.push(
+      'Note: publishSync() returns null when the command is not dirty (no-op) since v1.2.0. Always null-check the result before accessing properties.',
+    )
   }
   if (content.includes('getUserContext(')) {
     explanations.push(
       'Extracts user context (tenantCode, userId, role) from the invocation context.',
+    )
+  }
+
+  // TaskModule global pattern
+  if (content.includes('TaskModule.register(')) {
+    patterns.push('TaskModule Registration')
+    explanations.push(
+      'TaskModule.register() is global since v1.2.4 — call it exactly once in the host AppModule. Multiple registrations conflict and cause "transformTask is not a function" at runtime.',
     )
   }
 

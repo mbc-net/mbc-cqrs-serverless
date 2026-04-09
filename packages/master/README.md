@@ -26,14 +26,22 @@ npm install @mbc-cqrs-serverless/master
 
 ### 1. Register the Module
 
+When `enableController` is `true`, **`MasterModule` does not register `@mbc-cqrs-serverless/task` for you.** Register `TaskModule` once in the host app (with your `ITaskQueueEventFactory` implementation) **before or alongside** `MasterModule`. `TaskModule.register()` is global, so `TaskService` is available to `MasterSettingService`, `MyTaskService`, and controllers without importing `TaskModule` into every feature module.
+
 ```typescript
 import { Module } from '@nestjs/common';
 import { MasterModule } from '@mbc-cqrs-serverless/master';
+import { TaskModule } from '@mbc-cqrs-serverless/task';
 import { PrismaService } from './prisma/prisma.service';
 import { MasterDataSyncHandler } from './handlers/master-data-sync.handler';
+import { AppTaskQueueEventFactory } from './task/app-task-queue-event.factory';
 
 @Module({
   imports: [
+    TaskModule.register({
+      taskQueueEventFactory: AppTaskQueueEventFactory,
+      // enableController: true, // optional: task REST API from @mbc-cqrs-serverless/task
+    }),
     MasterModule.register({
       enableController: true, // Optional: enable REST endpoints
       prismaService: PrismaService, // Required when enableController is true
@@ -43,6 +51,15 @@ import { MasterDataSyncHandler } from './handlers/master-data-sync.handler';
 })
 export class AppModule {}
 ```
+
+### TaskModule requirement
+
+| Scenario | Action |
+|----------|--------|
+| `MasterModule.register({ enableController: true })` | **Required:** call `TaskModule.register({ taskQueueEventFactory })` in the host. `MasterSettingService` and `CustomTaskModule` (`MyTaskService`) inject `TaskService`. |
+| `enableController` omitted or `false` | `TaskModule` is still needed if you use APIs or services that inject `TaskService`; otherwise follow your app’s architecture. |
+
+Use one factory class that implements **`ITaskQueueEventFactory`** for both app-specific tasks and master Step Functions task mapping (`transformTask` / `transformStepFunctionTask`) so only one `TASK_QUEUE_EVENT_FACTORY` binding exists. Details: [@mbc-cqrs-serverless/task README](../task/README.md#global-module-and-single-registration).
 
 ### 2. Use Master Data Service
 
@@ -267,6 +284,7 @@ sk: SETTING#[code]                           (tenant/common)
 | Package | Description |
 |---------|-------------|
 | [@mbc-cqrs-serverless/core](https://www.npmjs.com/package/@mbc-cqrs-serverless/core) | Core CQRS framework |
+| [@mbc-cqrs-serverless/task](https://www.npmjs.com/package/@mbc-cqrs-serverless/task) | Async tasks and `TaskService` (register once in the host when using master controllers) |
 | [@mbc-cqrs-serverless/sequence](https://www.npmjs.com/package/@mbc-cqrs-serverless/sequence) | Uses master data for sequence formats |
 | [@mbc-cqrs-serverless/tenant](https://www.npmjs.com/package/@mbc-cqrs-serverless/tenant) | Tenant management for group settings |
 
