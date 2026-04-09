@@ -55,6 +55,24 @@ class MyTaskQueueEventFactory implements ITaskQueueEventFactory {
 export class AppModule {}
 ```
 
+#### Global module and single registration
+
+`TaskModule.register()` returns a **global** dynamic module (`global: true`). That means:
+
+- **`TaskService`** and the module’s exports are available in **every** Nest module without listing `TaskModule` in each feature module’s `imports`.
+- You must call **`TaskModule.register()` exactly once** per application so the `TASK_QUEUE_EVENT_FACTORY` token and task providers are registered a single time. Multiple `TaskModule.register()` calls can cause conflicting bindings and runtime errors (for example `transformTask is not a function` on the task queue handler).
+
+Implement **`ITaskQueueEventFactory`** with:
+
+- **`transformTask`** — maps `TaskQueueEvent` (standard async tasks from SQS) to your domain events.
+- **`transformStepFunctionTask`** — maps `StepFunctionTaskEvent` (Step Functions–backed tasks) to your domain events.
+
+Omit either method only if you do not use that execution path; the handlers still expect the factory object to expose the methods your deployment uses.
+
+#### Using `@mbc-cqrs-serverless/master`
+
+If you use `MasterModule.register({ enableController: true })` from `@mbc-cqrs-serverless/master`, that package **does not** call `TaskModule.register()` internally. You must register `TaskModule` in the host application as above so `MasterSettingService`, `MyTaskService`, and other providers can inject `TaskService`. See the [master package README](../master/README.md#taskmodule-requirement).
+
 ### 2. Create and Monitor Tasks
 
 ```typescript
