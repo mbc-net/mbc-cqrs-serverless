@@ -1,5 +1,6 @@
 import { UpdateItemCommand } from '@aws-sdk/client-dynamodb'
 import { GetObjectCommand } from '@aws-sdk/client-s3'
+import { Upload } from '@aws-sdk/lib-storage'
 import { marshall, unmarshall } from '@aws-sdk/util-dynamodb'
 import {
   DdbUpdateItem,
@@ -12,10 +13,12 @@ import {
   KEY_SEPARATOR,
   S3Service,
   SnsService,
+  StepFunctionService,
 } from '@mbc-cqrs-serverless/core'
 import { BadRequestException, Inject, Injectable, Logger } from '@nestjs/common'
 import { ConfigService } from '@nestjs/config'
 import csv from 'csv-parser'
+import * as JSZip from 'jszip'
 import { Readable } from 'stream'
 import { ulid } from 'ulid'
 
@@ -47,6 +50,9 @@ export class ImportService {
     private readonly s3Service: S3Service,
     @Inject(IMPORT_STRATEGY_MAP)
     private readonly importStrategyMap: Map<string, IImportStrategy<any, any>>,
+
+    private readonly configService: ConfigService,
+    private readonly sfnService: StepFunctionService,
   ) {
     this.tableName = dynamoDbService.getTableName('import_tmp')
     this.alarmTopicArn = this.config.get<string>('SNS_ALARM_TOPIC_ARN')
@@ -148,6 +154,11 @@ export class ImportService {
     const pk = `${ZIP_IMPORT_PK_PREFIX}${KEY_SEPARATOR}${dto.tenantCode}`
     const sk = `ZIP#${taskCode}`
 
+    const masterJobKey = {
+      pk,
+      sk,
+    }
+
     const item = new ImportEntity({
       id: `${pk}#${sk}`,
       pk,
@@ -157,7 +168,7 @@ export class ImportService {
       tenantCode: dto.tenantCode,
       type: 'ZIP_MASTER_JOB',
       name: `ZIP Import: ${dto.key.split('/').pop()}`,
-      status: ImportStatusEnum.CREATED,
+      status: ImportStatusEnum.PROCESSING,
       attributes: dto,
       requestId: options.invokeContext?.context?.awsRequestId,
       createdAt: new Date(),
@@ -169,7 +180,101 @@ export class ImportService {
     })
 
     await this.dynamoDbService.putItem(this.tableName, item)
-    return item
+
+    try {
+      let sortedS3Keys = dto.sortedFileKeys || []
+
+      // 3. Extract and Upload if sorted keys are not provided
+      if (sortedS3Keys.length === 0) {
+        this.logger.debug(`Downloading and extracting ZIP from S3: ${dto.key}`)
+
+        const { Body } = await this.s3Service.client.send(
+          new GetObjectCommand({ Bucket: dto.bucket, Key: dto.key }),
+        )
+
+        // Convert stream to buffer for JSZip
+        const zipBuffer = await this.streamToBuffer(Body as Readable)
+        const zip = await JSZip.loadAsync(zipBuffer)
+
+        const extractedKeys: string[] = []
+
+        // Upload extracted files back to S3
+        for (const [filename, zipEntry] of Object.entries(zip.files)) {
+          if (zipEntry.dir) continue
+
+          const fileContent = await zipEntry.async('nodebuffer')
+          const extractedKey = `csv-imports/${dto.tenantCode}/${Date.now()}-${filename}`
+
+          const upload = new Upload({
+            client: this.s3Service.client,
+            params: {
+              Bucket: dto.bucket,
+              Key: extractedKey,
+              Body: fileContent,
+            },
+          })
+          await upload.done()
+          extractedKeys.push(extractedKey)
+        }
+
+        if (extractedKeys.length === 0) {
+          throw new Error('ZIP file is empty or contains no valid files.')
+        }
+
+        // Update the DynamoDB record with the extracted keys
+        await this.updateImportJob(masterJobKey, {
+          set: { attributes: { extractedFileKeys: extractedKeys } },
+        })
+
+        // Sort them automatically if the client didn't
+        sortedS3Keys = extractedKeys.sort()
+      }
+
+      // 4. Trigger the Step Function Orchestrator synchronously
+      const sfnArn = this.configService.get<string>(
+        'SFN_IMPORT_ZIP_ORCHESTRATOR_ARN',
+      )
+      if (!sfnArn)
+        throw new Error('Missing SFN_IMPORT_ZIP_ORCHESTRATOR_ARN config')
+
+      const executionName = `${dto.tenantCode}-zip-import-${Date.now()}`
+
+      await this.sfnService.startExecution(
+        sfnArn,
+        {
+          masterJobKey,
+          sortedS3Keys,
+          parameters: {
+            bucket: dto.bucket,
+            tenantCode: dto.tenantCode,
+            tableName: dto.tableName,
+          },
+        },
+        executionName,
+      )
+
+      this.logger.log(`Successfully started ZIP orchestrator: ${executionName}`)
+      return item
+    } catch (error) {
+      // 5. Synchronous Rollback: If anything fails, mark DB as FAILED and bubble error
+      this.logger.error(`Failed to process ZIP job: ${masterJobKey.sk}`, error)
+
+      await this.updateStatus(masterJobKey, ImportStatusEnum.FAILED, {
+        error: { message: (error as Error).message },
+      })
+
+      throw error // Throwing here allows your HTTP Controller to return a 400/500 to the client
+    }
+  }
+
+  // Helper method if you don't already have it
+  private async streamToBuffer(stream: Readable): Promise<Buffer> {
+    return new Promise((resolve, reject) => {
+      const chunks: Uint8Array[] = []
+      stream.on('data', (chunk) => chunks.push(chunk))
+      stream.on('error', reject)
+      stream.on('end', () => resolve(Buffer.concat(chunks)))
+    })
   }
 
   /**

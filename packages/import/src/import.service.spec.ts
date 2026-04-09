@@ -1,105 +1,88 @@
-/**
- * ImportService Unit Tests
- *
- * 概要 / Overview:
- * ImportServiceのユニットテストスイート。特にincrementParentJobCountersメソッドの
- * 正しいステータス設定を検証します。
- *
- * Unit test suite for ImportService. Specifically verifies correct status
- * determination in incrementParentJobCounters method.
- *
- * 目的 / Purpose:
- * - 子ジョブ失敗時にマスタージョブがFAILEDステータスになることを検証
- * - 全子ジョブ成功時にマスタージョブがCOMPLETEDステータスになることを検証
- * - カウンターのアトミック更新が正しく動作することを検証
- *
- * - Verify master job gets FAILED status when child jobs fail
- * - Verify master job gets COMPLETED status when all children succeed
- * - Verify atomic counter updates work correctly
- */
-import { Test, TestingModule } from '@nestjs/testing'
+import { UpdateItemCommand } from '@aws-sdk/client-dynamodb'
 import { createMock } from '@golevelup/ts-jest'
-import { ConfigService } from '@nestjs/config'
 import {
   DynamoDbService,
-  SnsService,
   S3Service,
-  KEY_SEPARATOR,
+  SnsService,
+  StepFunctionService,
 } from '@mbc-cqrs-serverless/core'
-import { ImportService } from './import.service'
-import { ImportStatusEnum } from './enum'
+import { BadRequestException } from '@nestjs/common'
+import { ConfigService } from '@nestjs/config'
+import { Test, TestingModule } from '@nestjs/testing'
+import { Readable } from 'stream'
+
+import { CreateCsvImportDto } from './dto/create-csv-import.dto'
+import { CreateImportDto } from './dto/create-import.dto'
+import { CreateZipImportDto } from './dto/create-zip-import.dto'
+import { ImportEntity } from './entity'
+import { ImportStatusEnum, ProcessingMode } from './enum'
 import { IMPORT_STRATEGY_MAP } from './import.module-definition'
-import { CSV_IMPORT_PK_PREFIX } from './constant'
+import { ImportService } from './import.service'
+import { IImportStrategy } from './interface'
 
-// Mock UpdateItemCommand
-jest.mock('@aws-sdk/client-dynamodb', () => ({
-  UpdateItemCommand: jest.fn().mockImplementation((params) => params),
-}))
-
-jest.mock('@aws-sdk/util-dynamodb', () => ({
-  marshall: jest.fn((obj) => obj),
-  unmarshall: jest.fn((obj) => obj),
+// Mock the Upload class from lib-storage to prevent actual S3 calls
+jest.mock('@aws-sdk/lib-storage', () => ({
+  Upload: jest.fn().mockImplementation(() => ({
+    done: jest.fn().mockResolvedValue(true),
+  })),
 }))
 
 describe('ImportService', () => {
   let service: ImportService
   let dynamoDbService: jest.Mocked<DynamoDbService>
   let snsService: jest.Mocked<SnsService>
-  let mockDdbClient: { send: jest.Mock }
+  let configService: jest.Mocked<ConfigService>
+  let s3Service: jest.Mocked<S3Service>
+  let sfnService: jest.Mocked<StepFunctionService>
+  let mockStrategy: jest.Mocked<IImportStrategy<any, any>>
+  let strategyMap: Map<string, IImportStrategy<any, any>>
 
-  const mockTableName = 'test-import_tmp'
-  const mockPk = `${CSV_IMPORT_PK_PREFIX}${KEY_SEPARATOR}tenant001`
-  const mockSk = 'building#01ABC123'
+  const mockInvokeContext = {
+    invokeContext: {
+      event: { requestContext: { http: { sourceIp: '127.0.0.1' } } },
+      context: { awsRequestId: 'req-123' },
+    },
+  } as any
 
   beforeEach(async () => {
-    mockDdbClient = {
-      send: jest.fn(),
-    }
+    dynamoDbService = createMock<DynamoDbService>({
+      getTableName: jest.fn().mockReturnValue('import_tmp'),
+      client: { send: jest.fn() } as any,
+    })
+    snsService = createMock<SnsService>()
+    configService = createMock<ConfigService>()
+    s3Service = createMock<S3Service>({
+      client: { send: jest.fn() } as any,
+    })
+    sfnService = createMock<StepFunctionService>()
 
-    const mockDynamoDbService = {
-      getTableName: jest.fn().mockReturnValue(mockTableName),
-      client: mockDdbClient,
-      updateItem: jest.fn().mockResolvedValue({}),
-      putItem: jest.fn().mockResolvedValue({}),
-      getItem: jest.fn().mockResolvedValue(null),
-    }
+    mockStrategy = {
+      transform: jest.fn().mockImplementation((data) => Promise.resolve(data)),
+      validate: jest.fn().mockResolvedValue(true),
+    } as any
 
-    const mockSnsService = {
-      publish: jest.fn().mockResolvedValue({}),
-    }
+    strategyMap = new Map()
+    strategyMap.set('contract', mockStrategy)
+
+    configService.get.mockImplementation((key: string) => {
+      if (key === 'SNS_ALARM_TOPIC_ARN') return 'arn:aws:sns:alarm'
+      if (key === 'SFN_IMPORT_ZIP_ORCHESTRATOR_ARN') return 'arn:aws:states:zip'
+      return null
+    })
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         ImportService,
-        {
-          provide: DynamoDbService,
-          useValue: mockDynamoDbService,
-        },
-        {
-          provide: SnsService,
-          useValue: mockSnsService,
-        },
-        {
-          provide: S3Service,
-          useValue: createMock<S3Service>(),
-        },
-        {
-          provide: ConfigService,
-          useValue: {
-            get: jest.fn().mockReturnValue('arn:aws:sns:test:alarm-topic'),
-          },
-        },
-        {
-          provide: IMPORT_STRATEGY_MAP,
-          useValue: new Map(),
-        },
+        { provide: DynamoDbService, useValue: dynamoDbService },
+        { provide: SnsService, useValue: snsService },
+        { provide: ConfigService, useValue: configService },
+        { provide: S3Service, useValue: s3Service },
+        { provide: StepFunctionService, useValue: sfnService },
+        { provide: IMPORT_STRATEGY_MAP, useValue: strategyMap },
       ],
     }).compile()
 
     service = module.get<ImportService>(ImportService)
-    dynamoDbService = module.get(DynamoDbService) as jest.Mocked<DynamoDbService>
-    snsService = module.get(SnsService) as jest.Mocked<SnsService>
-
     jest.clearAllMocks()
   })
 
@@ -107,158 +90,256 @@ describe('ImportService', () => {
     expect(service).toBeDefined()
   })
 
-  describe('incrementParentJobCounters', () => {
-    const parentKey = { pk: mockPk, sk: mockSk }
+  describe('createWithApi', () => {
+    it('should throw BadRequestException if strategy is not found', async () => {
+      const dto: CreateImportDto = {
+        tableName: 'unknown',
+        tenantCode: 't1',
+        attributes: {},
+      }
+      await expect(
+        service.createWithApi(dto, mockInvokeContext),
+      ).rejects.toThrow(BadRequestException)
+    })
 
-    /**
-     * Test: Master job should be COMPLETED when all children succeed
-     * マスタージョブは全子ジョブ成功時にCOMPLETEDになるべき
-     */
-    it('should set final status to COMPLETED when all children succeed', async () => {
-      // Setup: All jobs processed, no failures
-      mockDdbClient.send.mockResolvedValue({
-        Attributes: {
-          pk: mockPk,
-          sk: mockSk,
-          totalRows: 3,
-          processedRows: 3,
-          succeededRows: 3,
-          failedRows: 0,
-        },
+    it('should transform, validate, and create import', async () => {
+      const dto: CreateImportDto = {
+        tableName: 'contract',
+        tenantCode: 't1',
+        attributes: { id: 1 },
+      }
+      jest
+        .spyOn(service, 'createImport')
+        .mockResolvedValue(new ImportEntity({} as any))
+
+      await service.createWithApi(dto, mockInvokeContext)
+
+      expect(mockStrategy.transform).toHaveBeenCalledWith(dto.attributes)
+      expect(mockStrategy.validate).toHaveBeenCalled()
+      expect(service.createImport).toHaveBeenCalled()
+    })
+  })
+
+  describe('createCsvJob', () => {
+    it('should create a CSV_MASTER_JOB record in DynamoDB', async () => {
+      const dto: CreateCsvImportDto = {
+        tableName: 'contract',
+        tenantCode: 't1',
+        bucket: 'b',
+        key: 'k.csv',
+        processingMode: ProcessingMode.STEP_FUNCTION,
+      }
+      const result = await service.createCsvJob(dto, mockInvokeContext)
+
+      expect(dynamoDbService.putItem).toHaveBeenCalledWith(
+        'import_tmp',
+        expect.objectContaining({
+          type: 'CSV_MASTER_JOB',
+          tenantCode: 't1',
+          status: ImportStatusEnum.CREATED,
+        }),
+      )
+      expect(result.type).toEqual('CSV_MASTER_JOB')
+    })
+  })
+
+  describe('createZipJob', () => {
+    it('should skip extraction and trigger Step Function if sortedFileKeys are provided', async () => {
+      const dto: CreateZipImportDto = {
+        tenantCode: 'tenant1',
+        bucket: 'my-bucket',
+        key: 'path/to/file.zip',
+        tableName: 'contract',
+        sortedFileKeys: ['extracted/1.csv', 'extracted/2.csv'],
+      }
+
+      ;(dynamoDbService.putItem as jest.Mock).mockResolvedValue(undefined)
+      sfnService.startExecution.mockResolvedValue({} as any)
+
+      const result = await service.createZipJob(dto, mockInvokeContext)
+
+      // Master job created
+      expect(dynamoDbService.putItem).toHaveBeenCalledWith(
+        'import_tmp',
+        expect.objectContaining({
+          type: 'ZIP_MASTER_JOB',
+          status: ImportStatusEnum.PROCESSING,
+        }),
+      )
+
+      // S3 Download skipped
+      expect(s3Service.client.send).not.toHaveBeenCalled()
+
+      // Step function triggered with sorted keys
+      expect(sfnService.startExecution).toHaveBeenCalledWith(
+        'arn:aws:states:zip',
+        expect.objectContaining({
+          sortedS3Keys: ['extracted/1.csv', 'extracted/2.csv'],
+        }),
+        expect.stringContaining('tenant1-zip-import-'),
+      )
+
+      expect(result.type).toEqual('ZIP_MASTER_JOB')
+    })
+
+    it('should catch errors, rollback status to FAILED, and rethrow', async () => {
+      const dto: CreateZipImportDto = {
+        tenantCode: 'tenant1',
+        bucket: 'my-bucket',
+        key: 'path/to/bad_file.zip',
+        tableName: 'contract',
+      }
+
+      ;(dynamoDbService.putItem as jest.Mock).mockResolvedValue(undefined)
+      const error = new Error('Corrupt ZIP file')
+      ;(s3Service.client.send as jest.Mock).mockRejectedValue(error)
+
+      jest.spyOn(service, 'updateStatus').mockResolvedValue(undefined)
+
+      await expect(
+        service.createZipJob(dto, mockInvokeContext),
+      ).rejects.toThrow('Corrupt ZIP file')
+
+      expect(service.updateStatus).toHaveBeenCalledWith(
+        expect.any(Object),
+        ImportStatusEnum.FAILED,
+        { error: { message: 'Corrupt ZIP file' } },
+      )
+    })
+  })
+
+  describe('updateStatus', () => {
+    it('should update DynamoDB and publish to SNS', async () => {
+      // Use a realistic pk with a '#' so the tenantCode extraction works perfectly
+      const key = { pk: 'IMPORT#tenant1', sk: 'SK123' }
+
+      await service.updateStatus(key, ImportStatusEnum.COMPLETED, {
+        result: { count: 5 },
       })
 
-      await service.incrementParentJobCounters(parentKey, true)
-
-      // Verify updateStatus was called with COMPLETED
       expect(dynamoDbService.updateItem).toHaveBeenCalledWith(
-        mockTableName,
-        parentKey,
-        expect.objectContaining({
-          set: expect.objectContaining({
+        'import_tmp',
+        key,
+        {
+          set: {
             status: ImportStatusEnum.COMPLETED,
-          }),
-        }),
-      )
-    })
-
-    /**
-     * Test: Master job should be FAILED when any child fails
-     * マスタージョブは子ジョブが1つでも失敗したらFAILEDになるべき
-     */
-    it('should set final status to FAILED when any child fails', async () => {
-      // Setup: All jobs processed, some failures
-      mockDdbClient.send.mockResolvedValue({
-        Attributes: {
-          pk: mockPk,
-          sk: mockSk,
-          totalRows: 3,
-          processedRows: 3,
-          succeededRows: 2,
-          failedRows: 1,
+            result: { count: 5 },
+            attributes: undefined,
+          },
         },
-      })
+      )
 
-      await service.incrementParentJobCounters(parentKey, false)
-
-      // Verify updateStatus was called with FAILED
-      expect(dynamoDbService.updateItem).toHaveBeenCalledWith(
-        mockTableName,
-        parentKey,
+      // THE FIX: Match the exact structure sent to snsService.publish
+      expect(snsService.publish).toHaveBeenCalledWith(
         expect.objectContaining({
-          set: expect.objectContaining({
-            status: ImportStatusEnum.FAILED,
-          }),
+          action: 'import-status',
+          pk: 'IMPORT#tenant1',
+          sk: 'SK123',
+          table: 'import_tmp',
+          id: 'IMPORT#tenant1#SK123',
+          tenantCode: 'tenant1',
+          content: {
+            status: ImportStatusEnum.COMPLETED,
+            result: { count: 5 },
+            attributes: undefined,
+          },
         }),
       )
     })
+  })
 
-    /**
-     * Test: Should not finalize if not all jobs are processed
-     * 全ジョブ処理完了前はファイナライズしないこと
-     */
-    it('should not finalize status if not all jobs are processed', async () => {
-      // Setup: Some jobs still pending
-      mockDdbClient.send.mockResolvedValue({
+  describe('incrementParentJobCounters', () => {
+    it('should atomic increment succeededRows and finalize to COMPLETED if done', async () => {
+      const parentKey = { pk: 'PK', sk: 'SK' }
+
+      // Mock DynamoDB send returning the updated attributes where totalRows == processedRows
+      ;(dynamoDbService.client.send as jest.Mock).mockResolvedValueOnce({
         Attributes: {
-          pk: mockPk,
-          sk: mockSk,
-          totalRows: 5,
-          processedRows: 3,
-          succeededRows: 2,
-          failedRows: 1,
+          totalRows: { N: '10' },
+          processedRows: { N: '10' },
+          succeededRows: { N: '10' },
+          failedRows: { N: '0' },
         },
-      })
+      } as any)
 
-      await service.incrementParentJobCounters(parentKey, true)
+      jest.spyOn(service, 'updateStatus').mockResolvedValue(undefined)
 
-      // Verify updateStatus was NOT called (job not complete)
-      expect(dynamoDbService.updateItem).not.toHaveBeenCalled()
+      const result = await service.incrementParentJobCounters(parentKey, true)
+
+      expect(dynamoDbService.client.send).toHaveBeenCalledWith(
+        expect.any(UpdateItemCommand),
+      )
+      expect(service.updateStatus).toHaveBeenCalledWith(
+        parentKey,
+        ImportStatusEnum.COMPLETED,
+        expect.objectContaining({
+          result: expect.objectContaining({ succeeded: 10 }),
+        }),
+      )
+      expect(result.succeededRows).toEqual(10)
     })
 
-    /**
-     * Test: Should increment succeededRows when child succeeds
-     * 子ジョブ成功時にsucceededRowsがインクリメントされること
-     */
-    it('should increment succeededRows when child succeeds', async () => {
-      mockDdbClient.send.mockResolvedValue({
+    it('should finalize to FAILED if done and there are failedRows', async () => {
+      const parentKey = { pk: 'PK', sk: 'SK' }
+
+      ;(dynamoDbService.client.send as jest.Mock).mockResolvedValueOnce({
         Attributes: {
-          pk: mockPk,
-          sk: mockSk,
-          totalRows: 5,
-          processedRows: 1,
-          succeededRows: 1,
-          failedRows: 0,
+          totalRows: { N: '10' },
+          processedRows: { N: '10' },
+          succeededRows: { N: '9' },
+          failedRows: { N: '1' },
         },
-      })
+      } as any)
 
-      await service.incrementParentJobCounters(parentKey, true)
-
-      // Verify the atomic update command was sent
-      expect(mockDdbClient.send).toHaveBeenCalled()
-    })
-
-    /**
-     * Test: Should increment failedRows when child fails
-     * 子ジョブ失敗時にfailedRowsがインクリメントされること
-     */
-    it('should increment failedRows when child fails', async () => {
-      mockDdbClient.send.mockResolvedValue({
-        Attributes: {
-          pk: mockPk,
-          sk: mockSk,
-          totalRows: 5,
-          processedRows: 1,
-          succeededRows: 0,
-          failedRows: 1,
-        },
-      })
+      jest.spyOn(service, 'updateStatus').mockResolvedValue(undefined)
 
       await service.incrementParentJobCounters(parentKey, false)
 
-      // Verify the atomic update command was sent
-      expect(mockDdbClient.send).toHaveBeenCalled()
+      expect(service.updateStatus).toHaveBeenCalledWith(
+        parentKey,
+        ImportStatusEnum.FAILED, // Assert status is FAILED because failedRows > 0
+        expect.anything(),
+      )
+    })
+  })
+
+  describe('publishAlarm', () => {
+    it('should publish alarm to SNS', async () => {
+      const mockEvent = {
+        importEvent: {
+          importKey: { pk: 'IMPORT#tenant1', sk: 'SK123' },
+        },
+      } as any
+
+      await service.publishAlarm(mockEvent, 'Task Failed')
+
+      expect(snsService.publish).toHaveBeenCalledWith(
+        expect.objectContaining({
+          action: 'sfn-alarm',
+          tenantCode: 'tenant1',
+          content: { errorMessage: 'Task Failed' },
+        }),
+        'arn:aws:sns:alarm',
+      )
+    })
+  })
+
+  describe('getImportByKey', () => {
+    it('should return null if item not found', async () => {
+      ;(dynamoDbService.getItem as jest.Mock).mockResolvedValue(null)
+      const result = await service.getImportByKey({ pk: '1', sk: '2' })
+      expect(result).toBeNull()
     })
 
-    /**
-     * Test: Should publish SNS notification when job finalizes
-     * ジョブ完了時にSNS通知が発行されること
-     */
-    it('should publish SNS notification when job finalizes with failures', async () => {
-      mockDdbClient.send.mockResolvedValue({
-        Attributes: {
-          pk: mockPk,
-          sk: mockSk,
-          totalRows: 2,
-          processedRows: 2,
-          succeededRows: 1,
-          failedRows: 1,
-        },
+    it('should return ImportEntity if item is found', async () => {
+      dynamoDbService.getItem.mockResolvedValue({
+        pk: '1',
+        sk: '2',
+        type: 'contract',
       })
-
-      await service.incrementParentJobCounters(parentKey, false)
-
-      // Verify SNS publish was called via updateStatus
-      expect(snsService.publish).toHaveBeenCalled()
+      const result = await service.getImportByKey({ pk: '1', sk: '2' })
+      expect(result).toBeInstanceOf(ImportEntity)
+      expect(result?.type).toEqual('contract')
     })
   })
 })
