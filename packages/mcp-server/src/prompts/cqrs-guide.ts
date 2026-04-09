@@ -570,6 +570,57 @@ export class OrderService {
 - No effect if unset — zero impact on existing projects
 - Session table \`{NODE_ENV}-{APP_NAME}-session\` must be created (see \`dynamodbs/session.json\`)
 
+### v1.2.4 — TaskModule global registration (breaking for @mbc-cqrs-serverless/master users)
+
+**\`TaskModule.register()\` now returns a global dynamic module (\`global: true\`)**
+
+\`MasterModule\` no longer calls \`TaskModule.register()\` internally. Any app that uses \`MasterModule\` must now register \`TaskModule\` exactly once in the host \`AppModule\`.
+
+**Before (v1.2.3 and earlier — worked automatically):**
+\`\`\`typescript
+// No TaskModule.register() needed; MasterModule registered it internally
+@Module({
+  imports: [
+    MasterModule.register({ enableController: true, prismaService: PrismaService }),
+  ],
+})
+export class AppModule {}
+\`\`\`
+
+**After (v1.2.4+ — must register explicitly):**
+\`\`\`typescript
+import { TaskModule, TaskQueueEventFactory } from '@mbc-cqrs-serverless/master'
+
+@Module({
+  imports: [
+    TaskModule.register({
+      taskQueueEventFactory: MyTaskQueueEventFactory, // extend TaskQueueEventFactory from master
+    }),
+    MasterModule.register({ enableController: true, prismaService: PrismaService }),
+  ],
+})
+export class AppModule {}
+\`\`\`
+
+**Migration steps:**
+1. Create a factory class that extends \`TaskQueueEventFactory\` from \`@mbc-cqrs-serverless/master\`:
+\`\`\`typescript
+import { TaskQueueEventFactory } from '@mbc-cqrs-serverless/master'
+import { IEvent, TaskQueueEvent } from '@mbc-cqrs-serverless/task'
+
+export class MyTaskQueueEventFactory extends TaskQueueEventFactory {
+  async transformTask(event: TaskQueueEvent): Promise<IEvent[]> {
+    // add your own task handling here
+    return []
+  }
+  // transformStepFunctionTask for MASTER_COPY tasks is inherited from TaskQueueEventFactory
+}
+\`\`\`
+2. Call \`TaskModule.register({ taskQueueEventFactory: MyTaskQueueEventFactory })\` once in the host \`AppModule\`.
+3. Remove any \`TaskModule.register()\` calls from feature modules — multiple registrations cause \`"transformTask is not a function"\` at runtime (detected by AP015).
+
+**Symptom if migration is skipped:** App crashes at startup with \`Nest can't resolve dependencies of MyTaskService (?)\`.
+
 ## Common Migration Issues
 
 ### Interface Changes
