@@ -35,13 +35,13 @@ Generate code and analyze projects:
 | `mbc_validate_cqrs` | Validate CQRS pattern implementation |
 | `mbc_analyze_project` | Analyze project structure and detect framework usage |
 | `mbc_lookup_error` | Look up error solutions from the error catalog |
-| `mbc_check_anti_patterns` | Detect anti-patterns (AP001–AP014) in project source files |
+| `mbc_check_anti_patterns` | Detect anti-patterns (AP001–AP020) in project source files |
 | `mbc_health_check` | Health check for dependencies, structure, and configuration |
 | `mbc_explain_code` | Explain a file or code section in the MBC CQRS context |
 
 #### Anti-Pattern Detection (`mbc_check_anti_patterns`)
 
-Detects 14 anti-patterns including v1.1.x and v1.2.0 breaking changes:
+Detects 20 anti-patterns including v1.1.x and v1.2.x breaking changes:
 
 | Code | Name | Severity |
 |------|------|----------|
@@ -59,6 +59,12 @@ Detects 14 anti-patterns including v1.1.x and v1.2.0 breaking changes:
 | AP012 | Uppercase COMMON Tenant Key (`#COMMON` → `#common` in v1.1.0) | Critical |
 | AP013 | publishSync Null Return Unchecked (`publishSync` returns `null` on no-op since v1.2.0) | High |
 | AP014 | Deprecated genNewSequence (`SequenceService.genNewSequence()` removed in v1.2.0) | High |
+| AP015 | Duplicate TaskModule Registration (global since v1.2.4) | High |
+| AP016 | Missing Error Logging Before Rethrow | High |
+| AP017 | Incorrect Attribute Merging on Partial Update | High |
+| AP018 | Missing Swagger Documentation | Low |
+| AP019 | Missing Pagination in List Queries | High |
+| AP020 | Missing getCommandSource for Tracing | Low |
 
 ### Prompts
 
@@ -78,6 +84,8 @@ Get guided assistance:
 | v1.1.4 | `publishSync` now writes full audit trail to Command + History tables |
 | v1.1.5 | CSV import batch architecture — `finalize_parent_job` state required in Step Functions |
 | v1.2.0 | `publishSync`/`publishPartialUpdateSync` return `null` on no-op; `genNewSequence()` removed; RYW `Repository` added |
+| v1.2.2 | `CsvBatchProcessor` Smart Retry (Poison Pill fix); `ImportQueueEventHandler` payload fix |
+| v1.2.4 | `TaskModule.register()` is now global — must be called once in host `AppModule` |
 
 ## Installation
 

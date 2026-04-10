@@ -32,6 +32,13 @@ This skill helps migrate MBC CQRS Serverless projects between versions.
 | v1.0.20 | v1.0.21 | Medium | ZIP Finalization Hooks |
 | v1.0.21 | v1.0.22 | Low | DynamoDB export filter fix |
 | v1.0.22 | v1.0.23 | Low | sendInlineTemplateEmail() |
+| v1.0.x | v1.1.0 | **High** | TENANT_COMMON → lowercase; publish() removed |
+| v1.1.x | v1.1.4 | Low | publishSync audit trail (transparent) |
+| v1.1.x | v1.1.5 | Medium | CSV import v2 batch architecture |
+| v1.1.x | v1.2.0 | **High** | publishSync null return; genNewSequence() removed |
+| v1.2.0 | v1.2.1 | Low | SqsService added (new feature) |
+| v1.2.1 | v1.2.2 | Low | CsvBatchProcessor Poison Pill fix (transparent) |
+| v1.2.x | v1.2.4 | Medium | TaskModule.register() must be in AppModule |
 
 ## Migration Guides
 
@@ -206,6 +213,128 @@ await notificationService.sendInlineTemplateEmail({
 **Migration Steps:**
 1. No breaking changes
 2. Optional: Use inline templates instead of SES templates for simple emails
+
+---
+
+---
+
+### v1.1.0 — Breaking Changes (data migration required)
+
+**1. TENANT_COMMON renamed to lowercase**
+```typescript
+// Before (v1.0.x)
+const pk = `MASTER_SETTING#COMMON#${settingCode}`
+
+// After (v1.1.0+)
+const pk = `MASTER_SETTING#common#${settingCode}`
+```
+- All DynamoDB keys using `#COMMON` must be migrated to `#common`
+- New utilities: `normalizeTenantCode()`, `isCommonTenant()`
+
+**2. `publish()` and `publishPartialUpdate()` removed**
+```typescript
+// Removed — compilation error in v1.1.0+
+this.commandService.publish(...)
+this.commandService.publishPartialUpdate(...)
+
+// Use instead
+this.commandService.publishAsync(...)
+this.commandService.publishPartialUpdateAsync(...)
+```
+
+---
+
+### v1.1.4 — publishSync audit trail (no code changes required)
+
+`publishSync` now writes a full audit trail to Command and History tables (parity with async pipeline). No migration required; behavior is transparent.
+
+---
+
+### v1.1.5 — CSV Import v2 batch architecture
+
+Step Functions state machine changes required:
+- `finalize_parent_job` state is now **required**
+- Row-level progress tracking via `import_tmp` table is removed
+- Counters (`processedRows`, `succeededRows`, `failedRows`) are aggregated at completion
+
+---
+
+### v1.2.0 — Breaking Changes
+
+**1. publishSync / publishPartialUpdateSync return type change**
+```typescript
+// Before (v1.1.x) — always returned CommandModel
+const result = await commandService.publishSync(entity, options)
+console.log(result.pk) // safe
+
+// After (v1.2.0+) — returns null when command is not dirty (no-op)
+const result = await commandService.publishSync(entity, options)
+if (!result) return // no-op
+console.log(result.pk) // safe after null check
+```
+
+**2. SequenceService.genNewSequence() removed**
+```typescript
+// Removed — compilation error in v1.2.0+
+await sequenceService.genNewSequence(...)
+
+// Use instead
+await sequenceService.generateSequenceItem(...)
+// or
+await sequenceService.generateSequenceItemWithProvideSetting(...)
+```
+
+**3. Read-Your-Writes (RYW) consistency (new optional feature)**
+```typescript
+import { DetailKey, Repository } from '@mbc-cqrs-serverless/core'
+
+// Enable: set RYW_SESSION_TTL_MINUTES env var (e.g. "5")
+// Session table {NODE_ENV}-{APP_NAME}-session must be created
+// No effect if unset — zero impact on existing projects
+```
+
+---
+
+### v1.2.2 — Bug fixes (no code changes required)
+
+- **CsvBatchProcessor Poison Pill fix**: Per-row try/catch now prevents Head-of-Line Blocking in SQS batches
+- **ImportQueueEventHandler**: `singleImportProcessor.process()` now receives `event.importEvent` instead of `event.payload`
+
+Both fixes are transparent — no migration steps needed.
+
+---
+
+### v1.2.4 — TaskModule global registration
+
+**Breaking for apps using `@mbc-cqrs-serverless/master`**
+
+`TaskModule.register()` is now global (`global: true`) and must be called **exactly once** in the host `AppModule`. `MasterModule` no longer registers `TaskModule` internally.
+
+```typescript
+// Before (v1.2.3 and earlier) — worked automatically
+@Module({
+  imports: [MasterModule.register({ enableController: true, prismaService: PrismaService })],
+})
+export class AppModule {}
+
+// After (v1.2.4+) — must register explicitly
+import { TaskModule, TaskQueueEventFactory } from '@mbc-cqrs-serverless/master'
+
+@Module({
+  imports: [
+    TaskModule.register({ taskQueueEventFactory: MyTaskQueueEventFactory }),
+    MasterModule.register({ enableController: true, prismaService: PrismaService }),
+  ],
+})
+export class AppModule {}
+```
+
+**Migration steps:**
+1. Create a factory extending `TaskQueueEventFactory` from `@mbc-cqrs-serverless/master`
+2. Call `TaskModule.register()` once in `AppModule`
+3. Remove `TaskModule.register()` from all feature modules
+
+**Symptom if skipped:** App crashes at startup with `Nest can't resolve dependencies of MyTaskService (?)`.
 
 ---
 
