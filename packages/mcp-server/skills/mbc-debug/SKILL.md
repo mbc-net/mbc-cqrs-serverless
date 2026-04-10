@@ -205,7 +205,96 @@ const results = await this.dataService.listByPk({
 
 ---
 
-### 5. Import Processing Issues
+### 5. publishSync Returns null Unexpectedly (v1.2.0+)
+
+**Symptom:** `Cannot read properties of null` when accessing result of `publishSync()`
+
+**Cause:** Since v1.2.0, `publishSync()` and `publishPartialUpdateSync()` return `null` when the command is not dirty (no changes detected — no-op).
+
+**Debug Steps:**
+```typescript
+// Step 1: Check if command has actual changes
+const result = await this.commandService.publishSync(entity, options)
+console.log('publishSync result:', result) // null = no-op (not dirty)
+
+// Step 2: Always null-check before accessing properties
+if (!result) {
+  // Command was a no-op — item already up-to-date
+  return existingItem
+}
+console.log('Published:', result.pk)
+```
+
+**Correct Pattern:**
+```typescript
+const result = await this.commandService.publishSync(command, options)
+if (!result) {
+  // No changes were made — return existing data
+  return await this.dataService.getItem({ pk, sk })
+}
+return result
+```
+
+---
+
+### 6. CSV Batch Import Head-of-Line Blocking (fixed in v1.2.2)
+
+**Symptom (pre-v1.2.2):** Valid CSV rows are never processed because one bad row causes the entire SQS batch to crash and retry indefinitely.
+
+**Root Cause:** A persistent validation error on any row (especially row 1) caused `CsvBatchProcessor` to throw immediately, blocking all subsequent rows until DLQ threshold was reached.
+
+**Status:** Fixed in v1.2.2 via Smart Retry pattern — each row is now processed in an independent try/catch.
+
+**If still on < v1.2.2, workaround:**
+```typescript
+// Pre-validate all rows before processing to identify bad rows
+const validRows = []
+const invalidRows = []
+for (const row of rows) {
+  try {
+    await strategy.compare(row, tenantCode)
+    validRows.push(row)
+  } catch {
+    invalidRows.push(row)
+  }
+}
+// Log invalid rows, then process only valid ones
+```
+
+**Upgrade recommendation:** Update to v1.2.2+ to get automatic per-row error isolation.
+
+---
+
+### 7. TaskModule Dependency Resolution Error (v1.2.4+)
+
+**Symptom:** App crashes at startup with:
+```
+Nest can't resolve dependencies of MyTaskService (?).
+Please make sure that the argument TASK_QUEUE_EVENT_FACTORY at index [0] is available in the MyModule context.
+```
+
+**Cause:** Since v1.2.4, `TaskModule.register()` is global and must be called exactly once in the host `AppModule`. `MasterModule` no longer registers it internally.
+
+**Fix:**
+```typescript
+import { TaskModule, TaskQueueEventFactory } from '@mbc-cqrs-serverless/master'
+
+@Module({
+  imports: [
+    // Register ONCE here in AppModule
+    TaskModule.register({ taskQueueEventFactory: MyTaskQueueEventFactory }),
+    MasterModule.register({ enableController: true, prismaService: PrismaService }),
+    // Remove TaskModule.register() from all feature modules!
+  ],
+})
+export class AppModule {}
+```
+
+**Also check:** `"transformTask is not a function"` at runtime indicates multiple `TaskModule.register()` calls creating conflicting bindings.
+
+---
+
+### 8. Import Processing Issues
 
 **Symptom:** Import job fails or gets stuck
 
@@ -420,11 +509,26 @@ aws logs tail /aws/lambda/YOUR_FUNCTION_NAME --since 1h
 Error Occurred
 │
 ├── Is it a TypeScript compilation error?
+│   ├── "genNewSequence is not a function"?
+│   │   └── Removed in v1.2.0 — use generateSequenceItem() instead
+│   │
 │   └── Check import statements and type definitions
 │
+├── Is it a startup crash?
+│   ├── "Nest can't resolve dependencies of MyTaskService"?
+│   │   └── v1.2.4: Add TaskModule.register() to AppModule (see §7)
+│   │
+│   └── Check module imports and provider registration
+│
 ├── Is it a runtime error?
+│   ├── "Cannot read properties of null" after publishSync?
+│   │   └── v1.2.0+: publishSync returns null on no-op — add null check (see §5)
+│   │
 │   ├── ConditionalCheckFailedException?
-│   │   └── Version mismatch - fetch latest version
+│   │   └── Version mismatch - fetch latest version before updating
+│   │
+│   ├── "transformTask is not a function"?
+│   │   └── v1.2.4: Multiple TaskModule.register() calls — keep only one in AppModule
 │   │
 │   ├── ResourceNotFoundException?
 │   │   └── Table/Item doesn't exist - check table name
@@ -436,6 +540,9 @@ Error Occurred
 │       └── Check CloudWatch logs for stack trace
 │
 ├── Is it a silent failure?
+│   ├── CSV import rows silently blocked (pre-v1.2.2)?
+│   │   └── Poison Pill problem — upgrade to v1.2.2+ (see §6)
+│   │
 │   ├── DataSyncHandler not running?
 │   │   └── Check type matching and registration
 │   │
