@@ -264,6 +264,52 @@ export class SequencesService implements ISequenceService {
     }
   }
 
+  private isIncrementNo(
+    rotateBy: RotateByEnum | undefined,
+    nowFiscalYear: number,
+    fiscalYear: number,
+    issuedAt: Date,
+  ) {
+    /**
+     * Determine whether to increment the number (no)
+     * based on rotateBy. If rotateBy matches the fiscal year, year, or month,
+     * depending on the value, it will return true for incrementing.
+     */
+
+    // If rotateBy is not provided, increment
+    if (!rotateBy) {
+      return true
+    }
+
+    // Reset the number if fiscal year changes
+    if (rotateBy === RotateByEnum.FISCAL_YEARLY) {
+      if (nowFiscalYear === fiscalYear) {
+        return true
+      }
+    }
+
+    // Use the current date in Japan time (JST)
+    const nowDate = new Date() // Assuming the server time is in JST
+
+    // Reset the number if year changes
+    if (rotateBy === RotateByEnum.YEARLY) {
+      if (nowDate.getFullYear() === issuedAt.getFullYear()) {
+        return true
+      }
+    }
+
+    // Reset the number if month changes
+    if (rotateBy === RotateByEnum.MONTHLY) {
+      if (nowDate.getFullYear() === issuedAt.getFullYear()) {
+        if (nowDate.getMonth() === issuedAt.getMonth()) {
+          return true
+        }
+      }
+    }
+
+    return false
+  }
+
   private getFiscalYear(options: FiscalYearOptions): number {
     /**
      * Calculates the fiscal year based on the provided `now` and `registerTime`.
