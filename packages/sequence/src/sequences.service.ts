@@ -237,10 +237,11 @@ export class SequencesService implements ISequenceService {
     const date = forDate || new Date()
 
     switch (rotateBy) {
-      case RotateByEnum.FISCAL_YEARLY:
+      case RotateByEnum.FISCAL_YEARLY: {
         const year = date.getFullYear()
         // new fiscal year from April
         return date.getMonth() < 3 ? (year - 1).toString() : year.toString()
+      }
 
       case RotateByEnum.YEARLY:
         return date.getFullYear().toString()
@@ -263,52 +264,6 @@ export class SequencesService implements ISequenceService {
     }
   }
 
-  private isIncrementNo(
-    rotateBy: RotateByEnum | undefined,
-    nowFiscalYear: number,
-    fiscalYear: number,
-    issuedAt: Date,
-  ) {
-    /**
-     * Determine whether to increment the number (no)
-     * based on rotateBy. If rotateBy matches the fiscal year, year, or month,
-     * depending on the value, it will return true for incrementing.
-     */
-
-    // If rotateBy is not provided, increment
-    if (!rotateBy) {
-      return true
-    }
-
-    // Reset the number if fiscal year changes
-    if (rotateBy === RotateByEnum.FISCAL_YEARLY) {
-      if (nowFiscalYear === fiscalYear) {
-        return true
-      }
-    }
-
-    // Use the current date in Japan time (JST)
-    const nowDate = new Date() // Assuming the server time is in JST
-
-    // Reset the number if year changes
-    if (rotateBy === RotateByEnum.YEARLY) {
-      if (nowDate.getFullYear() === issuedAt.getFullYear()) {
-        return true
-      }
-    }
-
-    // Reset the number if month changes
-    if (rotateBy === RotateByEnum.MONTHLY) {
-      if (nowDate.getFullYear() === issuedAt.getFullYear()) {
-        if (nowDate.getMonth() === issuedAt.getMonth()) {
-          return true
-        }
-      }
-    }
-
-    return false
-  }
-
   private getFiscalYear(options: FiscalYearOptions): number {
     /**
      * Calculates the fiscal year based on the provided `now` and `registerTime`.
@@ -326,7 +281,7 @@ export class SequencesService implements ISequenceService {
 
     const effectiveStartMonth = registerTime
       ? registerTime.getMonth() + 1
-      : (startMonth ?? 4)
+      : startMonth
     const referenceYear = registerTime ? registerTime.getFullYear() : 1953 // Reference year
 
     // Determine the current fiscal year
@@ -393,6 +348,11 @@ export class SequencesService implements ISequenceService {
   private extractPaddingInfo(str: string) {
     const regex = /:(\d)>(\d)/
     const match = str.match(regex)
+
+    if (!match) {
+      this.logger.warn(`Invalid padding format: "${str}"`)
+      return { paddingValue: '0', paddingNumber: 0 }
+    }
 
     return {
       paddingValue: match[1],
