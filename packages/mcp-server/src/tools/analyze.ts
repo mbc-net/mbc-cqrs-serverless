@@ -592,6 +592,55 @@ const ANTI_PATTERNS = [
     recommendation:
       'TaskModule.register() is global since v1.2.4 and must be called exactly once in the host AppModule. Multiple calls cause conflicting TASK_QUEUE_EVENT_FACTORY bindings and result in "transformTask is not a function" at runtime. Remove all TaskModule.register() calls from feature modules and keep only the one in the host AppModule.',
   },
+  {
+    code: 'AP016',
+    name: 'Missing Error Logging Before Rethrow',
+    severity: 'high' as const,
+    // Detect catch blocks that rethrow without logging (throw error; or throw new XxxException without logger.error)
+    pattern:
+      /catch\s*\(\s*(?:error|err|e)\s*\)\s*\{(?:(?!logger\.(error|warn)).)*throw\s+(?:error|err|e|new\s+\w+Exception)/s,
+    recommendation:
+      'Always log errors with context before rethrowing. Use this.logger.error() with the error message and stack trace for debugging.',
+  },
+  {
+    code: 'AP017',
+    name: 'Incorrect Attribute Merging on Partial Update',
+    severity: 'high' as const,
+    // Detect publishPartialUpdateAsync/Sync where attributes: dto.attributes (not spread merged)
+    pattern:
+      /publishPartialUpdate(?:Async|Sync)\s*\(\s*\{[^}]*attributes\s*:\s*(?:dto|input|body|data)\s*\.\s*attributes(?!\s*}?\s*,?\s*\.\.\.)(?![^}]*\.\.\.[^}]*attributes)/,
+    recommendation:
+      'When updating attributes, merge existing attributes with new ones: { ...existingItem.attributes, ...dto.attributes }. Passing dto.attributes directly overwrites all existing attributes.',
+  },
+  {
+    code: 'AP018',
+    name: 'Missing Swagger Documentation',
+    severity: 'low' as const,
+    // Detect @Controller classes that have no @ApiTags decorator
+    pattern: /@Controller\s*\([^)]*\)(?:(?!@ApiTags).){0,200}export\s+class/,
+    recommendation:
+      'Add @ApiTags() to controllers and @ApiOperation({ summary: ... }) / @ApiResponse() to endpoint methods for API documentation.',
+  },
+  {
+    code: 'AP019',
+    name: 'Missing Pagination in List Queries',
+    severity: 'high' as const,
+    // Detect listByPk/listItemsByPk/listItems calls without limit parameter
+    pattern:
+      /\.(?:listByPk|listItemsByPk|listItems)\s*\(\s*\{(?:(?!limit).)*\}\s*\)/,
+    recommendation:
+      'Always include limit and cursor parameters in list queries to avoid returning unbounded result sets and causing performance issues.',
+  },
+  {
+    code: 'AP020',
+    name: 'Missing getCommandSource for Tracing',
+    severity: 'low' as const,
+    // Detect publishAsync/publishSync called with options object that has invokeContext but no source
+    pattern:
+      /commandService\.publish(?:Async|Sync|PartialUpdateAsync|PartialUpdateSync)\s*\([^)]*invokeContext[^)]*\)/,
+    recommendation:
+      'Include source in publish options using getCommandSource(basename(__dirname), this.constructor.name, methodName) for debugging and audit trails.',
+  },
 ]
 
 /**
