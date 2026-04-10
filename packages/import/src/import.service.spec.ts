@@ -182,6 +182,23 @@ describe('ImportService', () => {
       expect(result.type).toEqual('ZIP_MASTER_JOB')
     })
 
+    it('should reject sortedFileKeys: [] before creating a job or touching S3', async () => {
+      const dto: CreateZipImportDto = {
+        tenantCode: 'tenant1',
+        bucket: 'my-bucket',
+        key: 'path/to/file.zip',
+        sortedFileKeys: [],
+      }
+
+      await expect(
+        service.createZipJob(dto, mockInvokeContext),
+      ).rejects.toThrow(/sortedFileKeys cannot be an empty array/)
+
+      expect(dynamoDbService.putItem).not.toHaveBeenCalled()
+      expect(s3Service.client.send).not.toHaveBeenCalled()
+      expect(sfnService.startExecution).not.toHaveBeenCalled()
+    })
+
     it('should catch errors, rollback status to FAILED, and rethrow', async () => {
       const dto: CreateZipImportDto = {
         tenantCode: 'tenant1',

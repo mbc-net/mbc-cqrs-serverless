@@ -46,7 +46,6 @@ export class ImportService {
     private readonly dynamoDbService: DynamoDbService,
     private readonly snsService: SnsService,
 
-    private readonly config: ConfigService,
     private readonly s3Service: S3Service,
     @Inject(IMPORT_STRATEGY_MAP)
     private readonly importStrategyMap: Map<string, IImportStrategy<any, any>>,
@@ -55,7 +54,7 @@ export class ImportService {
     private readonly sfnService: StepFunctionService,
   ) {
     this.tableName = dynamoDbService.getTableName('import_tmp')
-    this.alarmTopicArn = this.config.get<string>('SNS_ALARM_TOPIC_ARN')
+    this.alarmTopicArn = this.configService.get<string>('SNS_ALARM_TOPIC_ARN')
   }
 
   /**
@@ -146,6 +145,16 @@ export class ImportService {
       invokeContext: IInvoke
     },
   ): Promise<ImportEntity> {
+    if (
+      dto.sortedFileKeys != null &&
+      Array.isArray(dto.sortedFileKeys) &&
+      dto.sortedFileKeys.length === 0
+    ) {
+      throw new BadRequestException(
+        'sortedFileKeys cannot be an empty array; omit the field to extract from the ZIP in S3.',
+      )
+    }
+
     const sourceIp =
       options.invokeContext?.event?.requestContext?.http?.sourceIp
     const userContext = getUserContext(options.invokeContext)
@@ -203,7 +212,9 @@ export class ImportService {
           if (zipEntry.dir) continue
 
           const fileContent = await zipEntry.async('nodebuffer')
-          const extractedKey = `csv-imports/${dto.tenantCode}/${Date.now()}-${filename}`
+          // Use job taskCode as folder so the object basename stays the ZIP entry name.
+          // ZipImportSfnEventHandler parses tableName from yyyymmddHHmmss-{tableName}.csv on the final segment.
+          const extractedKey = `csv-imports/${dto.tenantCode}/${taskCode}/${filename}`
 
           const upload = new Upload({
             client: this.s3Service.client,
@@ -221,9 +232,11 @@ export class ImportService {
           throw new Error('ZIP file is empty or contains no valid files.')
         }
 
-        // Update the DynamoDB record with the extracted keys
+        // Merge into attributes so bucket/key/tenantCode/tableName are not wiped (full map SET).
         await this.updateImportJob(masterJobKey, {
-          set: { attributes: { extractedFileKeys: extractedKeys } },
+          set: {
+            attributes: { ...dto, extractedFileKeys: extractedKeys },
+          },
         })
 
         // Sort them automatically if the client didn't
