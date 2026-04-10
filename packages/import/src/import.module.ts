@@ -10,7 +10,6 @@ import { ImportQueueEventHandler } from './event/import.queue.event.handler'
 import { ImportStatusHandler } from './event/import-status.queue.event.handler'
 import { CsvBatchProcessor } from './event/processor/csv-batch.processor'
 import { SingleImportProcessor } from './event/processor/single-import.processor'
-import { ZipImportQueueEventHandler } from './event/zip-import.queue.event.handler'
 import { ZipImportSfnEventHandler } from './event/zip-import.sfn.event.handler'
 import { ImportController } from './import.controller'
 import {
@@ -36,7 +35,6 @@ import { IProcessStrategy } from './interface/processing-strategy.interface'
     CsvImportSfnEventHandler,
     CommandFinishedHandler,
     ImportStatusHandler,
-    ZipImportQueueEventHandler,
     ZipImportSfnEventHandler,
     CsvBatchProcessor,
     SingleImportProcessor,

@@ -22,6 +22,12 @@ export class ImportEventHandler implements IEventHandler<ImportEvent> {
   ) {}
 
   async execute(event: ImportEvent): Promise<any> {
+    if (event.importEntity.type === 'ZIP_MASTER_JOB') {
+      this.logger.debug(
+        `Skipping SQS publish for ZIP_MASTER_JOB: ${event.importEntity.id}`,
+      )
+      return
+    }
     const queueUrl = this.configService.get<string>('IMPORT_QUEUE_URL')
     if (!queueUrl) throw new Error('IMPORT_QUEUE_URL is not configured')
 

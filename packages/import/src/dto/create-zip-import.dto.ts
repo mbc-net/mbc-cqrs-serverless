@@ -1,4 +1,10 @@
-import { IsArray, IsNotEmpty, IsOptional, IsString } from 'class-validator'
+import {
+  ArrayMinSize,
+  IsArray,
+  IsNotEmpty,
+  IsOptional,
+  IsString,
+} from 'class-validator'
 
 export class CreateZipImportDto {
   @IsString()
@@ -14,9 +20,11 @@ export class CreateZipImportDto {
   tenantCode: string
 
   // High priority: sortedFileKeys
-  // If not provided, it will use the default sorting logic
+  // If omitted, the service downloads the ZIP from S3 and extracts CSV keys.
+  // If provided, it must contain at least one key (empty [] is invalid).
   @IsArray()
   @IsOptional()
+  @ArrayMinSize(1)
   sortedFileKeys?: string[]
 
   // High priority: tableName
