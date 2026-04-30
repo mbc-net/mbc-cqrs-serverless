@@ -539,13 +539,13 @@ export class OrderDataSyncHandler implements IDataSyncHandler {
       this.eventEmitter.emit('order.created', {
         orderId: cmd.id,
         tenantCode: cmd.tenantCode,
-        ...
+        // ... other fields from cmd.attributes
       });
     }
   }
 
   async down(cmd: CommandModel): Promise<void> {
-    this.eventEmitter.emit('order.deleted', { orderId: cmd.id, ... });
+    this.eventEmitter.emit('order.deleted', { orderId: cmd.id, tenantCode: cmd.tenantCode });
   }
 }
 ```
