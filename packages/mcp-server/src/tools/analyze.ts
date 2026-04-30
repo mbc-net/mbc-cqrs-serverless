@@ -641,6 +641,17 @@ const ANTI_PATTERNS = [
     recommendation:
       'Include source in publish options using getCommandSource(basename(__dirname), this.constructor.name, methodName) for debugging and audit trails.',
   },
+  {
+    code: 'AP021',
+    name: 'Event Emit Directly After publishAsync in CommandService',
+    severity: 'critical' as const,
+    // Detect eventEmitter.emit() called in the same method body after commandService.publishAsync/publishSync
+    // Pattern: publishAsync(...) followed by eventEmitter.emit(...) without an IDataSyncHandler boundary
+    pattern:
+      /commandService\.publish(?:Async|Sync|PartialUpdateAsync|PartialUpdateSync)\b[\s\S]{0,500}?this\.eventEmitter\.emit\s*\(/,
+    recommendation:
+      'Do not call eventEmitter.emit() directly after publishAsync(). At that point only the command table has been written; the data table is populated asynchronously via DynamoDB Streams. Any @OnEvent handler that calls DataService.getItem() will find no data. Instead, implement IDataSyncHandler and emit events inside up()/down(), which are called after the data table write completes. Register the handler in CommandModule.register({ dataSyncHandlers: [...] }). If change-detection is needed (e.g. statusChanged), embed previous values as attributes._prev in publishAsync and read them in the handler; strip _prev in RDS sync handlers to prevent it leaking into the database.',
+  },
 ]
 
 /**
