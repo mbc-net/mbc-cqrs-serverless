@@ -503,6 +503,61 @@ export class OrderModule {}
 
 ---
 
+### AP021: Emitting Events Directly in XxxCommandService After publishAsync
+
+**Severity:** Error
+
+**Pattern:**
+```typescript
+// Bad - emit immediately after publishAsync (data table not yet written)
+async createOrder(params: CreateOrderParams, context: UserContext): Promise<string> {
+  await this.commandService.publishAsync({ pk, sk, ... }, { invokeContext });
+
+  // WRONG: at this point, DataService.getItem() returns null
+  // because the data table is populated asynchronously via DynamoDB Streams
+  this.eventEmitter.emit('order.created', { orderId, tenantCode, ... });
+  return orderId;
+}
+
+// Bad - @OnEvent handler tries to read from DataService but finds nothing
+@OnEvent('order.created')
+async handleOrderCreated(event: OrderCreatedEvent) {
+  const order = await this.dataService.getItem({ pk, sk }); // Returns null!
+}
+
+// Good - emit inside IDataSyncHandler.up() AFTER data table write
+@Injectable()
+export class OrderDataSyncHandler implements IDataSyncHandler {
+  constructor(private readonly eventEmitter: EventEmitter2) {}
+
+  async up(cmd: CommandModel): Promise<void> {
+    if (!cmd.pk.startsWith('ORDER#')) return;
+    if (cmd.isDeleted) return;
+
+    if (cmd.version === VERSION_FIRST + 1) {
+      // Data table is already written at this point — DataService.getItem() works
+      this.eventEmitter.emit('order.created', {
+        orderId: cmd.id,
+        tenantCode: cmd.tenantCode,
+        // ... other fields from cmd.attributes
+      });
+    }
+  }
+
+  async down(cmd: CommandModel): Promise<void> {
+    this.eventEmitter.emit('order.deleted', { orderId: cmd.id, tenantCode: cmd.tenantCode });
+  }
+}
+```
+
+**Explanation:** `publishAsync` writes only to the DynamoDB **command** table. The **data** table (read by `DataService.getItem()`) is populated asynchronously via DynamoDB Streams → Step Functions → `IDataSyncHandler.up()`. Emitting events in `XxxCommandService` immediately after `publishAsync` means any `@OnEvent` handler that calls `DataService.getItem()` will find no data, causing "entity not found" errors.
+
+The correct pattern is to implement a custom `IDataSyncHandler` and emit events in `up()` / `down()`. By the time these methods run, the data table write has already completed. Register the handler in `CommandModule.register({ dataSyncHandlers: [...] })`.
+
+If you need to include previous field values for change-detection (e.g., `statusChanged`), embed them as `attributes._prev` in the `publishAsync` call and read them in the handler. Strip `_prev` from RDS sync handlers to prevent internal metadata from leaking into the database.
+
+---
+
 ## Review Checklist
 
 When reviewing MBC CQRS Serverless code, check:
@@ -520,6 +575,7 @@ When reviewing MBC CQRS Serverless code, check:
 - [ ] Existing version is fetched for updates
 - [ ] `generateId()` is used for ID generation
 - [ ] `getCommandSource()` is used for tracing
+- [ ] `eventEmitter.emit()` is NOT called directly after `publishAsync` (use IDataSyncHandler instead)
 
 ### DTOs
 - [ ] class-validator decorators are present
@@ -537,10 +593,12 @@ When reviewing MBC CQRS Serverless code, check:
 - [ ] Errors are logged appropriately
 
 ### Data Sync Handler
-- [ ] `@DataSyncHandler({ type: 'ENTITY' })` decorator is present
+- [ ] `@DataSyncHandler({ type: 'ENTITY' })` decorator is present (for RDS sync handlers)
 - [ ] Implements `IDataSyncHandler`
 - [ ] Handles both create/update and delete cases
 - [ ] Registered in module
+- [ ] Event-emitting handlers implement `IDataSyncHandler` and emit in `up()` / `down()`
+- [ ] `_prev` metadata is stripped before RDS upsert if used for change-detection
 
 ## Output Format
 
