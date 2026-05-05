@@ -82,13 +82,25 @@ export class Repository {
           `getItem session merge — version ${session.version}`,
           key,
         )
+
+        // Fetch existing data FIRST to check if the session is stale
+        const existing = await this.dataService.getItem(key)
+
+        // If data table has caught up or surpassed the session, the session is stale
+        if (existing && existing.version >= session.version) {
+          this.sessionService
+            .delete(userId, tenantCode, this.moduleTableName, itemId)
+            .catch(() => {})
+          return existing
+        }
+
+        // Otherwise, data is still lagging. Fetch the command to project it.
         const cmd = await this.commandService.getItem({
           pk: key.pk,
           sk: addSortKeyVersion(key.sk, session.version),
         })
 
         if (cmd) {
-          const existing = await this.dataService.getItem(key)
           return transformCommandToData(cmd, existing)
         }
       }
@@ -172,6 +184,15 @@ export class Repository {
       const itemId = session.sk.slice(skPrefix.length)
 
       const existing = itemMap.get(itemId) as DataModel | undefined
+
+      // If the item in the list already caught up to the session, clear the session and skip merge
+      if (existing && existing.version >= session.version) {
+        this.sessionService
+          .delete(userId, tenantCode, this.moduleTableName, itemId)
+          .catch(() => {})
+        continue
+      }
+
       const cmdPk = pk
       let skBase: string | undefined
 
@@ -314,6 +335,17 @@ export class Repository {
       }
 
       if (!cmdPk || !skBase) {
+        continue
+      }
+
+      // Fetch the actual current data record to see if it has caught up
+      const dataItem = await this.dataService.getItem({ pk: cmdPk, sk: skBase })
+
+      // If data table has caught up or surpassed the session, the session is stale
+      if (dataItem && dataItem.version >= session.version) {
+        this.sessionService
+          .delete(userId, tenantCode, this.moduleTableName, itemId)
+          .catch(() => {})
         continue
       }
 

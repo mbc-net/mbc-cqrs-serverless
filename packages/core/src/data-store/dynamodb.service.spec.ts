@@ -1,4 +1,5 @@
 import {
+  DeleteItemCommand,
   DynamoDBClient,
   GetItemCommand,
   PutItemCommand,
@@ -16,7 +17,6 @@ import { GetObjectCommand, S3Client } from '@aws-sdk/client-s3'
 import { sdkStreamMixin } from '@smithy/util-stream'
 import { Readable } from 'stream'
 import { ulid } from 'ulid'
-import { toISOStringWithTimezone } from '../helpers'
 
 const keys = {
   NODE_ENV: 'env',
@@ -51,6 +51,26 @@ describe('DynamoDbService', () => {
     jest.clearAllMocks()
     dynamoDBMock.reset()
     s3Mock.reset()
+  })
+
+  describe('deleteItem', () => {
+    it('should send DeleteItemCommand with the correct parameters', async () => {
+      // Arrange
+      dynamoDBMock.on(DeleteItemCommand).resolves({})
+      const key = { pk: 'master', sk: 'test' }
+
+      // Action
+      await dynamoDbService.deleteItem('table_name', key)
+
+      // Assert
+      expect(dynamoDBMock).toHaveReceivedCommandWith(DeleteItemCommand, {
+        TableName: 'table_name',
+        Key: {
+          pk: { S: 'master' },
+          sk: { S: 'test' },
+        },
+      })
+    })
   })
 
   describe('get', () => {
