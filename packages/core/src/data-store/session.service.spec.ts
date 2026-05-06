@@ -7,14 +7,17 @@ import { DynamoDbService } from './dynamodb.service'
 
 describe('SessionService', () => {
   let service: SessionService
+  let dynamoDbService: Partial<DynamoDbService>
   let putItem: jest.Mock
   let getItem: jest.Mock
   let listItemsByPk: jest.Mock
+  let deleteItem: jest.Mock
 
   beforeEach(async () => {
     putItem = jest.fn().mockResolvedValue(undefined)
     getItem = jest.fn()
     listItemsByPk = jest.fn()
+    deleteItem = jest.fn().mockResolvedValue({})
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -25,6 +28,7 @@ describe('SessionService', () => {
             putItem,
             getItem,
             listItemsByPk,
+            deleteItem,
           },
         },
         {
@@ -44,6 +48,42 @@ describe('SessionService', () => {
     }).compile()
 
     service = module.get(SessionService)
+    dynamoDbService = module.get(DynamoDbService)
+  })
+
+  describe('delete', () => {
+    it('should call deleteItem with the correct session key', async () => {
+      await service.delete('u1', 't1', 'mod', 'id1')
+
+      expect(deleteItem).toHaveBeenCalledWith('local-test-app-session', {
+        pk: `u1${KEY_SEPARATOR}t1`,
+        sk: `mod${KEY_SEPARATOR}id1`,
+      })
+    })
+
+    it('should handle deletion errors gracefully (non-fatal)', async () => {
+      deleteItem.mockRejectedValue(new Error('Dynamo failure'))
+
+      // Should not throw
+      await expect(
+        service.delete('u1', 't1', 'mod', 'id1'),
+      ).resolves.not.toThrow()
+    })
+
+    it('should no-op if session writes are disabled', async () => {
+      // Setup a service instance where sessionWritesEnabled will be false
+      const mod = await Test.createTestingModule({
+        providers: [
+          SessionService,
+          { provide: DynamoDbService, useValue: { deleteItem: jest.fn() } },
+          { provide: ConfigService, useValue: { get: () => undefined } },
+        ],
+      }).compile()
+      const s = mod.get(SessionService)
+
+      await s.delete('u1', 't1', 'mod', 'id1')
+      expect(mod.get(DynamoDbService).deleteItem).not.toHaveBeenCalled()
+    })
   })
 
   it('should put item with ttl field', async () => {

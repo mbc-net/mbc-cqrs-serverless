@@ -460,7 +460,17 @@ interface AntiPatternMatch {
 
 /**
  * Anti-patterns to check for.
- * Codes are sequential from AP001 to AP010.
+ *
+ * Codes are sequential from AP001 to AP021 in detector-implementation order.
+ *
+ * IMPORTANT: These detector codes are a SEPARATE numbering system from the AP codes
+ * used in `skills/mbc-review/SKILL.md`. Only AP016, AP017, AP018, AP019, and AP021
+ * happen to refer to the same concept in both systems. See the cross-reference
+ * table at the top of `skills/mbc-review/SKILL.md` to map a detector code to its
+ * corresponding skill-doc section.
+ *
+ * When adding a new detector, append at the end (do not renumber) and update the
+ * cross-reference table in `skills/mbc-review/SKILL.md`.
  */
 const ANTI_PATTERNS = [
   {
@@ -641,7 +651,42 @@ const ANTI_PATTERNS = [
     recommendation:
       'Include source in publish options using getCommandSource(basename(__dirname), this.constructor.name, methodName) for debugging and audit trails.',
   },
+  {
+    code: 'AP021',
+    name: 'Event Emit Directly After publishAsync in CommandService',
+    severity: 'high' as const,
+    // Detect eventEmitter.emit() called close after commandService.publishAsync/publishSync.
+    // 200-char window reduces cross-method false positives while catching same-method violations.
+    pattern:
+      /commandService\.publish(?:Async|Sync|PartialUpdateAsync|PartialUpdateSync)\b[\s\S]{0,200}?this\.eventEmitter\.emit\s*\(/,
+    recommendation:
+      'Do not call eventEmitter.emit() directly after publishAsync(). At that point only the command table has been written; the data table is populated asynchronously via DynamoDB Streams. Any @OnEvent handler that calls DataService.getItem() will find no data. Instead, implement IDataSyncHandler and emit events inside up()/down(), which are called after the data table write completes. Register the handler in CommandModule.register({ dataSyncHandlers: [...] }). If change-detection is needed (e.g. statusChanged), embed previous values as attributes._prev in publishAsync and read them in the handler; strip _prev in RDS sync handlers to prevent it leaking into the database.',
+  },
 ]
+
+/**
+ * Maps a detector AP code (this file) to the corresponding skill-doc AP code in
+ * `skills/mbc-review/SKILL.md`. Used to annotate detector output so users can
+ * navigate from a detector hit to the human-readable explanation.
+ *
+ * Codes not present in the map are detector-only (no skill-doc counterpart).
+ * Keep this table in sync with the cross-reference table in SKILL.md.
+ */
+const DETECTOR_TO_SKILL_AP: Record<string, string> = {
+  AP001: 'AP012', // Direct DynamoDB Write → Direct DynamoDB Access Instead of DataService
+  AP002: 'AP005', // Ignored Version Mismatch → Not Handling ConditionalCheckFailedException
+  AP005: 'AP002', // Hardcoded Tenant → Missing tenantCode in Multi-Tenant Operations
+  AP006: 'AP002', // Missing Tenant Validation → Missing tenantCode in Multi-Tenant Operations
+  AP011: 'AP010', // Deprecated Method Usage → Deprecated Method Usage
+  AP013: 'AP001', // publishSync Null Return Unchecked → Using publishSync Instead of publishAsync (related)
+  AP014: 'AP010', // Deprecated genNewSequence → Deprecated Method Usage (related)
+  AP016: 'AP016', // Missing Error Logging Before Rethrow ✅
+  AP017: 'AP017', // Incorrect Attribute Merging ✅
+  AP018: 'AP018', // Missing Swagger Documentation ✅
+  AP019: 'AP019', // Missing Pagination in List Queries ✅
+  AP020: 'AP011', // Missing getCommandSource for Tracing → Missing getCommandSource for Tracing
+  AP021: 'AP021', // Event Emit After publishAsync ✅
+}
 
 /**
  * Check for anti-patterns in code.
@@ -722,6 +767,8 @@ async function checkAntiPatterns(
   text += `| 🟠 High | ${high.length} |\n`
   text += `| 🟡 Medium | ${medium.length} |\n`
   text += `| 🟢 Low | ${low.length} |\n\n`
+  text +=
+    '> **Note:** AP codes below are *detector codes* (from `analyze.ts`). They are a separate numbering system from the AP codes in `mbc-review` skill documentation. See the cross-reference table at the top of `skills/mbc-review/SKILL.md` to map a detector code to its corresponding skill-doc section.\n\n'
 
   for (const m of matches) {
     const icon =
@@ -732,7 +779,9 @@ async function checkAntiPatterns(
           : m.severity === 'medium'
             ? '🟡'
             : '🟢'
-    text += `### ${icon} ${m.code}: ${m.name}\n\n`
+    const skillRef = DETECTOR_TO_SKILL_AP[m.code]
+    const skillRefSuffix = skillRef ? ` _(skill-doc: ${skillRef})_` : ''
+    text += `### ${icon} ${m.code}: ${m.name}${skillRefSuffix}\n\n`
     text += `**File:** \`${m.file}:${m.line}\`\n`
     text += `**Snippet:** \`${m.snippet}\`\n\n`
     text += `**Recommendation:** ${m.recommendation}\n\n`

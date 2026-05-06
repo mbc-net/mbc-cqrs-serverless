@@ -115,6 +115,32 @@ export class SessionService {
   }
 
   /**
+   * Delete a session entry.
+   * Used to clean up the session once the data table has caught up to the command version.
+   */
+  async delete(
+    userId: string,
+    tenantCode: string,
+    moduleTableName: string,
+    itemId: string,
+  ): Promise<void> {
+    if (!this.sessionWritesEnabled) return
+
+    const key = {
+      pk: this.buildPk(userId, tenantCode),
+      sk: this.buildSk(moduleTableName, itemId),
+    }
+
+    try {
+      await this.dynamoDbService.deleteItem(this.sessionTableName, key)
+    } catch (error) {
+      this.logger.warn(
+        `Failed to delete RYW session (non-fatal): ${error instanceof Error ? error.message : 'Unknown error'}`,
+      )
+    }
+  }
+
+  /**
    * List session entries for a user scoped to a command module.
    *
    * Queries the session table by `{userId}#{tenantCode}` and filters to entries

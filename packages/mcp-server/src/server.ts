@@ -11,10 +11,24 @@ import {
   McpError,
   ReadResourceRequestSchema,
 } from '@modelcontextprotocol/sdk/types.js'
+import { readFileSync } from 'fs'
+import { join } from 'path'
 
 import { handlePromptGet, registerPrompts } from './prompts/index.js'
 import { handleResourceRead, registerResources } from './resources/index.js'
 import { handleToolCall, registerTools } from './tools/index.js'
+
+// Read version from package.json so it stays in sync after `lerna version` bumps.
+const PACKAGE_VERSION: string = (() => {
+  try {
+    const pkg = JSON.parse(
+      readFileSync(join(__dirname, '..', 'package.json'), 'utf8'),
+    )
+    return pkg.version ?? '0.0.0'
+  } catch {
+    return '0.0.0'
+  }
+})()
 
 /**
  * MCP Server for MBC CQRS Serverless framework.
@@ -30,7 +44,7 @@ export class McpServer {
     this.server = new Server(
       {
         name: 'mbc-cqrs-serverless',
-        version: '0.1.74-beta.0',
+        version: PACKAGE_VERSION,
       },
       {
         capabilities: {
