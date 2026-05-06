@@ -21,6 +21,43 @@ Before executing this skill, check for updates:
 
 This skill reviews code for MBC CQRS Serverless best practices and identifies anti-patterns.
 
+## ⚠️ Important: Two Anti-Pattern Code Systems
+
+This codebase currently has **two independent `AP00X` numbering systems** that are NOT interchangeable:
+
+1. **Skill `AP` codes** (this document) — used in human-facing reviews and documentation. Stable identifiers for discussion.
+2. **Detector `AP` codes** (output of the `mbc_check_anti_patterns` tool, defined in `src/tools/analyze.ts`) — used by the static analysis tool. Numbered in detector implementation order.
+
+**Only AP016, AP017, AP018, AP019, and AP021 happen to refer to the same concept in both systems.** All other AP numbers diverge — for example, the detector's `AP005: Hardcoded Tenant` corresponds to this document's `AP002: Missing tenantCode`. Do not assume the codes match.
+
+**Cross-reference table** (detector → skill doc):
+
+| Detector code (analyze.ts) | Skill doc code (this file) | Topic |
+|---|---|---|
+| AP001 Direct DynamoDB Write | AP012 | Bypassing CommandService / DataService |
+| AP002 Ignored Version Mismatch | AP005 | ConditionalCheckFailedException handling |
+| AP003 N+1 Query Pattern | — (detector only) | Query in a loop |
+| AP004 Full Table Scan | — (detector only) | `.scan()` usage |
+| AP005 Hardcoded Tenant | AP002 | Multi-tenant code/key handling |
+| AP006 Missing Tenant Validation | AP002 | Trusting client-provided `tenantCode` |
+| AP007 Throwing in Sync Handler | — (detector only) | DataSyncHandler error escape |
+| AP008 Hardcoded Secret | — (detector only) | Secrets in code |
+| AP009 Manual JWT Parsing | — (detector only) | Bypassing Cognito authorizer |
+| AP010 Heavy Module Import | — (detector only) | Cold-start optimization |
+| AP011 Deprecated Method Usage | AP010 | `publish()` / `publishPartialUpdate()` removal |
+| AP012 Uppercase COMMON Tenant Key | — (detector only) | v1.1.0 tenant key migration |
+| AP013 publishSync Null Return Unchecked | AP001 (related) | `publishSync` v1.2.0+ return |
+| AP014 Deprecated genNewSequence | AP010 (related) | v1.2.0 sequence API change |
+| AP015 Duplicate TaskModule Registration | — (detector only) | v1.2.4 global TaskModule |
+| AP016 Missing Error Logging Before Rethrow | AP016 | ✅ same code |
+| AP017 Incorrect Attribute Merging | AP017 | ✅ same code |
+| AP018 Missing Swagger Documentation | AP018 | ✅ same code |
+| AP019 Missing Pagination in List Queries | AP019 | ✅ same code |
+| AP020 Missing getCommandSource for Tracing | AP011 | Tracing/audit |
+| AP021 Event Emit After publishAsync | AP021 | ✅ same code |
+
+When you receive `mbc_check_anti_patterns` output, look up the detector code in this table to find the corresponding skill-doc section for full context and recommended fixes. Future versions of this framework should consolidate the two systems; until then, treat them as separate identifier spaces.
+
 ## Anti-Patterns to Detect
 
 ### AP001: Using publishSync Instead of publishAsync
@@ -555,6 +592,10 @@ export class OrderDataSyncHandler implements IDataSyncHandler {
 The correct pattern is to implement a custom `IDataSyncHandler` and emit events in `up()` / `down()`. By the time these methods run, the data table write has already completed. Register the handler in `CommandModule.register({ dataSyncHandlers: [...] })`.
 
 If you need to include previous field values for change-detection (e.g., `statusChanged`), embed them as `attributes._prev` in the `publishAsync` call and read them in the handler. Strip `_prev` from RDS sync handlers to prevent internal metadata from leaking into the database.
+
+**Related (v1.2.6+):** If you only need read-your-writes consistency for the **same user within the same request flow** (e.g. POST → immediate GET in the API client), the Repository's RYW session mechanism (when `RYW_SESSION_TTL_MINUTES` is enabled) is sufficient — it merges the pending command-table write into the next read by the originating user, no event handler required.
+
+The `IDataSyncHandler.up()` pattern above is still required when other users, background jobs, or cross-module event subscribers need to react to the change — RYW only covers the writer's own subsequent reads.
 
 ---
 

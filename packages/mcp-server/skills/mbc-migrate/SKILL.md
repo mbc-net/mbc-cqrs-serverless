@@ -39,6 +39,8 @@ This skill helps migrate MBC CQRS Serverless projects between versions.
 | v1.2.0 | v1.2.1 | Low | SqsService added (new feature) |
 | v1.2.1 | v1.2.2 | Low | CsvBatchProcessor Poison Pill fix (transparent) |
 | v1.2.x | v1.2.4 | Medium | TaskModule.register() must be in AppModule |
+| v1.2.4 | v1.2.5 | Low | ZIP import refactor (transparent); MCP AP016–AP020 added |
+| v1.2.5 | v1.2.6 | Low | Repository RYW improvements (transparent); `getVersion` API |
 
 ## Migration Guides
 
@@ -335,6 +337,64 @@ export class AppModule {}
 3. Remove `TaskModule.register()` from all feature modules
 
 **Symptom if skipped:** App crashes at startup with `Nest can't resolve dependencies of MyTaskService (?)`.
+
+---
+
+### v1.2.5 — ZIP import refactor + MCP anti-pattern expansion (no migration steps required)
+
+**Framework changes (transparent):**
+
+- `ZipImportQueueEventHandler` removed; ZIP import jobs are now processed directly inside `ImportService`.
+- `ImportEventHandler` no longer publishes SQS messages for `ZIP_MASTER_JOB` events.
+- Enhanced ZIP import validation in `CreateZipImportDto` and improved error handling/logging.
+
+No application code changes are required. If you previously imported `ZipImportQueueEventHandler` directly (uncommon), remove the import.
+
+**MCP server changes:**
+
+- `mbc_check_anti_patterns` tool expanded from 15 to 20 detectors (AP016–AP020 added):
+  - AP016: Missing Error Logging Before Rethrow (High)
+  - AP017: Incorrect Attribute Merging on Partial Update (High)
+  - AP018: Missing Swagger Documentation / `@ApiTags` (Low)
+  - AP019: Missing Pagination in List Queries (High)
+  - AP020: Missing `getCommandSource` for Tracing (Low)
+- `@modelcontextprotocol/sdk` updated 1.26.0 → 1.29.0.
+
+---
+
+### v1.2.6 — Repository RYW improvements (no migration steps required)
+
+The `Repository` class now actively purges stale RYW sessions when the data table catches up to or surpasses the session version. This eliminates the "stale override" issue where a user could see their own older write even after an external update was already absorbed into the data table.
+
+**Behavior changes (transparent — no code changes required):**
+
+- `getItem`: when `existing.version >= session.version`, the session is purged in the background and the persisted data is returned directly (skipping the unnecessary command-table read).
+- `listItemsByPk`: synchronized sessions are cleaned up in-place during the merge loop.
+- `listItems` (RDS path): per-session checks are now parallelized via `Promise.all`, eliminating sequential N+1 latency.
+
+**New optional optimization for `listItems`:**
+
+```typescript
+// If your RDS rows already carry `version`, supply `getVersion` to skip the
+// extra DynamoDB GetItem entirely when the existing RDS row proves caught-up.
+await repository.listItems(
+  () => rdsQuery(),
+  {
+    latestFlg: true,
+    transformCommand: (cmd) => ({
+      id: cmd.id,
+      version: cmd.version,
+      // ...map other CommandModel fields to your RDS row shape
+    }),
+    getVersion: (item) => item.version,  // ← new in v1.2.6
+  },
+  options,
+)
+```
+
+**Note:** `getVersion` only short-circuits the **update path** (when the session's `itemId` matches an existing RDS row). Create-new items (session present but not yet reflected in RDS) still fetch the command as before — there is no existing row to derive a version from.
+
+All changes are backward-compatible: `getVersion` is optional, and the cleanup behavior is automatic when `RYW_SESSION_TTL_MINUTES` is enabled. Projects with RYW disabled (env var unset) are unaffected.
 
 ---
 
