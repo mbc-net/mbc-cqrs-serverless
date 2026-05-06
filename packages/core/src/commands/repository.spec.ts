@@ -311,8 +311,31 @@ describe('Repository', () => {
         { latestFlg: true },
         opts,
       )
-
       expect(result.items).toHaveLength(0)
+    })
+
+    it('should short-circuit dataService.getItem in listItems if getVersion proves caught-up', async () => {
+      const rdsItem = { id: mockItemId, version: 10 }
+      const rdsQuery = jest
+        .fn()
+        .mockResolvedValue({ total: 1, items: [rdsItem] })
+      sessionService.listByUser.mockResolvedValue([
+        {
+          sk: `${mockModuleOptions.tableName}${KEY_SEPARATOR}${mockItemId}`,
+          version: 10,
+        } as any,
+      ])
+
+      const mergeWithVersion: IMergeOptions<any> = {
+        latestFlg: true,
+        getVersion: (item) => item.version,
+        transformCommand: (cmd) => cmd,
+      }
+
+      await repository.listItems(rdsQuery, mergeWithVersion, opts)
+
+      expect(dataService.getItem).not.toHaveBeenCalled() // Proves short-circuit worked
+      expect(sessionService.delete).toHaveBeenCalled()
     })
   })
 

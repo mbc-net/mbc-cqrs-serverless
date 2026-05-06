@@ -32,6 +32,13 @@ export interface IMergeOptions<TItem extends { id: string }> {
   latestFlg?: boolean
 
   /**
+   * Optional: Extract version from the query result item (e.g. RDS row).
+   * If the provided version is >= session.version, the DynamoDB Data Table
+   * check is skipped to reduce latency.
+   */
+  getVersion?: (item: TItem) => number | undefined
+
+  /**
    * Transform a CommandModel into the same shape as a TItem returned by the query.
    * The `existing` parameter is provided for update cases to merge unchanged fields.
    */
@@ -86,11 +93,15 @@ export class Repository {
         // Fetch existing data FIRST to check if the session is stale
         const existing = await this.dataService.getItem(key)
 
-        // If data table has caught up or surpassed the session, the session is stale
+        /**
+         * If the data table version is greater than or equal to the session version,
+         * the read model has already absorbed the user's specific write (or a newer one).
+         * We purge the stale session in the background and return the persisted data.
+         */
         if (existing && existing.version >= session.version) {
           this.sessionService
             .delete(userId, tenantCode, this.moduleTableName, itemId)
-            .catch(() => {})
+            .catch(() => {}) // Fire-and-forget: do not block the critical read path
           return existing
         }
 
@@ -303,58 +314,81 @@ export class Repository {
     const itemMap = new Map<string, TItem>(
       baseResult.items.map((item) => [item.id, item]),
     )
-    const newItems: TItem[] = []
-    let adjustedTotal = baseResult.total
+
     const skPrefix = `${this.moduleTableName}${KEY_SEPARATOR}`
 
-    for (const session of sessions) {
-      if (!session.sk.startsWith(skPrefix)) {
-        continue
-      }
-      const itemId = session.sk.slice(skPrefix.length)
+    /**
+     * Parallelize session checks to avoid N+1 sequential database roundtrips.
+     * For each session, we determine if we need to merge a command or skip if synced.
+     */
+    const sessionResults = await Promise.all(
+      sessions.map(async (session) => {
+        if (!session.sk.startsWith(skPrefix)) return null
+        const itemId = session.sk.slice(skPrefix.length)
+        const existing = itemMap.get(itemId)
 
-      const existing = itemMap.get(itemId)
+        let cmdPk: string | undefined
+        let skBase: string | undefined
 
-      let cmdPk: string | undefined
-      let skBase: string | undefined
+        const existingSk = (existing as unknown as { sk?: string })?.sk
+        const existingPk = (existing as unknown as { pk?: string })?.pk
 
-      const existingSk = (existing as unknown as { sk?: string })?.sk
-      const existingPk = (existing as unknown as { pk?: string })?.pk
-
-      if (existing && existingSk && existingPk) {
-        cmdPk = existingPk
-        skBase = removeSortKeyVersion(existingSk)
-      } else {
-        // Fallback: Strictly parse the ID assuming a 2-segment PK format ({type}#{tenantCode})
-        const parsed = parseTwoSegmentPkSkFromId(itemId)
-        if (!parsed) {
-          continue
+        if (existing && existingSk && existingPk) {
+          cmdPk = existingPk
+          skBase = removeSortKeyVersion(existingSk)
+        } else {
+          // Fallback: Strictly parse the ID assuming a 2-segment PK format ({type}#{tenantCode})
+          const parsed = parseTwoSegmentPkSkFromId(itemId)
+          if (!parsed) return null
+          cmdPk = parsed.pk
+          skBase = parsed.skBase
         }
-        cmdPk = parsed.pk
-        skBase = parsed.skBase
+
+        if (!cmdPk || !skBase) return null
+
+        // Optimization: check item version provided by the external source first
+        const currentVersion = existing
+          ? mergeOptions.getVersion?.(existing)
+          : undefined
+        if (currentVersion !== undefined && currentVersion >= session.version) {
+          this.sessionService
+            .delete(userId, tenantCode, this.moduleTableName, itemId)
+            .catch(() => {})
+          return { type: 'synced', itemId }
+        }
+
+        // Verify state against DynamoDB Data Table
+        const dataItem = await this.dataService.getItem({
+          pk: cmdPk,
+          sk: skBase,
+        })
+        if (dataItem && dataItem.version >= session.version) {
+          this.sessionService
+            .delete(userId, tenantCode, this.moduleTableName, itemId)
+            .catch(() => {})
+          return { type: 'synced', itemId }
+        }
+
+        const cmd = await this.commandService.getItem({
+          pk: cmdPk,
+          sk: addSortKeyVersion(skBase, session.version),
+        })
+
+        return cmd ? { type: 'command', cmd, existing, itemId } : null
+      }),
+    )
+
+    const newItems: TItem[] = []
+    let adjustedTotal = baseResult.total
+
+    for (const res of sessionResults) {
+      if (!res || res.type === 'synced') continue
+
+      const { cmd, existing, itemId } = res as {
+        cmd: CommandModel
+        existing?: TItem
+        itemId: string
       }
-
-      if (!cmdPk || !skBase) {
-        continue
-      }
-
-      // Fetch the actual current data record to see if it has caught up
-      const dataItem = await this.dataService.getItem({ pk: cmdPk, sk: skBase })
-
-      // If data table has caught up or surpassed the session, the session is stale
-      if (dataItem && dataItem.version >= session.version) {
-        this.sessionService
-          .delete(userId, tenantCode, this.moduleTableName, itemId)
-          .catch(() => {})
-        continue
-      }
-
-      const cmd = await this.commandService.getItem({
-        pk: cmdPk,
-        sk: addSortKeyVersion(skBase, session.version),
-      })
-      if (!cmd) continue
-
       const transformed = mergeOptions.transformCommand(cmd, existing)
 
       if (cmd.isDeleted) {
