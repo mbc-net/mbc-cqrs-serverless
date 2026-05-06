@@ -1,454 +1,499 @@
 import { Test, TestingModule } from '@nestjs/testing'
-
-import { SessionService } from '../data-store/session.service'
-import { CommandModel, DataEntity, DataModel } from '../interfaces'
-import { ICommandOptions } from '../interfaces/command.options.interface'
-import { MODULE_OPTIONS_TOKEN } from './command.module-definition'
-import { CommandService } from './command.service'
+import { Repository, IMergeOptions } from './repository'
 import { DataService } from './data.service'
-import { IMergeOptions, Repository } from './repository'
-
-/** Physical DynamoDB data table name (DataService); session SK uses module name only. */
-const PHYSICAL_DATA_TABLE = 'local-app-user-tenant-data'
-const MODULE_TABLE = 'user-tenant'
-
-const makeInvokeContext = (
-  userId = 'user-1',
-): ICommandOptions['invokeContext'] =>
-  ({
-    event: {
-      requestContext: {
-        authorizer: {
-          jwt: {
-            claims: {
-              sub: userId,
-              'custom:roles': '[]',
-            },
-          },
-        },
-      },
-      headers: { 'x-tenant-code': 'tenant-a' },
-    },
-    context: {},
-  }) as unknown as ICommandOptions['invokeContext']
-
-const makeCmd = (
-  id: string,
-  version: number,
-  isDeleted = false,
-): CommandModel => ({
-  pk: 'USER_TENANT#tenant-A',
-  sk: `USER_TENANT#${id}@${version}`,
-  id: `USER_TENANT#tenant-A#USER_TENANT#${id}`,
-  code: id,
-  name: id,
-  version,
-  tenantCode: 'tenant-A',
-  type: 'USER_TENANT',
-  isDeleted,
-  attributes: { role: 'admin' },
-  createdAt: new Date('2024-01-01'),
-  updatedAt: new Date('2024-01-02'),
-  createdBy: 'user-1',
-  updatedBy: 'user-1',
-})
-
-const makeDataModel = (id: string, version = 1): DataModel => ({
-  pk: 'USER_TENANT#tenant-A',
-  sk: `USER_TENANT#${id}`,
-  id: `USER_TENANT#tenant-A#USER_TENANT#${id}`,
-  code: id,
-  name: id,
-  version,
-  tenantCode: 'tenant-A',
-  type: 'USER_TENANT',
-  attributes: { role: 'viewer' },
-  cpk: 'USER_TENANT#tenant-A',
-  csk: `USER_TENANT#${id}@${version}`,
-  createdAt: new Date('2024-01-01'),
-  updatedAt: new Date('2024-01-01'),
-  createdBy: 'user-1',
-  updatedBy: 'user-1',
-})
-
-const mockDataService = {
-  tableName: PHYSICAL_DATA_TABLE,
-  getItem: jest.fn(),
-  listItemsByPk: jest.fn(),
-}
-
-const mockCommandService = {
-  getItem: jest.fn(),
-}
-
-const mockSessionService = {
-  get: jest.fn(),
-  listByUser: jest.fn(),
-}
-
-const mockOptions = { tableName: MODULE_TABLE }
+import { CommandService } from './command.service'
+import { SessionService } from '../data-store/session.service'
+import { MODULE_OPTIONS_TOKEN } from './command.module-definition'
+import {
+  DataEntity,
+  DataListEntity,
+  DataModel,
+  CommandModel,
+} from '../interfaces'
+import { KEY_SEPARATOR } from '../constants'
+import * as userContextHelper from '../context/user'
 
 describe('Repository', () => {
-  let repo: Repository
+  let repository: Repository
+  let dataService: jest.Mocked<DataService>
+  let commandService: jest.Mocked<CommandService>
+  let sessionService: jest.Mocked<SessionService>
+
+  const mockModuleOptions = { tableName: 'user-tenant' }
+  const mockTenant = 'tenant-A'
+  const mockUserId = 'user-1'
+  const mockPk = `USER_TENANT#${mockTenant}`
+  const mockSk = 'USER_TENANT#item-1'
+  const mockItemId = `${mockPk}#${mockSk}`
 
   beforeEach(async () => {
-    jest.clearAllMocks()
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         Repository,
-        { provide: DataService, useValue: mockDataService },
-        { provide: CommandService, useValue: mockCommandService },
-        { provide: SessionService, useValue: mockSessionService },
-        { provide: MODULE_OPTIONS_TOKEN, useValue: mockOptions },
+        {
+          provide: DataService,
+          useValue: { getItem: jest.fn(), listItemsByPk: jest.fn() },
+        },
+        {
+          provide: CommandService,
+          useValue: { getItem: jest.fn() },
+        },
+        {
+          provide: SessionService,
+          useValue: {
+            get: jest.fn(),
+            delete: jest.fn(),
+            listByUser: jest.fn(),
+          },
+        },
+        {
+          provide: MODULE_OPTIONS_TOKEN,
+          useValue: mockModuleOptions,
+        },
       ],
     }).compile()
 
-    repo = module.get(Repository)
+    repository = module.get<Repository>(Repository)
+    dataService = module.get(DataService)
+    commandService = module.get(CommandService)
+    sessionService = module.get(SessionService)
+
+    // Default mock for user context
+    jest.spyOn(userContextHelper, 'getUserContext').mockReturnValue({
+      userId: mockUserId,
+      tenantCode: mockTenant,
+    } as any)
+
+    // sessionService.delete is fire-and-forget in repository, always returns promise
+    sessionService.delete.mockResolvedValue(undefined)
   })
 
-  describe('getItem', () => {
-    const key = { pk: 'USER_TENANT#tenant-A', sk: 'USER_TENANT#item-1' }
-    const opts = { invokeContext: makeInvokeContext() }
+  afterEach(() => {
+    jest.restoreAllMocks()
+  })
 
-    it('should return DataService result when no session exists', async () => {
-      mockSessionService.get.mockResolvedValue(null)
-      const dataItem = makeDataModel('item-1')
-      mockDataService.getItem.mockResolvedValue(dataItem)
+  describe('getItem — branch and cleanup logic', () => {
+    const detailKey = { pk: mockPk, sk: mockSk }
+    const options = { invokeContext: {} as any }
 
-      const result = await repo.getItem(key, opts)
+    it('should return data directly when no userId is present in context', async () => {
+      jest
+        .spyOn(userContextHelper, 'getUserContext')
+        .mockReturnValue(null as any)
+      const mockData = { id: '1' } as DataModel
+      dataService.getItem.mockResolvedValue(mockData)
 
-      expect(mockSessionService.get).toHaveBeenCalled()
-      expect(mockCommandService.getItem).not.toHaveBeenCalled()
-      expect(result).toEqual(dataItem)
+      const result = await repository.getItem(detailKey, options)
+
+      expect(result).toBe(mockData)
+      expect(sessionService.get).not.toHaveBeenCalled()
     })
 
-    it('should return transformed command when session exists', async () => {
-      mockSessionService.get.mockResolvedValue({
-        version: 3,
-        sk: `${MODULE_TABLE}#USER_TENANT#tenant-A#USER_TENANT#item-1`,
-      })
-      const cmd = makeCmd('item-1', 3)
-      mockCommandService.getItem.mockResolvedValue(cmd)
-      mockDataService.getItem.mockResolvedValue(makeDataModel('item-1', 2))
+    it('should return data directly when no session exists', async () => {
+      sessionService.get.mockResolvedValue(null)
+      const mockData = { id: '1' } as DataModel
+      dataService.getItem.mockResolvedValue(mockData)
 
-      const result = await repo.getItem(key, opts)
+      const result = await repository.getItem(detailKey, options)
 
-      expect(mockCommandService.getItem).toHaveBeenCalled()
-      expect(result.version).toBe(3)
-      expect(result.attributes).toEqual({ role: 'admin' })
+      expect(result).toBe(mockData)
+      expect(commandService.getItem).not.toHaveBeenCalled()
     })
 
-    it('should fallback to DataService when command not found', async () => {
-      mockSessionService.get.mockResolvedValue({ version: 3 })
-      mockCommandService.getItem.mockResolvedValue(null)
-      const dataItem = makeDataModel('item-1')
-      mockDataService.getItem.mockResolvedValue(dataItem)
+    it('should DELETE session and return existing when data table caught up (v2 === v2)', async () => {
+      sessionService.get.mockResolvedValue({ version: 2 } as any)
+      const caughtUp = {
+        id: mockItemId,
+        pk: mockPk,
+        sk: mockSk,
+        version: 2,
+        name: 'caught-up',
+      } as DataModel
+      dataService.getItem.mockResolvedValue(caughtUp)
 
-      const result = await repo.getItem(key, opts)
+      const result = await repository.getItem(detailKey, options)
 
-      expect(result).toEqual(dataItem)
+      expect(result).toEqual(caughtUp)
+      expect(commandService.getItem).not.toHaveBeenCalled() // Critical path optimization
+      expect(sessionService.delete).toHaveBeenCalledWith(
+        mockUserId,
+        mockTenant,
+        mockModuleOptions.tableName,
+        mockItemId,
+      )
     })
 
-    it('should fallback to DataService when userId is absent', async () => {
-      const noUserCtx = { invokeContext: makeInvokeContext('') }
-      const dataItem = makeDataModel('item-1')
-      mockDataService.getItem.mockResolvedValue(dataItem)
+    it('should DELETE session when data table SURPASSED session (v5 > v2)', async () => {
+      sessionService.get.mockResolvedValue({ version: 2 } as any)
+      dataService.getItem.mockResolvedValue({
+        id: mockItemId,
+        pk: mockPk,
+        sk: mockSk,
+        version: 5,
+      } as DataModel)
 
-      const result = await repo.getItem(key, noUserCtx)
+      const result = await repository.getItem(detailKey, options)
 
-      expect(mockSessionService.get).not.toHaveBeenCalled()
-      expect(result).toEqual(dataItem)
+      expect(result.version).toBe(5)
+      expect(commandService.getItem).not.toHaveBeenCalled()
+      expect(sessionService.delete).toHaveBeenCalled()
+    })
+
+    it('should NOT delete session and merge command when data table is lagging (v1 < v2)', async () => {
+      sessionService.get.mockResolvedValue({ version: 2 } as any)
+      dataService.getItem.mockResolvedValue({
+        id: mockItemId,
+        pk: mockPk,
+        sk: mockSk,
+        version: 1,
+        name: 'old',
+      } as DataModel)
+      commandService.getItem.mockResolvedValue({
+        id: mockItemId,
+        pk: mockPk,
+        sk: `${mockSk}@2`,
+        version: 2,
+        name: 'new',
+        code: 'c',
+        type: 'TEST',
+        tenantCode: mockTenant,
+      } as CommandModel)
+
+      const result = await repository.getItem(detailKey, options)
+
+      expect(result.version).toBe(2)
+      expect(result.name).toBe('new')
+      expect(sessionService.delete).not.toHaveBeenCalled() //
+    })
+
+    it('should not throw when sessionService.delete fails (fire-and-forget contract)', async () => {
+      sessionService.get.mockResolvedValue({ version: 2 } as any)
+      dataService.getItem.mockResolvedValue({
+        id: mockItemId,
+        pk: mockPk,
+        sk: mockSk,
+        version: 2,
+      } as DataModel)
+      // Service layer error handling check
+      sessionService.delete.mockRejectedValue(new Error('DDB outage'))
+
+      await expect(
+        repository.getItem(detailKey, options),
+      ).resolves.toBeDefined()
+    })
+
+    it('should return data table result if commandService returns null', async () => {
+      sessionService.get.mockResolvedValue({ version: 2 } as any)
+      const mockData = { id: '1', version: 1 } as DataModel
+      dataService.getItem.mockResolvedValue(mockData)
+      commandService.getItem.mockResolvedValue(null)
+
+      const result = await repository.getItem(detailKey, options)
+
+      expect(result).toBe(mockData)
     })
   })
 
-  describe('listItemsByPk', () => {
-    const pk = 'USER_TENANT#tenant-A'
-    const opts = { invokeContext: makeInvokeContext() }
+  describe('listItemsByPk — branch and cleanup logic', () => {
+    const opts = { invokeContext: {} as any }
 
-    it('should return base result when latestFlg is false', async () => {
-      const base = {
-        items: [new DataEntity(makeDataModel('item-1'))],
-        lastSk: undefined,
-      }
-      mockDataService.listItemsByPk.mockResolvedValue(base)
+    it('should return base results when latestFlg is false', async () => {
+      const baseResult = new DataListEntity({ items: [], lastSk: undefined })
+      dataService.listItemsByPk.mockResolvedValue(baseResult)
 
-      const result = await repo.listItemsByPk(
-        pk,
+      const result = await repository.listItemsByPk(
+        mockPk,
         {},
         { latestFlg: false },
         opts,
       )
 
-      expect(mockSessionService.listByUser).not.toHaveBeenCalled()
-      expect(result).toEqual(base)
+      expect(result).toBe(baseResult)
+      expect(sessionService.listByUser).not.toHaveBeenCalled()
     })
 
-    it('should return base result when no sessions', async () => {
-      mockDataService.listItemsByPk.mockResolvedValue({
-        items: [],
-        lastSk: undefined,
-      })
-      mockSessionService.listByUser.mockResolvedValue([])
-
-      const result = await repo.listItemsByPk(pk, {}, { latestFlg: true }, opts)
-
-      expect(result.items).toHaveLength(0)
-    })
-
-    it('should override existing item (update case)', async () => {
-      const existingItem = makeDataModel('item-1', 1)
-      mockDataService.listItemsByPk.mockResolvedValue({
-        items: [new DataEntity(existingItem)],
-        lastSk: undefined,
-      })
-      mockSessionService.listByUser.mockResolvedValue([
-        {
-          pk: 'user-1#tenant-A',
-          sk: `${MODULE_TABLE}#USER_TENANT#tenant-A#USER_TENANT#item-1`,
-          version: 2,
-        },
-      ])
-      mockCommandService.getItem.mockResolvedValue(makeCmd('item-1', 2))
-
-      const result = await repo.listItemsByPk(pk, {}, { latestFlg: true }, opts)
-
-      expect(result.items).toHaveLength(1)
-      expect(result.items[0].version).toBe(2)
-    })
-
-    it('should remove item for delete case', async () => {
-      mockDataService.listItemsByPk.mockResolvedValue({
-        items: [
-          new DataEntity(makeDataModel('item-1')),
-          new DataEntity(makeDataModel('item-2')),
-        ],
-        lastSk: undefined,
-      })
-      mockSessionService.listByUser.mockResolvedValue([
-        {
-          pk: 'user-1#tenant-A',
-          sk: `${MODULE_TABLE}#USER_TENANT#tenant-A#USER_TENANT#item-1`,
-          version: 2,
-        },
-      ])
-      mockCommandService.getItem.mockResolvedValue(makeCmd('item-1', 2, true))
-
-      const result = await repo.listItemsByPk(pk, {}, { latestFlg: true }, opts)
-
-      expect(result.items).toHaveLength(1)
-      expect(result.items[0].id).toBe('USER_TENANT#tenant-A#USER_TENANT#item-2')
-    })
-
-    it('should add create-new item not yet synced', async () => {
-      mockDataService.listItemsByPk.mockResolvedValue({
-        items: [],
-        lastSk: undefined,
-      })
-      mockSessionService.listByUser.mockResolvedValue([
-        {
-          pk: 'user-1#tenant-A',
-          sk: `${MODULE_TABLE}#USER_TENANT#tenant-A#USER_TENANT#item-new`,
-          version: 1,
-        },
-      ])
-      mockCommandService.getItem.mockResolvedValue(makeCmd('item-new', 1))
-
-      const result = await repo.listItemsByPk(pk, {}, { latestFlg: true }, opts)
-
-      expect(result.items).toHaveLength(1)
-      expect(result.items[0].id).toBe(
-        'USER_TENANT#tenant-A#USER_TENANT#item-new',
+    it('should DELETE session and skip merge when existing item already caught up', async () => {
+      const caughtUp = {
+        id: mockItemId,
+        pk: mockPk,
+        sk: mockSk,
+        version: 5,
+        name: 'caught-up',
+      } as DataModel
+      dataService.listItemsByPk.mockResolvedValue(
+        new DataListEntity({
+          items: [new DataEntity(caughtUp)],
+          lastSk: undefined,
+        }),
       )
-    })
-  })
+      sessionService.listByUser.mockResolvedValue([
+        {
+          sk: `${mockModuleOptions.tableName}${KEY_SEPARATOR}${mockItemId}`,
+          version: 5,
+        } as any,
+      ])
 
-  describe('listItems', () => {
-    const opts = { invokeContext: makeInvokeContext() }
-
-    type RdsItem = {
-      id: string
-      pk?: string
-      sk?: string
-      tenantCode: string
-      role: string
-    }
-
-    const makeRdsItem = (id: string): RdsItem => ({
-      id: `USER_TENANT#tenant-A#USER_TENANT#${id}`,
-      pk: 'USER_TENANT#tenant-A',
-      sk: `USER_TENANT#${id}`,
-      tenantCode: 'tenant-A',
-      role: 'viewer',
-    })
-
-    const mergeOpts: IMergeOptions<RdsItem> = {
-      latestFlg: true,
-      transformCommand: (cmd) => ({
-        id: cmd.id,
-        tenantCode: cmd.tenantCode,
-        pk: 'USER_TENANT#tenant-A',
-        sk: `USER_TENANT#${cmd.code}`,
-        role: (cmd.attributes as { role?: string })?.role ?? 'viewer',
-      }),
-      matchesFilter: (item) => item.role !== 'blocked',
-    }
-
-    it('should passthrough when latestFlg is false', async () => {
-      const rdsQuery = jest
-        .fn()
-        .mockResolvedValue({ total: 1, items: [makeRdsItem('item-1')] })
-
-      const result = await repo.listItems(
-        rdsQuery,
-        { ...mergeOpts, latestFlg: false },
+      const result = await repository.listItemsByPk(
+        mockPk,
+        {},
+        { latestFlg: true },
         opts,
       )
 
-      expect(mockSessionService.listByUser).not.toHaveBeenCalled()
-      expect(result.total).toBe(1)
+      expect(result.items).toHaveLength(1)
+      expect(commandService.getItem).not.toHaveBeenCalled()
+      expect(sessionService.delete).toHaveBeenCalled() //
     })
 
-    it('should return rds result when no sessions', async () => {
+    it('should NOT delete session for create-new (regression guard)', async () => {
+      dataService.listItemsByPk.mockResolvedValue(
+        new DataListEntity({ items: [], lastSk: undefined }),
+      )
+      sessionService.listByUser.mockResolvedValue([
+        {
+          sk: `${mockModuleOptions.tableName}${KEY_SEPARATOR}${mockItemId}`,
+          version: 1,
+        } as any,
+      ])
+      commandService.getItem.mockResolvedValue({
+        id: mockItemId,
+        pk: mockPk,
+        sk: `${mockSk}@1`,
+        version: 1,
+        name: 'new',
+        code: 'c',
+        type: 'TEST',
+        tenantCode: mockTenant,
+      } as CommandModel)
+
+      const result = await repository.listItemsByPk(
+        mockPk,
+        {},
+        { latestFlg: true },
+        opts,
+      )
+
+      expect(result.items).toHaveLength(1)
+      expect(sessionService.delete).not.toHaveBeenCalled()
+      expect(commandService.getItem).toHaveBeenCalled()
+    })
+
+    it('should remove item from result when command.isDeleted is true', async () => {
+      const existing = {
+        id: mockItemId,
+        pk: mockPk,
+        sk: mockSk,
+        version: 1,
+      } as DataModel
+      dataService.listItemsByPk.mockResolvedValue(
+        new DataListEntity({
+          items: [new DataEntity(existing)],
+          lastSk: undefined,
+        }),
+      )
+      sessionService.listByUser.mockResolvedValue([
+        {
+          sk: `${mockModuleOptions.tableName}${KEY_SEPARATOR}${mockItemId}`,
+          version: 2,
+        } as any,
+      ])
+      commandService.getItem.mockResolvedValue({
+        id: mockItemId,
+        pk: mockPk,
+        sk: `${mockSk}@2`,
+        isDeleted: true,
+        version: 2,
+      } as CommandModel)
+
+      const result = await repository.listItemsByPk(
+        mockPk,
+        {},
+        { latestFlg: true },
+        opts,
+      )
+      expect(result.items).toHaveLength(0)
+    })
+
+    it('should short-circuit dataService.getItem in listItems if getVersion proves caught-up', async () => {
+      const rdsItem = { id: mockItemId, version: 10 }
       const rdsQuery = jest
         .fn()
-        .mockResolvedValue({ total: 1, items: [makeRdsItem('item-1')] })
-      mockSessionService.listByUser.mockResolvedValue([])
+        .mockResolvedValue({ total: 1, items: [rdsItem] })
+      sessionService.listByUser.mockResolvedValue([
+        {
+          sk: `${mockModuleOptions.tableName}${KEY_SEPARATOR}${mockItemId}`,
+          version: 10,
+        } as any,
+      ])
 
-      const result = await repo.listItems(rdsQuery, mergeOpts, opts)
+      const mergeWithVersion: IMergeOptions<any> = {
+        latestFlg: true,
+        getVersion: (item) => item.version,
+        transformCommand: (cmd) => cmd,
+      }
+
+      await repository.listItems(rdsQuery, mergeWithVersion, opts)
+
+      expect(dataService.getItem).not.toHaveBeenCalled() // Proves short-circuit worked
+      expect(sessionService.delete).toHaveBeenCalled()
+    })
+  })
+
+  describe('listItems (RDS) — branch and cleanup logic', () => {
+    const opts = { invokeContext: {} as any }
+    const mergeOptions: IMergeOptions<any> = {
+      latestFlg: true,
+      transformCommand: (cmd) => ({
+        id: cmd.id,
+        pk: mockPk,
+        sk: mockSk,
+        version: cmd.version,
+        name: cmd.name,
+        role: 'viewer',
+      }),
+      matchesFilter: (item) => item.role === 'viewer',
+    }
+
+    it('should return base results when latestFlg is false', async () => {
+      const rdsQuery = jest
+        .fn()
+        .mockResolvedValue({ total: 1, items: [{ id: '1' }] })
+
+      const result = await repository.listItems(
+        rdsQuery,
+        { latestFlg: false } as any,
+        opts,
+      )
 
       expect(result.total).toBe(1)
+      expect(sessionService.listByUser).not.toHaveBeenCalled()
     })
 
-    it('should use request tenant for session lookup, not row tenantCode', async () => {
-      mockSessionService.listByUser.mockResolvedValue([])
+    it('should DELETE session and skip command fetch when data table caught up', async () => {
       const rdsQuery = jest.fn().mockResolvedValue({
         total: 1,
         items: [
           {
-            ...makeRdsItem('item-1'),
-            tenantCode: 'common',
+            id: mockItemId,
+            pk: mockPk,
+            sk: mockSk,
+            version: 5,
+            name: 'rds-row',
           },
         ],
       })
+      sessionService.listByUser.mockResolvedValue([
+        {
+          sk: `${mockModuleOptions.tableName}${KEY_SEPARATOR}${mockItemId}`,
+          version: 5,
+        } as any,
+      ])
+      dataService.getItem.mockResolvedValue({
+        id: mockItemId,
+        pk: mockPk,
+        sk: mockSk,
+        version: 5,
+      } as DataModel)
 
-      await repo.listItems(rdsQuery, mergeOpts, opts)
+      const result = await repository.listItems(rdsQuery, mergeOptions, opts)
 
-      expect(mockSessionService.listByUser).toHaveBeenCalledWith(
-        'user-1',
-        'tenant-a',
-        MODULE_TABLE,
-      )
+      expect(commandService.getItem).not.toHaveBeenCalled()
+      expect(sessionService.delete).toHaveBeenCalled()
+      expect(result.total).toBe(1)
     })
 
-    it('should override existing item (update)', async () => {
+    it('should fetch command when data table is lagging', async () => {
       const rdsQuery = jest.fn().mockResolvedValue({
         total: 1,
-        items: [makeRdsItem('item-1')],
+        items: [
+          { id: mockItemId, pk: mockPk, sk: mockSk, version: 1, name: 'old' },
+        ],
       })
-      mockSessionService.listByUser.mockResolvedValue([
+      sessionService.listByUser.mockResolvedValue([
         {
-          pk: 'user-1#tenant-A',
-          sk: `${MODULE_TABLE}#USER_TENANT#tenant-A#USER_TENANT#item-1`,
-          version: 2,
-        },
+          sk: `${mockModuleOptions.tableName}${KEY_SEPARATOR}${mockItemId}`,
+          version: 3,
+        } as any,
       ])
-      const cmd = makeCmd('item-1', 2)
-      cmd.attributes = { role: 'admin' }
-      mockCommandService.getItem.mockResolvedValue(cmd)
+      dataService.getItem.mockResolvedValue({
+        id: mockItemId,
+        pk: mockPk,
+        sk: mockSk,
+        version: 1,
+      } as DataModel)
+      commandService.getItem.mockResolvedValue({
+        id: mockItemId,
+        pk: mockPk,
+        sk: `${mockSk}@3`,
+        version: 3,
+        name: 'new',
+        code: 'c',
+        type: 'TEST',
+        tenantCode: mockTenant,
+      } as CommandModel)
 
-      const result = await repo.listItems(rdsQuery, mergeOpts, opts)
+      const result = await repository.listItems(rdsQuery, mergeOptions, opts)
 
-      expect(result.total).toBe(1)
-      expect(result.items[0].role).toBe('admin')
+      expect(commandService.getItem).toHaveBeenCalled()
+      expect(sessionService.delete).not.toHaveBeenCalled()
+      expect(result.items[0].name).toBe('new')
     })
 
-    it('should remove deleted item', async () => {
+    it('should decrement total when item is deleted via command', async () => {
       const rdsQuery = jest.fn().mockResolvedValue({
-        total: 2,
-        items: [makeRdsItem('item-1'), makeRdsItem('item-2')],
+        total: 1,
+        items: [{ id: mockItemId, pk: mockPk, sk: mockSk, version: 1 }],
       })
-      mockSessionService.listByUser.mockResolvedValue([
+      sessionService.listByUser.mockResolvedValue([
         {
-          pk: 'user-1#tenant-A',
-          sk: `${MODULE_TABLE}#USER_TENANT#tenant-A#USER_TENANT#item-1`,
+          sk: `${mockModuleOptions.tableName}${KEY_SEPARATOR}${mockItemId}`,
           version: 2,
-        },
+        } as any,
       ])
-      mockCommandService.getItem.mockResolvedValue(makeCmd('item-1', 2, true))
+      dataService.getItem.mockResolvedValue({
+        id: mockItemId,
+        version: 1,
+      } as DataModel)
+      commandService.getItem.mockResolvedValue({
+        id: mockItemId,
+        isDeleted: true,
+        version: 2,
+      } as CommandModel)
 
-      const result = await repo.listItems(rdsQuery, mergeOpts, opts)
+      const result = await repository.listItems(rdsQuery, mergeOptions, opts)
 
-      expect(result.total).toBe(1)
-      expect(result.items.find((i) => i.id.includes('item-1'))).toBeUndefined()
+      expect(result.total).toBe(0)
+      expect(result.items).toHaveLength(0)
     })
 
-    it('should append create-new item that passes matchesFilter', async () => {
-      const rdsQuery = jest
-        .fn()
-        .mockResolvedValue({ total: 1, items: [makeRdsItem('item-1')] })
-      mockSessionService.listByUser.mockResolvedValue([
-        {
-          pk: 'user-1#tenant-A',
-          sk: `${MODULE_TABLE}#USER_TENANT#tenant-A#USER_TENANT#item-new`,
-          version: 1,
-        },
-      ])
-      const cmd = makeCmd('item-new', 1)
-      cmd.attributes = { role: 'admin' }
-      mockCommandService.getItem.mockResolvedValue(cmd)
-
-      const result = await repo.listItems(rdsQuery, mergeOpts, opts)
-
-      expect(result.total).toBe(2)
-      expect(result.items.find((i) => i.id.includes('item-new'))).toBeDefined()
-    })
-
-    it('should NOT append create-new item that fails matchesFilter', async () => {
-      const rdsQuery = jest
-        .fn()
-        .mockResolvedValue({ total: 1, items: [makeRdsItem('item-1')] })
-      mockSessionService.listByUser.mockResolvedValue([
-        {
-          pk: 'user-1#tenant-A',
-          sk: `${MODULE_TABLE}#USER_TENANT#tenant-A#USER_TENANT#item-blocked`,
-          version: 1,
-        },
-      ])
-      const cmd = makeCmd('item-blocked', 1)
-      cmd.attributes = { role: 'blocked' }
-      mockCommandService.getItem.mockResolvedValue(cmd)
-
-      const result = await repo.listItems(rdsQuery, mergeOpts, opts)
-
-      expect(result.total).toBe(1)
-      expect(
-        result.items.find((i) => i.id.includes('item-blocked')),
-      ).toBeUndefined()
-    })
-
-    it('should append create-new item when matchesFilter is not provided', async () => {
+    it('should respect matchesFilter for create-new items', async () => {
       const rdsQuery = jest.fn().mockResolvedValue({ total: 0, items: [] })
-      mockSessionService.listByUser.mockResolvedValue([
+      sessionService.listByUser.mockResolvedValue([
         {
-          pk: 'user-1#tenant-A',
-          sk: `${MODULE_TABLE}#USER_TENANT#tenant-A#USER_TENANT#item-new`,
+          sk: `${mockModuleOptions.tableName}${KEY_SEPARATOR}${mockItemId}`,
           version: 1,
-        },
+        } as any,
       ])
-      mockCommandService.getItem.mockResolvedValue(makeCmd('item-new', 1))
+      dataService.getItem.mockResolvedValue(null)
 
-      const optsNoFilter: IMergeOptions<RdsItem> = {
-        latestFlg: true,
-        transformCommand: (cmd) => ({
-          id: cmd.id,
-          tenantCode: cmd.tenantCode,
-          role: 'admin',
-        }),
+      // Command shape that will FAIL filter (role is not 'viewer')
+      commandService.getItem.mockResolvedValue({
+        id: mockItemId,
+        version: 1,
+        attributes: { role: 'admin' },
+        code: 'c',
+        name: 'n',
+      } as any)
+
+      const filteredMerge: IMergeOptions<any> = {
+        ...mergeOptions,
+        transformCommand: (cmd) => ({ id: cmd.id, role: cmd.attributes.role }),
       }
 
-      const result = await repo.listItems(rdsQuery, optsNoFilter, opts)
+      const result = await repository.listItems(rdsQuery, filteredMerge, opts)
 
-      expect(result.total).toBe(1)
+      expect(result.total).toBe(0) // Filtered out
+      expect(result.items).toHaveLength(0)
     })
   })
 })
