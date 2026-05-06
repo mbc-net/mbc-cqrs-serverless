@@ -294,7 +294,38 @@ export class AppModule {}
 
 ---
 
-### 8. Import Processing Issues
+### 8. RYW Session Disappears Before TTL Expiration (v1.2.6+)
+
+**Symptom:** Session entry deleted from `{NODE_ENV}-{APP_NAME}-session` table before `RYW_SESSION_TTL_MINUTES` elapses.
+
+**Cause (intentional, since v1.2.6):** `Repository` proactively purges sessions once the data table catches up (`existing.version >= session.version`). Once your write is visible in the data table, the session is no longer needed — keeping it would cause stale overrides when external updates arrive.
+
+**How to verify the purge succeeded normally:**
+```typescript
+// Check application logs. Absence of this warning means the delete succeeded:
+//   "Failed to delete RYW session (non-fatal): ..."
+//
+// You can also enable Repository debug logs to see the purge decision:
+//   logger.debug(`getItem session merge — version ${session.version}`, key)
+```
+
+**When it's a real problem:** If sessions disappear *and* `Repository.getItem` still returns stale data, the issue is upstream — DynamoDB Streams sync may be delayed. Check `IteratorAge` on the DynamoDB Streams source; a sustained non-zero value indicates the Stream → `IDataSyncHandler` pipeline is falling behind:
+```bash
+# Inspect Stream lag (high IteratorAge = sync is behind = data table stays stale)
+aws cloudwatch get-metric-statistics \
+  --namespace AWS/Lambda \
+  --metric-name IteratorAge \
+  --dimensions Name=FunctionName,Value=your-data-sync-handler \
+  --start-time $(date -u -v-1H +%Y-%m-%dT%H:%M:%S) \
+  --end-time   $(date -u            +%Y-%m-%dT%H:%M:%S) \
+  --period 60 --statistics Maximum
+```
+
+**Related:** If you maintain RDS read models, supply `mergeOptions.getVersion` in `listItems()` to skip the extra DynamoDB round-trip when the RDS row already carries the latest version (see migration guide v1.2.6).
+
+---
+
+### 9. Import Processing Issues
 
 **Symptom:** Import job fails or gets stuck
 
@@ -340,7 +371,7 @@ const validateCsv = async (filePath: string) => {
 
 ---
 
-### 6. Performance Issues
+### 10. Performance Issues
 
 **Symptom:** Slow API responses
 
