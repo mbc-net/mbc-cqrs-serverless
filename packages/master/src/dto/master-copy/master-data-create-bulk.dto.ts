@@ -1,5 +1,10 @@
 import { Type } from 'class-transformer'
-import { ArrayNotEmpty, IsArray, ValidateNested } from 'class-validator'
+import {
+  ArrayMaxSize,
+  ArrayNotEmpty,
+  IsArray,
+  ValidateNested,
+} from 'class-validator'
 
 import { MasterDataCreateDto } from './master-data-create.dto'
 
@@ -8,5 +13,6 @@ export class MasterDataCreateBulkDto {
   @ValidateNested({ each: true })
   @Type(() => MasterDataCreateDto)
   @ArrayNotEmpty()
+  @ArrayMaxSize(100)
   items: MasterDataCreateDto[]
 }

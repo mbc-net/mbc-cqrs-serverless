@@ -309,7 +309,7 @@ describe('Service Configuration - Environment Variables', () => {
 
       it('should create SNSClient with local endpoint', () => {
         expect(factory).toBeDefined()
-        const client = factory.getClient('arn:aws:sns:us-east-1:000000000000:test-topic')
+        const client = factory.getClient()
         expect(client).toBeDefined()
         expect(client).toBeInstanceOf(SNSClient)
       })
@@ -342,7 +342,7 @@ describe('Service Configuration - Environment Variables', () => {
 
       it('should create SNSClient without explicit endpoint', () => {
         expect(factory).toBeDefined()
-        const client = factory.getClient('arn:aws:sns:ap-northeast-1:123456789012:prod-topic')
+        const client = factory.getClient()
         expect(client).toBeDefined()
         expect(client).toBeInstanceOf(SNSClient)
       })
@@ -387,7 +387,7 @@ describe('Service Configuration - Environment Variables', () => {
 
         expect(dynamoDb.client).toBeDefined()
         expect(s3.client).toBeDefined()
-        expect(sns.getClient('arn:aws:sns:us-east-1:000000000000:test')).toBeDefined()
+        expect(sns.getClient()).toBeDefined()
       })
     })
 

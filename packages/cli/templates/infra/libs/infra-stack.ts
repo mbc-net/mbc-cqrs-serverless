@@ -402,6 +402,7 @@ export class InfraStack extends cdk.Stack {
       DATABASE_URL: `postgresql://${props.config.rds.accountSsmKey}@${props.config.rds.endpoint}/${props.config.rds.dbName}?schema=public`,
       S3_PUBLIC_BUCKET_NAME: publicBucket.bucketName,
       FRONT_BASE_URL: props.config.frontBaseUrl,
+      IMPORT_QUEUE_URL: importActionSqs.queueUrl,
     }
     const lambdaApi = new cdk.aws_lambda.Function(this, 'lambda-api', {
       vpc,
@@ -887,8 +888,47 @@ export class InfraStack extends cdk.Stack {
       cdk.aws_stepfunctions.IntegrationPattern.REQUEST_RESPONSE,
     )
 
+    const importCsvSuccess = new cdk.aws_stepfunctions.Succeed(
+      this,
+      'ImportCsvSuccess',
+      {
+        stateName: 'success',
+      },
+    )
+
+    const finalizeParentJobInvoke =
+      new cdk.aws_stepfunctions_tasks.LambdaInvoke(
+        this,
+        'finalize_parent_job',
+        {
+          lambdaFunction: lambdaApi,
+          payload: cdk.aws_stepfunctions.TaskInput.fromObject({
+            'input.$': '$',
+            'context.$': '$$',
+          }),
+          stateName: 'finalize_parent_job',
+          outputPath: '$.Payload[0][0]',
+          integrationPattern:
+            cdk.aws_stepfunctions.IntegrationPattern.REQUEST_RESPONSE,
+          retryOnServiceExceptions: false,
+        },
+      )
+    finalizeParentJobInvoke.addRetry({
+      errors: [
+        'Lambda.ServiceException',
+        'Lambda.AWSLambdaException',
+        'Lambda.SdkClientException',
+      ],
+      interval: cdk.Duration.seconds(2),
+      maxAttempts: 5,
+      backoffRate: 2,
+    })
+    const finalizeParentJobState =
+      finalizeParentJobInvoke.next(importCsvSuccess)
+
     const sfnImportCsvDefinition = new DistributedMap(this, 'import-csv', {
       maxConcurrency: 50,
+      resultPath: '$.mapOutput', // Captures the MapRunArn and ResultWriterDetails
     })
       .setLabel('import-csv')
       .setItemReader({
@@ -903,14 +943,31 @@ export class InfraStack extends cdk.Stack {
         },
       })
       .setItemBatcher({
-        MaxInputBytesPerBatch: 10,
+        MaxItemsPerBatch: 100,
         BatchInput: {
           'Attributes.$': '$',
         },
       })
-      .itemProcessor(csvRowsHandlerState, {
-        executionType: cdk.aws_stepfunctions.ProcessorType.EXPRESS,
+      .setResultWriter({
+        Resource: 'arn:aws:states:::s3:putObject',
+        Parameters: {
+          // Replace this with your actual CDK bucket reference (e.g., props.bucket.bucketName)
+          Bucket: 'your-import-bucket-name',
+          Prefix: 'sfn-results/import-csv',
+        },
       })
+      .itemProcessor(csvRowsHandlerState, {
+        executionType: aws_stepfunctions.ProcessorType.STANDARD,
+      })
+
+    // Catch ALL Map state errors and route them to finalizeParentJobState
+    sfnImportCsvDefinition.addCatch(finalizeParentJobState, {
+      errors: ['States.ALL'],
+      resultPath: '$.errorOutput',
+    })
+
+    // Normal successful flow
+    sfnImportCsvDefinition.next(finalizeParentJobState)
 
     const sfnImportCsvLogGroup = new cdk.aws_logs.LogGroup(
       this,
@@ -999,6 +1056,11 @@ export class InfraStack extends cdk.Stack {
           filters: [
             cdk.aws_lambda.FilterCriteria.filter({
               eventName: cdk.aws_lambda.FilterRule.isEqual('INSERT'),
+              dynamodb: {
+                NewImage: {
+                  syncMode: cdk.aws_lambda.FilterRule.notExists(),
+                },
+              },
             }),
           ],
         }),
@@ -1036,6 +1098,7 @@ export class InfraStack extends cdk.Stack {
     taskSqs.grantSendMessages(lambdaApi)
     notifySqs.grantSendMessages(lambdaApi)
     appSyncApi.grantMutation(lambdaApi)
+    importActionSqs.grantSendMessages(lambdaApi)
 
     // Define an IAM policy for full DynamoDB access
     const dynamoDbTablePrefixArn = cdk.Arn.format({

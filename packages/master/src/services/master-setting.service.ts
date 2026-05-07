@@ -223,29 +223,9 @@ export class MasterSettingService implements IMasterSettingService {
     dto: TenantSettingDto,
     options: { invokeContext: IInvoke },
   ): Promise<CommandModel> {
-    const { name, tenantCode, settingValue, code } = dto
-
-    const pk = generateMasterPk(tenantCode)
-    const sk = generateMasterSettingSk(code)
-
-    const setting = await this.dataService.getItem({ pk, sk })
-    if (setting && setting.isDeleted === false) {
-      throw new BadRequestException(`Setting already exists: ${code}`)
-    }
-
-    const command: CommandDto = {
-      sk,
-      pk,
-      code: code,
-      name: name,
-      id: generateId(pk, sk),
-      tenantCode: tenantCode,
-      type: MASTER_PK_PREFIX,
-      version: setting?.version ?? VERSION_FIRST,
-      isDeleted: false,
-      attributes: settingValue,
-    }
-    return await this.commandService.publishAsync(command, options)
+    return this.createOrUpsertTenantSetting(dto, options, {
+      throwIfExists: true,
+    })
   }
 
   async createGroupSetting(
@@ -375,6 +355,79 @@ export class MasterSettingService implements IMasterSettingService {
     return Promise.all(
       createDto.items.map((item) => this.create(item, invokeContext)),
     )
+  }
+
+  async upsertTenantSetting(
+    dto: TenantSettingDto,
+    options: { invokeContext: IInvoke },
+  ): Promise<CommandModel> {
+    return this.createOrUpsertTenantSetting(dto, options, {
+      throwIfExists: false,
+    })
+  }
+
+  private async createOrUpsertTenantSetting(
+    dto: TenantSettingDto,
+    options: { invokeContext: IInvoke },
+    { throwIfExists }: { throwIfExists: boolean },
+  ): Promise<CommandModel> {
+    const { name, tenantCode, settingValue, code } = dto
+
+    const pk = generateMasterPk(tenantCode)
+    const sk = generateMasterSettingSk(code)
+
+    const setting = await this.dataService.getItem({ pk, sk })
+
+    if (throwIfExists && setting && setting.isDeleted === false) {
+      throw new BadRequestException(`Setting already exists: ${code}`)
+    }
+
+    const command: CommandDto = {
+      sk,
+      pk,
+      code: code,
+      name: name,
+      id: generateId(pk, sk),
+      tenantCode: tenantCode,
+      type: MASTER_PK_PREFIX,
+      version: setting?.version ?? VERSION_FIRST,
+      isDeleted: false,
+      attributes: settingValue,
+    }
+
+    const item = await this.commandService.publishAsync(command, options)
+
+    if (!item) {
+      // No changes detected - return existing data without requestId
+      // to indicate that no new command was created
+      if (!setting) {
+        throw new NotFoundException('Setting not found')
+      }
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
+      const { requestId, ...rest } = setting
+      return rest as CommandModel
+    }
+
+    return item
+  }
+
+  async upsertSetting(createDto: CommonSettingDto, invokeContext: IInvoke) {
+    const userContext = getUserContext(invokeContext)
+    return await this.upsertTenantSetting(
+      {
+        ...createDto,
+        tenantCode: createDto.tenantCode ?? userContext.tenantCode,
+      },
+      { invokeContext },
+    )
+  }
+
+  async upsertBulk(createDto: CommonSettingBulkDto, invokeContext: IInvoke) {
+    const results = []
+    for (const item of createDto.items) {
+      results.push(await this.upsertSetting(item, invokeContext))
+    }
+    return results
   }
 
   async update(

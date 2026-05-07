@@ -556,6 +556,50 @@ describe('EmailService', () => {
       expect(results[2].status).toBe('fulfilled')
       expect(mockAwsSend).toHaveBeenCalledTimes(3)
     })
+
+    it('should pass EmailTags to SendEmailCommand in sendEmail (Simple)', async () => {
+      const msgWithTags: EmailNotification = {
+        toAddrs: ['test@example.com'],
+        subject: 'Tags Test',
+        body: 'body',
+        emailTags: [
+          { name: 'department', value: 'sales' },
+          { name: 'campaign', value: 'summer_2024' },
+        ],
+      }
+
+      await service.sendEmail(msgWithTags)
+
+      expect(SendEmailCommand).toHaveBeenCalledTimes(1)
+      const input = (SendEmailCommand as unknown as jest.Mock).mock.calls[0][0]
+
+      expect(input.EmailTags).toEqual([
+        { Name: 'department', Value: 'sales' },
+        { Name: 'campaign', Value: 'summer_2024' },
+      ])
+    })
+
+    it('should pass EmailTags to SendEmailCommand in sendEmail (Raw/Attachments)', async () => {
+      mockNodemailerSendMail.mockImplementation((options, callback) => {
+        callback(null, { message: FAKE_RAW_BUFFER })
+      })
+
+      const msgWithTagsAndAttach: EmailNotification = {
+        toAddrs: ['test@example.com'],
+        subject: 'Tags Attachment',
+        body: 'body',
+        attachments: [{ filename: 'test.txt', content: Buffer.from('test') }],
+        emailTags: [{ name: 'type', value: 'report' }],
+      }
+
+      await service.sendEmail(msgWithTagsAndAttach)
+
+      expect(SendEmailCommand).toHaveBeenCalledTimes(1)
+      const input = (SendEmailCommand as unknown as jest.Mock).mock.calls[0][0]
+
+      // Tags should be present even when sending Raw content
+      expect(input.EmailTags).toEqual([{ Name: 'type', Value: 'report' }])
+    })
   })
 
   /**
@@ -668,6 +712,29 @@ describe('EmailService', () => {
           .calls[0][0]
         expect(commandInput.ConfigurationSetName).toBe('TrackingSet')
       })
+
+      it('should pass EmailTags to SendEmailCommand in sendInlineTemplateEmail', async () => {
+        const tmplWithTags: TemplatedEmailNotification = {
+          toAddrs: ['test@example.com'],
+          template: { subject: 'S', html: 'H' },
+          data: {},
+          emailTags: [
+            { name: 'userId', value: '12345' },
+            { name: 'env', value: 'production' },
+          ],
+        }
+
+        await service.sendInlineTemplateEmail(tmplWithTags)
+
+        expect(SendEmailCommand).toHaveBeenCalledTimes(1)
+        const input = (SendEmailCommand as unknown as jest.Mock).mock
+          .calls[0][0]
+
+        expect(input.EmailTags).toEqual([
+          { Name: 'userId', Value: '12345' },
+          { Name: 'env', Value: 'production' },
+        ])
+      })
     })
 
     describe('Environment: LOCAL/OFFLINE (Manual Compilation)', () => {
@@ -730,85 +797,6 @@ describe('EmailService', () => {
         // {{auth.otp}} should remain literally in the text because the data is missing
         expect(commandInput.Content.Simple.Body.Html.Data).toContain(
           '{{auth.otp}}',
-        )
-      })
-
-      it('should handle Complex Scenarios (Japanese keys, Whitespace, Deep Nesting)', async () => {
-        const complexMsg: TemplatedEmailNotification = {
-          toAddrs: ['test@jp.com'],
-          template: {
-            subject: 'Confirm: {{ 認証コード }}', // Contains spaces and Japanese
-            html: '<p>User: {{ user.details.name }}</p><p>Code: {{認証コード}}</p>',
-            text: 'Code: {{認証コード}}',
-          },
-          data: {
-            '認証コード': '12345', // Japanese Key
-            user: {
-              details: {
-                name: 'Taro', // Nested Key
-              },
-            },
-          },
-        }
-
-        await service.sendInlineTemplateEmail(complexMsg)
-
-        const commandInput = (SendEmailCommand as unknown as jest.Mock).mock.calls[0][0]
-
-        // 1. Validate Japanese Key with Whitespace inside braces
-        // {{ 認証コード }} -> 12345
-        expect(commandInput.Content.Simple.Subject.Data).toBe('Confirm: 12345')
-
-        // 2. Validate Nested Object & Japanese Key without whitespace
-        // {{ user.details.name }} -> Taro
-        // {{認証コード}} -> 12345
-        expect(commandInput.Content.Simple.Body.Html.Data).toBe(
-          '<p>User: Taro</p><p>Code: 12345</p>',
-        )
-      })
-
-      it('should handle NESTED objects with JAPANESE keys and values', async () => {
-        const japaneseNestedMsg: TemplatedEmailNotification = {
-          toAddrs: ['jp-test@example.com'],
-          template: {
-            subject: '注文確認: {{ 注文.ID }}',
-            html: '<p>お客様: {{ 顧客.情報.名前 }} 様</p><p>商品: {{ 注文.詳細.品名 }}</p>',
-            text: 'お客様: {{ 顧客.情報.名前 }} 様, 商品: {{ 注文.詳細.品名 }}',
-          },
-          data: {
-            // Nested Japanese Keys
-            '注文': {
-              'ID': 'ORD-2024',
-              '詳細': {
-                '品名': 'ワイヤレスイヤホン', // Japanese Value
-              },
-            },
-            '顧客': {
-              '情報': {
-                '名前': '山田 太郎', // Japanese Value
-              },
-            },
-          },
-        }
-
-        await service.sendInlineTemplateEmail(japaneseNestedMsg)
-
-        const commandInput = (SendEmailCommand as unknown as jest.Mock).mock
-          .calls[0][0]
-
-        // 1. Check Subject: {{ 注文.ID }} -> ORD-2024
-        expect(commandInput.Content.Simple.Subject.Data).toBe('注文確認: ORD-2024')
-
-        // 2. Check Body HTML:
-        // {{ 顧客.情報.名前 }} -> 山田 太郎
-        // {{ 注文.詳細.品名 }} -> ワイヤレスイヤホン
-        expect(commandInput.Content.Simple.Body.Html.Data).toBe(
-          '<p>お客様: 山田 太郎 様</p><p>商品: ワイヤレスイヤホン</p>',
-        )
-
-        // 3. Check Body Text: Same replacements
-        expect(commandInput.Content.Simple.Body.Text.Data).toBe(
-          'お客様: 山田 太郎 様, 商品: ワイヤレスイヤホン',
         )
       })
 

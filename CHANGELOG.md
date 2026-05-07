@@ -15,6 +15,9 @@ See [Conventional Commits](https://conventionalcommits.org) for commit guideline
   - Use `publishAsync()` instead
 - **core:** Remove deprecated `CommandService.publishPartialUpdate()` method
   - Use `publishPartialUpdateAsync()` instead
+- **core:** `CommandService.publishSync()` and `publishPartialUpdateSync()` now return `Promise<CommandModel | null>` (previously `Promise<CommandModel>`)
+  - Returns `null` when the command is not dirty (no-op), matching `publishAsync()` / `publishPartialUpdateAsync()`
+  - **Migration:** Callers must handle `null` before using the result (e.g. `if (result) { ... }` or early return)
 - **sequence:** Remove deprecated `SequencesService.genNewSequence()` method
   - Use `generateSequenceItem()` or `generateSequenceItemWithProvideSetting()` instead
 

@@ -1,3 +1,5 @@
 export * from './data-store.module'
 export * from './dynamodb.service'
 export * from './s3.service'
+export * from './session.interface'
+export * from './session.service'

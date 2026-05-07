@@ -10,12 +10,12 @@ import { S3Service } from '../data-store'
 import { addSortKeyVersion, removeSortKeyVersion } from '../helpers/key'
 import { CommandModuleOptions, INotification } from '../interfaces'
 import { SnsService } from '../queue'
+import { StepFunctionService } from '../step-func/step-function.service'
 import { MODULE_OPTIONS_TOKEN } from './command.module-definition'
 import { CommandService } from './command.service'
 import { DataService } from './data.service'
 import { CommandStatus, getCommandStatus } from './enums/status.enum'
 import { HistoryService } from './history.service'
-import { StepFunctionService } from '../step-func/step-function.service'
 
 @Injectable()
 export class CommandEventHandler {
@@ -149,7 +149,7 @@ export class CommandEventHandler {
       result: -1,
       error: 'version is not match',
       cause:
-        'next version must be ' + nextVersion + ' but got ' + new String(1),
+        'next version must be ' + nextVersion + ' but got ' + commandVersion,
     }
 
     await this.publishAlarm(event, errorDetails)

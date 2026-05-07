@@ -12,9 +12,9 @@ import {
 import { Injectable, Logger } from '@nestjs/common'
 
 import { CSV_IMPORT_PK_PREFIX } from '../constant'
+import { ImportStatusEnum } from '../enum'
 import { ImportService } from '../import.service'
 import { ImportStatusQueueEvent } from './import-status.queue.event'
-import { ImportStatusEnum } from '../enum'
 
 @Injectable()
 @EventHandler(ImportStatusQueueEvent)
@@ -47,7 +47,7 @@ export class ImportStatusHandler
       return
     }
 
-    this.logger.log(
+    this.logger.debug(
       `Received ${status} master CSV job event for: ${notification.id}`,
     )
 
@@ -64,22 +64,25 @@ export class ImportStatusHandler
       // 3. Check if a taskToken was saved in its attributes.
       const taskToken = importJob.attributes?.taskToken
       if (taskToken) {
-        this.logger.log(
-          `Found task token. Sending ${status} signal to Step Function.`,
+        this.logger.debug(
+          status === ImportStatusEnum.FAILED
+            ? 'Found task token. Sending SendTaskSuccess with importJobStatus FAILED (ZIP orchestrator).'
+            : `Found task token. Sending ${status} signal to Step Function.`,
         )
 
-        // 4. Send the appropriate signal based on status.
+        // 4. Send the callback so the ZIP orchestrator Map can continue (option B).
+        // Always use SendTaskSuccess; include importJobStatus when the CSV master job failed
+        // so finalize_zip_job can mark the ZIP FAILED after aggregating all files.
         if (status === ImportStatusEnum.COMPLETED) {
           await this.sendTaskSuccess(taskToken, importJob.result)
         } else if (status === ImportStatusEnum.FAILED) {
-          await this.sendTaskFailure(
+          await this.sendTaskSuccess(
             taskToken,
-            'ImportFailed',
-            importJob.result,
+            this.buildZipOrchestratorFailureOutput(importJob.result),
           )
         }
       } else {
-        this.logger.log(
+        this.logger.debug(
           'No task token found in import job attributes. Nothing to do.',
         )
       }
@@ -90,12 +93,31 @@ export class ImportStatusHandler
   }
 
   /**
+   * Merges the import job result with FAILED status for ZIP orchestrator callbacks.
+   */
+  private buildZipOrchestratorFailureOutput(
+    result: unknown,
+  ): Record<string, unknown> {
+    if (
+      result != null &&
+      typeof result === 'object' &&
+      !Array.isArray(result)
+    ) {
+      return {
+        ...(result as Record<string, unknown>),
+        importJobStatus: ImportStatusEnum.FAILED,
+      }
+    }
+    return { result, importJobStatus: ImportStatusEnum.FAILED }
+  }
+
+  /**
    * Sends a success signal to a waiting Step Function task.
    * @param taskToken The unique token of the paused task.
    * @param output The JSON output to send back to the state machine.
    */
   async sendTaskSuccess(taskToken: string, output: any) {
-    this.logger.log(`Sending task success for token: ${taskToken}`)
+    this.logger.debug(`Sending task success for token: ${taskToken}`)
     return this.sfnService.client.send(
       new SendTaskSuccessCommand({
         taskToken: taskToken,
@@ -106,12 +128,18 @@ export class ImportStatusHandler
 
   /**
    * Sends a failure signal to a waiting Step Function task.
+   *
+   * NOTE: As of this PR, this method is no longer called from execute().
+   * The ZIP orchestrator uses SendTaskSuccess with importJobStatus instead (Option B),
+   * so the Map state can continue processing remaining files even when one CSV fails.
+   * Kept public for potential use cases outside ZIP orchestration.
+   *
    * @param taskToken The unique token of the paused task.
    * @param error The error code to send back to the state machine.
    * @param cause The detailed cause of the failure (will be JSON stringified).
    */
   async sendTaskFailure(taskToken: string, error: string, cause: any) {
-    this.logger.log(`Sending task failure for token: ${taskToken}`)
+    this.logger.debug(`Sending task failure for token: ${taskToken}`)
     return this.sfnService.client.send(
       new SendTaskFailureCommand({
         taskToken: taskToken,

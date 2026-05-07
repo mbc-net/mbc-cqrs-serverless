@@ -1,5 +1,6 @@
 import {
   AttributeValue,
+  DeleteItemCommand,
   DynamoDBClient,
   GetItemCommand,
   PutItemCommand,
@@ -124,6 +125,17 @@ export class DynamoDbService {
     )
 
     return await this.ddbItemToObj(Item)
+  }
+
+  async deleteItem(tableName: string, key: DetailKey, conditions?: string) {
+    const res = await this.client.send(
+      new DeleteItemCommand({
+        TableName: tableName,
+        Key: this.toDdbKey(key),
+        ConditionExpression: conditions,
+      }),
+    )
+    return res
   }
 
   async listItemsByPk(

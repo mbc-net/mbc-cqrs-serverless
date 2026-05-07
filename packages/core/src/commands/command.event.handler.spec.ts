@@ -1,6 +1,7 @@
 import { createMock } from '@golevelup/ts-jest'
 import { Test } from '@nestjs/testing'
 import { DynamoDbService, S3Service } from '../data-store'
+import { SessionService } from '../data-store/session.service'
 
 import {
   DynamoDBClient,
@@ -155,6 +156,10 @@ describe('DataSyncCommandSfnEventHandler', () => {
           TtlService,
           SnsClientFactory,
           StepFunctionService,
+          {
+            provide: SessionService,
+            useValue: createMock<SessionService>(),
+          },
           {
             provide: SFNClient,
             useValue: sfnMock,

@@ -10,6 +10,7 @@ import { CommandService } from './command.service'
 import { DataService } from './data.service'
 import { DataSyncDdsHandler } from './handlers/data-sync-dds.handler'
 import { HistoryService } from './history.service'
+import { Repository } from './repository'
 import { TtlService } from './ttl.service'
 
 @Module({
@@ -22,6 +23,7 @@ import { TtlService } from './ttl.service'
     HistoryService,
     CommandEventHandler,
     DataSyncDdsHandler,
+    Repository,
   ],
   exports: [
     CommandService,
@@ -29,6 +31,7 @@ import { TtlService } from './ttl.service'
     HistoryService,
     CommandEventHandler,
     TtlService,
+    Repository,
   ],
 })
 export class CommandModule extends ConfigurableModuleClass {

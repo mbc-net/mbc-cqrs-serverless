@@ -39,6 +39,8 @@ describe('MasterSettingController', () => {
     const mockMasterSettingService = {
       getSetting: jest.fn(),
       createUserSetting: jest.fn(),
+      createBulk: jest.fn(),
+      upsertBulk: jest.fn(),
       updateSetting: jest.fn(),
       deleteSetting: jest.fn(),
     }
@@ -75,9 +77,14 @@ describe('MasterSettingController', () => {
 
       jest.spyOn(service, 'getSetting').mockResolvedValue(expectedResult as any)
 
-      const result = await controller.getSettingDetail(getDto as any, mockInvokeContext)
+      const result = await controller.getSettingDetail(
+        getDto as any,
+        mockInvokeContext,
+      )
 
-      expect(service.getSetting).toHaveBeenCalledWith(getDto, { invokeContext: mockInvokeContext })
+      expect(service.getSetting).toHaveBeenCalledWith(getDto, {
+        invokeContext: mockInvokeContext,
+      })
       expect(result).toEqual(expectedResult)
     })
 
@@ -87,9 +94,9 @@ describe('MasterSettingController', () => {
 
       jest.spyOn(service, 'getSetting').mockRejectedValue(error)
 
-      await expect(controller.getSettingDetail(getDto as any, mockInvokeContext)).rejects.toThrow(
-        'Setting not found',
-      )
+      await expect(
+        controller.getSettingDetail(getDto as any, mockInvokeContext),
+      ).rejects.toThrow('Setting not found')
     })
   })
 
@@ -110,7 +117,9 @@ describe('MasterSettingController', () => {
         version: 1,
       }
 
-      jest.spyOn(service, 'createUserSetting').mockResolvedValue(expectedResult as any)
+      jest
+        .spyOn(service, 'createUserSetting')
+        .mockResolvedValue(expectedResult as any)
 
       const result = await controller.createUserSetting(
         mockInvokeContext,
@@ -140,6 +149,46 @@ describe('MasterSettingController', () => {
     })
   })
 
+  describe('createBulk', () => {
+    it('should call upsertBulk', async () => {
+      const createDto = {
+        items: [
+          {
+            code: 'Setting1',
+            name: 'Setting 1',
+            settingValue: { key: 'value1' },
+          },
+        ],
+      }
+      const expectedResult = [
+        {
+          pk: 'SETTING#MBC',
+          sk: 'SETTING#Setting1',
+          id: 'SETTING#MBC#SETTING#Setting1',
+          attributes: { key: 'value1' },
+          code: 'Setting1',
+          version: 1,
+          tenantCode: 'MBC',
+          name: 'Setting 1',
+          type: 'MASTER',
+        },
+      ]
+
+      jest.spyOn(service, 'upsertBulk').mockResolvedValue(expectedResult as any)
+
+      const result = await controller.createBulk(
+        createDto as any,
+        mockInvokeContext,
+      )
+
+      expect(service.upsertBulk).toHaveBeenCalledWith(
+        createDto,
+        mockInvokeContext,
+      )
+      expect(result).toEqual(expectedResult)
+    })
+  })
+
   describe('updateTenant', () => {
     it('should update tenant setting successfully', async () => {
       const key: DetailDto = { pk: 'MASTER#test-tenant', sk: 'test-sk' }
@@ -151,7 +200,9 @@ describe('MasterSettingController', () => {
         version: 2,
       }
 
-      jest.spyOn(service, 'updateSetting').mockResolvedValue(expectedResult as any)
+      jest
+        .spyOn(service, 'updateSetting')
+        .mockResolvedValue(expectedResult as any)
 
       const result = await controller.updateTenant(
         key,
@@ -188,12 +239,11 @@ describe('MasterSettingController', () => {
         version: 2,
       }
 
-      jest.spyOn(service, 'deleteSetting').mockResolvedValue(expectedResult as any)
+      jest
+        .spyOn(service, 'deleteSetting')
+        .mockResolvedValue(expectedResult as any)
 
-      const result = await controller.deleteTenant(
-        key,
-        mockInvokeContext,
-      )
+      const result = await controller.deleteTenant(key, mockInvokeContext)
 
       expect(service.deleteSetting).toHaveBeenCalledWith(key, {
         invokeContext: mockInvokeContext,

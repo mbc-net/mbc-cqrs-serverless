@@ -133,7 +133,13 @@ export class MasterSettingController {
     @Body() createDto: CommonSettingBulkDto,
     @INVOKE_CONTEXT() invokeContext: IInvoke,
   ) {
-    return this.masterSettingService.createBulk(createDto, invokeContext)
+    const userContext = getUserContext(invokeContext)
+    for (const item of createDto.items) {
+      if (item.tenantCode && item.tenantCode !== userContext.tenantCode) {
+        throw new BadRequestException(`Invalid tenant code: ${item.tenantCode}`)
+      }
+    }
+    return this.masterSettingService.upsertBulk(createDto, invokeContext)
   }
 
   @Put('/:id')

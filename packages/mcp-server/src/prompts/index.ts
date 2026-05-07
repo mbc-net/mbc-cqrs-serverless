@@ -1,13 +1,15 @@
 import { Prompt, PromptMessage } from '@modelcontextprotocol/sdk/types.js'
-import { getCqrsPrompts, getCqrsPromptMessages } from './cqrs-guide.js'
+
+import { getCqrsPromptMessages, getCqrsPrompts } from './cqrs-guide.js'
+
+const ALL_PROMPTS: Prompt[] = [...getCqrsPrompts()]
+const PROMPT_NAMES = new Set(ALL_PROMPTS.map((p) => p.name))
 
 /**
  * Register all available prompts.
  */
 export function registerPrompts(): Prompt[] {
-  return [
-    ...getCqrsPrompts(),
-  ]
+  return ALL_PROMPTS
 }
 
 /**
@@ -15,13 +17,11 @@ export function registerPrompts(): Prompt[] {
  */
 export function handlePromptGet(
   name: string,
-  args?: Record<string, string>
+  args?: Record<string, string>,
 ): { messages: PromptMessage[] } {
   const safeArgs = args || {}
 
-  // CQRS prompts
-  const cqrsPromptNames = ['cqrs_implementation_guide', 'debug_command_error', 'migration_guide']
-  if (cqrsPromptNames.includes(name)) {
+  if (PROMPT_NAMES.has(name)) {
     return getCqrsPromptMessages(name, safeArgs)
   }
 

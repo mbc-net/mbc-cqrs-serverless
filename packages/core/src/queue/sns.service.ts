@@ -23,7 +23,7 @@ export class SnsService {
       throw new Error('No topic ARN provided or configured as default.')
     }
 
-    const client = this.snsClientFactory.getClient(resolvedTopicArn)
+    const client = this.snsClientFactory.getClient()
 
     return client.send(
       new PublishCommand({

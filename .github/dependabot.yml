@@ -1,0 +1,38 @@
+version: 2
+updates:
+  - package-ecosystem: "npm"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+    groups:
+      aws-sdk:
+        patterns:
+          - "@aws-sdk/*"
+      nestjs:
+        patterns:
+          - "@nestjs/*"
+      testing:
+        patterns:
+          - "jest*"
+          - "@types/jest"
+          - "ts-jest"
+      typescript:
+        patterns:
+          - "typescript"
+          - "@typescript-eslint/*"
+      eslint:
+        patterns:
+          - "eslint*"
+          - "prettier*"
+    commit-message:
+      prefix: "chore(deps)"
+    open-pull-requests-limit: 10
+    ignore:
+      # Ignore major version updates for critical packages to prevent breaking changes
+      - dependency-name: "@nestjs/*"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "class-transformer"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "class-validator"
+        update-types: ["version-update:semver-major"]

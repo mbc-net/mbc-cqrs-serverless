@@ -24,11 +24,7 @@ import { PRISMA_SERVICE } from '../master.module-definition'
 import { TaskService } from '@mbc-cqrs-serverless/task'
 import { BadRequestException, NotFoundException } from '@nestjs/common'
 import { createMock } from '@golevelup/ts-jest'
-import { 
-  DataModel, 
-  CommandModel, 
-  DetailKey,
-} from '@mbc-cqrs-serverless/core'
+import { DataModel, CommandModel, DetailKey } from '@mbc-cqrs-serverless/core'
 import { MasterDataEntity } from '../entities'
 
 const mockInvokeContext = {
@@ -102,9 +98,15 @@ describe('SettingService', () => {
     }).compile()
 
     service = module.get<MasterSettingService>(MasterSettingService)
-    dataService = module.get<DataService>(DataService) as jest.Mocked<DataService>
-    commandService = module.get<CommandService>(CommandService) as jest.Mocked<CommandService>
-    dynamoDbService = module.get<DynamoDbService>(DynamoDbService) as jest.Mocked<DynamoDbService>
+    dataService = module.get<DataService>(
+      DataService,
+    ) as jest.Mocked<DataService>
+    commandService = module.get<CommandService>(
+      CommandService,
+    ) as jest.Mocked<CommandService>
+    dynamoDbService = module.get<DynamoDbService>(
+      DynamoDbService,
+    ) as jest.Mocked<DynamoDbService>
   })
   //
   it('should be defined', () => {
@@ -792,6 +794,221 @@ describe('SettingService', () => {
     })
   })
 
+  describe('upsertTenantSetting', () => {
+    afterEach(() => {
+      jest.clearAllMocks()
+    })
+
+    it('should create new setting when not exists', async () => {
+      const dto: TenantSettingDto = {
+        tenantCode: 'MBC',
+        code: 'NewSetting',
+        name: 'New Setting',
+        settingValue: { key: 'value' },
+      }
+
+      dataService.getItem.mockResolvedValue(null)
+      const mockResponse = {
+        pk: 'SETTING#MBC',
+        sk: 'SETTING#NewSetting',
+        id: 'SETTING#MBC#SETTING#NewSetting',
+        attributes: { key: 'value' },
+        code: 'NewSetting',
+        version: 1,
+        tenantCode: 'MBC',
+        name: 'New Setting',
+        type: 'MASTER',
+        isDeleted: false,
+      }
+      commandService.publishAsync.mockResolvedValue(mockResponse)
+
+      const result = await service.upsertTenantSetting(dto, optionsMock)
+
+      expect(result).toBeInstanceOf(Object)
+      expect(commandService.publishAsync).toHaveBeenCalledWith(
+        expect.objectContaining({
+          version: 0,
+          isDeleted: false,
+        }),
+        optionsMock,
+      )
+    })
+
+    it('should update existing setting when exists with changes', async () => {
+      const dto: TenantSettingDto = {
+        tenantCode: 'MBC',
+        code: 'ExistingSetting',
+        name: 'Updated Setting',
+        settingValue: { key: 'new-value' },
+      }
+
+      const existingData: DataModel = {
+        id: 'existing-id',
+        pk: 'SETTING#MBC',
+        sk: 'SETTING#ExistingSetting',
+        code: 'ExistingSetting',
+        name: 'Old Setting',
+        version: 2,
+        type: 'MASTER',
+        tenantCode: 'MBC',
+        isDeleted: false,
+        attributes: { key: 'old-value' },
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      }
+
+      dataService.getItem.mockResolvedValue(existingData)
+      const mockResponse = {
+        ...existingData,
+        name: 'Updated Setting',
+        attributes: { key: 'new-value' },
+        version: 3,
+      }
+      commandService.publishAsync.mockResolvedValue(mockResponse)
+
+      const result = await service.upsertTenantSetting(dto, optionsMock)
+
+      expect(result).toBeInstanceOf(Object)
+      expect(commandService.publishAsync).toHaveBeenCalledWith(
+        expect.objectContaining({
+          version: 2,
+          isDeleted: false,
+        }),
+        optionsMock,
+      )
+    })
+
+    it('should return existing data when data is identical (not dirty)', async () => {
+      const dto: TenantSettingDto = {
+        tenantCode: 'MBC',
+        code: 'SameSetting',
+        name: 'Same Setting',
+        settingValue: { key: 'same-value' },
+      }
+
+      const existingData: DataModel = {
+        id: 'existing-id',
+        pk: 'SETTING#MBC',
+        sk: 'SETTING#SameSetting',
+        code: 'SameSetting',
+        name: 'Same Setting',
+        version: 2,
+        type: 'MASTER',
+        tenantCode: 'MBC',
+        isDeleted: false,
+        attributes: { key: 'same-value' },
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      }
+
+      dataService.getItem.mockResolvedValue(existingData)
+      commandService.publishAsync.mockResolvedValue(null)
+
+      const result = await service.upsertTenantSetting(dto, optionsMock)
+
+      expect(result).toBeInstanceOf(Object)
+      expect(result.code).toBe('SameSetting')
+    })
+
+    it('should recreate when existing setting is deleted', async () => {
+      const dto: TenantSettingDto = {
+        tenantCode: 'MBC',
+        code: 'DeletedSetting',
+        name: 'Recreated Setting',
+        settingValue: { recreated: true },
+      }
+
+      const existingDeletedData: DataModel = {
+        id: 'existing-id',
+        pk: 'SETTING#MBC',
+        sk: 'SETTING#DeletedSetting',
+        code: 'DeletedSetting',
+        name: 'Deleted Setting',
+        version: 3,
+        type: 'MASTER',
+        tenantCode: 'MBC',
+        isDeleted: true,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      }
+
+      dataService.getItem.mockResolvedValue(existingDeletedData)
+      const mockResponse = {
+        ...existingDeletedData,
+        name: 'Recreated Setting',
+        attributes: { recreated: true },
+        isDeleted: false,
+        version: 3,
+      }
+      commandService.publishAsync.mockResolvedValue(mockResponse)
+
+      const result = await service.upsertTenantSetting(dto, optionsMock)
+
+      expect(result).toBeInstanceOf(Object)
+      expect(result.isDeleted).toBe(false)
+      expect(commandService.publishAsync).toHaveBeenCalledWith(
+        expect.objectContaining({
+          version: 3,
+          isDeleted: false,
+        }),
+        optionsMock,
+      )
+    })
+  })
+
+  describe('upsertBulk', () => {
+    afterEach(() => {
+      jest.clearAllMocks()
+    })
+
+    it('should upsert multiple items', async () => {
+      const item1: CommonSettingDto = {
+        code: 'Setting1',
+        name: 'Setting 1',
+        settingValue: { key: 'value1' },
+      }
+      const item2: CommonSettingDto = {
+        code: 'Setting2',
+        name: 'Setting 2',
+        settingValue: { key: 'value2' },
+      }
+
+      dataService.getItem.mockResolvedValue(null)
+      commandService.publishAsync
+        .mockResolvedValueOnce({
+          pk: 'SETTING#MBC',
+          sk: 'SETTING#Setting1',
+          id: 'SETTING#MBC#SETTING#Setting1',
+          attributes: { key: 'value1' },
+          code: 'Setting1',
+          version: 1,
+          tenantCode: 'MBC',
+          name: 'Setting 1',
+          type: 'MASTER',
+          isDeleted: false,
+        })
+        .mockResolvedValueOnce({
+          pk: 'SETTING#MBC',
+          sk: 'SETTING#Setting2',
+          id: 'SETTING#MBC#SETTING#Setting2',
+          attributes: { key: 'value2' },
+          code: 'Setting2',
+          version: 1,
+          tenantCode: 'MBC',
+          name: 'Setting 2',
+          type: 'MASTER',
+          isDeleted: false,
+        })
+
+      const result = await service.upsertBulk(
+        { items: [item1, item2] },
+        mockInvokeContext,
+      )
+
+      expect(result).toHaveLength(2)
+    })
+  })
+
   describe('deleteSetting', () => {
     /**
      * Test Overview: Tests deleteSetting method functionality for MasterSettingService
@@ -821,9 +1038,13 @@ describe('SettingService', () => {
         version: 1,
         updatedAt: new Date(),
       }
-      commandService.publishPartialUpdateAsync.mockResolvedValue(mockDeleteResult)
+      commandService.publishPartialUpdateAsync.mockResolvedValue(
+        mockDeleteResult,
+      )
 
-      const result = await service.deleteSetting(key, { invokeContext: mockInvokeContext })
+      const result = await service.deleteSetting(key, {
+        invokeContext: mockInvokeContext,
+      })
 
       expect(result).toBeInstanceOf(Object)
       expect(commandService.publishPartialUpdateAsync).toHaveBeenCalledWith(
@@ -833,7 +1054,7 @@ describe('SettingService', () => {
           version: existingData.version,
           isDeleted: true,
         }),
-        { invokeContext: mockInvokeContext }
+        { invokeContext: mockInvokeContext },
       )
     })
 
@@ -842,8 +1063,9 @@ describe('SettingService', () => {
 
       dataService.getItem.mockResolvedValue(null)
 
-      await expect(service.deleteSetting(key, { invokeContext: mockInvokeContext }))
-        .rejects.toThrow(BadRequestException)
+      await expect(
+        service.deleteSetting(key, { invokeContext: mockInvokeContext }),
+      ).rejects.toThrow(BadRequestException)
       expect(commandService.publishPartialUpdateAsync).not.toHaveBeenCalled()
     })
   })
@@ -863,8 +1085,9 @@ describe('SettingService', () => {
         dbError.name = 'ResourceNotFoundException'
         dynamoDbService.getItem.mockRejectedValue(dbError)
 
-        await expect(service.getSetting({ code }, { invokeContext: mockInvokeContext }))
-          .rejects.toThrow(BadRequestException)
+        await expect(
+          service.getSetting({ code }, { invokeContext: mockInvokeContext }),
+        ).rejects.toThrow(BadRequestException)
       })
 
       it('should handle malformed tenant data in DynamoDB', async () => {
@@ -873,12 +1096,13 @@ describe('SettingService', () => {
 
         dynamoDbService.getItem.mockResolvedValue({
           attributes: {
-            malformedData: 'invalid-json-structure'
-          }
+            malformedData: 'invalid-json-structure',
+          },
         })
 
-        await expect(service.getSetting({ code }, { invokeContext: mockInvokeContext }))
-          .rejects.toThrow(BadRequestException)
+        await expect(
+          service.getSetting({ code }, { invokeContext: mockInvokeContext }),
+        ).rejects.toThrow(BadRequestException)
       })
 
       it('should handle timeout errors during hierarchical setting retrieval', async () => {
@@ -887,11 +1111,12 @@ describe('SettingService', () => {
 
         const timeoutError = new Error('Request timeout')
         timeoutError.name = 'TimeoutError'
-        
+
         dataService.getItem.mockRejectedValue(timeoutError)
 
-        await expect(service.getSetting({ code }, { invokeContext: mockInvokeContext }))
-          .rejects.toThrow('Request timeout')
+        await expect(
+          service.getSetting({ code }, { invokeContext: mockInvokeContext }),
+        ).rejects.toThrow('Request timeout')
       })
     })
 
@@ -907,8 +1132,11 @@ describe('SettingService', () => {
         const publishError = new Error('Command publish failed')
         commandService.publishAsync.mockRejectedValue(publishError)
 
-        await expect(service.createCommonTenantSetting(dto, { invokeContext: mockInvokeContext }))
-          .rejects.toThrow('Command publish failed')
+        await expect(
+          service.createCommonTenantSetting(dto, {
+            invokeContext: mockInvokeContext,
+          }),
+        ).rejects.toThrow('Command publish failed')
       })
 
       it('should handle database connection errors during existence check', async () => {
@@ -922,8 +1150,11 @@ describe('SettingService', () => {
         dbError.name = 'NetworkingError'
         dataService.getItem.mockRejectedValue(dbError)
 
-        await expect(service.createCommonTenantSetting(dto, { invokeContext: mockInvokeContext }))
-          .rejects.toThrow('Database connection failed')
+        await expect(
+          service.createCommonTenantSetting(dto, {
+            invokeContext: mockInvokeContext,
+          }),
+        ).rejects.toThrow('Database connection failed')
       })
     })
 
@@ -949,8 +1180,13 @@ describe('SettingService', () => {
         versionError.name = 'ConditionalCheckFailedException'
         commandService.publishPartialUpdateAsync.mockRejectedValue(versionError)
 
-        await expect(service.updateSetting(key, { settingValue: { updated: true } }, { invokeContext: mockInvokeContext }))
-          .rejects.toThrow('Version conflict')
+        await expect(
+          service.updateSetting(
+            key,
+            { settingValue: { updated: true } },
+            { invokeContext: mockInvokeContext },
+          ),
+        ).rejects.toThrow('Version conflict')
       })
 
       it('should handle concurrent update attempts', async () => {
@@ -971,10 +1207,17 @@ describe('SettingService', () => {
 
         dataService.getItem.mockResolvedValue(existingData)
         const concurrencyError = new Error('Concurrent modification')
-        commandService.publishPartialUpdateAsync.mockRejectedValue(concurrencyError)
+        commandService.publishPartialUpdateAsync.mockRejectedValue(
+          concurrencyError,
+        )
 
-        await expect(service.updateSetting(key, { settingValue: { updated: true } }, { invokeContext: mockInvokeContext }))
-          .rejects.toThrow('Concurrent modification')
+        await expect(
+          service.updateSetting(
+            key,
+            { settingValue: { updated: true } },
+            { invokeContext: mockInvokeContext },
+          ),
+        ).rejects.toThrow('Concurrent modification')
       })
     })
   })
@@ -986,121 +1229,137 @@ describe('SettingService', () => {
    */
   describe('Edge Cases and Boundary Conditions', () => {
     it('should handle empty setting code', async () => {
-        await expect(service.getSetting({ code: 'TEST_SETTING' }, { invokeContext: mockInvokeContext }))
-          .rejects.toThrow(BadRequestException)
-      })
-
-      it('should handle null setting code', async () => {
-        await expect(service.getSetting({ code: null }, { invokeContext: mockInvokeContext }))
-          .rejects.toThrow(BadRequestException)
-      })
-
-      it('should handle special characters in setting codes', async () => {
-        const specialCode = 'SETTING_特殊文字@#$%'
-
-        const mockCommonSetting = {
-          id: 'test-id',
-          pk: 'SETTING#common',
-          sk: `SETTING#${specialCode}`,
-          code: specialCode,
-          name: 'Special Setting',
-          version: 1,
-          type: 'MASTER',
-          tenantCode: 'common',
-          isDeleted: false,
-          attributes: { special: true },
-          createdAt: new Date(),
-          updatedAt: new Date(),
-        }
-        
-        dataService.getItem.mockResolvedValue(mockCommonSetting)
-
-        const result = await service.getSetting({ code: specialCode }, { invokeContext: mockInvokeContext })
-
-        expect(result).toBeDefined()
-        expect(result).toBeInstanceOf(MasterSettingEntity)
-      })
-
-      it('should handle missing user context in invoke context', async () => {
-        const tenantCode = 'TEST_TENANT'
-        const code = 'TEST_SETTING'
-        const emptyInvokeContext = {}
-
-        dataService.getItem.mockResolvedValue(null)
-
-        await expect(service.getSetting({ code }, { invokeContext: mockInvokeContext }))
-          .rejects.toThrow(BadRequestException)
-      })
+      await expect(
+        service.getSetting(
+          { code: 'TEST_SETTING' },
+          { invokeContext: mockInvokeContext },
+        ),
+      ).rejects.toThrow(BadRequestException)
     })
 
-    describe('createTenantSetting - Edge Cases', () => {
-      it('should handle empty setting values', async () => {
-        const dto: TenantSettingDto = {
-          tenantCode: 'TEST_TENANT',
-          code: 'TEST_SETTING',
-          name: 'Test Setting',
-          settingValue: {},
-        }
-
-        dataService.getItem.mockResolvedValue(null)
-        const mockResponse: CommandModel = {
-          id: 'test-id',
-          pk: 'SETTING#TEST_TENANT',
-          sk: 'SETTING#TEST_SETTING',
-          version: 1,
-          type: 'MASTER',
-          tenantCode: 'TEST_TENANT',
-          name: 'TEST_SETTING',
-          code: 'TEST_SETTING',
-          isDeleted: false,
-          attributes: {},
-          createdAt: new Date(),
-          updatedAt: new Date(),
-        }
-        commandService.publishAsync.mockResolvedValue(mockResponse)
-
-        const result = await service.createTenantSetting(dto, { invokeContext: mockInvokeContext })
-
-        expect(result).toBeInstanceOf(Object)
-        expect(result.attributes).toEqual({})
-      })
-
-      it('should handle very large setting values', async () => {
-        const largeSettingValue = {}
-        for (let i = 0; i < 1000; i++) {
-          largeSettingValue[`key${i}`] = `value${i}`.repeat(50)
-        }
-
-        const dto: TenantSettingDto = {
-          tenantCode: 'TEST_TENANT',
-          code: 'LARGE_SETTING',
-          name: 'Large Setting',
-          settingValue: largeSettingValue,
-        }
-
-        dataService.getItem.mockResolvedValue(null)
-        const mockResponse: CommandModel = {
-          id: 'test-id',
-          pk: 'SETTING#TEST_TENANT',
-          sk: 'SETTING#LARGE_SETTING',
-          version: 1,
-          type: 'MASTER',
-          tenantCode: 'TEST_TENANT',
-          name: 'LARGE_SETTING',
-          code: 'LARGE_SETTING',
-          isDeleted: false,
-          attributes: largeSettingValue,
-          createdAt: new Date(),
-          updatedAt: new Date(),
-        }
-        commandService.publishAsync.mockResolvedValue(mockResponse)
-
-        const result = await service.createTenantSetting(dto, { invokeContext: mockInvokeContext })
-
-        expect(result).toBeInstanceOf(Object)
-        expect(Object.keys(result.attributes)).toHaveLength(1000)
-      })
+    it('should handle null setting code', async () => {
+      await expect(
+        service.getSetting(
+          { code: null },
+          { invokeContext: mockInvokeContext },
+        ),
+      ).rejects.toThrow(BadRequestException)
     })
+
+    it('should handle special characters in setting codes', async () => {
+      const specialCode = 'SETTING_特殊文字@#$%'
+
+      const mockCommonSetting = {
+        id: 'test-id',
+        pk: 'SETTING#common',
+        sk: `SETTING#${specialCode}`,
+        code: specialCode,
+        name: 'Special Setting',
+        version: 1,
+        type: 'MASTER',
+        tenantCode: 'common',
+        isDeleted: false,
+        attributes: { special: true },
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      }
+
+      dataService.getItem.mockResolvedValue(mockCommonSetting)
+
+      const result = await service.getSetting(
+        { code: specialCode },
+        { invokeContext: mockInvokeContext },
+      )
+
+      expect(result).toBeDefined()
+      expect(result).toBeInstanceOf(MasterSettingEntity)
+    })
+
+    it('should handle missing user context in invoke context', async () => {
+      const tenantCode = 'TEST_TENANT'
+      const code = 'TEST_SETTING'
+      const emptyInvokeContext = {}
+
+      dataService.getItem.mockResolvedValue(null)
+
+      await expect(
+        service.getSetting({ code }, { invokeContext: mockInvokeContext }),
+      ).rejects.toThrow(BadRequestException)
+    })
+  })
+
+  describe('createTenantSetting - Edge Cases', () => {
+    it('should handle empty setting values', async () => {
+      const dto: TenantSettingDto = {
+        tenantCode: 'TEST_TENANT',
+        code: 'TEST_SETTING',
+        name: 'Test Setting',
+        settingValue: {},
+      }
+
+      dataService.getItem.mockResolvedValue(null)
+      const mockResponse: CommandModel = {
+        id: 'test-id',
+        pk: 'SETTING#TEST_TENANT',
+        sk: 'SETTING#TEST_SETTING',
+        version: 1,
+        type: 'MASTER',
+        tenantCode: 'TEST_TENANT',
+        name: 'TEST_SETTING',
+        code: 'TEST_SETTING',
+        isDeleted: false,
+        attributes: {},
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      }
+      commandService.publishAsync.mockResolvedValue(mockResponse)
+
+      const result = await service.createTenantSetting(dto, {
+        invokeContext: mockInvokeContext,
+      })
+
+      expect(result).toBeInstanceOf(Object)
+      expect(result.attributes).toEqual({})
+    })
+
+    it('should handle very large setting values', async () => {
+      const largeSettingValue = {}
+      for (let i = 0; i < 1000; i++) {
+        largeSettingValue[`key${i}`] = `value${i}`.repeat(50)
+      }
+
+      const dto: TenantSettingDto = {
+        tenantCode: 'TEST_TENANT',
+        code: 'LARGE_SETTING',
+        name: 'Large Setting',
+        settingValue: largeSettingValue,
+      }
+
+      dataService.getItem.mockResolvedValue(null)
+      const mockResponse: CommandModel = {
+        id: 'test-id',
+        pk: 'SETTING#TEST_TENANT',
+        sk: 'SETTING#LARGE_SETTING',
+        version: 1,
+        type: 'MASTER',
+        tenantCode: 'TEST_TENANT',
+        name: 'LARGE_SETTING',
+        code: 'LARGE_SETTING',
+        isDeleted: false,
+        attributes: largeSettingValue,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      }
+      commandService.publishAsync.mockResolvedValue(mockResponse)
+
+      const result = await service.createTenantSetting(dto, {
+        invokeContext: mockInvokeContext,
+      })
+
+      expect(result).toBeInstanceOf(Object)
+      expect(Object.keys(result.attributes)).toHaveLength(1000)
+    })
+  })
 
   /**
    * Test Overview: Tests comprehensive deleted setting re-addition scenarios for MasterSettingService
@@ -1148,7 +1407,9 @@ describe('SettingService', () => {
         }
         commandService.publishAsync.mockResolvedValue(mockResponse)
 
-        const result = await service.createCommonTenantSetting(dto, { invokeContext: mockInvokeContext })
+        const result = await service.createCommonTenantSetting(dto, {
+          invokeContext: mockInvokeContext,
+        })
 
         expect(result).toBeInstanceOf(Object)
         expect(result.version).toBe(3)
@@ -1160,7 +1421,7 @@ describe('SettingService', () => {
             isDeleted: false,
             attributes: { recreated: true, version: 2 },
           }),
-          { invokeContext: mockInvokeContext }
+          { invokeContext: mockInvokeContext },
         )
       })
 
@@ -1203,7 +1464,9 @@ describe('SettingService', () => {
         }
         commandService.publishAsync.mockResolvedValue(mockResponse)
 
-        const result = await service.createCommonTenantSetting(dto, { invokeContext: mockInvokeContext })
+        const result = await service.createCommonTenantSetting(dto, {
+          invokeContext: mockInvokeContext,
+        })
 
         expect(result).toBeInstanceOf(Object)
         expect(result.version).toBe(7)
@@ -1253,7 +1516,9 @@ describe('SettingService', () => {
         }
         commandService.publishAsync.mockResolvedValue(mockResponse)
 
-        const result = await service.createTenantSetting(dto, { invokeContext: mockInvokeContext })
+        const result = await service.createTenantSetting(dto, {
+          invokeContext: mockInvokeContext,
+        })
 
         expect(result).toBeInstanceOf(Object)
         expect(result.version).toBe(2)
@@ -1287,7 +1552,9 @@ describe('SettingService', () => {
         }
         commandService.publishAsync.mockResolvedValue(mockResponse)
 
-        const result = await service.createTenantSetting(dto, { invokeContext: mockInvokeContext })
+        const result = await service.createTenantSetting(dto, {
+          invokeContext: mockInvokeContext,
+        })
 
         expect(result).toBeInstanceOf(Object)
         expect(result.version).toBe(1)
@@ -1338,13 +1605,18 @@ describe('SettingService', () => {
         }
         commandService.publishAsync.mockResolvedValue(mockResponse)
 
-        const result = await service.createGroupSetting(dto, { invokeContext: mockInvokeContext })
+        const result = await service.createGroupSetting(dto, {
+          invokeContext: mockInvokeContext,
+        })
 
         expect(result).toBeInstanceOf(Object)
         expect(result.version).toBe(4)
         expect(result.tenantCode).toBe('TEST_TENANT')
         expect(result.isDeleted).toBe(false)
-        expect(result.attributes).toEqual({ group: 'GROUP_123', recreated: true })
+        expect(result.attributes).toEqual({
+          group: 'GROUP_123',
+          recreated: true,
+        })
       })
 
       it('should handle group setting recreation across different groups', async () => {
@@ -1373,12 +1645,17 @@ describe('SettingService', () => {
         }
         commandService.publishAsync.mockResolvedValue(mockResponse)
 
-        const result = await service.createGroupSetting(dto, { invokeContext: mockInvokeContext })
+        const result = await service.createGroupSetting(dto, {
+          invokeContext: mockInvokeContext,
+        })
 
         expect(result).toBeInstanceOf(Object)
         expect(result.version).toBe(1)
         expect(result.isDeleted).toBe(false)
-        expect(result.attributes).toEqual({ group: 'GROUP_456', value: 'different' })
+        expect(result.attributes).toEqual({
+          group: 'GROUP_456',
+          value: 'different',
+        })
       })
     })
 
@@ -1424,7 +1701,9 @@ describe('SettingService', () => {
         }
         commandService.publishAsync.mockResolvedValue(mockResponse)
 
-        const result = await service.createUserSetting(dto, { invokeContext: mockInvokeContext })
+        const result = await service.createUserSetting(dto, {
+          invokeContext: mockInvokeContext,
+        })
 
         expect(result).toBeInstanceOf(Object)
         expect(result.version).toBe(6)
@@ -1475,7 +1754,9 @@ describe('SettingService', () => {
         }
         commandService.publishAsync.mockResolvedValue(mockResponse)
 
-        const result = await service.createUserSetting(dto, { invokeContext: mockInvokeContext })
+        const result = await service.createUserSetting(dto, {
+          invokeContext: mockInvokeContext,
+        })
 
         expect(result).toBeInstanceOf(Object)
         expect(result.createdAt).toEqual(originalCreatedAt)
@@ -1510,16 +1791,16 @@ describe('SettingService', () => {
           createdAt: new Date(),
           updatedAt: new Date(),
         }
-        
+
         dataService.getItem.mockResolvedValue(mockCommonSetting)
 
-        const promises = Array.from({ length: 5 }, () => 
-          service.getSetting({ code }, { invokeContext: mockInvokeContext })
+        const promises = Array.from({ length: 5 }, () =>
+          service.getSetting({ code }, { invokeContext: mockInvokeContext }),
         )
 
         const results = await Promise.all(promises)
-        
-        results.forEach(result => {
+
+        results.forEach((result) => {
           expect(result).toBeInstanceOf(MasterSettingEntity)
           expect(result).toBeDefined()
         })
@@ -1537,7 +1818,7 @@ describe('SettingService', () => {
         const results = await Promise.allSettled([
           service.getSetting({ code }, { invokeContext: mockInvokeContext }),
           service.getSetting({ code }, { invokeContext: mockInvokeContext }),
-          service.getSetting({ code }, { invokeContext: mockInvokeContext })
+          service.getSetting({ code }, { invokeContext: mockInvokeContext }),
         ])
 
         expect(results[0].status).toBe('rejected')
@@ -1586,10 +1867,15 @@ describe('SettingService', () => {
           .mockResolvedValueOnce(mockResponse1)
           .mockRejectedValueOnce(versionConflictError)
 
-        const result1 = await service.createTenantSetting(dto1, { invokeContext: mockInvokeContext })
-        
-        await expect(service.createTenantSetting(dto2, { invokeContext: mockInvokeContext }))
-          .rejects.toThrow('Version conflict')
+        const result1 = await service.createTenantSetting(dto1, {
+          invokeContext: mockInvokeContext,
+        })
+
+        await expect(
+          service.createTenantSetting(dto2, {
+            invokeContext: mockInvokeContext,
+          }),
+        ).rejects.toThrow('Version conflict')
 
         expect(result1).toBeInstanceOf(Object)
         expect(result1.attributes).toEqual({ first: true })
@@ -1628,10 +1914,19 @@ describe('SettingService', () => {
           .mockResolvedValueOnce(mockUpdateResult1)
           .mockRejectedValueOnce(versionConflictError)
 
-        const result1 = await service.updateSetting(key, { settingValue: { updated: true } }, { invokeContext: mockInvokeContext })
-        
-        await expect(service.updateSetting(key, { settingValue: { updated: true } }, { invokeContext: mockInvokeContext }))
-          .rejects.toThrow('Version conflict')
+        const result1 = await service.updateSetting(
+          key,
+          { settingValue: { updated: true } },
+          { invokeContext: mockInvokeContext },
+        )
+
+        await expect(
+          service.updateSetting(
+            key,
+            { settingValue: { updated: true } },
+            { invokeContext: mockInvokeContext },
+          ),
+        ).rejects.toThrow('Version conflict')
 
         expect(result1.version).toBe(2)
       })

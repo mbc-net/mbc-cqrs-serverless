@@ -4,9 +4,10 @@ export * from './key'
 export * from './object'
 export * from './serializer'
 export * from './source'
+export * from './transform'
 
 // Re-export serialization helpers for convenience
-export { serializeToExternal, deserializeToInternal } from './serializer'
+export { deserializeToInternal, serializeToExternal } from './serializer'
 
 export const IS_LAMBDA_RUNNING =
   !!process.env.AWS_LAMBDA_FUNCTION_NAME &&

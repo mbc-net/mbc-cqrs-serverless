@@ -1,7 +1,9 @@
+import { Tool } from '@modelcontextprotocol/sdk/types.js'
 import * as fs from 'fs'
 import * as path from 'path'
-import { Tool } from '@modelcontextprotocol/sdk/types.js'
 import { z } from 'zod'
+
+import { findFiles, readFileSafe } from '../utils/fs.js'
 
 /**
  * Analysis result interface.
@@ -41,7 +43,10 @@ interface EntityInfo {
 }
 
 const AnalyzeProjectSchema = z.object({
-  path: z.string().optional().describe('Path to analyze (defaults to project root)'),
+  path: z
+    .string()
+    .optional()
+    .describe('Path to analyze (defaults to project root)'),
 })
 
 const LookupErrorSchema = z.object({
@@ -67,7 +72,8 @@ export function getAnalyzeTools(): Tool[] {
   return [
     {
       name: 'mbc_analyze_project',
-      description: 'Analyze an MBC CQRS Serverless project structure. Returns information about modules, entities, services, and CQRS pattern usage.',
+      description:
+        'Analyze an MBC CQRS Serverless project structure. Returns information about modules, entities, services, and CQRS pattern usage.',
       inputSchema: {
         type: 'object',
         properties: {
@@ -80,7 +86,8 @@ export function getAnalyzeTools(): Tool[] {
     },
     {
       name: 'mbc_lookup_error',
-      description: 'Look up an error message in the error catalog to find its cause and solution.',
+      description:
+        'Look up an error message in the error catalog to find its cause and solution.',
       inputSchema: {
         type: 'object',
         properties: {
@@ -94,7 +101,8 @@ export function getAnalyzeTools(): Tool[] {
     },
     {
       name: 'mbc_check_anti_patterns',
-      description: 'Check the project code for common anti-patterns and bad practices. Returns a list of detected issues with locations and recommendations.',
+      description:
+        'Check the project code for common anti-patterns and bad practices. Returns a list of detected issues with locations and recommendations.',
       inputSchema: {
         type: 'object',
         properties: {
@@ -107,7 +115,8 @@ export function getAnalyzeTools(): Tool[] {
     },
     {
       name: 'mbc_health_check',
-      description: 'Perform a health check on the MBC CQRS Serverless project. Checks dependencies, structure, configuration, and common setup issues.',
+      description:
+        'Perform a health check on the MBC CQRS Serverless project. Checks dependencies, structure, configuration, and common setup issues.',
       inputSchema: {
         type: 'object',
         properties: {},
@@ -115,7 +124,8 @@ export function getAnalyzeTools(): Tool[] {
     },
     {
       name: 'mbc_explain_code',
-      description: 'Analyze and explain a specific file or code section in the context of the MBC CQRS Serverless framework.',
+      description:
+        'Analyze and explain a specific file or code section in the context of the MBC CQRS Serverless framework.',
       inputSchema: {
         type: 'object',
         properties: {
@@ -144,12 +154,14 @@ export function getAnalyzeTools(): Tool[] {
 export async function handleAnalyzeTool(
   name: string,
   args: Record<string, unknown>,
-  projectPath: string
+  projectPath: string,
 ): Promise<{ content: { type: 'text'; text: string }[]; isError?: boolean }> {
   switch (name) {
     case 'mbc_analyze_project': {
       const parsed = AnalyzeProjectSchema.parse(args)
-      const targetPath = parsed.path ? path.resolve(projectPath, parsed.path) : projectPath
+      const targetPath = parsed.path
+        ? path.resolve(projectPath, parsed.path)
+        : projectPath
       const result = await analyzeProject(targetPath)
       return formatAnalysisResult(result)
     }
@@ -159,7 +171,9 @@ export async function handleAnalyzeTool(
     }
     case 'mbc_check_anti_patterns': {
       const parsed = CheckAntiPatternsSchema.parse(args)
-      const targetPath = parsed.path ? path.resolve(projectPath, parsed.path) : path.join(projectPath, 'src')
+      const targetPath = parsed.path
+        ? path.resolve(projectPath, parsed.path)
+        : path.join(projectPath, 'src')
       return await checkAntiPatterns(targetPath, projectPath)
     }
     case 'mbc_health_check': {
@@ -203,11 +217,22 @@ async function analyzeProject(projectPath: string): Promise<AnalysisResult> {
   // Check package.json
   const packageJsonPath = path.join(projectPath, 'package.json')
   if (fs.existsSync(packageJsonPath)) {
-    const packageJson = JSON.parse(fs.readFileSync(packageJsonPath, 'utf-8'))
+    let packageJson: {
+      name?: string
+      dependencies?: Record<string, string>
+      devDependencies?: Record<string, string>
+    }
+    try {
+      packageJson = JSON.parse(readFileSafe(packageJsonPath))
+    } catch {
+      packageJson = {}
+    }
     result.projectName = packageJson.name || result.projectName
     const deps = { ...packageJson.dependencies, ...packageJson.devDependencies }
 
-    const mbcPackages = Object.keys(deps).filter(k => k.startsWith('@mbc-cqrs-serverless/'))
+    const mbcPackages = Object.keys(deps).filter((k) =>
+      k.startsWith('@mbc-cqrs-serverless/'),
+    )
     result.framework.packages = mbcPackages
     result.framework.detected = mbcPackages.length > 0
 
@@ -224,13 +249,16 @@ async function analyzeProject(projectPath: string): Promise<AnalysisResult> {
   // Analyze modules
   const moduleFiles = await findFiles(srcPath, '.module.ts')
   for (const file of moduleFiles) {
-    const content = fs.readFileSync(file, 'utf-8')
+    const content = readFileSafe(file)
     const classMatch = content.match(/export\s+class\s+(\w+Module)/)
     if (classMatch) {
       const imports: string[] = []
       const importMatches = content.matchAll(/imports:\s*\[([\s\S]*?)\]/g)
       for (const match of importMatches) {
-        const importList = match[1].split(',').map(s => s.trim()).filter(s => s)
+        const importList = match[1]
+          .split(',')
+          .map((s) => s.trim())
+          .filter((s) => s)
         imports.push(...importList)
       }
       result.structure.modules.push({
@@ -244,17 +272,30 @@ async function analyzeProject(projectPath: string): Promise<AnalysisResult> {
   // Analyze entities
   const entityFiles = await findFiles(srcPath, '.entity.ts')
   for (const file of entityFiles) {
-    const content = fs.readFileSync(file, 'utf-8')
+    const content = readFileSafe(file)
     const classMatch = content.match(/export\s+class\s+(\w+)/)
     if (classMatch) {
-      const type: 'command' | 'data' | 'unknown' =
-        content.includes('CommandEntity') ? 'command' :
-        content.includes('DataEntity') ? 'data' : 'unknown'
+      const type: 'command' | 'data' | 'unknown' = content.includes(
+        'CommandEntity',
+      )
+        ? 'command'
+        : content.includes('DataEntity')
+          ? 'data'
+          : 'unknown'
 
       const fields: string[] = []
       const fieldMatches = content.matchAll(/^\s*(\w+)(?:\?)?:\s*(\w+)/gm)
       for (const match of fieldMatches) {
-        if (!['constructor', 'export', 'import', 'class', 'extends', 'implements'].includes(match[1])) {
+        if (
+          ![
+            'constructor',
+            'export',
+            'import',
+            'class',
+            'extends',
+            'implements',
+          ].includes(match[1])
+        ) {
           fields.push(`${match[1]}: ${match[2]}`)
         }
       }
@@ -270,42 +311,29 @@ async function analyzeProject(projectPath: string): Promise<AnalysisResult> {
 
   // Count other files
   result.structure.services = (await findFiles(srcPath, '.service.ts')).length
-  result.structure.controllers = (await findFiles(srcPath, '.controller.ts')).length
+  result.structure.controllers = (
+    await findFiles(srcPath, '.controller.ts')
+  ).length
   result.structure.dtos = (await findFiles(srcPath, '.dto.ts')).length
 
   // Analyze CQRS patterns
   const allTsFiles = await findFiles(srcPath, '.ts')
   for (const file of allTsFiles) {
-    const content = fs.readFileSync(file, 'utf-8')
-    if (content.includes('@CommandHandler')) result.cqrsPatterns.commandHandlers++
+    const content = readFileSafe(file)
+    if (content.includes('@CommandHandler'))
+      result.cqrsPatterns.commandHandlers++
     if (content.includes('@QueryHandler')) result.cqrsPatterns.queryHandlers++
-    if (content.includes('@EventHandler') || content.includes('IEventHandler')) result.cqrsPatterns.eventHandlers++
+    if (content.includes('@EventHandler') || content.includes('IEventHandler'))
+      result.cqrsPatterns.eventHandlers++
   }
 
   return result
 }
 
-async function findFiles(dir: string, suffix: string): Promise<string[]> {
-  const files: string[] = []
-
-  if (!fs.existsSync(dir)) {
-    return files
-  }
-
-  const entries = fs.readdirSync(dir, { withFileTypes: true })
-  for (const entry of entries) {
-    const fullPath = path.join(dir, entry.name)
-    if (entry.isDirectory() && entry.name !== 'node_modules' && entry.name !== 'dist') {
-      files.push(...await findFiles(fullPath, suffix))
-    } else if (entry.isFile() && entry.name.endsWith(suffix)) {
-      files.push(fullPath)
-    }
-  }
-
-  return files
-}
-
-async function lookupError(errorMessage: string, projectPath: string): Promise<{ content: { type: 'text'; text: string }[]; isError?: boolean }> {
+async function lookupError(
+  errorMessage: string,
+  projectPath: string,
+): Promise<{ content: { type: 'text'; text: string }[]; isError?: boolean }> {
   // Use projectPath parameter which comes from MBC_PROJECT_PATH environment variable
   // プロジェクトパスはMBC_PROJECT_PATH環境変数から取得されたパスを使用
   const errorCatalogPath = path.join(projectPath, 'docs', 'ERROR_CATALOG.md')
@@ -317,7 +345,7 @@ async function lookupError(errorMessage: string, projectPath: string): Promise<{
     }
   }
 
-  const catalog = fs.readFileSync(errorCatalogPath, 'utf-8')
+  const catalog = readFileSafe(errorCatalogPath)
   const lowerError = errorMessage.toLowerCase()
 
   // Find matching sections
@@ -326,30 +354,40 @@ async function lookupError(errorMessage: string, projectPath: string): Promise<{
 
   for (const section of sections) {
     const sectionLower = section.toLowerCase()
-    if (sectionLower.includes(lowerError) ||
-        lowerError.split(' ').some(word => word.length > 4 && sectionLower.includes(word))) {
+    if (
+      sectionLower.includes(lowerError) ||
+      lowerError
+        .split(' ')
+        .some((word) => word.length > 4 && sectionLower.includes(word))
+    ) {
       matches.push('### ' + section.trim())
     }
   }
 
   if (matches.length === 0) {
     return {
-      content: [{
-        type: 'text',
-        text: `No matching error found for: "${errorMessage}"\n\nTry searching with different keywords or check the full error catalog using the mbc://docs/errors resource.`,
-      }],
+      content: [
+        {
+          type: 'text',
+          text: `No matching error found for: "${errorMessage}"\n\nTry searching with different keywords or check the full error catalog using the mbc://docs/errors resource.`,
+        },
+      ],
     }
   }
 
   return {
-    content: [{
-      type: 'text',
-      text: `## Error Lookup Results\n\nFound ${matches.length} matching error(s):\n\n${matches.join('\n\n---\n\n')}`,
-    }],
+    content: [
+      {
+        type: 'text',
+        text: `## Error Lookup Results\n\nFound ${matches.length} matching error(s):\n\n${matches.join('\n\n---\n\n')}`,
+      },
+    ],
   }
 }
 
-function formatAnalysisResult(result: AnalysisResult): { content: { type: 'text'; text: string }[] } {
+function formatAnalysisResult(result: AnalysisResult): {
+  content: { type: 'text'; text: string }[]
+} {
   let text = `## Project Analysis: ${result.projectName}\n\n`
 
   // Framework info
@@ -422,7 +460,17 @@ interface AntiPatternMatch {
 
 /**
  * Anti-patterns to check for.
- * Codes are sequential from AP001 to AP010.
+ *
+ * Codes are sequential from AP001 to AP021 in detector-implementation order.
+ *
+ * IMPORTANT: These detector codes are a SEPARATE numbering system from the AP codes
+ * used in `skills/mbc-review/SKILL.md`. Only AP016, AP017, AP018, AP019, and AP021
+ * happen to refer to the same concept in both systems. See the cross-reference
+ * table at the top of `skills/mbc-review/SKILL.md` to map a detector code to its
+ * corresponding skill-doc section.
+ *
+ * When adding a new detector, append at the end (do not renumber) and update the
+ * cross-reference table in `skills/mbc-review/SKILL.md`.
  */
 const ANTI_PATTERNS = [
   {
@@ -430,20 +478,24 @@ const ANTI_PATTERNS = [
     name: 'Direct DynamoDB Write',
     severity: 'critical' as const,
     pattern: /new\s+(PutItemCommand|UpdateItemCommand|DeleteItemCommand)\s*\(/,
-    recommendation: 'Use CommandService.publishAsync() instead of direct DynamoDB writes to maintain CQRS pattern.',
+    recommendation:
+      'Use CommandService.publishAsync() instead of direct DynamoDB writes to maintain CQRS pattern.',
   },
   {
     code: 'AP002',
     name: 'Ignored Version Mismatch',
     severity: 'high' as const,
-    pattern: /catch\s*\([^)]*\)\s*\{[^}]*VersionMismatch[^}]*(?:console\.log|\/\/|return\s*;)/,
-    recommendation: 'Handle VersionMismatchError by retrying with fresh data, not by ignoring.',
+    pattern:
+      /catch\s*\([^)]*\)\s*\{[^}]*VersionMismatch[^}]*(?:console\.log|\/\/|return\s*;)/,
+    recommendation:
+      'Handle VersionMismatchError by retrying with fresh data, not by ignoring.',
   },
   {
     code: 'AP003',
     name: 'N+1 Query Pattern',
     severity: 'high' as const,
-    pattern: /for\s*\([^)]+\)\s*\{[^}]*await\s+(?:this\.)?(?:dataService|commandService)\./,
+    pattern:
+      /for\s*\([^)]+\)\s*\{[^}]*await\s+(?:this\.)?(?:dataService|commandService)\./,
     recommendation: 'Use batch operations or pre-fetch data before the loop.',
   },
   {
@@ -458,14 +510,16 @@ const ANTI_PATTERNS = [
     name: 'Hardcoded Tenant',
     severity: 'critical' as const,
     pattern: /['"`]TENANT#\w+['"`]/,
-    recommendation: 'Use getUserContext(context).tenantCode to get tenant dynamically.',
+    recommendation:
+      'Use getUserContext(invokeContext).tenantCode to get the tenant code from the authenticated context.',
   },
   {
     code: 'AP006',
     name: 'Missing Tenant Validation',
     severity: 'critical' as const,
     pattern: /(?:dto|body|request)\s*\.\s*tenantCode/,
-    recommendation: 'Never trust client-provided tenant codes. Use getUserContext() from authenticated context.',
+    recommendation:
+      'Never trust client-provided tenant codes. Use getUserContext() from authenticated context.',
   },
   {
     code: 'AP007',
@@ -473,37 +527,173 @@ const ANTI_PATTERNS = [
     severity: 'high' as const,
     // Limit match to 500 characters to avoid false positives across distant code
     pattern: /@DataSyncHandler[\s\S]{0,500}throw\s+(?:error|new\s+\w+Error)/,
-    recommendation: 'Handle errors gracefully in DataSyncHandler. Use DLQ for failed events.',
+    recommendation:
+      'Handle errors gracefully in DataSyncHandler. Use DLQ for failed events.',
   },
   {
     code: 'AP008',
     name: 'Hardcoded Secret',
     severity: 'critical' as const,
     pattern: /(?:password|secret|apiKey|token)\s*[:=]\s*['"`][^'"`]{8,}['"`]/i,
-    recommendation: 'Use environment variables or AWS Secrets Manager for sensitive values.',
+    recommendation:
+      'Use environment variables or AWS Secrets Manager for sensitive values.',
   },
   {
     code: 'AP009',
     name: 'Manual JWT Parsing',
     severity: 'critical' as const,
     pattern: /atob\s*\([^)]*\.split\s*\(['"`]\.['"`]\)/,
-    recommendation: 'Use the framework\'s built-in JWT validation via Cognito authorizer.',
+    recommendation:
+      "Use the framework's built-in JWT validation via Cognito authorizer.",
   },
   {
     code: 'AP010',
     name: 'Heavy Module Import',
     severity: 'medium' as const,
-    pattern: /^import\s+\*\s+as\s+\w+\s+from\s+['"`](?:aws-sdk|lodash|moment)['"`]/m,
+    pattern:
+      /^import\s+\*\s+as\s+\w+\s+from\s+['"`](?:aws-sdk|lodash|moment)['"`]/m,
     recommendation: 'Import only what you need to reduce cold start time.',
   },
+  {
+    code: 'AP011',
+    name: 'Deprecated Method Usage',
+    severity: 'high' as const,
+    // Match .publish( and .publishPartialUpdate( but not the Async/Sync variants
+    pattern:
+      /\.publish(?!Async|Sync|PartialUpdateAsync|PartialUpdateSync)\s*\(|\.publishPartialUpdate(?!Async|Sync)\s*\(/,
+    recommendation:
+      'publish() and publishPartialUpdate() were removed in v1.1.0. Use publishAsync() or publishPartialUpdateAsync() instead.',
+  },
+  {
+    code: 'AP012',
+    name: 'Uppercase COMMON Tenant Key',
+    severity: 'critical' as const,
+    // Detect hardcoded uppercase COMMON in DynamoDB partition keys (pre-v1.1.0 format)
+    pattern: /['"`](?:MASTER_SETTING|MASTER_DATA|TENANT)#COMMON['"`#]/,
+    recommendation:
+      'TENANT_COMMON changed from "COMMON" to "common" (lowercase) in v1.1.0. Update partition keys and migrate existing DynamoDB data.',
+  },
+  {
+    code: 'AP013',
+    name: 'publishSync Null Return Unchecked',
+    severity: 'high' as const,
+    // Detect direct property access on publishSync/publishPartialUpdateSync result without null check
+    pattern:
+      /(?:publishSync|publishPartialUpdateSync)\s*\([^)]*\)[^;{]*\.\s*(?:pk|sk|id|version|code|name|tenantCode|type|attributes)/,
+    recommendation:
+      'publishSync() and publishPartialUpdateSync() return null when the command is not dirty (no-op) since v1.2.0. Always null-check the result before accessing properties.',
+  },
+  {
+    code: 'AP014',
+    name: 'Deprecated genNewSequence',
+    severity: 'high' as const,
+    // Detect usage of removed SequenceService.genNewSequence() method
+    pattern: /\.genNewSequence\s*\(/,
+    recommendation:
+      'SequenceService.genNewSequence() was removed in v1.2.0. Use generateSequenceItem() or generateSequenceItemWithProvideSetting() instead.',
+  },
+  {
+    code: 'AP015',
+    name: 'Duplicate TaskModule Registration',
+    severity: 'high' as const,
+    // Detect TaskModule.register() calls inside @Module imports — multiple registrations
+    // conflict because TASK_QUEUE_EVENT_FACTORY is a global singleton since v1.2.4.
+    pattern: /TaskModule\.register\s*\(/,
+    recommendation:
+      'TaskModule.register() is global since v1.2.4 and must be called exactly once in the host AppModule. Multiple calls cause conflicting TASK_QUEUE_EVENT_FACTORY bindings and result in "transformTask is not a function" at runtime. Remove all TaskModule.register() calls from feature modules and keep only the one in the host AppModule.',
+  },
+  {
+    code: 'AP016',
+    name: 'Missing Error Logging Before Rethrow',
+    severity: 'high' as const,
+    // Detect catch blocks that rethrow without logging (throw error; or throw new XxxException without logger.error)
+    pattern:
+      /catch\s*\(\s*(?:error|err|e)\s*\)\s*\{(?:(?!logger\.(error|warn)).)*throw\s+(?:error|err|e|new\s+\w+Exception)/s,
+    recommendation:
+      'Always log errors with context before rethrowing. Use this.logger.error() with the error message and stack trace for debugging.',
+  },
+  {
+    code: 'AP017',
+    name: 'Incorrect Attribute Merging on Partial Update',
+    severity: 'high' as const,
+    // Detect publishPartialUpdateAsync/Sync where attributes: dto.attributes (not spread merged)
+    pattern:
+      /publishPartialUpdate(?:Async|Sync)\s*\(\s*\{[^}]*attributes\s*:\s*(?:dto|input|body|data)\s*\.\s*attributes(?!\s*}?\s*,?\s*\.\.\.)(?![^}]*\.\.\.[^}]*attributes)/,
+    recommendation:
+      'When updating attributes, merge existing attributes with new ones: { ...existingItem.attributes, ...dto.attributes }. Passing dto.attributes directly overwrites all existing attributes.',
+  },
+  {
+    code: 'AP018',
+    name: 'Missing Swagger Documentation',
+    severity: 'low' as const,
+    // Detect @Controller classes that have no @ApiTags decorator
+    pattern: /@Controller\s*\([^)]*\)(?:(?!@ApiTags).){0,200}export\s+class/,
+    recommendation:
+      'Add @ApiTags() to controllers and @ApiOperation({ summary: ... }) / @ApiResponse() to endpoint methods for API documentation.',
+  },
+  {
+    code: 'AP019',
+    name: 'Missing Pagination in List Queries',
+    severity: 'high' as const,
+    // Detect listByPk/listItemsByPk/listItems calls without limit parameter
+    pattern:
+      /\.(?:listByPk|listItemsByPk|listItems)\s*\(\s*\{(?:(?!limit).)*\}\s*\)/,
+    recommendation:
+      'Always include limit and cursor parameters in list queries to avoid returning unbounded result sets and causing performance issues.',
+  },
+  {
+    code: 'AP020',
+    name: 'Missing getCommandSource for Tracing',
+    severity: 'low' as const,
+    // Detect publishAsync/publishSync called with options object that has invokeContext but no source
+    pattern:
+      /commandService\.publish(?:Async|Sync|PartialUpdateAsync|PartialUpdateSync)\s*\([^)]*invokeContext[^)]*\)/,
+    recommendation:
+      'Include source in publish options using getCommandSource(basename(__dirname), this.constructor.name, methodName) for debugging and audit trails.',
+  },
+  {
+    code: 'AP021',
+    name: 'Event Emit Directly After publishAsync in CommandService',
+    severity: 'high' as const,
+    // Detect eventEmitter.emit() called close after commandService.publishAsync/publishSync.
+    // 200-char window reduces cross-method false positives while catching same-method violations.
+    pattern:
+      /commandService\.publish(?:Async|Sync|PartialUpdateAsync|PartialUpdateSync)\b[\s\S]{0,200}?this\.eventEmitter\.emit\s*\(/,
+    recommendation:
+      'Do not call eventEmitter.emit() directly after publishAsync(). At that point only the command table has been written; the data table is populated asynchronously via DynamoDB Streams. Any @OnEvent handler that calls DataService.getItem() will find no data. Instead, implement IDataSyncHandler and emit events inside up()/down(), which are called after the data table write completes. Register the handler in CommandModule.register({ dataSyncHandlers: [...] }). If change-detection is needed (e.g. statusChanged), embed previous values as attributes._prev in publishAsync and read them in the handler; strip _prev in RDS sync handlers to prevent it leaking into the database.',
+  },
 ]
+
+/**
+ * Maps a detector AP code (this file) to the corresponding skill-doc AP code in
+ * `skills/mbc-review/SKILL.md`. Used to annotate detector output so users can
+ * navigate from a detector hit to the human-readable explanation.
+ *
+ * Codes not present in the map are detector-only (no skill-doc counterpart).
+ * Keep this table in sync with the cross-reference table in SKILL.md.
+ */
+const DETECTOR_TO_SKILL_AP: Record<string, string> = {
+  AP001: 'AP012', // Direct DynamoDB Write → Direct DynamoDB Access Instead of DataService
+  AP002: 'AP005', // Ignored Version Mismatch → Not Handling ConditionalCheckFailedException
+  AP005: 'AP002', // Hardcoded Tenant → Missing tenantCode in Multi-Tenant Operations
+  AP006: 'AP002', // Missing Tenant Validation → Missing tenantCode in Multi-Tenant Operations
+  AP011: 'AP010', // Deprecated Method Usage → Deprecated Method Usage
+  AP013: 'AP001', // publishSync Null Return Unchecked → Using publishSync Instead of publishAsync (related)
+  AP014: 'AP010', // Deprecated genNewSequence → Deprecated Method Usage (related)
+  AP016: 'AP016', // Missing Error Logging Before Rethrow ✅
+  AP017: 'AP017', // Incorrect Attribute Merging ✅
+  AP018: 'AP018', // Missing Swagger Documentation ✅
+  AP019: 'AP019', // Missing Pagination in List Queries ✅
+  AP020: 'AP011', // Missing getCommandSource for Tracing → Missing getCommandSource for Tracing
+  AP021: 'AP021', // Event Emit After publishAsync ✅
+}
 
 /**
  * Check for anti-patterns in code.
  */
 async function checkAntiPatterns(
   targetPath: string,
-  projectPath: string
+  projectPath: string,
 ): Promise<{ content: { type: 'text'; text: string }[]; isError?: boolean }> {
   if (!fs.existsSync(targetPath)) {
     return {
@@ -517,15 +707,16 @@ async function checkAntiPatterns(
   const files = await findFiles(targetPath, '.ts')
 
   for (const file of files) {
-    if (file.includes('.spec.') || file.includes('.test.') || file.includes('.d.ts')) {
+    if (
+      file.includes('.spec.') ||
+      file.includes('.test.') ||
+      file.includes('.d.ts')
+    ) {
       continue
     }
 
-    let content: string
-    try {
-      content = fs.readFileSync(file, 'utf-8')
-    } catch (err) {
-      // Skip files that cannot be read (permission issues, etc.)
+    const content = readFileSafe(file)
+    if (content.startsWith('Error reading file:')) {
       skippedFiles.push(path.relative(projectPath, file))
       continue
     }
@@ -544,7 +735,8 @@ async function checkAntiPatterns(
           severity: ap.severity,
           file: path.relative(projectPath, file),
           line: lineNumber,
-          snippet: snippet.length > 80 ? snippet.substring(0, 77) + '...' : snippet,
+          snippet:
+            snippet.length > 80 ? snippet.substring(0, 77) + '...' : snippet,
           recommendation: ap.recommendation,
         })
       }
@@ -552,7 +744,8 @@ async function checkAntiPatterns(
   }
 
   if (matches.length === 0) {
-    let text = '## Anti-Pattern Check Results\n\n✅ No anti-patterns detected! Your code follows best practices.'
+    let text =
+      '## Anti-Pattern Check Results\n\n✅ No anti-patterns detected! Your code follows best practices.'
     if (skippedFiles.length > 0) {
       text += `\n\n**Note:** ${skippedFiles.length} file(s) could not be read and were skipped.`
     }
@@ -562,10 +755,10 @@ async function checkAntiPatterns(
   }
 
   // Group by severity
-  const critical = matches.filter(m => m.severity === 'critical')
-  const high = matches.filter(m => m.severity === 'high')
-  const medium = matches.filter(m => m.severity === 'medium')
-  const low = matches.filter(m => m.severity === 'low')
+  const critical = matches.filter((m) => m.severity === 'critical')
+  const high = matches.filter((m) => m.severity === 'high')
+  const medium = matches.filter((m) => m.severity === 'medium')
+  const low = matches.filter((m) => m.severity === 'low')
 
   let text = `## Anti-Pattern Check Results\n\n`
   text += `Found **${matches.length}** potential issue(s):\n\n`
@@ -574,10 +767,21 @@ async function checkAntiPatterns(
   text += `| 🟠 High | ${high.length} |\n`
   text += `| 🟡 Medium | ${medium.length} |\n`
   text += `| 🟢 Low | ${low.length} |\n\n`
+  text +=
+    '> **Note:** AP codes below are *detector codes* (from `analyze.ts`). They are a separate numbering system from the AP codes in `mbc-review` skill documentation. See the cross-reference table at the top of `skills/mbc-review/SKILL.md` to map a detector code to its corresponding skill-doc section.\n\n'
 
   for (const m of matches) {
-    const icon = m.severity === 'critical' ? '🔴' : m.severity === 'high' ? '🟠' : m.severity === 'medium' ? '🟡' : '🟢'
-    text += `### ${icon} ${m.code}: ${m.name}\n\n`
+    const icon =
+      m.severity === 'critical'
+        ? '🔴'
+        : m.severity === 'high'
+          ? '🟠'
+          : m.severity === 'medium'
+            ? '🟡'
+            : '🟢'
+    const skillRef = DETECTOR_TO_SKILL_AP[m.code]
+    const skillRefSuffix = skillRef ? ` _(skill-doc: ${skillRef})_` : ''
+    text += `### ${icon} ${m.code}: ${m.name}${skillRefSuffix}\n\n`
     text += `**File:** \`${m.file}:${m.line}\`\n`
     text += `**Snippet:** \`${m.snippet}\`\n\n`
     text += `**Recommendation:** ${m.recommendation}\n\n`
@@ -607,7 +811,7 @@ interface HealthCheckResult {
  * Perform health check on project.
  */
 async function healthCheck(
-  projectPath: string
+  projectPath: string,
 ): Promise<{ content: { type: 'text'; text: string }[] }> {
   const result: HealthCheckResult = {
     status: 'healthy',
@@ -617,9 +821,12 @@ async function healthCheck(
   // Check package.json
   const packageJsonPath = path.join(projectPath, 'package.json')
   if (fs.existsSync(packageJsonPath)) {
-    let pkg: { dependencies?: Record<string, string>; devDependencies?: Record<string, string> }
+    let pkg: {
+      dependencies?: Record<string, string>
+      devDependencies?: Record<string, string>
+    }
     try {
-      pkg = JSON.parse(fs.readFileSync(packageJsonPath, 'utf-8'))
+      pkg = JSON.parse(readFileSafe(packageJsonPath))
     } catch (err) {
       result.checks.push({
         name: 'package.json',
@@ -632,12 +839,15 @@ async function healthCheck(
     const deps = { ...pkg.dependencies, ...pkg.devDependencies }
 
     // Check for MBC packages
-    const mbcPackages = Object.keys(deps).filter(k => k.startsWith('@mbc-cqrs-serverless/'))
+    const mbcPackages = Object.keys(deps).filter((k) =>
+      k.startsWith('@mbc-cqrs-serverless/'),
+    )
     if (mbcPackages.length === 0) {
       result.checks.push({
         name: 'MBC Framework',
         status: 'fail',
-        message: 'No @mbc-cqrs-serverless packages found. Is this an MBC project?',
+        message:
+          'No @mbc-cqrs-serverless packages found. Is this an MBC project?',
       })
       result.status = 'error'
     } else {
@@ -649,7 +859,9 @@ async function healthCheck(
     }
 
     // Check for @nestjs packages
-    const nestPackages = Object.keys(deps).filter(k => k.startsWith('@nestjs/'))
+    const nestPackages = Object.keys(deps).filter((k) =>
+      k.startsWith('@nestjs/'),
+    )
     if (nestPackages.length === 0) {
       result.checks.push({
         name: 'NestJS',
@@ -698,7 +910,8 @@ async function healthCheck(
       result.checks.push({
         name: 'Environment',
         status: 'warn',
-        message: '.env not found, but .env.example exists. Copy and configure it.',
+        message:
+          '.env not found, but .env.example exists. Copy and configure it.',
       })
       if (result.status === 'healthy') result.status = 'warning'
     } else {
@@ -749,19 +962,27 @@ async function healthCheck(
     result.checks.push({
       name: 'Serverless Config',
       status: 'pass',
-      message: fs.existsSync(serverlessYml) ? 'serverless.yml found' : 'serverless.ts found',
+      message: fs.existsSync(serverlessYml)
+        ? 'serverless.yml found'
+        : 'serverless.ts found',
     })
   }
 
   // Format output
-  const icon = result.status === 'healthy' ? '✅' : result.status === 'warning' ? '⚠️' : '❌'
+  const icon =
+    result.status === 'healthy'
+      ? '✅'
+      : result.status === 'warning'
+        ? '⚠️'
+        : '❌'
   let text = `## Project Health Check ${icon}\n\n`
   text += `**Overall Status:** ${result.status.toUpperCase()}\n\n`
   text += `| Check | Status | Details |\n`
   text += `|-------|--------|--------|\n`
 
   for (const check of result.checks) {
-    const statusIcon = check.status === 'pass' ? '✅' : check.status === 'warn' ? '⚠️' : '❌'
+    const statusIcon =
+      check.status === 'pass' ? '✅' : check.status === 'warn' ? '⚠️' : '❌'
     text += `| ${check.name} | ${statusIcon} | ${check.message} |\n`
   }
 
@@ -774,7 +995,7 @@ async function healthCheck(
 async function explainCode(
   filePath: string,
   startLine?: number,
-  endLine?: number
+  endLine?: number,
 ): Promise<{ content: { type: 'text'; text: string }[]; isError?: boolean }> {
   if (!fs.existsSync(filePath)) {
     return {
@@ -783,7 +1004,7 @@ async function explainCode(
     }
   }
 
-  const content = fs.readFileSync(filePath, 'utf-8')
+  const content = readFileSafe(filePath)
   const lines = content.split('\n')
   const fileName = path.basename(filePath)
 
@@ -802,32 +1023,43 @@ async function explainCode(
   if (content.includes('@Module(')) {
     patterns.push('NestJS Module')
     if (content.includes('CommandModule')) {
-      explanations.push('This module imports CommandModule, enabling CQRS command handling.')
+      explanations.push(
+        'This module imports CommandModule, enabling CQRS command handling.',
+      )
     }
     if (content.includes('imports:')) {
-      explanations.push('The imports array lists other modules this module depends on.')
+      explanations.push(
+        'The imports array lists other modules this module depends on.',
+      )
     }
     if (content.includes('providers:')) {
-      explanations.push('The providers array lists services and handlers available in this module.')
+      explanations.push(
+        'The providers array lists services and handlers available in this module.',
+      )
     }
   }
 
   // Controller detection
   if (content.includes('@Controller(')) {
     patterns.push('REST Controller')
-    if (content.includes('@Get(')) explanations.push('Contains GET endpoint(s) for read operations.')
-    if (content.includes('@Post(')) explanations.push('Contains POST endpoint(s) for create operations.')
+    if (content.includes('@Get('))
+      explanations.push('Contains GET endpoint(s) for read operations.')
+    if (content.includes('@Post('))
+      explanations.push('Contains POST endpoint(s) for create operations.')
     if (content.includes('@Patch(') || content.includes('@Put(')) {
       explanations.push('Contains PATCH/PUT endpoint(s) for update operations.')
     }
-    if (content.includes('@Delete(')) explanations.push('Contains DELETE endpoint(s) for delete operations.')
+    if (content.includes('@Delete('))
+      explanations.push('Contains DELETE endpoint(s) for delete operations.')
   }
 
   // Service detection
   if (content.includes('@Injectable()') && fileName.includes('.service.')) {
     patterns.push('Service')
     if (content.includes('CommandService')) {
-      explanations.push('Uses CommandService for publishing commands (state changes).')
+      explanations.push(
+        'Uses CommandService for publishing commands (state changes).',
+      )
     }
     if (content.includes('DataService')) {
       explanations.push('Uses DataService for querying data (read operations).')
@@ -841,32 +1073,59 @@ async function explainCode(
   if (fileName.includes('.entity.')) {
     patterns.push('Entity')
     if (content.includes('CommandEntity')) {
-      explanations.push('This is a Command entity stored in the command table for write operations.')
+      explanations.push(
+        'This is a Command entity stored in the command table for write operations.',
+      )
     }
     if (content.includes('DataEntity')) {
-      explanations.push('This is a Data entity stored in the data table for read operations.')
+      explanations.push(
+        'This is a Data entity stored in the data table for read operations.',
+      )
     }
     if (content.includes('pk:') && content.includes('sk:')) {
-      explanations.push('Uses DynamoDB single-table design with partition key (pk) and sort key (sk).')
+      explanations.push(
+        'Uses DynamoDB single-table design with partition key (pk) and sort key (sk).',
+      )
     }
   }
 
   // Handler detection
   if (content.includes('@DataSyncHandler(')) {
     patterns.push('Data Sync Handler')
-    explanations.push('This handler reacts to DynamoDB Streams events for data synchronization.')
-    explanations.push('It runs when items are created, updated, or deleted in DynamoDB.')
+    explanations.push(
+      'This handler reacts to DynamoDB Streams events for data synchronization.',
+    )
+    explanations.push(
+      'It runs when items are created, updated, or deleted in DynamoDB.',
+    )
   }
 
   // CQRS patterns
   if (content.includes('publishAsync(')) {
-    explanations.push('Uses publishAsync() for non-blocking command publishing.')
+    explanations.push(
+      'Uses publishAsync() for non-blocking command publishing.',
+    )
   }
   if (content.includes('publishSync(')) {
-    explanations.push('Uses publishSync() for synchronous command execution (waits for Step Functions).')
+    explanations.push(
+      'Uses publishSync() for synchronous command execution (waits for Step Functions).',
+    )
+    explanations.push(
+      'Note: publishSync() returns null when the command is not dirty (no-op) since v1.2.0. Always null-check the result before accessing properties.',
+    )
   }
   if (content.includes('getUserContext(')) {
-    explanations.push('Extracts user context (tenantCode, userId, role) from the invocation context.')
+    explanations.push(
+      'Extracts user context (tenantCode, userId, role) from the invocation context.',
+    )
+  }
+
+  // TaskModule global pattern
+  if (content.includes('TaskModule.register(')) {
+    patterns.push('TaskModule Registration')
+    explanations.push(
+      'TaskModule.register() is global since v1.2.4 — call it exactly once in the host AppModule. Multiple registrations conflict and cause "transformTask is not a function" at runtime.',
+    )
   }
 
   // Build output
@@ -897,7 +1156,8 @@ async function explainCode(
 
   if (patterns.length === 0 && explanations.length === 0) {
     text += 'No specific MBC CQRS patterns detected in this file.\n'
-    text += 'This might be a utility file, DTO, or non-framework-specific code.\n'
+    text +=
+      'This might be a utility file, DTO, or non-framework-specific code.\n'
   }
 
   return { content: [{ type: 'text', text }] }

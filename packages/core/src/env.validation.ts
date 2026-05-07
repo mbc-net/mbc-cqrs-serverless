@@ -81,6 +81,10 @@ export class EnvironmentVariables {
   @IsString()
   @IsOptional()
   REQUEST_BODY_SIZE_LIMIT: string
+
+  @IsNumber()
+  @IsOptional()
+  RYW_SESSION_TTL_MINUTES: number
 }
 
 export function getValidateConfig<T extends EnvironmentVariables>(

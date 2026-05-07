@@ -133,7 +133,7 @@ describe('ExplorerService', () => {
 
       it('should handle modules with null providers', () => {
         const mockModule = {
-          providers: new Map()
+          providers: new Map(),
         } as any
         const mockModules = new Map([['testModule', mockModule]])
         modulesContainer.values.mockReturnValue(mockModules.values() as any)
@@ -146,7 +146,7 @@ describe('ExplorerService', () => {
 
       it('should handle modules with undefined providers', () => {
         const mockModule = {
-          providers: new Map()
+          providers: new Map(),
         } as any
         const mockModules = new Map([['testModule', mockModule]])
         modulesContainer.values.mockReturnValue(mockModules.values() as any)
@@ -162,21 +162,27 @@ describe('ExplorerService', () => {
       it('should handle providers with invalid metadata', () => {
         const mockProvider = {
           instance: {
-            constructor: null
-          }
+            constructor: null,
+          },
         }
 
-        const result = service['extractMetadata'](mockProvider as any, 'test-key')
+        const result = service['extractMetadata'](
+          mockProvider as any,
+          'test-key',
+        )
 
         expect(result).toBeUndefined()
       })
 
       it('should handle providers with missing constructor', () => {
         const mockProvider = {
-          instance: {}
+          instance: {},
         }
 
-        const result = service['extractMetadata'](mockProvider as any, 'test-key')
+        const result = service['extractMetadata'](
+          mockProvider as any,
+          'test-key',
+        )
 
         expect(result).toBeUndefined()
       })
@@ -185,11 +191,14 @@ describe('ExplorerService', () => {
         const mockConstructor = function TestClass() {}
         const mockProvider = {
           instance: {
-            constructor: mockConstructor
-          }
+            constructor: mockConstructor,
+          },
         }
 
-        const result = service['extractMetadata'](mockProvider as any, 'test-key')
+        const result = service['extractMetadata'](
+          mockProvider as any,
+          'test-key',
+        )
 
         expect(result).toBeUndefined()
       })
@@ -198,15 +207,18 @@ describe('ExplorerService', () => {
         const mockConstructor = function TestClass() {}
         Object.defineProperty(mockConstructor, 'metadata', {
           value: 'invalid-metadata',
-          configurable: true
+          configurable: true,
         })
         const mockProvider = {
           instance: {
-            constructor: mockConstructor
-          }
+            constructor: mockConstructor,
+          },
         }
 
-        const result = service['extractMetadata'](mockProvider as any, 'test-key')
+        const result = service['extractMetadata'](
+          mockProvider as any,
+          'test-key',
+        )
 
         expect(result).toBeUndefined()
       })
@@ -242,19 +254,22 @@ describe('ExplorerService', () => {
         const mockConstructor = function ComplexClass() {}
         const complexMetadata = [
           ['test-key', { value: 'test-value', nested: { deep: 'data' } }],
-          ['another-key', [1, 2, 3, { array: 'item' }]]
+          ['another-key', [1, 2, 3, { array: 'item' }]],
         ]
         Object.defineProperty(mockConstructor, 'metadata', {
           value: complexMetadata,
-          configurable: true
+          configurable: true,
         })
         const mockProvider = {
           instance: {
-            constructor: mockConstructor
-          }
+            constructor: mockConstructor,
+          },
         }
 
-        const result = service['extractMetadata'](mockProvider as any, 'test-key')
+        const result = service['extractMetadata'](
+          mockProvider as any,
+          'test-key',
+        )
 
         expect(result).toBeUndefined()
       })
@@ -262,18 +277,21 @@ describe('ExplorerService', () => {
       it('should handle providers with inherited constructors', () => {
         class BaseClass {}
         class DerivedClass extends BaseClass {}
-        
+
         const baseMetadata = [['base-key', 'base-value']]
         Object.defineProperty(BaseClass, 'metadata', {
           value: baseMetadata,
-          configurable: true
+          configurable: true,
         })
 
         const mockProvider = {
-          instance: new DerivedClass()
+          instance: new DerivedClass(),
         }
 
-        const result = service['extractMetadata'](mockProvider as any, 'base-key')
+        const result = service['extractMetadata'](
+          mockProvider as any,
+          'base-key',
+        )
 
         expect(result).toBeUndefined()
       })
@@ -282,67 +300,91 @@ describe('ExplorerService', () => {
         const mockConstructor = function EmptyMetadataClass() {}
         Object.defineProperty(mockConstructor, 'metadata', {
           value: [],
-          configurable: true
+          configurable: true,
         })
         const mockProvider = {
           instance: {
-            constructor: mockConstructor
-          }
+            constructor: mockConstructor,
+          },
         }
 
-        const result = service['extractMetadata'](mockProvider as any, 'test-key')
+        const result = service['extractMetadata'](
+          mockProvider as any,
+          'test-key',
+        )
 
         expect(result).toBeUndefined()
       })
 
       it('should handle providers with null instance', () => {
         const mockProvider = {
-          instance: null
+          instance: null,
         }
 
-        expect(() => service['extractMetadata'](mockProvider as any, 'test-key')).not.toThrow()
-        const result = service['extractMetadata'](mockProvider as any, 'test-key')
+        expect(() =>
+          service['extractMetadata'](mockProvider as any, 'test-key'),
+        ).not.toThrow()
+        const result = service['extractMetadata'](
+          mockProvider as any,
+          'test-key',
+        )
         expect(result).toBeUndefined()
       })
     })
 
     describe('filterProvider - Wrapper State Scenarios', () => {
       it('should handle providers with various wrapper states', () => {
-        const mockProvider1 = { 
-          instance: { constructor: function() {} },
-          isNotMetatype: false 
+        const mockProvider1 = {
+          instance: { constructor: function () {} },
+          isNotMetatype: false,
         }
-        const mockProvider2 = { 
-          instance: { constructor: function() {} },
-          isNotMetatype: true 
+        const mockProvider2 = {
+          instance: { constructor: function () {} },
+          isNotMetatype: true,
         }
-        const mockProvider3 = { 
-          instance: { constructor: function() {} },
-          isNotMetatype: undefined 
+        const mockProvider3 = {
+          instance: { constructor: function () {} },
+          isNotMetatype: undefined,
         }
-        const mockProvider4 = { 
-          instance: { constructor: function() {} }
+        const mockProvider4 = {
+          instance: { constructor: function () {} },
         }
 
-        expect(service['filterProvider'](mockProvider1 as any, 'test-key')).toBeUndefined()
-        expect(service['filterProvider'](mockProvider2 as any, 'test-key')).toBeUndefined()
-        expect(service['filterProvider'](mockProvider3 as any, 'test-key')).toBeUndefined()
-        expect(service['filterProvider'](mockProvider4 as any, 'test-key')).toBeUndefined()
+        expect(
+          service['filterProvider'](mockProvider1 as any, 'test-key'),
+        ).toBeUndefined()
+        expect(
+          service['filterProvider'](mockProvider2 as any, 'test-key'),
+        ).toBeUndefined()
+        expect(
+          service['filterProvider'](mockProvider3 as any, 'test-key'),
+        ).toBeUndefined()
+        expect(
+          service['filterProvider'](mockProvider4 as any, 'test-key'),
+        ).toBeUndefined()
       })
 
       it('should handle null provider', () => {
-        expect(() => service['filterProvider'](null as any, 'test-key')).toThrow('Cannot destructure property \'instance\' of \'wrapper\' as it is null')
+        // Error message varies with coverage instrumentation
+        expect(() =>
+          service['filterProvider'](null as any, 'test-key'),
+        ).toThrow(/Cannot destructure property 'instance' of .* as it is null/)
       })
 
       it('should handle undefined provider', () => {
-        expect(() => service['filterProvider'](undefined as any, 'test-key')).toThrow('Cannot destructure property \'instance\' of \'wrapper\' as it is undefined')
+        // Error message varies with coverage instrumentation
+        expect(() =>
+          service['filterProvider'](undefined as any, 'test-key'),
+        ).toThrow(
+          /Cannot destructure property 'instance' of .* as it is undefined/,
+        )
       })
     })
 
     describe('flatMap - Module Processing', () => {
       it('should handle modules with empty provider maps', () => {
         const mockModule = {
-          providers: new Map()
+          providers: new Map(),
         }
         const mockModules = new Map([['emptyModule', mockModule]])
         modulesContainer.values.mockReturnValue(mockModules.values() as any)
@@ -357,26 +399,35 @@ describe('ExplorerService', () => {
         const validConstructor = function ValidClass() {}
         Object.defineProperty(validConstructor, 'metadata', {
           value: [['valid-key', 'valid-value']],
-          configurable: true
+          configurable: true,
         })
 
         const mockProviders = new Map([
-          ['validProvider', {
-            instance: { constructor: validConstructor },
-            isNotMetatype: false
-          }],
-          ['invalidProvider', {
-            instance: null,
-            isNotMetatype: false
-          }],
-          ['filteredProvider', {
-            instance: { constructor: validConstructor },
-            isNotMetatype: true
-          }]
+          [
+            'validProvider',
+            {
+              instance: { constructor: validConstructor },
+              isNotMetatype: false,
+            },
+          ],
+          [
+            'invalidProvider',
+            {
+              instance: null,
+              isNotMetatype: false,
+            },
+          ],
+          [
+            'filteredProvider',
+            {
+              instance: { constructor: validConstructor },
+              isNotMetatype: true,
+            },
+          ],
         ])
 
         const mockModule = {
-          providers: mockProviders
+          providers: mockProviders,
         }
         const mockModules = new Map([['mixedModule', mockModule]])
         modulesContainer.values.mockReturnValue(mockModules.values() as any)
@@ -422,16 +473,16 @@ describe('ExplorerService', () => {
         ['object-key', { nested: 'object' }],
         ['array-key', [1, 2, 3]],
         ['null-key', null],
-        ['undefined-key', undefined]
+        ['undefined-key', undefined],
       ]
       Object.defineProperty(mockConstructor, 'metadata', {
         value: mixedMetadata,
-        configurable: true
+        configurable: true,
       })
 
       const mockProvider = {
         instance: { constructor: mockConstructor },
-        isNotMetatype: false
+        isNotMetatype: false,
       }
       const mockProviders = new Map([['multiType', mockProvider]])
       const mockModule = { providers: mockProviders }
@@ -449,16 +500,16 @@ describe('ExplorerService', () => {
       const duplicateMetadata = [
         ['duplicate-key', 'first-value'],
         ['duplicate-key', 'second-value'],
-        ['unique-key', 'unique-value']
+        ['unique-key', 'unique-value'],
       ]
       Object.defineProperty(mockConstructor, 'metadata', {
         value: duplicateMetadata,
-        configurable: true
+        configurable: true,
       })
 
       const mockProvider = {
         instance: { constructor: mockConstructor },
-        isNotMetatype: false
+        isNotMetatype: false,
       }
       const mockProviders = new Map([['duplicate', mockProvider]])
       const mockModule = { providers: mockProviders }
@@ -477,16 +528,16 @@ describe('ExplorerService', () => {
         ['key-with-unicode-🚀', 'value-with-unicode-ñáéíóú'],
         ['key with spaces', 'value with spaces'],
         ['key!@#$%^&*()', 'value!@#$%^&*()'],
-        ['key\nwith\nnewlines', 'value\nwith\nnewlines']
+        ['key\nwith\nnewlines', 'value\nwith\nnewlines'],
       ]
       Object.defineProperty(mockConstructor, 'metadata', {
         value: specialMetadata,
-        configurable: true
+        configurable: true,
       })
 
       const mockProvider = {
         instance: { constructor: mockConstructor },
-        isNotMetatype: false
+        isNotMetatype: false,
       }
       const mockProviders = new Map([['special', mockProvider]])
       const mockModule = { providers: mockProviders }
@@ -526,17 +577,17 @@ describe('ExplorerService', () => {
 
     it('should handle large numbers of modules efficiently', () => {
       const largeModuleMap = new Map()
-      
+
       for (let i = 0; i < 100; i++) {
-        const mockConstructor = function() {}
+        const mockConstructor = function () {}
         Object.defineProperty(mockConstructor, 'metadata', {
           value: [['key' + i, 'value' + i]],
-          configurable: true
+          configurable: true,
         })
 
         const mockProvider = {
           instance: { constructor: mockConstructor },
-          isNotMetatype: false
+          isNotMetatype: false,
         }
         const mockProviders = new Map([['provider' + i, mockProvider]])
         const mockModule = { providers: mockProviders }
@@ -553,17 +604,17 @@ describe('ExplorerService', () => {
 
     it('should handle modules with large numbers of providers', () => {
       const largeProviderMap = new Map()
-      
+
       for (let i = 0; i < 50; i++) {
-        const mockConstructor = function() {}
+        const mockConstructor = function () {}
         Object.defineProperty(mockConstructor, 'metadata', {
           value: [['provider-key' + i, 'provider-value' + i]],
-          configurable: true
+          configurable: true,
         })
 
         const mockProvider = {
           instance: { constructor: mockConstructor },
-          isNotMetatype: false
+          isNotMetatype: false,
         }
         largeProviderMap.set('provider' + i, mockProvider)
       }
@@ -582,12 +633,12 @@ describe('ExplorerService', () => {
       const mockConstructor = function ConcurrentClass() {}
       Object.defineProperty(mockConstructor, 'metadata', {
         value: [['concurrent-key', 'concurrent-value']],
-        configurable: true
+        configurable: true,
       })
 
       const mockProvider = {
         instance: { constructor: mockConstructor },
-        isNotMetatype: false
+        isNotMetatype: false,
       }
       const mockProviders = new Map([['concurrent', mockProvider]])
       const mockModule = { providers: mockProviders }
@@ -596,7 +647,7 @@ describe('ExplorerService', () => {
 
       const results = Array.from({ length: 10 }, () => service.explore())
 
-      results.forEach(result => {
+      results.forEach((result) => {
         expect(result.events).toHaveLength(0)
         expect(result.eventFactorys).toHaveLength(0)
       })
@@ -604,19 +655,19 @@ describe('ExplorerService', () => {
 
     it('should handle exploration with mixed provider states efficiently', () => {
       const mixedProviderMap = new Map()
-      
+
       for (let i = 0; i < 20; i++) {
-        const mockConstructor = function() {}
+        const mockConstructor = function () {}
         if (i % 2 === 0) {
           Object.defineProperty(mockConstructor, 'metadata', {
             value: [['even-key' + i, 'even-value' + i]],
-            configurable: true
+            configurable: true,
           })
         }
 
         const mockProvider = {
           instance: i % 3 === 0 ? null : { constructor: mockConstructor },
-          isNotMetatype: i % 4 === 0
+          isNotMetatype: i % 4 === 0,
         }
         mixedProviderMap.set('provider' + i, mockProvider)
       }

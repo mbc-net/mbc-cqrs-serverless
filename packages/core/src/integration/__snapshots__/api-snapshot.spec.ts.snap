@@ -1,0 +1,544 @@
+// Jest Snapshot v1, https://goo.gl/fbAQLP
+
+exports[`API Snapshot Tests Complex data structure snapshots should handle CQRS command structure consistently 1`] = `
+{
+  "attributes": {
+    "M": {
+      "customerId": {
+        "S": "cust-123",
+      },
+      "items": {
+        "L": [
+          {
+            "M": {
+              "price": {
+                "N": "100",
+              },
+              "productId": {
+                "S": "prod-1",
+              },
+              "quantity": {
+                "N": "2",
+              },
+            },
+          },
+          {
+            "M": {
+              "price": {
+                "N": "200",
+              },
+              "productId": {
+                "S": "prod-2",
+              },
+              "quantity": {
+                "N": "1",
+              },
+            },
+          },
+        ],
+      },
+      "status": {
+        "S": "pending",
+      },
+      "total": {
+        "N": "400",
+      },
+    },
+  },
+  "code": {
+    "S": "2024-001",
+  },
+  "createdAt": {
+    "S": "2024-01-15T10:00:00Z",
+  },
+  "createdBy": {
+    "S": "user-001",
+  },
+  "pk": {
+    "S": "TENANT#tenant1#ORDER",
+  },
+  "sk": {
+    "S": "ORDER#2024-001",
+  },
+  "type": {
+    "S": "ORDER",
+  },
+  "updatedAt": {
+    "S": "2024-01-15T10:00:00Z",
+  },
+  "updatedBy": {
+    "S": "user-001",
+  },
+  "version": {
+    "N": "1",
+  },
+}
+`;
+
+exports[`API Snapshot Tests Complex data structure snapshots should handle event sourcing structure consistently 1`] = `
+[
+  {
+    "aggregateId": {
+      "S": "order-2024-001",
+    },
+    "eventId": {
+      "S": "evt-001",
+    },
+    "eventType": {
+      "S": "OrderCreated",
+    },
+    "payload": {
+      "M": {
+        "customerId": {
+          "S": "cust-123",
+        },
+        "items": {
+          "L": [],
+        },
+      },
+    },
+    "timestamp": {
+      "S": "2024-01-15T10:00:00Z",
+    },
+    "version": {
+      "N": "1",
+    },
+  },
+  {
+    "aggregateId": {
+      "S": "order-2024-001",
+    },
+    "eventId": {
+      "S": "evt-002",
+    },
+    "eventType": {
+      "S": "ItemAdded",
+    },
+    "payload": {
+      "M": {
+        "productId": {
+          "S": "prod-1",
+        },
+        "quantity": {
+          "N": "2",
+        },
+      },
+    },
+    "timestamp": {
+      "S": "2024-01-15T10:01:00Z",
+    },
+    "version": {
+      "N": "2",
+    },
+  },
+  {
+    "aggregateId": {
+      "S": "order-2024-001",
+    },
+    "eventId": {
+      "S": "evt-003",
+    },
+    "eventType": {
+      "S": "OrderSubmitted",
+    },
+    "payload": {
+      "M": {
+        "submittedBy": {
+          "S": "user-001",
+        },
+      },
+    },
+    "timestamp": {
+      "S": "2024-01-15T10:02:00Z",
+    },
+    "version": {
+      "N": "3",
+    },
+  },
+]
+`;
+
+exports[`API Snapshot Tests DynamoDB marshall/unmarshall snapshots should handle NULL and BOOL types consistently 1`] = `
+{
+  "isFalse": false,
+  "isNull": null,
+  "isTrue": true,
+}
+`;
+
+exports[`API Snapshot Tests DynamoDB marshall/unmarshall snapshots should marshall complex nested object consistently 1`] = `
+{
+  "items": {
+    "L": [
+      {
+        "M": {
+          "id": {
+            "S": "item1",
+          },
+          "name": {
+            "S": "Product A",
+          },
+          "price": {
+            "N": "19.99",
+          },
+          "quantity": {
+            "N": "2",
+          },
+        },
+      },
+      {
+        "M": {
+          "id": {
+            "S": "item2",
+          },
+          "name": {
+            "S": "Product B",
+          },
+          "price": {
+            "N": "29.99",
+          },
+          "quantity": {
+            "N": "1",
+          },
+        },
+      },
+    ],
+  },
+  "metadata": {
+    "M": {
+      "campaign": {
+        "S": "summer-sale",
+      },
+      "source": {
+        "S": "web",
+      },
+      "tags": {
+        "L": [
+          {
+            "S": "electronics",
+          },
+          {
+            "S": "sale",
+          },
+        ],
+      },
+    },
+  },
+  "pk": {
+    "S": "ORDER#789",
+  },
+  "sk": {
+    "S": "ITEM#001",
+  },
+  "timestamps": {
+    "M": {
+      "created": {
+        "S": "2024-01-01T00:00:00Z",
+      },
+      "updated": {
+        "S": "2024-01-02T00:00:00Z",
+      },
+    },
+  },
+}
+`;
+
+exports[`API Snapshot Tests DynamoDB marshall/unmarshall snapshots should marshall simple object consistently 1`] = `
+{
+  "active": {
+    "BOOL": true,
+  },
+  "age": {
+    "N": "30",
+  },
+  "name": {
+    "S": "John Doe",
+  },
+  "pk": {
+    "S": "USER#123",
+  },
+  "score": {
+    "N": "95.5",
+  },
+  "sk": {
+    "S": "PROFILE#456",
+  },
+}
+`;
+
+exports[`API Snapshot Tests DynamoDB marshall/unmarshall snapshots should marshall with special types consistently 1`] = `
+{
+  "binaryData": {
+    "B": {
+      "data": [
+        104,
+        101,
+        108,
+        108,
+        111,
+      ],
+      "type": "Buffer",
+    },
+  },
+  "emptyArray": {
+    "L": [],
+  },
+  "emptyObject": {
+    "M": {},
+  },
+  "emptyString": {
+    "NULL": true,
+  },
+  "nullValue": {
+    "NULL": true,
+  },
+  "pk": {
+    "S": "DATA#001",
+  },
+  "setOfNumbers": {
+    "NS": [
+      "1",
+      "2",
+      "3",
+    ],
+  },
+  "setOfStrings": {
+    "SS": [
+      "a",
+      "b",
+      "c",
+    ],
+  },
+}
+`;
+
+exports[`API Snapshot Tests DynamoDB marshall/unmarshall snapshots should unmarshall DynamoDB response consistently 1`] = `
+{
+  "active": true,
+  "address": {
+    "city": "Tokyo",
+    "street": "123 Main St",
+  },
+  "age": 30,
+  "flags": Set {
+    "verified",
+    "premium",
+  },
+  "name": "John Doe",
+  "pk": "USER#123",
+  "scores": Set {
+    95,
+    87,
+    92,
+  },
+  "sk": "PROFILE#456",
+  "tags": [
+    "developer",
+    "nodejs",
+  ],
+}
+`;
+
+exports[`API Snapshot Tests Edge case snapshots should handle deeply nested structures consistently 1`] = `
+{
+  "level1": {
+    "M": {
+      "level2": {
+        "M": {
+          "level3": {
+            "M": {
+              "level4": {
+                "M": {
+                  "level5": {
+                    "M": {
+                      "array": {
+                        "L": [
+                          {
+                            "N": "1",
+                          },
+                          {
+                            "N": "2",
+                          },
+                          {
+                            "M": {
+                              "nested": {
+                                "BOOL": true,
+                              },
+                            },
+                          },
+                        ],
+                      },
+                      "value": {
+                        "S": "deep",
+                      },
+                    },
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
+    },
+  },
+}
+`;
+
+exports[`API Snapshot Tests Edge case snapshots should handle special number values consistently 1`] = `
+{
+  "float": {
+    "N": "3.14159",
+  },
+  "integer": {
+    "N": "42",
+  },
+  "largeNumber": {
+    "N": "9007199254740991",
+  },
+  "negative": {
+    "N": "-100",
+  },
+  "scientific": {
+    "N": "12300000000",
+  },
+  "smallNumber": {
+    "N": "-9007199254740991",
+  },
+  "zero": {
+    "N": "0",
+  },
+}
+`;
+
+exports[`API Snapshot Tests Edge case snapshots should handle unicode strings consistently 1`] = `
+{
+  "chinese": "中文测试",
+  "emoji": "🎉🚀💻",
+  "japanese": "日本語テスト",
+  "korean": "한국어 테스트",
+  "mixed": "Hello 世界 🌍",
+}
+`;
+
+exports[`API Snapshot Tests ULID format snapshots should produce consistent ULID format 1`] = `
+{
+  "length": 26,
+  "matchesPattern": true,
+  "timestampLength": 10,
+}
+`;
+
+exports[`API Snapshot Tests class-transformer snapshots should handle array transformation consistently 1`] = `
+{
+  "items": [
+    {
+      "id": "1",
+      "name": "Item 1",
+    },
+    {
+      "id": "2",
+      "name": "Item 2",
+    },
+    {
+      "id": "3",
+      "name": "Item 3",
+    },
+  ],
+}
+`;
+
+exports[`API Snapshot Tests class-transformer snapshots should handle missing optional fields consistently 1`] = `
+{
+  "active": false,
+  "address": undefined,
+  "age": undefined,
+  "createdAt": 2024-02-01T08:00:00.000Z,
+  "email": "bob@example.com",
+  "id": "user-456",
+  "name": "Bob Smith",
+  "role": "user",
+  "tags": [],
+}
+`;
+
+exports[`API Snapshot Tests class-transformer snapshots should transform plain to instance consistently 1`] = `
+{
+  "active": true,
+  "address": {
+    "city": "Osaka",
+    "postalCode": "530-0001",
+    "street": "456 Oak Ave",
+  },
+  "age": 25,
+  "createdAt": 2024-01-15T10:30:00.000Z,
+  "email": "jane@example.com",
+  "id": "user-123",
+  "name": "Jane Doe",
+  "role": "admin",
+  "tags": [
+    "developer",
+    "lead",
+  ],
+}
+`;
+
+exports[`API Snapshot Tests class-transformer snapshots should transform with groups consistently: admin-group 1`] = `
+{
+  "email": "alice@example.com",
+  "id": "user-789",
+  "name": "Alice",
+  "role": "admin",
+}
+`;
+
+exports[`API Snapshot Tests class-transformer snapshots should transform with groups consistently: public-group 1`] = `
+{
+  "id": "user-789",
+  "name": "Alice",
+}
+`;
+
+exports[`API Snapshot Tests class-validator error structure snapshots should produce consistent nested validation error structure 1`] = `[]`;
+
+exports[`API Snapshot Tests class-validator error structure snapshots should produce consistent validateSync error structure 1`] = `
+[
+  {
+    "constraints": {
+      "isNotEmpty": "required should not be empty",
+    },
+    "property": "required",
+  },
+  {
+    "constraints": {
+      "isNumber": "number must be a number conforming to the specified constraints",
+    },
+    "property": "number",
+  },
+]
+`;
+
+exports[`API Snapshot Tests class-validator error structure snapshots should produce consistent validation error structure 1`] = `
+[
+  {
+    "constraints": {
+      "isNotEmpty": "id should not be empty",
+    },
+    "property": "id",
+    "value": "",
+  },
+  {
+    "constraints": {
+      "isNotEmpty": "name should not be empty",
+    },
+    "property": "name",
+    "value": "",
+  },
+  {
+    "constraints": {
+      "isEnum": "role must be one of the following values: ",
+    },
+    "property": "role",
+    "value": "invalid-role",
+  },
+]
+`;
