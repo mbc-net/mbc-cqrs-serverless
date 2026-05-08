@@ -55,6 +55,10 @@ This codebase currently has **two independent `AP00X` numbering systems** that a
 | AP019 Missing Pagination in List Queries | AP019 | ✅ same code |
 | AP020 Missing getCommandSource for Tracing | AP011 | Tracing/audit |
 | AP021 Event Emit After publishAsync | AP021 | ✅ same code |
+| AP022 Use of eval() or Function() Constructor | — (detector only) | RCE/XSS sink (CWE-95) |
+| AP023 Shell Command Built from String Concatenation | — (detector only) | Command injection (CWE-78) |
+| AP024 HTTP Request Without Timeout | — (detector only) | Local DoS via stalled upstream (CWE-400) |
+| AP025 Logging process.env or full request object | — (detector only) | Sensitive data exposure (CWE-312, CWE-532) |
 
 When you receive `mbc_check_anti_patterns` output, look up the detector code in this table to find the corresponding skill-doc section for full context and recommended fixes. Future versions of this framework should consolidate the two systems; until then, treat them as separate identifier spaces.
 
