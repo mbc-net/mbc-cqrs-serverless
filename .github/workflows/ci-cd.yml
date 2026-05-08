@@ -57,7 +57,7 @@ jobs:
         continue-on-error: true
 
       - name: Security Scan (Trivy)
-        uses: aquasecurity/trivy-action@master
+        uses: aquasecurity/trivy-action@v0.36.0
         if: matrix.node-version == '20.x'
         with:
           scan-type: 'fs'

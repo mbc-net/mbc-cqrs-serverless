@@ -36,3 +36,12 @@ updates:
         update-types: ["version-update:semver-major"]
       - dependency-name: "class-validator"
         update-types: ["version-update:semver-major"]
+
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+    commit-message:
+      prefix: "chore(actions)"
+    open-pull-requests-limit: 5
