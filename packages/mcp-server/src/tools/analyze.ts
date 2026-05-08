@@ -461,7 +461,7 @@ interface AntiPatternMatch {
 /**
  * Anti-patterns to check for.
  *
- * Codes are sequential from AP001 to AP021 in detector-implementation order.
+ * Codes are sequential from AP001 to AP025 in detector-implementation order.
  *
  * IMPORTANT: These detector codes are a SEPARATE numbering system from the AP codes
  * used in `skills/mbc-review/SKILL.md`. Only AP016, AP017, AP018, AP019, and AP021
@@ -661,6 +661,54 @@ const ANTI_PATTERNS = [
       /commandService\.publish(?:Async|Sync|PartialUpdateAsync|PartialUpdateSync)\b[\s\S]{0,200}?this\.eventEmitter\.emit\s*\(/,
     recommendation:
       'Do not call eventEmitter.emit() directly after publishAsync(). At that point only the command table has been written; the data table is populated asynchronously via DynamoDB Streams. Any @OnEvent handler that calls DataService.getItem() will find no data. Instead, implement IDataSyncHandler and emit events inside up()/down(), which are called after the data table write completes. Register the handler in CommandModule.register({ dataSyncHandlers: [...] }). If change-detection is needed (e.g. statusChanged), embed previous values as attributes._prev in publishAsync and read them in the handler; strip _prev in RDS sync handlers to prevent it leaking into the database.',
+  },
+  {
+    code: 'AP022',
+    name: 'Use of eval() or Function() Constructor',
+    severity: 'critical' as const,
+    // Detect the eval and Function-constructor sinks at actual call sites,
+    // not mentions in strings or comments. Requires preceding context that
+    // indicates an expression position (=, (, ;, {, comma, or an
+    // await/return/throw keyword).
+    pattern:
+      /(?:[=({,;]|\b(?:await|return|throw|void)\s)\s*(?:eval\s*\(|new\s+Function\s*\()/,
+    recommendation:
+      'eval() and new Function() execute arbitrary code and are common XSS/RCE sinks (CWE-95). Use JSON.parse() for parsing data, structured serialization (Zod, class-validator) for input, or a sandboxed expression evaluator (e.g. expr-eval, mathjs) for user-defined formulas. There is almost never a legitimate need for these in framework code.',
+  },
+  {
+    code: 'AP023',
+    name: 'Shell Command Built from String Concatenation',
+    severity: 'critical' as const,
+    // Detect child_process.exec/execSync calls whose first argument is built
+    // by interpolation or concatenation. Requires the call to be at an
+    // expression position (preceded by =, (, ;, {, comma, or await/return)
+    // to avoid matching the substring "exec(" inside comments or strings.
+    pattern:
+      /(?:[=({,;]|\b(?:await|return|throw)\s)\s*(?:child_process\.|cp\.)?(?:exec|execSync)\s*\(\s*(?:`[^`]*\$\{[^}]+\}[^`]*`|['"][^'"]*['"]\s*\+\s*\w)/,
+    recommendation:
+      "exec/execSync interpret the first argument as a shell command string. Concatenating user-controlled values into it is a command-injection sink (CWE-78). Use execFile/execFileSync with an args array instead, which bypasses the shell. Example: execFile('git', ['log', userBranch]) is safe; building the same command via string interpolation is not.",
+  },
+  {
+    code: 'AP024',
+    name: 'HTTP Request Without Timeout',
+    severity: 'medium' as const,
+    // Detect axios/fetch/http.get calls where no timeout option is set.
+    // Limits to short window after the call to reduce false positives from later .timeout() chaining.
+    pattern:
+      /(?:axios|http|https)\.(?:get|post|put|patch|delete|request)\s*\([^)]*\)(?![^;{]*\.timeout)/,
+    recommendation:
+      'HTTP requests without an explicit timeout can hang indefinitely if the remote host stalls — a DoS vector against your own service (CWE-400). Set { timeout: 5000 } (or appropriate ms) on every outbound request. For Lambda functions, the timeout must be lower than the function timeout to avoid wasted billed duration.',
+  },
+  {
+    code: 'AP025',
+    name: 'Logging process.env or full request object',
+    severity: 'high' as const,
+    // Detect console/logger calls that pass process.env or *.headers/body wholesale.
+    // CodeQL js/clear-text-logging — sensitive data exposure (CWE-532).
+    pattern:
+      /(?:console\.(?:log|info|warn|error|debug)|logger\.\w+)\s*\([^)]*\b(?:process\.env\b(?!\.[A-Z_]+)|\bheaders\s*[,)\]}]|\bauthorization\b|\bcookie\b)/i,
+    recommendation:
+      'Logging process.env (without picking specific keys), the full headers object, or fields like authorization/cookie leaks credentials, JWT tokens, and API keys into log aggregation systems where they may be retained or replicated to less-trusted observers (CWE-312, CWE-532). Log only the specific non-secret fields you actually need (e.g. process.env.NODE_ENV, request id, user id from JWT claims).',
   },
 ]
 
