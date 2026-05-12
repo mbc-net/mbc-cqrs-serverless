@@ -249,6 +249,87 @@ export class InfraStack extends cdk.Stack {
     this.graphqlApiKey = new cdk.CfnOutput(this, 'GraphQLAPIKey', {
       value: appSyncApi.apiKey || '',
     })
+
+    // AppSync Events API (HTTP pub/sub, schema-free)
+    // Uses L2 EventApi so that ChannelNamespace can set explicit publishAuthModeTypes
+    // and subscribeAuthModeTypes — without these the namespace has no effective
+    // authorization and Lambda publish calls receive 401.
+    let appSyncEventsApi: cdk.aws_appsync.EventApi | undefined
+    let appSyncEventsNamespace: cdk.aws_appsync.ChannelNamespace | undefined
+
+    if (props.config.appsyncEvents?.enabled) {
+      const expireDays = props.config.appsyncEvents.apiKeyExpireDays ?? 365
+      const namespaceName = props.config.appsyncEvents.namespace ?? 'default'
+
+      appSyncEventsApi = new cdk.aws_appsync.EventApi(this, 'events-api', {
+        apiName: prefix + 'events',
+        authorizationConfig: {
+          authProviders: [
+            {
+              authorizationType: cdk.aws_appsync.AppSyncAuthorizationType.IAM,
+            },
+            {
+              authorizationType:
+                cdk.aws_appsync.AppSyncAuthorizationType.API_KEY,
+              apiKeyConfig: {
+                expires: cdk.Expiration.after(cdk.Duration.days(expireDays)),
+              },
+            },
+          ],
+          connectionAuthModeTypes: [
+            cdk.aws_appsync.AppSyncAuthorizationType.API_KEY,
+          ],
+          defaultPublishAuthModeTypes: [
+            cdk.aws_appsync.AppSyncAuthorizationType.IAM,
+          ],
+          defaultSubscribeAuthModeTypes: [
+            cdk.aws_appsync.AppSyncAuthorizationType.API_KEY,
+          ],
+        },
+      })
+
+      // ChannelNamespace — explicitly sets auth per operation
+      //   publish  = AWS_IAM   → Lambda signs with its execution role
+      //   subscribe = API_KEY  → browser clients pass x-api-key header
+      appSyncEventsNamespace = new cdk.aws_appsync.ChannelNamespace(
+        this,
+        'events-namespace',
+        {
+          api: appSyncEventsApi,
+          channelNamespaceName: namespaceName,
+          authorizationConfig: {
+            publishAuthModeTypes: [
+              cdk.aws_appsync.AppSyncAuthorizationType.IAM,
+            ],
+            subscribeAuthModeTypes: [
+              cdk.aws_appsync.AppSyncAuthorizationType.API_KEY,
+            ],
+          },
+        },
+      )
+
+      // Outputs
+      new cdk.CfnOutput(this, 'AppSyncEventsHttpEndpoint', {
+        value: `https://${appSyncEventsApi.httpDns}/event`,
+        description:
+          'AppSync Events HTTP endpoint — APPSYNC_EVENTS_ENDPOINT env var',
+      })
+      new cdk.CfnOutput(this, 'AppSyncEventsRealtimeEndpoint', {
+        value: `wss://${appSyncEventsApi.realtimeDns}/event/realtime`,
+        description:
+          'AppSync Events WebSocket endpoint for client subscriptions',
+      })
+      new cdk.CfnOutput(this, 'AppSyncEventsApiKey', {
+        value: appSyncEventsApi.apiKeys?.[0]?.attrApiKey ?? '',
+        description: 'AppSync Events API key — APPSYNC_EVENTS_API_KEY env var',
+      })
+      new cdk.CfnOutput(this, 'AppSyncEventsNamespace', {
+        value: props.config.appsyncEvents.namespace,
+        description:
+          'AppSync Events namespace — APPSYNC_EVENTS_NAMESPACE env var',
+      })
+    }
+
     // S3
     const ddbBucket = new cdk.aws_s3.Bucket(this, 'ddb-attributes', {
       bucketName: prefix + 'ddb-attributes', // Globally unique bucket name
@@ -398,6 +479,17 @@ export class InfraStack extends cdk.Stack {
       SNS_ALARM_TOPIC_ARN: alarmSns.topicArn,
       COGNITO_USER_POOL_ID: userPool.userPoolId,
       APPSYNC_ENDPOINT: appSyncApi.graphqlUrl,
+      // AppSync Events — only injected when feature is enabled
+      ...(props.config.appsyncEvents?.enabled && appSyncEventsApi
+        ? {
+            APPSYNC_EVENTS_ENABLED: 'true',
+            APPSYNC_EVENTS_ENDPOINT: `https://${appSyncEventsApi.httpDns}/event`,
+            APPSYNC_EVENTS_API_KEY:
+              appSyncEventsApi.apiKeys?.[0]?.attrApiKey ?? '',
+            APPSYNC_EVENTS_NAMESPACE: props.config.appsyncEvents.namespace,
+            // APPSYNC_EVENTS_REGION defaults to 'ap-northeast-1' in the service, no need to set
+          }
+        : {}),
       SES_FROM_EMAIL: props.config.fromEmailAddress,
       DATABASE_URL: `postgresql://${props.config.rds.accountSsmKey}@${props.config.rds.endpoint}/${props.config.rds.dbName}?schema=public`,
       S3_PUBLIC_BUCKET_NAME: publicBucket.bucketName,
@@ -644,6 +736,14 @@ export class InfraStack extends cdk.Stack {
       recordName: props.config.domain.http,
       domainName: httpDistribution.distributionDomainName,
     })
+
+    if (props.config.domain.appsyncEvents && appSyncEventsApi) {
+      new cdk.aws_route53.CnameRecord(this, 'AppSyncEventsCnameRecord', {
+        zone: hostedZone,
+        recordName: props.config.domain.appsyncEvents,
+        domainName: appSyncEventsApi.httpDns,
+      })
+    }
 
     this.httpDistributionDomain = new cdk.CfnOutput(
       this,
@@ -1100,6 +1200,15 @@ export class InfraStack extends cdk.Stack {
     appSyncApi.grantMutation(lambdaApi)
     importActionSqs.grantSendMessages(lambdaApi)
 
+    if (appSyncEventsApi) {
+      lambdaApi.addToRolePolicy(
+        new cdk.aws_iam.PolicyStatement({
+          actions: ['appsync:EventPublish'],
+          resources: [`${appSyncEventsApi.apiArn}/*`],
+        }),
+      )
+    }
+
     // Define an IAM policy for full DynamoDB access
     const dynamoDbTablePrefixArn = cdk.Arn.format({
       partition: 'aws',
@@ -1231,6 +1340,14 @@ export class InfraStack extends cdk.Stack {
           statements: [ssmPolicy],
         }),
       )
+      if (appSyncEventsApi) {
+        taskRole.addToPrincipalPolicy(
+          new cdk.aws_iam.PolicyStatement({
+            actions: ['appsync:EventPublish'],
+            resources: [`${appSyncEventsApi.apiArn}/*`],
+          }),
+        )
+      }
     }
   }
 }

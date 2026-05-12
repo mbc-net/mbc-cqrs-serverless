@@ -10,6 +10,20 @@ export type Config = {
   domain: {
     http: string
     appsync: string
+    appsyncEvents?: string // optional: custom domain for AppSync Events API
+  }
+
+  appsyncEvents?: {
+    /** Set true to create the AppSync Events API and inject env vars into Lambda/ECS */
+    enabled: boolean
+    /**
+     * Channel namespace name — must be a pre-registered name in the AppSync Event API.
+     * Becomes segment 1 of every channel path: /{namespace}/{tenantCode}/{table}/{action}/{id}
+     * Defaults to 'default'.
+     */
+    namespace?: string
+    /** API key TTL in days. Defaults to 365. */
+    apiKeyExpireDays?: number
   }
 
   // existing resources
