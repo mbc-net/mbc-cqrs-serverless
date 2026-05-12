@@ -65,9 +65,38 @@ export class EnvironmentVariables {
   @IsOptional()
   SNS_REGION: string
 
+  // AppSync Subscription (existing GraphQL-based, kept for backward compatibility)
   @IsString()
   @IsOptional()
   APPSYNC_ENDPOINT: string
+
+  // AppSync Events API (new HTTP pub/sub)
+  // Set APPSYNC_EVENTS_ENABLED=true to opt in.
+  // When APPSYNC_ENDPOINT is also set, both are used during migration (dual-publish).
+  @IsBoolean()
+  @IsOptional()
+  APPSYNC_EVENTS_ENABLED: boolean
+
+  @IsString()
+  @IsOptional()
+  APPSYNC_EVENTS_ENDPOINT: string
+
+  @IsString()
+  @IsOptional()
+  APPSYNC_EVENTS_API_KEY: string
+
+  @IsString()
+  @IsOptional()
+  APPSYNC_EVENTS_REGION: string
+
+  /**
+   * Must match the channel namespace name pre-created in your AppSync Event API.
+   * The namespace is the first segment of every channel path: /{namespace}/...
+   * Defaults to "default" if not set.
+   */
+  @IsString()
+  @IsOptional()
+  APPSYNC_EVENTS_NAMESPACE: string
 
   @IsString()
   @IsOptional()
