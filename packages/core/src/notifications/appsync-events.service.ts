@@ -1,76 +1,90 @@
+import { randomUUID } from 'node:crypto'
+
 import { Sha256 } from '@aws-crypto/sha256-js'
 import { defaultProvider } from '@aws-sdk/credential-provider-node'
-import { SignatureV4 } from '@aws-sdk/signature-v4'
 import { Injectable, Logger } from '@nestjs/common'
 import { ConfigService } from '@nestjs/config'
+import { HttpRequest } from '@smithy/protocol-http'
+import { SignatureV4 } from '@smithy/signature-v4'
 import fetch from 'node-fetch'
 
 import { INotification } from '../interfaces'
+
+/** Default headers required for AppSync Events API requests */
+const DEFAULT_HEADERS = {
+  accept: 'application/json, text/javascript',
+  'content-encoding': 'amz-1.0',
+  'content-type': 'application/json; charset=UTF-8',
+}
 
 @Injectable()
 export class AppSyncEventsService {
   private readonly logger = new Logger(AppSyncEventsService.name)
 
-  private readonly endpoint?: string
-  private readonly hostname?: string
-  private readonly apiKey?: string
-  private readonly region: string
+  private readonly url: URL | undefined
   private readonly namespace: string
-  private readonly signer?: SignatureV4
+  private readonly signer: SignatureV4 | undefined
 
   constructor(private readonly config: ConfigService) {
-    this.endpoint = config.get<string>('APPSYNC_EVENTS_ENDPOINT')
-    this.apiKey = config.get<string>('APPSYNC_EVENTS_API_KEY')
-    this.region =
-      config.get<string>('APPSYNC_EVENTS_REGION') ?? 'ap-northeast-1'
+    const endpoint = config.get<string>('APPSYNC_EVENTS_ENDPOINT')
     this.namespace = config.get<string>('APPSYNC_EVENTS_NAMESPACE') ?? 'default'
 
-    // Guard against undefined endpoint if the feature is disabled/missing env var
-    if (this.endpoint) {
-      this.hostname = new URL(this.endpoint).hostname
+    if (endpoint) {
+      this.url = new URL(endpoint)
+
+      // Region is parsed from the hostname automatically:
+      //   <id>.appsync-api.<region>.amazonaws.com → region
+      // Falls back to AWS_REGION env var (always set in Lambda runtime).
+      const match = this.url.hostname.match(
+        /\w+\.appsync-api\.([\w-]+)\.amazonaws\.com/,
+      )
+      const region = match?.[1] ?? process.env.AWS_REGION ?? 'ap-northeast-1'
+
       this.signer = new SignatureV4({
         credentials: defaultProvider(),
-        region: this.region,
         service: 'appsync',
+        region,
         sha256: Sha256,
       })
     }
   }
 
   /**
-   * Publish INotification to an AppSync Events channel.
+   * Publish INotification to an AppSync Events channel via IAM SigV4.
    *
-   * Channel structure (max 5 segments, namespace is seg 1):
-   *   /{namespace}/{tenantCode}/{table}/{action}/{encodedId}
+   * Channel structure (max 5 segments, seg 1 = namespace):
+   *   /{namespace}/{tenantCode}/{table}/{action}/{sanitizedId}
    *
-   * Client subscription options (wildcard catches all sub-channels):
-   *   /{namespace}/{tenantCode}/*                           — all events for tenant
-   *   /{namespace}/{tenantCode}/{table}/*                   — all events for a table/module
-   *   /{namespace}/{tenantCode}/{table}/{action}/*          — all events for an action
-   *   /{namespace}/{tenantCode}/{table}/{action}/{id}       — specific command (exact)
+   * Client subscription options (wildcard /* catches all sub-channels):
+   *   /{namespace}/{tenantCode}/*                       — all events for tenant
+   *   /{namespace}/{tenantCode}/{table}/*               — all events for a module
+   *   /{namespace}/{tenantCode}/{table}/{action}/*      — all events for an action
+   *   /{namespace}/{tenantCode}/{table}/{action}/{id}   — specific command (exact)
    */
-  async publishEvent(msg: INotification): Promise<void> {
-    // Short-circuit if the endpoint wasn't provided (e.g., feature disabled)
-    if (!this.endpoint || !this.hostname) {
-      this.logger.debug('AppSync Events endpoint is missing. Skipping publish.')
+  async sendMessage(msg: INotification): Promise<void> {
+    if (!this.url || !this.signer) {
+      this.logger.debug('APPSYNC_EVENTS_ENDPOINT not set, skipping')
       return
     }
 
     const channel = this.resolveChannel(msg)
-    this.logger.debug(`publishEvent:: channel=${channel}`)
+    this.logger.debug(`sendMessage:: channel=${channel}`)
+
     await this.postToChannel(channel, msg)
   }
 
   /**
    * Resolves the most specific channel path for a notification.
-   * Clients subscribe at the level of granularity they need using wildcard.
+   * Non-alphanumeric characters (e.g. #, @) are sanitized to dashes
+   * since AppSync Events channel segments only allow [a-zA-Z0-9-].
    */
-  resolveChannel(msg: INotification): string {
-    const tenantCode = this.sanitizeSegment(msg.tenantCode)
-    const table = this.sanitizeSegment(msg.table)
-    const action = this.sanitizeSegment(msg.action)
-    const id = this.sanitizeSegment(msg.id)
-    return `/${this.namespace}/${tenantCode}/${table}/${action}/${id}`
+  resolveChannel(notification: INotification): string {
+    const namespace = this.sanitizeSegment(this.namespace)
+    const tenantCode = this.sanitizeSegment(notification.tenantCode)
+    const table = this.sanitizeSegment(notification.table)
+    const action = this.sanitizeSegment(notification.action)
+    const id = this.sanitizeSegment(notification.id)
+    return `/${namespace}/${tenantCode}/${table}/${action}/${id}`
   }
 
   /**
@@ -97,62 +111,51 @@ export class AppSyncEventsService {
 
   private async postToChannel(
     channel: string,
-    msg: INotification,
+    notification: INotification,
   ): Promise<void> {
-    const endpointUrl = new URL(this.endpoint as string)
-    const url = endpointUrl.toString()
-    const apiPath = endpointUrl.pathname // Extracted path, e.g. '/event'
+    const signedReq = await this.signRequest(channel, notification)
 
-    // The AppSync Events API requires the 'channel' inside the JSON body
-    const body = JSON.stringify({
-      channel: channel,
-      events: [JSON.stringify(msg)],
+    const res = await fetch(this.url!.toString(), {
+      method: signedReq.method,
+      headers: signedReq.headers as Record<string, string>,
+      body: signedReq.body,
     })
 
-    const method = 'POST'
-    const headers: Record<string, string> = {
-      'Content-Type': 'application/json',
-      host: endpointUrl.hostname,
-    }
-
-    if (this.apiKey) {
-      headers['x-api-key'] = this.apiKey
-      const res = await fetch(url, { method, headers, body })
-      await this.handleResponse(res, channel)
-    } else if (this.signer) {
-      // The signed request path must be the base '/event' path, not the channel string
-      const signedRequest = await this.signer.sign(
-        {
-          method,
-          headers,
-          protocol: 'https:',
-          hostname: endpointUrl.hostname,
-          path: apiPath,
-          body,
-        },
-        {
-          signingDate: new Date(),
-          signingRegion: this.region,
-          signingService: 'appsync',
-        },
-      )
-      const res = await fetch(url, {
-        method: signedRequest.method,
-        headers: signedRequest.headers as Record<string, string>,
-        body: signedRequest.body,
-      })
-      await this.handleResponse(res, channel)
-    }
-
-    this.logger.debug(`AppSync Events published successfully to ${channel}`)
-  }
-
-  private async handleResponse(res: any, channel: string): Promise<void> {
     if (!res.ok) {
       const text = await res.text()
       throw new Error(
         `AppSync Events publish failed [${res.status}] on channel ${channel}: ${text}`,
       )
     }
+
+    this.logger.debug(`sendMessage:: published successfully to ${channel}`)
+  }
+
+  /**
+   * Builds and signs an HttpRequest for the given channel and notification.
+   * Separating signing from the fetch call makes each step independently testable.
+   */
+  private async signRequest(
+    channel: string,
+    notification: INotification,
+  ): Promise<HttpRequest> {
+    const body = JSON.stringify({
+      id: randomUUID(),
+      channel,
+      events: [JSON.stringify(notification)],
+    })
+
+    const httpRequest = new HttpRequest({
+      method: 'POST',
+      headers: {
+        ...DEFAULT_HEADERS,
+        host: this.url!.hostname,
+      },
+      body,
+      hostname: this.url!.hostname,
+      path: this.url!.pathname,
+    })
+
+    return this.signer!.sign(httpRequest) as Promise<HttpRequest>
   }
 }
