@@ -16,7 +16,7 @@ import { StepFunctionModule } from './step-func/step-function.module'
 
 @Module({
   imports: [
-    NotificationModule,
+    NotificationModule.register(),
     DataStoreModule,
     DataSyncModule,
     StepFunctionModule,

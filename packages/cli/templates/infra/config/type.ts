@@ -22,19 +22,20 @@ export type Config = {
      * Defaults to 'default'.
      */
     namespace: string
-    /**
-     * Value injected as NOTIFICATION_TRANSPORTS env var into Lambda/ECS.
-     * Controls which transports NotificationEventHandler uses.
-     * Examples:
-     *   'appsync-event'                    — Events API only
-     *   'appsync-graphql'                  — GraphQL API only
-     *   'appsync-graphql,appsync-event'    — dual-publish (migration mode)
-     * Defaults to 'appsync-event' when appsyncEvents is enabled.
-     */
-    notificationTransports?: string
     /** API key TTL in days. Defaults to 365. */
     apiKeyExpireDays?: number
   }
+
+  /**
+   * Value injected as NOTIFICATION_TRANSPORTS env var into Lambda/ECS.
+   * Controls which transports NotificationEventHandler uses.
+   * Examples:
+   *   'appsync-event'                    — Events API only
+   *   'appsync-graphql'                  — GraphQL API only
+   *   'appsync-graphql,appsync-event'    — dual-publish (migration mode)
+   * Defaults to 'appsync-event' when appsyncEvents is enabled.
+   */
+  notificationTransports?: string
 
   // existing resources
   userPoolId?: string

@@ -6,6 +6,7 @@ import { ConfigService } from '@nestjs/config'
 import fetch, { Response } from 'node-fetch'
 
 import { INotification } from '../interfaces'
+import { INotificationTransport } from './interfaces'
 
 const query = /* GraphQL */ `
   mutation SEND_MESSAGE($message: AWSJSON!) {
@@ -22,7 +23,7 @@ const query = /* GraphQL */ `
 `
 
 @Injectable()
-export class AppSyncService {
+export class AppSyncService implements INotificationTransport {
   private readonly logger = new Logger(AppSyncService.name)
 
   private readonly endpoint: string
@@ -44,7 +45,7 @@ export class AppSyncService {
     })
   }
 
-  async sendMessage(msg: INotification) {
+  async sendMessage(notification: INotification): Promise<void> {
     const headers = {
       'Content-Type': 'application/json',
       host: this.hostname,
@@ -52,7 +53,7 @@ export class AppSyncService {
     const body = JSON.stringify({
       query,
       variables: {
-        message: JSON.stringify(msg),
+        message: JSON.stringify(notification),
       },
     })
     const method = 'POST'

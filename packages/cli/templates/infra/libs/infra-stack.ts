@@ -481,8 +481,7 @@ export class InfraStack extends cdk.Stack {
       ...(props.config.appsyncEvents?.enabled && appSyncEventsApi
         ? {
             NOTIFICATION_TRANSPORTS:
-              props.config.appsyncEvents.notificationTransports ??
-              'appsync-event',
+              props.config.notificationTransports ?? 'appsync-event',
             APPSYNC_EVENTS_ENDPOINT: `https://${appSyncEventsApi.httpDns}/event`,
             APPSYNC_EVENTS_NAMESPACE:
               props.config.appsyncEvents.namespace ?? 'default',

@@ -75,7 +75,7 @@ describe('AppSyncEventsService', () => {
     it('should build correct channel sanitizing # and @ from id', () => {
       const channel = service.resolveChannel(mockNotification)
       expect(channel).toBe(
-        '/default/MBC/user-tenant/command-status/user-tenant-TEST-MBC-publish-sync-data-5',
+        '/default/MBC/command-status/user-tenant-TEST-MBC-publish-sync-data-5',
       )
     })
 
@@ -113,7 +113,10 @@ describe('AppSyncEventsService', () => {
     })
 
     it('should fall back to "none" for empty segment', () => {
-      const channel = service.resolveChannel({ ...mockNotification, table: '' })
+      const channel = service.resolveChannel({
+        ...mockNotification,
+        tenantCode: '',
+      })
       expect(channel).toContain('/none/')
     })
 

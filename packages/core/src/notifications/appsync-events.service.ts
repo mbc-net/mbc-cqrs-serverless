@@ -9,6 +9,7 @@ import { SignatureV4 } from '@smithy/signature-v4'
 import fetch from 'node-fetch'
 
 import { INotification } from '../interfaces'
+import { INotificationTransport } from './interfaces'
 
 /** Default headers required for AppSync Events API requests */
 const DEFAULT_HEADERS = {
@@ -18,7 +19,7 @@ const DEFAULT_HEADERS = {
 }
 
 @Injectable()
-export class AppSyncEventsService {
+export class AppSyncEventsService implements INotificationTransport {
   private readonly logger = new Logger(AppSyncEventsService.name)
 
   private readonly url: URL | undefined
@@ -53,24 +54,25 @@ export class AppSyncEventsService {
    * Publish INotification to an AppSync Events channel via IAM SigV4.
    *
    * Channel structure (max 5 segments, seg 1 = namespace):
-   *   /{namespace}/{tenantCode}/{table}/{action}/{sanitizedId}
+   *   /{namespace}/{tenantCode}/{action}/{sanitizedId}
    *
    * Client subscription options (wildcard /* catches all sub-channels):
-   *   /{namespace}/{tenantCode}/*                       — all events for tenant
-   *   /{namespace}/{tenantCode}/{table}/*               — all events for a module
-   *   /{namespace}/{tenantCode}/{table}/{action}/*      — all events for an action
-   *   /{namespace}/{tenantCode}/{table}/{action}/{id}   — specific command (exact)
+   *   /{namespace}/{tenantCode}/*                  — all events for tenant
+   *   /{namespace}/{tenantCode}/{action}/*          — filtered by action
+   *   /{namespace}/{tenantCode}/{action}/{id}       — specific command
+   *
+   * Requires: Lambda execution role must have appsync:EventPublish permission.
    */
-  async sendMessage(msg: INotification): Promise<void> {
+  async sendMessage(notification: INotification): Promise<void> {
     if (!this.url || !this.signer) {
       this.logger.debug('APPSYNC_EVENTS_ENDPOINT not set, skipping')
       return
     }
 
-    const channel = this.resolveChannel(msg)
+    const channel = this.resolveChannel(notification)
     this.logger.debug(`sendMessage:: channel=${channel}`)
 
-    await this.postToChannel(channel, msg)
+    await this.postToChannel(channel, notification)
   }
 
   /**
@@ -81,10 +83,9 @@ export class AppSyncEventsService {
   resolveChannel(notification: INotification): string {
     const namespace = this.sanitizeSegment(this.namespace)
     const tenantCode = this.sanitizeSegment(notification.tenantCode)
-    const table = this.sanitizeSegment(notification.table)
     const action = this.sanitizeSegment(notification.action)
     const id = this.sanitizeSegment(notification.id)
-    return `/${namespace}/${tenantCode}/${table}/${action}/${id}`
+    return `/${namespace}/${tenantCode}/${action}/${id}`
   }
 
   /**
