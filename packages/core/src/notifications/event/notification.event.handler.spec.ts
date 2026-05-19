@@ -1,20 +1,38 @@
 import { Test, TestingModule } from '@nestjs/testing'
+import { ConfigService } from '@nestjs/config'
+import { ModuleRef } from '@nestjs/core'
 
 import { INotification } from '../../interfaces'
-import {
-  INotificationTransport,
-  NOTIFICATION_TRANSPORT,
-  NotificationTransportMap,
-} from '../interfaces/notification-transport.interface'
-import { NotificationTransport } from '../enums'
+import { ExplorerService } from '../../services'
+import { INotificationTransport } from '../interfaces/notification-transport.interface'
 import { NotificationEventHandler } from './notification.event.handler'
 import { NotificationEvent } from './notification.event'
+import { NotificationTransport } from '../../decorators'
+
+// --- Mock Transports ---
+
+@NotificationTransport('mock-transport')
+class MockTransport implements INotificationTransport {
+  sendMessage = jest.fn().mockResolvedValue(undefined)
+}
+
+@NotificationTransport('other-transport')
+class OtherTransport implements INotificationTransport {
+  sendMessage = jest.fn().mockResolvedValue(undefined)
+}
+
+@NotificationTransport('unconfigured-transport')
+class UnconfiguredTransport implements INotificationTransport {
+  sendMessage = jest.fn().mockResolvedValue(undefined)
+}
+
+// --- Test Data ---
 
 const mockNotification: INotification = {
-  id: 'user-tenant#TEST#MBC#publish-sync#data@5',
-  table: 'user-tenant',
+  id: 'test-id',
+  table: 'test-table',
   pk: 'TEST#MBC',
-  sk: 'publish-sync#data@5',
+  sk: 'publish-sync@5',
   tenantCode: 'MBC',
   action: 'command-status',
   content: { status: 'finish:FINISHED' },
@@ -26,17 +44,34 @@ function makeSqsEvent(notification: INotification): NotificationEvent {
   return event
 }
 
-function makeMockTransport(): jest.Mocked<INotificationTransport> {
-  return { sendMessage: jest.fn().mockResolvedValue(undefined) }
-}
+// --- Helper ---
 
 async function buildModule(
-  map: NotificationTransportMap,
+  activeTransports: string | undefined,
 ): Promise<TestingModule> {
   return Test.createTestingModule({
     providers: [
       NotificationEventHandler,
-      { provide: NOTIFICATION_TRANSPORT, useValue: map },
+      {
+        provide: ConfigService,
+        useValue: { get: () => activeTransports },
+      },
+      {
+        provide: ExplorerService,
+        useValue: {
+          exploreNotificationTransports: () => ({
+            // Explorer pretends to find all three decorated classes in the app
+            notificationTransports: [
+              MockTransport,
+              OtherTransport,
+              UnconfiguredTransport,
+            ],
+          }),
+        },
+      },
+      MockTransport,
+      OtherTransport,
+      UnconfiguredTransport,
     ],
   }).compile()
 }
@@ -44,137 +79,106 @@ async function buildModule(
 describe('NotificationEventHandler', () => {
   afterEach(() => jest.clearAllMocks())
 
-  it('should be defined', async () => {
-    const module = await buildModule(new Map())
-    expect(module.get(NotificationEventHandler)).toBeDefined()
+  describe('onModuleInit (Discovery & Registration)', () => {
+    it('should initialize default transport if NOTIFICATION_TRANSPORTS is not set', async () => {
+      const module = await buildModule(undefined)
+      const handler = module.get(NotificationEventHandler)
+
+      handler.onModuleInit()
+
+      // The fallback is 'appsync-graphql'. Since our mock Explorer doesn't return
+      // 'appsync-graphql', the internal map should be empty.
+      expect((handler as any).transports.size).toBe(0)
+      expect((handler as any).activeTransportNames).toEqual(['appsync-graphql'])
+    })
+
+    it('should only initialize transports explicitly requested in config', async () => {
+      // We only want 'mock-transport'. 'unconfigured-transport' should be ignored.
+      const module = await buildModule('mock-transport')
+      const handler = module.get(NotificationEventHandler)
+
+      handler.onModuleInit()
+
+      const transportsMap = (handler as any).transports
+      expect(transportsMap.size).toBe(1)
+      expect(transportsMap.has('mock-transport')).toBe(true)
+      expect(transportsMap.has('unconfigured-transport')).toBe(false)
+    })
+
+    it('should auto-assign the "name" property to the instance if missing', async () => {
+      const module = await buildModule('mock-transport')
+      const handler = module.get(NotificationEventHandler)
+      const transportInstance = module.get(MockTransport)
+
+      // Before init, it has no name property defined manually
+      expect((transportInstance as any).name).toBeUndefined()
+
+      handler.onModuleInit()
+
+      // After init, the handler should have patched the decorator name onto the instance
+      expect((transportInstance as any).name).toBe('mock-transport')
+    })
+
+    it('should support multiple active transports', async () => {
+      const module = await buildModule('mock-transport, other-transport')
+      const handler = module.get(NotificationEventHandler)
+
+      handler.onModuleInit()
+
+      const transportsMap = (handler as any).transports
+      expect(transportsMap.size).toBe(2)
+      expect(transportsMap.has('mock-transport')).toBe(true)
+      expect(transportsMap.has('other-transport')).toBe(true)
+    })
   })
 
-  // ---------------------------------------------------------------------------
-  // Empty map
-  // ---------------------------------------------------------------------------
-  describe('with empty transport map', () => {
-    it('should resolve without error', async () => {
-      const module = await buildModule(new Map())
+  describe('execute (Broadcasting)', () => {
+    it('should broadcast notification to all active transports', async () => {
+      const module = await buildModule('mock-transport, other-transport')
       const handler = module.get(NotificationEventHandler)
+
+      const mockTransport = module.get(MockTransport)
+      const otherTransport = module.get(OtherTransport)
+      const unconfiguredTransport = module.get(UnconfiguredTransport)
+
+      handler.onModuleInit() // Wire them up
+      await handler.execute(makeSqsEvent(mockNotification))
+
+      // Active ones should receive the message
+      expect(mockTransport.sendMessage).toHaveBeenCalledTimes(1)
+      expect(mockTransport.sendMessage).toHaveBeenCalledWith(mockNotification)
+
+      expect(otherTransport.sendMessage).toHaveBeenCalledTimes(1)
+      expect(otherTransport.sendMessage).toHaveBeenCalledWith(mockNotification)
+
+      // Unconfigured one should NOT receive the message
+      expect(unconfiguredTransport.sendMessage).not.toHaveBeenCalled()
+    })
+
+    it('should reject if any active transport throws an error', async () => {
+      const module = await buildModule('mock-transport, other-transport')
+      const handler = module.get(NotificationEventHandler)
+
+      const mockTransport = module.get(MockTransport)
+      mockTransport.sendMessage.mockRejectedValue(new Error('Pusher is down!'))
+
+      handler.onModuleInit()
 
       await expect(
         handler.execute(makeSqsEvent(mockNotification)),
-      ).resolves.toBeUndefined()
-    })
-  })
-
-  // ---------------------------------------------------------------------------
-  // Single transport
-  // ---------------------------------------------------------------------------
-  describe('with one transport', () => {
-    it('should call sendMessage on the single transport', async () => {
-      const transport = makeMockTransport()
-      const map: NotificationTransportMap = new Map([
-        [NotificationTransport.APPSYNC_GRAPHQL, transport],
-      ])
-      const module = await buildModule(map)
-      const handler = module.get(NotificationEventHandler)
-
-      await handler.execute(makeSqsEvent(mockNotification))
-
-      expect(transport.sendMessage).toHaveBeenCalledTimes(1)
-      expect(transport.sendMessage).toHaveBeenCalledWith(mockNotification)
-    })
-  })
-
-  // ---------------------------------------------------------------------------
-  // Multiple transports (broadcast)
-  // ---------------------------------------------------------------------------
-  describe('with multiple transports', () => {
-    it('should broadcast to all transports in the map', async () => {
-      const t1 = makeMockTransport()
-      const t2 = makeMockTransport()
-      const map: NotificationTransportMap = new Map([
-        [NotificationTransport.APPSYNC_GRAPHQL, t1],
-        [NotificationTransport.APPSYNC_EVENT, t2],
-      ])
-      const module = await buildModule(map)
-      const handler = module.get(NotificationEventHandler)
-
-      await handler.execute(makeSqsEvent(mockNotification))
-
-      expect(t1.sendMessage).toHaveBeenCalledTimes(1)
-      expect(t1.sendMessage).toHaveBeenCalledWith(mockNotification)
-      expect(t2.sendMessage).toHaveBeenCalledTimes(1)
-      expect(t2.sendMessage).toHaveBeenCalledWith(mockNotification)
-    })
-
-    it('should run all transports in parallel via Promise.all', async () => {
-      const order: string[] = []
-      const t1: INotificationTransport = {
-        sendMessage: jest.fn().mockImplementation(async () => {
-          order.push('t1')
-        }),
-      }
-      const t2: INotificationTransport = {
-        sendMessage: jest.fn().mockImplementation(async () => {
-          order.push('t2')
-        }),
-      }
-      const map: NotificationTransportMap = new Map([
-        [NotificationTransport.APPSYNC_GRAPHQL, t1],
-        [NotificationTransport.APPSYNC_EVENT, t2],
-      ])
-      const module = await buildModule(map)
-      const handler = module.get(NotificationEventHandler)
-
-      await handler.execute(makeSqsEvent(mockNotification))
-
-      expect(order).toHaveLength(2)
-      expect(order).toContain('t1')
-      expect(order).toContain('t2')
-    })
-
-    it('should reject if any transport throws', async () => {
-      const t1 = makeMockTransport()
-      const t2: INotificationTransport = {
-        sendMessage: jest.fn().mockRejectedValue(new Error('transport error')),
-      }
-      const map: NotificationTransportMap = new Map([
-        [NotificationTransport.APPSYNC_GRAPHQL, t1],
-        [NotificationTransport.APPSYNC_EVENT, t2],
-      ])
-      const module = await buildModule(map)
-      const handler = module.get(NotificationEventHandler)
-
-      await expect(
-        handler.execute(makeSqsEvent(mockNotification)),
-      ).rejects.toThrow('transport error')
-    })
-  })
-
-  // ---------------------------------------------------------------------------
-  // Body parsing
-  // ---------------------------------------------------------------------------
-  describe('body parsing', () => {
-    it('should pass parsed notification object to transports', async () => {
-      const transport = makeMockTransport()
-      const map: NotificationTransportMap = new Map([
-        [NotificationTransport.APPSYNC_GRAPHQL, transport],
-      ])
-      const module = await buildModule(map)
-      const handler = module.get(NotificationEventHandler)
-
-      await handler.execute(makeSqsEvent(mockNotification))
-
-      const received = transport.sendMessage.mock.calls[0][0]
-      expect(typeof received).toBe('object')
-      expect(received).toEqual(mockNotification)
+      ).rejects.toThrow('Pusher is down!')
     })
 
     it('should throw on malformed JSON body', async () => {
-      const module = await buildModule(new Map())
+      const module = await buildModule('mock-transport')
       const handler = module.get(NotificationEventHandler)
+
+      handler.onModuleInit()
 
       const badEvent = new NotificationEvent()
       badEvent.body = 'not-json'
 
-      await expect(handler.execute(badEvent)).rejects.toThrow()
+      await expect(handler.execute(badEvent)).rejects.toThrow(SyntaxError)
     })
   })
 })
