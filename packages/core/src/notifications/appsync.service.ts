@@ -1,13 +1,14 @@
 import { Sha256 } from '@aws-crypto/sha256-js'
 import { defaultProvider } from '@aws-sdk/credential-provider-node'
 import { SignatureV4 } from '@aws-sdk/signature-v4'
-import { Injectable, Logger } from '@nestjs/common'
+import { Logger } from '@nestjs/common'
 import { ConfigService } from '@nestjs/config'
 import fetch, { Response } from 'node-fetch'
 
+import { NotificationTransport } from '../decorators'
 import { INotification } from '../interfaces'
+import { NotificationTransports } from './enums'
 import { INotificationTransport } from './interfaces'
-
 const query = /* GraphQL */ `
   mutation SEND_MESSAGE($message: AWSJSON!) {
     sendMessage(message: $message) {
@@ -22,7 +23,7 @@ const query = /* GraphQL */ `
   }
 `
 
-@Injectable()
+@NotificationTransport(NotificationTransports.APPSYNC_GRAPHQL)
 export class AppSyncService implements INotificationTransport {
   private readonly logger = new Logger(AppSyncService.name)
 

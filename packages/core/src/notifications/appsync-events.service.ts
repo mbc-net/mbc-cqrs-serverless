@@ -2,13 +2,15 @@ import { randomUUID } from 'node:crypto'
 
 import { Sha256 } from '@aws-crypto/sha256-js'
 import { defaultProvider } from '@aws-sdk/credential-provider-node'
-import { Injectable, Logger } from '@nestjs/common'
+import { Logger } from '@nestjs/common'
 import { ConfigService } from '@nestjs/config'
 import { HttpRequest } from '@smithy/protocol-http'
 import { SignatureV4 } from '@smithy/signature-v4'
 import fetch from 'node-fetch'
 
+import { NotificationTransport } from '../decorators'
 import { INotification } from '../interfaces'
+import { NotificationTransports } from './enums'
 import { INotificationTransport } from './interfaces'
 
 /** Default headers required for AppSync Events API requests */
@@ -18,7 +20,7 @@ const DEFAULT_HEADERS = {
   'content-type': 'application/json; charset=UTF-8',
 }
 
-@Injectable()
+@NotificationTransport(NotificationTransports.APPSYNC_EVENT)
 export class AppSyncEventsService implements INotificationTransport {
   private readonly logger = new Logger(AppSyncEventsService.name)
 
