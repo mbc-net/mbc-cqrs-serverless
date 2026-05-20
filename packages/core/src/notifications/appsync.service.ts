@@ -34,19 +34,27 @@ export class AppSyncService implements INotificationTransport {
   private readonly signer: SignatureV4
 
   constructor(private readonly config: ConfigService) {
-    this.endpoint = config.get<string>('APPSYNC_ENDPOINT')
-    this.apiKey = config.get<string>('APPSYNC_API_KEY')
+    this.endpoint = config.get<string>('APPSYNC_ENDPOINT') ?? ''
+    this.apiKey = config.get<string>('APPSYNC_API_KEY') ?? ''
     this.region = 'ap-northeast-1'
-    this.hostname = new URL(this.endpoint).hostname
-    this.signer = new SignatureV4({
-      credentials: defaultProvider(),
-      region: this.region,
-      service: 'appsync',
-      sha256: Sha256,
-    })
+
+    if (this.endpoint) {
+      this.hostname = new URL(this.endpoint).hostname
+      this.signer = new SignatureV4({
+        credentials: defaultProvider(),
+        region: this.region,
+        service: 'appsync',
+        sha256: Sha256,
+      })
+    }
   }
 
   async sendMessage(notification: INotification): Promise<void> {
+    if (!this.endpoint || !this.hostname) {
+      this.logger.debug('APPSYNC_ENDPOINT is not set, skipping.')
+      return
+    }
+
     const headers = {
       'Content-Type': 'application/json',
       host: this.hostname,
