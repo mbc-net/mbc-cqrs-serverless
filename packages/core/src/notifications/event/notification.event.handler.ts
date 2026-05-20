@@ -4,8 +4,8 @@ import { ModuleRef } from '@nestjs/core'
 
 import { EventHandler, NOTIFICATION_TRANSPORT_METADATA } from '../../decorators'
 import { IEventHandler, INotification } from '../../interfaces'
+import { parseNotificationTransports } from '../../notification-env.validation'
 import { ExplorerService } from '../../services'
-import { NotificationTransports } from '../enums'
 import { INotificationTransport } from '../interfaces/notification-transport.interface'
 import { NotificationEvent } from './notification.event'
 
@@ -22,14 +22,9 @@ export class NotificationEventHandler
     private readonly explorerService: ExplorerService,
     private readonly config: ConfigService,
   ) {
-    const raw = this.config.get<string>('NOTIFICATION_TRANSPORTS') ?? ''
-    const names = raw
-      .split(',')
-      .map((s) => s.trim())
-      .filter(Boolean)
-    this.activeTransportNames = names.length
-      ? names
-      : [NotificationTransports.APPSYNC_GRAPHQL]
+    this.activeTransportNames = parseNotificationTransports(
+      this.config.get<string>('NOTIFICATION_TRANSPORTS'),
+    )
   }
 
   onModuleInit() {

@@ -26,6 +26,11 @@ class UnconfiguredTransport implements INotificationTransport {
   sendMessage = jest.fn().mockResolvedValue(undefined)
 }
 
+@NotificationTransport('appsync-graphql')
+class GraphqlMockTransport implements INotificationTransport {
+  sendMessage = jest.fn().mockResolvedValue(undefined)
+}
+
 // --- Test Data ---
 
 const mockNotification: INotification = {
@@ -46,32 +51,36 @@ function makeSqsEvent(notification: INotification): NotificationEvent {
 
 // --- Helper ---
 
+const allMockTransportClasses = [
+  MockTransport,
+  OtherTransport,
+  UnconfiguredTransport,
+  GraphqlMockTransport,
+]
+
 async function buildModule(
   activeTransports: string | undefined,
+  discoveredClasses = allMockTransportClasses,
 ): Promise<TestingModule> {
   return Test.createTestingModule({
     providers: [
       NotificationEventHandler,
       {
         provide: ConfigService,
-        useValue: { get: () => activeTransports },
+        useValue: {
+          get: (key: string) =>
+            key === 'NOTIFICATION_TRANSPORTS' ? activeTransports : undefined,
+        },
       },
       {
         provide: ExplorerService,
         useValue: {
           exploreNotificationTransports: () => ({
-            // Explorer pretends to find all three decorated classes in the app
-            notificationTransports: [
-              MockTransport,
-              OtherTransport,
-              UnconfiguredTransport,
-            ],
+            notificationTransports: discoveredClasses,
           }),
         },
       },
-      MockTransport,
-      OtherTransport,
-      UnconfiguredTransport,
+      ...discoveredClasses,
     ],
   }).compile()
 }
@@ -86,10 +95,9 @@ describe('NotificationEventHandler', () => {
 
       handler.onModuleInit()
 
-      // The fallback is 'appsync-graphql'. Since our mock Explorer doesn't return
-      // 'appsync-graphql', the internal map should be empty.
-      expect((handler as any).transports.size).toBe(0)
       expect((handler as any).activeTransportNames).toEqual(['appsync-graphql'])
+      expect((handler as any).transports.size).toBe(1)
+      expect((handler as any).transports.has('appsync-graphql')).toBe(true)
     })
 
     it('should only initialize transports explicitly requested in config', async () => {

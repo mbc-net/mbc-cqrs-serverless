@@ -9,6 +9,14 @@ import {
   validateSync,
 } from 'class-validator'
 
+import { validateBuiltinNotificationTransportEnv } from './notification-env.validation'
+
+export {
+  BUILTIN_NOTIFICATION_TRANSPORT_ENV,
+  parseNotificationTransports,
+  validateBuiltinNotificationTransportEnv,
+} from './notification-env.validation'
+
 export enum Environment {
   Local = 'local',
   Development = 'dev',
@@ -136,6 +144,11 @@ export function getValidateConfig<T extends EnvironmentVariables>(
     if (errors.length > 0) {
       throw new Error(errors.toString())
     }
+
+    validateBuiltinNotificationTransportEnv(
+      validatedConfig as unknown as Record<string, unknown>,
+    )
+
     return validatedConfig
   }
 }

@@ -210,7 +210,7 @@ describe('AppSyncEventsService', () => {
       )
     })
 
-    it('should skip publish and not throw when endpoint is not configured', async () => {
+    it('should throw when endpoint is not configured', async () => {
       const module = await Test.createTestingModule({
         providers: [
           AppSyncEventsService,
@@ -222,7 +222,7 @@ describe('AppSyncEventsService', () => {
       }).compile()
       const svc = module.get<AppSyncEventsService>(AppSyncEventsService)
 
-      await expect(svc.sendMessage(mockNotification)).resolves.toBeUndefined()
+      await expect(svc.sendMessage(mockNotification)).rejects.toThrow(TypeError)
       expect(mockFetch).not.toHaveBeenCalled()
     })
 

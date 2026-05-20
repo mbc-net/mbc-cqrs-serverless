@@ -24,7 +24,9 @@ describe('AppSyncService', () => {
   beforeEach(async () => {
     mockFetch = require('node-fetch')
     mockFetch.mockResolvedValue({
-      json: jest.fn().mockResolvedValue({ data: { sendMessage: mockNotification } }),
+      json: jest
+        .fn()
+        .mockResolvedValue({ data: { sendMessage: mockNotification } }),
     })
 
     const mockConfigService = createMock<ConfigService>()
@@ -75,7 +77,7 @@ describe('AppSyncService', () => {
             host: 'test.appsync-api.ap-northeast-1.amazonaws.com',
           }),
           body: expect.stringContaining('mutation SEND_MESSAGE'),
-        })
+        }),
       )
       expect(result).toEqual({ data: { sendMessage: mockNotification } })
     })
@@ -118,7 +120,7 @@ describe('AppSyncService', () => {
           headers: expect.not.objectContaining({
             'x-api-key': expect.any(String),
           }),
-        })
+        }),
       )
 
       delete process.env.AWS_ACCESS_KEY_ID
@@ -130,7 +132,25 @@ describe('AppSyncService', () => {
       const error = new Error('AppSync error')
       mockFetch.mockRejectedValue(error)
 
-      await expect(service.sendMessage(mockNotification)).rejects.toThrow('AppSync error')
+      await expect(service.sendMessage(mockNotification)).rejects.toThrow(
+        'AppSync error',
+      )
+    })
+
+    it('should reject when APPSYNC_ENDPOINT is not configured (IAM path)', async () => {
+      const mockConfig = createMock<ConfigService>()
+      mockConfig.get.mockImplementation(() => undefined)
+
+      const module = await Test.createTestingModule({
+        providers: [
+          AppSyncService,
+          { provide: ConfigService, useValue: mockConfig },
+        ],
+      }).compile()
+      const svc = module.get<AppSyncService>(AppSyncService)
+
+      await expect(svc.sendMessage(mockNotification)).rejects.toThrow()
+      expect(mockFetch).not.toHaveBeenCalled()
     })
 
     it('should serialize message data correctly in GraphQL variables', async () => {
@@ -138,7 +158,7 @@ describe('AppSyncService', () => {
 
       const callArgs = mockFetch.mock.calls[0]
       const body = JSON.parse(callArgs[1].body)
-      
+
       expect(body.variables.message).toBe(JSON.stringify(mockNotification))
       expect(body.query).toContain('mutation SEND_MESSAGE')
     })
@@ -158,8 +178,12 @@ describe('AppSyncService', () => {
   describe('client configuration', () => {
     it('should configure with correct endpoint and hostname', () => {
       expect(service).toBeDefined()
-      expect((service as any).endpoint).toBe('https://test.appsync-api.ap-northeast-1.amazonaws.com/graphql')
-      expect((service as any).hostname).toBe('test.appsync-api.ap-northeast-1.amazonaws.com')
+      expect((service as any).endpoint).toBe(
+        'https://test.appsync-api.ap-northeast-1.amazonaws.com/graphql',
+      )
+      expect((service as any).hostname).toBe(
+        'test.appsync-api.ap-northeast-1.amazonaws.com',
+      )
     })
 
     it('should set region to ap-northeast-1', () => {

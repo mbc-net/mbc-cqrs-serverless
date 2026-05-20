@@ -66,11 +66,6 @@ export class AppSyncEventsService implements INotificationTransport {
    * Requires: Lambda execution role must have appsync:EventPublish permission.
    */
   async sendMessage(notification: INotification): Promise<void> {
-    if (!this.url || !this.signer) {
-      this.logger.debug('APPSYNC_EVENTS_ENDPOINT not set, skipping')
-      return
-    }
-
     const channel = this.resolveChannel(notification)
     this.logger.debug(`sendMessage:: channel=${channel}`)
 

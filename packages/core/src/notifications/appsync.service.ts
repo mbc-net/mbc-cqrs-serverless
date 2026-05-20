@@ -50,11 +50,6 @@ export class AppSyncService implements INotificationTransport {
   }
 
   async sendMessage(notification: INotification): Promise<void> {
-    if (!this.endpoint || !this.hostname) {
-      this.logger.debug('APPSYNC_ENDPOINT is not set, skipping.')
-      return
-    }
-
     const headers = {
       'Content-Type': 'application/json',
       host: this.hostname,
