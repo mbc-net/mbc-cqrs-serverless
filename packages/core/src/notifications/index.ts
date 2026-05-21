@@ -1,4 +1,7 @@
 export * from './appsync.service'
+export * from './appsync-events.service'
 export * from './email.service'
+export * from './enums'
 export * from './event'
+export * from './interfaces'
 export * from './notification.module'

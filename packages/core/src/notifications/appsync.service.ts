@@ -1,12 +1,14 @@
 import { Sha256 } from '@aws-crypto/sha256-js'
 import { defaultProvider } from '@aws-sdk/credential-provider-node'
 import { SignatureV4 } from '@aws-sdk/signature-v4'
-import { Injectable, Logger } from '@nestjs/common'
+import { Logger } from '@nestjs/common'
 import { ConfigService } from '@nestjs/config'
 import fetch, { Response } from 'node-fetch'
 
+import { NotificationTransport } from '../decorators'
 import { INotification } from '../interfaces'
-
+import { NotificationTransports } from './enums'
+import { INotificationTransport } from './interfaces'
 const query = /* GraphQL */ `
   mutation SEND_MESSAGE($message: AWSJSON!) {
     sendMessage(message: $message) {
@@ -21,8 +23,8 @@ const query = /* GraphQL */ `
   }
 `
 
-@Injectable()
-export class AppSyncService {
+@NotificationTransport(NotificationTransports.APPSYNC_GRAPHQL)
+export class AppSyncService implements INotificationTransport {
   private readonly logger = new Logger(AppSyncService.name)
 
   private readonly endpoint: string
@@ -32,19 +34,27 @@ export class AppSyncService {
   private readonly signer: SignatureV4
 
   constructor(private readonly config: ConfigService) {
-    this.endpoint = config.get<string>('APPSYNC_ENDPOINT')
-    this.apiKey = config.get<string>('APPSYNC_API_KEY')
+    this.endpoint = config.get<string>('APPSYNC_ENDPOINT') ?? ''
+    this.apiKey = config.get<string>('APPSYNC_API_KEY') ?? ''
     this.region = 'ap-northeast-1'
-    this.hostname = new URL(this.endpoint).hostname
-    this.signer = new SignatureV4({
-      credentials: defaultProvider(),
-      region: this.region,
-      service: 'appsync',
-      sha256: Sha256,
-    })
+
+    if (this.endpoint) {
+      this.hostname = new URL(this.endpoint).hostname
+      this.signer = new SignatureV4({
+        credentials: defaultProvider(),
+        region: this.region,
+        service: 'appsync',
+        sha256: Sha256,
+      })
+    }
   }
 
-  async sendMessage(msg: INotification) {
+  async sendMessage(notification: INotification): Promise<void> {
+    if (!this.endpoint?.trim() || !this.hostname) {
+      this.logger.warn('APPSYNC_ENDPOINT is not set, skipping.')
+      return
+    }
+
     const headers = {
       'Content-Type': 'application/json',
       host: this.hostname,
@@ -52,7 +62,7 @@ export class AppSyncService {
     const body = JSON.stringify({
       query,
       variables: {
-        message: JSON.stringify(msg),
+        message: JSON.stringify(notification),
       },
     })
     const method = 'POST'

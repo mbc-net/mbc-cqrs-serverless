@@ -9,6 +9,14 @@ import {
   validateSync,
 } from 'class-validator'
 
+import { validateBuiltinNotificationTransportEnv } from './notification-env.validation'
+
+export {
+  BUILTIN_NOTIFICATION_TRANSPORT_ENV,
+  parseNotificationTransports,
+  validateBuiltinNotificationTransportEnv,
+} from './notification-env.validation'
+
 export enum Environment {
   Local = 'local',
   Development = 'dev',
@@ -65,9 +73,40 @@ export class EnvironmentVariables {
   @IsOptional()
   SNS_REGION: string
 
+  /**
+   * Comma-separated list of active notification transport names.
+   * Supported built-in values: 'appsync-graphql' | 'appsync-event'
+   * Defaults to 'appsync-graphql' when not set.
+   *
+   * Examples:
+   *   NOTIFICATION_TRANSPORTS=appsync-graphql
+   *   NOTIFICATION_TRANSPORTS=appsync-event
+   *   NOTIFICATION_TRANSPORTS=appsync-graphql,appsync-event
+   */
+  @IsString()
+  @IsOptional()
+  NOTIFICATION_TRANSPORTS: string
+
+  // AppSync GraphQL API (transport: appsync-graphql)
   @IsString()
   @IsOptional()
   APPSYNC_ENDPOINT: string
+
+  // AppSync Events API (transport: appsync-event)
+  @IsString()
+  @IsOptional()
+  APPSYNC_EVENTS_ENDPOINT: string
+
+  /**
+   * Channel namespace name — must match the pre-created namespace in the
+   * AppSync Event API (segment 1 of every channel path).
+   * Defaults to 'default'.
+   */
+  @IsString()
+  @IsOptional()
+  APPSYNC_EVENTS_NAMESPACE: string
+
+  // ---------------------------------------------------------------------------
 
   @IsString()
   @IsOptional()
@@ -105,6 +144,11 @@ export function getValidateConfig<T extends EnvironmentVariables>(
     if (errors.length > 0) {
       throw new Error(errors.toString())
     }
+
+    validateBuiltinNotificationTransportEnv(
+      validatedConfig as unknown as Record<string, unknown>,
+    )
+
     return validatedConfig
   }
 }

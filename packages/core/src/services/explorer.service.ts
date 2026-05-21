@@ -7,6 +7,7 @@ import {
   DATA_SYNC_HANDLER_METADATA,
   EVENT_FACTORY_METADATA,
   EVENT_HANDLER_METADATA,
+  NOTIFICATION_TRANSPORT_METADATA,
 } from '../decorators'
 import { IDataSyncHandler, IEventFactory, IEventHandler } from '../interfaces'
 
@@ -40,6 +41,14 @@ export class ExplorerService {
         ),
     )
     return { dataSyncHandlers }
+  }
+
+  exploreNotificationTransports() {
+    const modules = [...this.modulesContainer.values()]
+    const notificationTransports = this.flatMap<any>(modules, (instance) =>
+      this.filterProvider(instance, NOTIFICATION_TRANSPORT_METADATA),
+    )
+    return { notificationTransports }
   }
 
   flatMap<T>(

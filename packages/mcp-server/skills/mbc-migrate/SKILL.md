@@ -41,6 +41,7 @@ This skill helps migrate MBC CQRS Serverless projects between versions.
 | v1.2.x | v1.2.4 | Medium | TaskModule.register() must be in AppModule |
 | v1.2.4 | v1.2.5 | Low | ZIP import refactor (transparent); MCP AP016–AP020 added |
 | v1.2.5 | v1.2.6 | Low | Repository RYW improvements (transparent); `getVersion` API |
+| v1.2.7 | v1.3.0 | Low | AppSync Events API support (opt-in, no breaking changes) |
 
 ## Migration Guides
 
@@ -549,10 +550,83 @@ export class OrderDataSyncRdsHandler implements IDataSyncHandler {}
 
 ---
 
+---
+
+### v1.2.7 → v1.3.0
+
+**Change:** AppSync Events API support added (opt-in, no breaking changes)
+
+No code changes are required. `AppSyncEventsService` is registered in `NotificationModule` automatically but does nothing unless `NOTIFICATION_TRANSPORTS` includes `appsync-event`.
+
+**To adopt the new Events API transport:**
+
+**Step 1 — Provision infrastructure (CDK)**
+
+Add `appsyncEvents` and `notificationTransports` to your `Config`:
+
+```typescript
+// infra/config/config.ts
+export const config: Config = {
+  appsyncEvents: {
+    enabled: true,
+    namespace: 'default',       // must match the ChannelNamespace created in AppSync
+    apiKeyExpireDays: 365,
+  },
+  notificationTransports: 'appsync-graphql,appsync-event', // dual-publish during migration
+}
+```
+
+Run `cdk deploy` to create the `EventApi` and `ChannelNamespace`. The stack outputs `AppSyncEventsHttpEndpoint` and `AppSyncEventsNamespace`.
+
+**Step 2 — Enable dual-publish (migration phase)**
+
+When `appsyncEvents.enabled: true`, the CDK stack automatically injects these env vars into Lambda/ECS:
+
+```bash
+NOTIFICATION_TRANSPORTS=appsync-graphql,appsync-event   # dual-publish
+APPSYNC_EVENTS_ENDPOINT=https://xxxx.appsync-api.ap-northeast-1.amazonaws.com/event
+APPSYNC_EVENTS_NAMESPACE=default
+APPSYNC_ENDPOINT=https://xxxx.appsync-api.ap-northeast-1.amazonaws.com/graphql  # keep existing
+```
+
+**Step 3 — Switch to Events API only**
+
+Once all clients have migrated to the Events API, update `notificationTransports` in CDK Config:
+
+```typescript
+notificationTransports: 'appsync-event',  // Events API only
+```
+
+Then redeploy. `APPSYNC_ENDPOINT` can be removed from the environment.
+
+**Channel subscription patterns (for client-side code):**
+
+```javascript
+// All events for a tenant
+appsyncClient.subscribe(`/${namespace}/${tenantCode}/*`)
+
+// Filtered by action
+appsyncClient.subscribe(`/${namespace}/${tenantCode}/${action}/*`)
+
+// Track one specific command result
+appsyncClient.subscribe(`/${namespace}/${tenantCode}/${action}/${sanitizedId}`)
+```
+
+Non-alphanumeric characters in `id` (e.g. `#`, `@` from DynamoDB pk/sk) are sanitized to `-` automatically on the server side. Client-side code using `EventsSubscriptionClientImpl` from the example app applies the same sanitization.
+
+**Migration Steps:**
+1. Add `appsyncEvents` and `notificationTransports` to CDK `Config` and deploy
+2. Verify events arrive via both transports (dual-publish phase)
+3. Migrate frontend clients to subscribe via AppSync Events API channels
+4. Once all clients migrated, set `notificationTransports: 'appsync-event'` and redeploy
+
+---
+
 ## Version Compatibility Matrix
 
 | Core Version | CLI Version | NestJS | Node.js | TypeScript |
 |--------------|-------------|--------|---------|------------|
+| v1.3.0 | v1.3.0 | 10.x | 18+ | 5.x |
 | v1.0.23 | v1.0.23 | 10.x | 18+ | 5.x |
 | v1.0.22 | v1.0.22 | 10.x | 18+ | 5.x |
 | v1.0.21 | v1.0.21 | 10.x | 18+ | 5.x |
