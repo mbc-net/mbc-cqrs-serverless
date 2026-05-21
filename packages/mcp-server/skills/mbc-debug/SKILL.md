@@ -596,6 +596,54 @@ Error Occurred
 
 ---
 
+---
+
+## AppSync Events API Troubleshooting
+
+### Notifications not delivered via Events API
+
+**Symptom:** `appsync-event` transport is configured but clients receive no events.
+
+**Checklist:**
+
+1. **Verify `NOTIFICATION_TRANSPORTS` includes `appsync-event`**
+   ```bash
+   echo $NOTIFICATION_TRANSPORTS
+   # Expected: appsync-event  or  appsync-graphql,appsync-event
+   ```
+
+2. **Verify `APPSYNC_EVENTS_ENDPOINT` is set and correct**
+   ```bash
+   # Must end with /event, not /graphql
+   echo $APPSYNC_EVENTS_ENDPOINT
+   # Expected: https://xxxx.appsync-api.ap-northeast-1.amazonaws.com/event
+   ```
+
+3. **Check IAM permissions (most common cause)**
+   ```bash
+   # Lambda/ECS execution role must have appsync:EventPublish
+   aws iam simulate-principal-policy \
+     --policy-source-arn arn:aws:iam::ACCOUNT:role/YOUR_LAMBDA_ROLE \
+     --action-names appsync:EventPublish \
+     --resource-arns "arn:aws:appsync:REGION:ACCOUNT:apis/API_ID/channelNamespace/*"
+   ```
+   If using CDK, `appSyncEventsApi.grantPublish(lambdaRole)` handles this automatically.
+
+4. **Verify `APPSYNC_EVENTS_NAMESPACE` matches the ChannelNamespace in AppSync**
+   ```bash
+   echo $APPSYNC_EVENTS_NAMESPACE
+   # Expected: default (or whatever namespace was created by CDK)
+   ```
+   The value must match a pre-created `ChannelNamespace` in the AppSync Event API. Check the AWS Console → AppSync → your Event API → Channel Namespaces.
+
+5. **Check for 400 errors in CloudWatch**
+   A 400 response from AppSync means the channel path is invalid. Channel segments must be alphanumeric + dashes only, max 50 chars each. The framework sanitizes `tenantCode`, `action`, and `id` automatically.
+
+6. **Confirm dual-publish is intentional**
+   If `NOTIFICATION_TRANSPORTS=appsync-graphql,appsync-event`, the framework publishes to both transports. A failure in one transport causes the entire publish to fail — check CloudWatch for errors from either service.
+
+---
+
 ## Getting Help
 
 When reporting issues, include:
