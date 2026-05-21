@@ -710,6 +710,15 @@ const ANTI_PATTERNS = [
     recommendation:
       'Logging process.env (without picking specific keys), the full headers object, or fields like authorization/cookie leaks credentials, JWT tokens, and API keys into log aggregation systems where they may be retained or replicated to less-trusted observers (CWE-312, CWE-532). Log only the specific non-secret fields you actually need (e.g. process.env.NODE_ENV, request id, user id from JWT claims).',
   },
+  {
+    code: 'AP026',
+    name: 'Notification service class using @Injectable instead of @NotificationTransport',
+    severity: 'high' as const,
+    // Detect classes that implement INotificationTransport but use @Injectable() instead of @NotificationTransport()
+    pattern: /@Injectable\(\)[\s\S]{0,200}implements\s+INotificationTransport/,
+    recommendation:
+      "Classes that implement INotificationTransport must use @NotificationTransport('transport-name') instead of @Injectable(). The decorator registers the transport name as metadata so NotificationEventHandler can discover and activate it via NOTIFICATION_TRANSPORTS env var. With @Injectable() alone, the transport will never be invoked.",
+  },
 ]
 
 /**
@@ -734,6 +743,7 @@ const DETECTOR_TO_SKILL_AP: Record<string, string> = {
   AP019: 'AP019', // Missing Pagination in List Queries ✅
   AP020: 'AP011', // Missing getCommandSource for Tracing → Missing getCommandSource for Tracing
   AP021: 'AP021', // Event Emit After publishAsync ✅
+  // AP026: detector-only (no skill-doc AP counterpart)
 }
 
 /**

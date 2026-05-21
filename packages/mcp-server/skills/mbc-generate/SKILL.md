@@ -440,6 +440,55 @@ export class [Entity]EventHandler {
 }
 ```
 
+### Custom Notification Transport (`notifications/[name].transport.ts`)
+
+For adding a custom pub/sub transport alongside or instead of the built-in AppSync transports:
+
+```typescript
+import { Logger } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
+import { NotificationTransport } from '@mbc-cqrs-serverless/core';
+import { INotification, INotificationTransport } from '@mbc-cqrs-serverless/core';
+
+@NotificationTransport('[name]')  // must match NOTIFICATION_TRANSPORTS value
+export class [Name]NotificationTransport implements INotificationTransport {
+  private readonly logger = new Logger([Name]NotificationTransport.name);
+
+  constructor(private readonly config: ConfigService) {}
+
+  async sendMessage(notification: INotification): Promise<void> {
+    this.logger.debug(`sendMessage:: ${notification.action} for ${notification.tenantCode}`);
+    // Add your transport logic here (e.g., WebSocket push, Pusher, SNS, etc.)
+  }
+}
+```
+
+Register in `NotificationModule` (or your app module):
+
+```typescript
+import { NotificationModule } from '@mbc-cqrs-serverless/core';
+
+@Module({
+  imports: [NotificationModule],
+  providers: [[Name]NotificationTransport],
+})
+export class AppModule {}
+```
+
+Activate via environment variable (comma-separated, order does not matter):
+
+```bash
+# Use only the custom transport
+NOTIFICATION_TRANSPORTS=[name]
+
+# Use alongside the built-in AppSync GraphQL transport
+NOTIFICATION_TRANSPORTS=appsync-graphql,[name]
+```
+
+> **Note:** The decorator name `'[name]'` must exactly match the value in `NOTIFICATION_TRANSPORTS`. If it does not match, the transport is silently ignored (AP026).
+
+---
+
 ### Query Handler for Complex Searches (`[entity].query.ts`)
 
 For advanced query operations:

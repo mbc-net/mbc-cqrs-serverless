@@ -169,6 +169,35 @@ describe('analyze tools', () => {
       )
     })
 
+    it('should detect @Injectable instead of @NotificationTransport (AP026)', async () => {
+      const testFile = path.join(testDir, 'src', 'test.ts')
+      fs.writeFileSync(
+        testFile,
+        `
+        import { Injectable } from '@nestjs/common';
+        import { INotificationTransport } from '@mbc-cqrs-serverless/core';
+
+        @Injectable()
+        export class MyCustomTransport implements INotificationTransport {
+          async sendMessage(notification: INotification): Promise<void> {
+            // custom logic
+          }
+        }
+      `,
+      )
+
+      const result = await handleAnalyzeTool(
+        'mbc_check_anti_patterns',
+        { path: 'src' },
+        testDir,
+      )
+
+      expect(result.content[0].text).toContain('AP026')
+      expect(result.content[0].text).toContain(
+        'Notification service class using @Injectable instead of @NotificationTransport',
+      )
+    })
+
     it('should return error for non-existent path', async () => {
       const result = await handleAnalyzeTool(
         'mbc_check_anti_patterns',

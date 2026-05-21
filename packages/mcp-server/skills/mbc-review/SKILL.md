@@ -59,6 +59,7 @@ This codebase currently has **two independent `AP00X` numbering systems** that a
 | AP023 Shell Command Built from String Concatenation | — (detector only) | Command injection (CWE-78) |
 | AP024 HTTP Request Without Timeout | — (detector only) | Local DoS via stalled upstream (CWE-400) |
 | AP025 Logging process.env or full request object | — (detector only) | Sensitive data exposure (CWE-312, CWE-532) |
+| AP026 @Injectable instead of @NotificationTransport | — (detector only) | INotificationTransport implementor never invoked |
 
 When you receive `mbc_check_anti_patterns` output, look up the detector code in this table to find the corresponding skill-doc section for full context and recommended fixes. Future versions of this framework should consolidate the two systems; until then, treat them as separate identifier spaces.
 
@@ -644,6 +645,10 @@ When reviewing MBC CQRS Serverless code, check:
 - [ ] Registered in module
 - [ ] Event-emitting handlers implement `IDataSyncHandler` and emit in `up()` / `down()`
 - [ ] `_prev` metadata is stripped before RDS upsert if used for change-detection
+
+### Notification Transport (when implementing INotificationTransport)
+- [ ] Uses `@NotificationTransport('transport-name')` decorator instead of `@Injectable()` (AP026)
+- [ ] Transport name is registered in `NOTIFICATION_TRANSPORTS` env var to be active
 
 ## Output Format
 
