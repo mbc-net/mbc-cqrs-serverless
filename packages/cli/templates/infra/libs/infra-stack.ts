@@ -312,15 +312,6 @@ export class InfraStack extends cdk.Stack {
         description:
           'AppSync Events WebSocket endpoint for client subscriptions',
       })
-      new cdk.CfnOutput(this, 'AppSyncEventsApiKey', {
-        value:
-          (
-            Object.values(
-              appSyncEventsApi.apiKeys,
-            )[0] as cdk.aws_appsync.CfnApiKey
-          )?.attrApiKey ?? '',
-        description: 'AppSync Events API key — APPSYNC_EVENTS_API_KEY env var',
-      })
       new cdk.CfnOutput(this, 'AppSyncEventsNamespace', {
         value: props.config.appsyncEvents.namespace ?? 'default',
         description:

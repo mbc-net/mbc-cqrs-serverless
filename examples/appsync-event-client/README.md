@@ -1,8 +1,3 @@
-Here is the updated, complete **`README.md`** for your `appsync-event-client` project. It replaces the generic default template with tailored technical documentation, written in both English and Japanese to match your app's bilingual design.
-
----
-
-```markdown
 # AppSync Events Client / AppSync イベントクライアント
 
 This is a Next.js-based client application designed to test and demonstrate real-time notification subscriptions over both traditional AWS AppSync GraphQL Subscriptions and the new **AWS AppSync Events API**.
@@ -29,7 +24,6 @@ src/
   │   └── page.tsx         # Interactive bilingual AppSync Tester UI
   └── lib/
       └── subscribe-events.ts # Unified subscription abstraction layer
-
 ```
 
 ---
@@ -43,22 +37,22 @@ Ensure you have your target AppSync Events API configurations ready.
 
 ### 2. Configuration / 設定
 
-Open `src/app/page.tsx` and configure AWS Amplify with your actual AppSync endpoint details:
-`src/app/page.tsx` を開き、実際の AppSync エンドポイント情報で AWS Amplify を設定します。
+Copy the example env file and fill in values from your CDK stack outputs or AWS console:
 
-```typescript
-Amplify.configure({
-  API: {
-    Events: {
-      endpoint: "https://<your-id>.appsync-api.<region>[.amazonaws.com/event](https://.amazonaws.com/event)",
-      region: "ap-northeast-1",
-      defaultAuthMode: "apiKey",
-      apiKey: "da2-xxxxxxxxxxxxxxxxxxxxxxxxxx"
-    }
-  }
-});
-
+```bash
+cp .env.local.example .env.local
 ```
+
+Edit `.env.local` (do not commit it — `.env*` is gitignored):
+
+```bash
+NEXT_PUBLIC_APPSYNC_EVENTS_ENDPOINT=https://<id>.appsync-api.<region>.amazonaws.com/event
+NEXT_PUBLIC_APPSYNC_EVENTS_REGION=ap-northeast-1
+NEXT_PUBLIC_APPSYNC_EVENTS_API_KEY=da2-xxxxxxxxxxxxxxxxxxxxxxxxxx
+NEXT_PUBLIC_APPSYNC_EVENTS_NAMESPACE=default
+```
+
+`page.tsx` reads these `NEXT_PUBLIC_*` variables at build/runtime. You do not need to hardcode secrets in source files.
 
 ### 3. Installation / インストール
 
@@ -67,18 +61,16 @@ Install the project dependencies:
 
 ```bash
 npm install
-
 ```
 
 ### 4. Run the Development Server / 開発サーバーの起動
 
 ```bash
 npm run dev
-
 ```
 
-Open [http://localhost:3000](https://www.google.com/search?q=http://localhost:3000) with your browser to use the AppSync Events Tester.
-ブラウザで [http://localhost:3000](https://www.google.com/search?q=http://localhost:3000) を開き、AppSync イベントテスターを使用します。
+Open [http://localhost:3000](http://localhost:3000) with your browser to use the AppSync Events Tester.
+ブラウザで [http://localhost:3000](http://localhost:3000) を開き、AppSync イベントテスターを使用します。
 
 ---
 
@@ -95,7 +87,3 @@ When using the `EventsSubscriptionClientImpl`, inputs map transparently into str
 * **Tenant only / テナントのみ**: `/{namespace}/{tenantCode}/*`
 * **Tenant + Action / テナント + アクション**: `/{namespace}/{tenantCode}/{action}/*`
 * **Specific Identifier / 特定のID指定**: `/{namespace}/{tenantCode}/{action}/{sanitizedId}`
-
-```
-
-```

@@ -137,7 +137,7 @@ describe('AppSyncService', () => {
       )
     })
 
-    it('should reject when APPSYNC_ENDPOINT is not configured (IAM path)', async () => {
+    it('should skip publish when APPSYNC_ENDPOINT is not configured', async () => {
       const mockConfig = createMock<ConfigService>()
       mockConfig.get.mockImplementation(() => undefined)
 
@@ -149,7 +149,7 @@ describe('AppSyncService', () => {
       }).compile()
       const svc = module.get<AppSyncService>(AppSyncService)
 
-      await expect(svc.sendMessage(mockNotification)).rejects.toThrow()
+      await expect(svc.sendMessage(mockNotification)).resolves.toBeUndefined()
       expect(mockFetch).not.toHaveBeenCalled()
     })
 

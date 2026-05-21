@@ -9,23 +9,36 @@ import {
   SubscribeVariables,
 } from '@/lib/subscribe-events'
 
-// 1. Configure Amplify
-Amplify.configure({
-  API: {
-    Events: {
-      endpoint:
-        'https://<your-id>.appsync-api.<region>.amazonaws.com/event', // <-- UPDATE WITH YOUR REAL ENDPOINT
-      region: 'ap-northeast-1',
-      defaultAuthMode: 'apiKey',
-      apiKey: 'da2-xxxxxxxxxxxxxxxxxxxxxxxxxx', // <-- UPDATE WITH YOUR REAL API KEY
+const eventsEndpoint = process.env.NEXT_PUBLIC_APPSYNC_EVENTS_ENDPOINT ?? ''
+const eventsApiKey = process.env.NEXT_PUBLIC_APPSYNC_EVENTS_API_KEY
+const eventsRegion =
+  process.env.NEXT_PUBLIC_APPSYNC_EVENTS_REGION ?? 'ap-northeast-1'
+const eventsNamespace =
+  process.env.NEXT_PUBLIC_APPSYNC_EVENTS_NAMESPACE ?? 'default'
+
+const amplifyConfigured = Boolean(eventsEndpoint && eventsApiKey)
+
+if (amplifyConfigured) {
+  Amplify.configure({
+    API: {
+      Events: {
+        endpoint: eventsEndpoint,
+        region: eventsRegion,
+        defaultAuthMode: 'apiKey',
+        apiKey: eventsApiKey,
+      },
     },
-  },
-})
+  })
+}
 
 export default function AppSyncTester() {
   // Connection state
   const [isSubscribed, setIsSubscribed] = useState(false)
-  const [error, setError] = useState<string | null>(null)
+  const [error, setError] = useState<string | null>(
+    amplifyConfigured
+      ? null
+      : 'Missing NEXT_PUBLIC_APPSYNC_EVENTS_ENDPOINT or NEXT_PUBLIC_APPSYNC_EVENTS_API_KEY. Copy .env.local.example to .env.local and set your values.',
+  )
 
   // Filter variables state
   const [tenantCode, setTenantCode] = useState('MBC')
@@ -44,7 +57,10 @@ export default function AppSyncTester() {
     console.log('Connecting to AppSync Events...')
     setError(null) // Clear previous errors when attempting to connect
 
-    const clientImpl = new EventsSubscriptionClientImpl(events, 'default')
+    const clientImpl = new EventsSubscriptionClientImpl(
+      events,
+      eventsNamespace,
+    )
 
     const variables: SubscribeVariables = {
       tenantCode,
@@ -165,8 +181,10 @@ export default function AppSyncTester() {
 
           <div className="flex items-center space-x-4">
             <button
+              type="button"
+              disabled={!amplifyConfigured}
               onClick={() => setIsSubscribed(!isSubscribed)}
-              className={`px-4 py-2 rounded-md text-white font-medium transition-colors text-sm ${
+              className={`px-4 py-2 rounded-md text-white font-medium transition-colors text-sm disabled:opacity-50 disabled:cursor-not-allowed ${
                 isSubscribed
                   ? 'bg-red-500 hover:bg-red-600'
                   : 'bg-blue-600 hover:bg-blue-700'
