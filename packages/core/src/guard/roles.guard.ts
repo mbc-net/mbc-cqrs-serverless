@@ -88,8 +88,9 @@ export class RolesGuard implements CanActivate {
       return true
     }
 
-    // Allow users with cross-tenant roles
-    return this.getCrossTenantRoles().includes(userContext.tenantRole)
+    const tenantRoles = this.getUserTenantRoles(context)
+    const crossTenantRoles = this.getCrossTenantRoles()
+    return tenantRoles.some((role) => crossTenantRoles.includes(role))
   }
 
   /**
@@ -135,6 +136,14 @@ export class RolesGuard implements CanActivate {
     return getAuthorizerClaims(invokeContext)
   }
 
+  protected getUserTenantRoles(context: ExecutionContext): string[] {
+    const { tenantRoles, tenantRole } = getUserContext(context)
+    if (tenantRoles?.length) {
+      return tenantRoles
+    }
+    return tenantRole ? [tenantRole] : []
+  }
+
   protected async verifyRole(context: ExecutionContext): Promise<boolean> {
     const requiredRoles = this.reflector.getAllAndOverride<string[]>(
       ROLE_METADATA,
@@ -145,15 +154,15 @@ export class RolesGuard implements CanActivate {
       return true
     }
 
-    const userRole = await this.getUserRole(context)
-    if (!userRole) {
+    const tenantRoles = this.getUserTenantRoles(context)
+    if (!tenantRoles.length) {
       return false
     }
-    if (userRole === ROLE_SYSTEM_ADMIN) {
+    if (tenantRoles.includes(ROLE_SYSTEM_ADMIN)) {
       return true
     }
 
-    return requiredRoles.includes(userRole)
+    return requiredRoles.some((role) => tenantRoles.includes(role))
   }
 
   // eslint-disable-next-line @typescript-eslint/no-unused-vars

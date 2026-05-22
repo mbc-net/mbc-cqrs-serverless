@@ -13,6 +13,10 @@
         {
           "Name": "custom:roles",
           "Value": "[{\"role\":\"system_admin\"}]"
+        },
+        {
+          "Name": "custom:groups",
+          "Value": "[]"
         }
       ],
       "Enabled": true,
@@ -257,6 +261,17 @@
         "StringAttributeConstraints": {
           "MinLength": "1",
           "MaxLength": "10"
+        }
+      },
+      {
+        "Name": "custom:groups",
+        "AttributeDataType": "String",
+        "DeveloperOnlyAttribute": false,
+        "Mutable": true,
+        "Required": false,
+        "StringAttributeConstraints": {
+          "MinLength": "0",
+          "MaxLength": "2048"
         }
       }
     ],

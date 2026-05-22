@@ -2,6 +2,7 @@ import { ExecutionContext } from '@nestjs/common'
 
 import { HEADER_TENANT_CODE } from '../constants'
 import { extractInvokeContext, getAuthorizerClaims, IInvoke } from './invoke'
+import { parseCustomRolesJson, resolveTenantRoles } from './role-resolver'
 
 export interface CustomRole {
   tenant: string // tenant's code
@@ -10,11 +11,20 @@ export interface CustomRole {
 
 export class UserContext {
   userId: string
+  /** First matching role from custom:roles only — unchanged for backward compatibility. */
   tenantRole: string
   tenantCode: string
+  /**
+   * Union of custom:roles and custom:groups for authorization (RolesGuard).
+   * Omitted on legacy/manual contexts; guards fall back to [tenantRole] when empty.
+   */
+  tenantRoles?: string[]
 
   constructor(partial: Partial<UserContext>) {
     Object.assign(this, partial)
+    if (this.tenantRoles === undefined) {
+      this.tenantRoles = this.tenantRole ? [this.tenantRole] : []
+    }
   }
 }
 
@@ -36,10 +46,7 @@ export function getUserContext(ctx: IInvoke | ExecutionContext): UserContext {
 
   const userId = claims.sub
 
-  // Parse roles
-  const roles = (
-    JSON.parse(claims['custom:roles'] || '[]') as CustomRole[]
-  ).map((role) => ({ ...role, tenant: (role.tenant || '').toLowerCase() }))
+  const roles = parseCustomRolesJson(claims['custom:roles'])
 
   // Determine tenant code
   // 1. Cognito custom:tenant attribute takes priority
@@ -49,7 +56,9 @@ export function getUserContext(ctx: IInvoke | ExecutionContext): UserContext {
     claims['custom:tenant'] || (ctx?.event?.headers || {})[HEADER_TENANT_CODE]
   )?.toLowerCase()
 
-  // Find tenantRole (case-insensitive matching - both tenantCode and role.tenant are lowercase)
+  const tenantRoles = resolveTenantRoles(claims, tenantCode)
+
+  // Find tenantRole from direct custom:roles only (case-insensitive matching)
   let tenantRole = ''
   for (const { tenant, role } of roles) {
     if (tenant === '' || tenant === tenantCode) {
@@ -64,5 +73,6 @@ export function getUserContext(ctx: IInvoke | ExecutionContext): UserContext {
     userId,
     tenantRole,
     tenantCode,
+    tenantRoles,
   }
 }

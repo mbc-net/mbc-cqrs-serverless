@@ -21,6 +21,8 @@ export interface JwtClaims {
   name: string
   'custom:tenant'?: string // tenant code
   'custom:roles'?: string
+  /** JSON array of { tenant, role } — roles granted via group membership (flattened at token issuance). */
+  'custom:groups'?: string
   exp: number
   email: string
   email_verified?: boolean

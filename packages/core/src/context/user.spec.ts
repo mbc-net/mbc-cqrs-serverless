@@ -25,7 +25,9 @@ describe('getUserContext', () => {
         {
           sub: 'user-123',
           'custom:tenant': 'tenant-a',
-          'custom:roles': JSON.stringify([{ tenant: 'tenant-a', role: 'user' }]),
+          'custom:roles': JSON.stringify([
+            { tenant: 'tenant-a', role: 'user' },
+          ]),
         },
         { [HEADER_TENANT_CODE]: 'tenant-b' },
       )
@@ -40,7 +42,9 @@ describe('getUserContext', () => {
       const ctx = createMockContext(
         {
           sub: 'user-123',
-          'custom:roles': JSON.stringify([{ tenant: 'tenant-a', role: 'user' }]),
+          'custom:roles': JSON.stringify([
+            { tenant: 'tenant-a', role: 'user' },
+          ]),
         },
         { [HEADER_TENANT_CODE]: 'tenant-b' },
       )
@@ -204,9 +208,7 @@ describe('getUserContext', () => {
       const ctx = createMockContext({
         sub: 'user-123',
         'custom:tenant': 'tenant-a',
-        'custom:roles': JSON.stringify([
-          { tenant: 'TENANT-A', role: 'admin' },
-        ]),
+        'custom:roles': JSON.stringify([{ tenant: 'TENANT-A', role: 'admin' }]),
       })
 
       const result = getUserContext(ctx)
@@ -219,7 +221,9 @@ describe('getUserContext', () => {
         {
           sub: 'user-123',
           'custom:tenant': 'Tenant-A',
-          'custom:roles': JSON.stringify([{ tenant: 'tenant-a', role: 'user' }]),
+          'custom:roles': JSON.stringify([
+            { tenant: 'tenant-a', role: 'user' },
+          ]),
         },
         { [HEADER_TENANT_CODE]: 'tenant-b' },
       )
@@ -303,7 +307,9 @@ describe('getUserContext', () => {
       const ctx = createMockContext(
         {
           sub: 'user-123',
-          'custom:roles': JSON.stringify([{ tenant: 'tenant-a', role: 'admin' }]),
+          'custom:roles': JSON.stringify([
+            { tenant: 'tenant-a', role: 'admin' },
+          ]),
         },
         { [HEADER_TENANT_CODE]: 'tenant-b' },
       )
@@ -320,7 +326,9 @@ describe('getUserContext', () => {
         {
           sub: 'user-123',
           'custom:tenant': 'tenant-a',
-          'custom:roles': JSON.stringify([{ tenant: 'tenant-a', role: 'admin' }]),
+          'custom:roles': JSON.stringify([
+            { tenant: 'tenant-a', role: 'admin' },
+          ]),
         },
         { [HEADER_TENANT_CODE]: 'tenant-b' },
       )
@@ -368,7 +376,11 @@ describe('getUserContext', () => {
         {
           sub: 'attacker-123',
           'custom:roles': JSON.stringify([
-            { tenant: '', role: 'user', __proto__: { role: ROLE_SYSTEM_ADMIN } },
+            {
+              tenant: '',
+              role: 'user',
+              __proto__: { role: ROLE_SYSTEM_ADMIN },
+            },
           ]),
         },
         { [HEADER_TENANT_CODE]: 'target-tenant' },
@@ -413,6 +425,7 @@ describe('getUserContext', () => {
         userId: 'user-123',
         tenantCode: 'tenant-a',
         tenantRole: 'user',
+        tenantRoles: ['user'],
       })
       // Note: It's a plain object, not a UserContext instance
       expect(result.constructor.name).toBe('Object')
@@ -485,7 +498,9 @@ describe('getUserContext', () => {
       const ctx = createMockContext(
         {
           sub: 'user-123',
-          'custom:roles': JSON.stringify([{ tenant: 'tenant-b', role: 'admin' }]),
+          'custom:roles': JSON.stringify([
+            { tenant: 'tenant-b', role: 'admin' },
+          ]),
         },
         { [HEADER_TENANT_CODE]: 'TENANT-B' },
       )
@@ -509,7 +524,9 @@ describe('getUserContext', () => {
         const ctx = createMockContext({
           sub: 'user-123',
           'custom:tenant': tenant,
-          'custom:roles': JSON.stringify([{ tenant: roleTenant, role: 'user' }]),
+          'custom:roles': JSON.stringify([
+            { tenant: roleTenant, role: 'user' },
+          ]),
         })
 
         const result = getUserContext(ctx)
@@ -598,6 +615,70 @@ describe('getUserContext', () => {
       const result = getUserContext(ctx)
 
       expect(result.tenantRole).toBe('')
+    })
+  })
+
+  describe('tenantRoles (custom:groups union)', () => {
+    it('should include roles from custom:groups in tenantRoles', () => {
+      const ctx = createMockContext({
+        sub: 'user-123',
+        'custom:tenant': '1801',
+        'custom:roles': JSON.stringify([{ tenant: '1801', role: 'user' }]),
+        'custom:groups': JSON.stringify([
+          { tenant: '1801', role: 'admin' },
+          { tenant: '', role: 'auditor' },
+        ]),
+      })
+
+      const result = getUserContext(ctx)
+
+      expect(result.tenantRoles.sort()).toEqual(
+        ['admin', 'auditor', 'user'].sort(),
+      )
+    })
+
+    it('should keep tenantRole from custom:roles only when groups add roles', () => {
+      const ctx = createMockContext({
+        sub: 'user-123',
+        'custom:tenant': '1801',
+        'custom:roles': JSON.stringify([{ tenant: '1801', role: 'user' }]),
+        'custom:groups': JSON.stringify([{ tenant: '1801', role: 'admin' }]),
+      })
+
+      const result = getUserContext(ctx)
+
+      expect(result.tenantRole).toBe('user')
+      expect(result.tenantRoles).toContain('admin')
+    })
+
+    it('should allow group-only roles with empty tenantRole', () => {
+      const ctx = createMockContext({
+        sub: 'user-123',
+        'custom:tenant': '1801',
+        'custom:roles': '[]',
+        'custom:groups': JSON.stringify([{ tenant: '1801', role: 'admin' }]),
+      })
+
+      const result = getUserContext(ctx)
+
+      expect(result.tenantRole).toBe('')
+      expect(result.tenantRoles).toEqual(['admin'])
+    })
+
+    it('should include multiple group-derived roles for same tenant', () => {
+      const ctx = createMockContext({
+        sub: 'user-123',
+        'custom:tenant': '1801',
+        'custom:roles': '[]',
+        'custom:groups': JSON.stringify([
+          { tenant: '1801', role: 'viewer' },
+          { tenant: '1801', role: 'admin' },
+        ]),
+      })
+
+      const result = getUserContext(ctx)
+
+      expect(result.tenantRoles.sort()).toEqual(['admin', 'viewer'].sort())
     })
   })
 })
