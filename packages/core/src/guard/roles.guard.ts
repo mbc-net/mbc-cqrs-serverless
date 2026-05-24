@@ -165,10 +165,13 @@ export class RolesGuard implements CanActivate {
     return requiredRoles.some((role) => tenantRoles.includes(role))
   }
 
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  /**
+   * @deprecated Override `getUserTenantRoles` instead. This method is no longer
+   * called by `verifyRole` as of [this release] and will be removed in a future
+   * major version.
+   */
   protected async getUserRole(context: ExecutionContext): Promise<string> {
     const userContext = getUserContext(context)
-
     return userContext.tenantRole
   }
 }

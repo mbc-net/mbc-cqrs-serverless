@@ -2,14 +2,17 @@ import { JwtClaims } from './invoke'
 import { CustomRole } from './user'
 
 export function parseCustomRolesJson(json: string | undefined): CustomRole[] {
-  if (!json) {
+  if (!json) return []
+  try {
+    const parsed = JSON.parse(json)
+    if (!Array.isArray(parsed)) return []
+    return parsed.map((entry) => ({
+      ...entry,
+      tenant: (entry.tenant || '').toLowerCase(),
+    }))
+  } catch {
     return []
   }
-  const parsed = JSON.parse(json) as CustomRole[]
-  return parsed.map((entry) => ({
-    ...entry,
-    tenant: (entry.tenant || '').toLowerCase(),
-  }))
 }
 
 export function resolveTenantRoles(

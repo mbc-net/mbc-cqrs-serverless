@@ -13,8 +13,16 @@ describe('parseCustomRolesJson', () => {
     ])
   })
 
-  it('throws on invalid JSON', () => {
-    expect(() => parseCustomRolesJson('not-json')).toThrow()
+  it('returns empty array on invalid JSON', () => {
+    expect(parseCustomRolesJson('not-json')).toEqual([])
+  })
+
+  it('returns empty array when JSON is null literal', () => {
+    expect(parseCustomRolesJson('null')).toEqual([])
+  })
+
+  it('returns empty array when JSON is a single object (not array)', () => {
+    expect(parseCustomRolesJson(JSON.stringify({ tenant: 'a', role: 'b' }))).toEqual([])
   })
 })
 
