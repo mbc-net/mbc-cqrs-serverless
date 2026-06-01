@@ -3,7 +3,7 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
-## [1.3.1](https://github.com/mbc-net/mbc-cqrs-serverless/releases/tag/v1.3.1) (2026-06-01)
+## [1.3.1](https://github.com/mbc-net/mbc-cqrs-serverless/releases/tag/v1.3.1) (2026-06-02)
 
 ### Features
 
