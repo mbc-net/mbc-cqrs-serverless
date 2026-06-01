@@ -1141,7 +1141,7 @@ describe('RolesGuard', () => {
       expect(await guard.canActivate(execution_context)).toBe(false)
     })
 
-    it('should deny when resolver throws', async () => {
+    it('should propagate resolver errors (5xx), not deny as 403', async () => {
       resolveRoles.mockRejectedValue(new Error('db down'))
       const { guard, reflector } = await createGuardWithResolver()
       mockJwtDecode.mockReturnValue(claimsWithGroups)
@@ -1149,7 +1149,9 @@ describe('RolesGuard', () => {
       ;(
         execution_context.switchToHttp().getRequest as jest.Mock
       ).mockReturnValue(createRequestStub('test'))
-      expect(await guard.canActivate(execution_context)).toBe(false)
+      await expect(guard.canActivate(execution_context)).rejects.toThrow(
+        'db down',
+      )
     })
 
     it('should ignore group path when no registry (backward compat)', async () => {

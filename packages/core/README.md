@@ -236,6 +236,7 @@ import {
   IGroupRoleResolver,
 } from '@mbc-cqrs-serverless/core';
 
+// Do not add @Injectable() — @GroupRoleResolver() already registers the provider.
 @GroupRoleResolver()
 export class AppGroupRoleResolver implements IGroupRoleResolver {
   async resolveRoles({ tenantCode, groupIds, claims }) {
@@ -246,6 +247,10 @@ export class AppGroupRoleResolver implements IGroupRoleResolver {
 ```
 
 Register the class in your NestJS module `providers`. `AuthModule` is imported automatically via core `AppModule.forRoot()` and exports `GroupRoleResolverRegistry` globally for `@Auth()` / `RolesGuard`.
+
+### Extending authorization
+
+`RolesGuard` evaluates `tenantRoles` from the JWT (not `getUserRole()`). The protected `getUserRole()` method is **deprecated** and not called by the default guard. Subclasses should override `verifyRole` or `resolveGroupRoles` for custom logic.
 
 ## Environment Variables
 

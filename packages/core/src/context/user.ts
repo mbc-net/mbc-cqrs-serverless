@@ -27,19 +27,31 @@ function parseTenantGroups(
   raw: string | undefined,
   tenantCode: string | undefined,
 ): string[] {
-  const memberships = (JSON.parse(raw || '[]') as TenantGroupMembership[]).map(
-    (membership) => ({
-      ...membership,
-      tenant: (membership.tenant || '').toLowerCase(),
-    }),
-  )
   if (!tenantCode) {
     return []
   }
+
+  let parsed: unknown
+  try {
+    parsed = JSON.parse(raw || '[]')
+  } catch {
+    return []
+  }
+
+  if (!Array.isArray(parsed)) {
+    return []
+  }
+
+  const memberships = (parsed as TenantGroupMembership[]).map((membership) => ({
+    ...membership,
+    tenant: (membership.tenant || '').toLowerCase(),
+  }))
+
   const match = memberships.find(
     (membership) => membership.tenant === tenantCode,
   )
-  return match?.groups ?? []
+  const groups = match?.groups
+  return Array.isArray(groups) ? groups : []
 }
 
 function collectTenantRoles(

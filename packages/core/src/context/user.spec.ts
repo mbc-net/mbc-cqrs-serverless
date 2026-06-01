@@ -354,14 +354,24 @@ describe('getUserContext', () => {
       expect(() => getUserContext(ctx)).toThrow()
     })
 
-    it('should throw on malformed custom:groups JSON', () => {
+    it('should return empty tenantGroupIds on malformed custom:groups JSON', () => {
       const ctx = createMockContext({
         sub: 'user-a',
         'custom:tenant': 'tenant-a',
         'custom:groups': 'invalid json',
       })
 
-      expect(() => getUserContext(ctx)).toThrow()
+      expect(getUserContext(ctx).tenantGroupIds).toEqual([])
+    })
+
+    it('should return empty tenantGroupIds when custom:groups is not a JSON array', () => {
+      const ctx = createMockContext({
+        sub: 'user-a',
+        'custom:tenant': 'tenant-a',
+        'custom:groups': JSON.stringify({ tenant: 'tenant-a', groups: ['x'] }),
+      })
+
+      expect(getUserContext(ctx).tenantGroupIds).toEqual([])
     })
 
     it('should handle null injection in role object', () => {

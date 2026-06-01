@@ -164,7 +164,7 @@ export class RolesGuard implements CanActivate {
       })
     } catch (err) {
       this.logger.error('GroupRoleResolver.resolveRoles failed', err)
-      return []
+      throw err
     }
   }
 
@@ -192,7 +192,12 @@ export class RolesGuard implements CanActivate {
     return this.hasAnyRole(requiredRoles, groupRoles)
   }
 
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  /**
+   * Returns the primary direct role string from JWT context.
+   *
+   * @deprecated Not invoked by `verifyRole`. For custom authorization, override
+   * `verifyRole`, `resolveGroupRoles`, or `canOverrideTenant` instead.
+   */
   protected async getUserRole(context: ExecutionContext): Promise<string> {
     const userContext = getUserContext(context)
 
