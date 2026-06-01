@@ -94,6 +94,8 @@ export class MyTaskService {
       userId,
       tenantRole,
       tenantCode,
+      tenantRoles: tenantRole ? [tenantRole] : [],
+      tenantGroupIds: [],
     }
   }
 }
