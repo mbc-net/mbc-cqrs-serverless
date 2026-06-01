@@ -16,7 +16,9 @@ import { createMock } from '@golevelup/ts-jest'
 import { ExecutionContext } from '@nestjs/common'
 import { RolesGuard } from './roles.guard'
 import { Reflector } from '@nestjs/core'
-import { Test } from '@nestjs/testing'
+import { Test, TestingModule } from '@nestjs/testing'
+import { GroupRoleResolverRegistry } from '../auth'
+import { IGroupRoleResolver } from '../auth/group-role-resolver.interface'
 import { ROLE_METADATA } from '../decorators'
 import { UserContext } from '../context'
 import * as jwtDecode from 'jwt-decode'
@@ -94,10 +96,12 @@ describe('RolesGuard', () => {
     it('should return false if tenant code does not exist', async () => {
       // Arrange
       mockJwtDecode.mockReturnValue(systemAdminClaims)
-      jest.spyOn(reflector, 'getAllAndOverride').mockReturnValue(['system_admin'])
-      ;(execution_context.switchToHttp().getRequest as jest.Mock).mockReturnValue(
-        createRequestStub(''),
-      )
+      jest
+        .spyOn(reflector, 'getAllAndOverride')
+        .mockReturnValue(['system_admin'])
+      ;(
+        execution_context.switchToHttp().getRequest as jest.Mock
+      ).mockReturnValue(createRequestStub(''))
       // Act & Assert
       expect(await rolesGuard.canActivate(execution_context)).toBeFalsy()
       expect(reflector.getAllAndOverride).toHaveBeenCalledTimes(0)
@@ -108,9 +112,9 @@ describe('RolesGuard', () => {
       // Arrange
       mockJwtDecode.mockReturnValue(tenantUserClaims)
       jest.spyOn(reflector, 'getAllAndOverride').mockReturnValue(['user'])
-      ;(execution_context.switchToHttp().getRequest as jest.Mock).mockReturnValue(
-        createRequestStub('test'),
-      )
+      ;(
+        execution_context.switchToHttp().getRequest as jest.Mock
+      ).mockReturnValue(createRequestStub('test'))
       // Act & Assert
       expect(await rolesGuard.canActivate(execution_context)).toBeTruthy()
     })
@@ -119,10 +123,12 @@ describe('RolesGuard', () => {
     it('should allow system admin to override tenant via header', async () => {
       // Arrange
       mockJwtDecode.mockReturnValue(systemAdminClaims)
-      jest.spyOn(reflector, 'getAllAndOverride').mockReturnValue(['system_admin'])
-      ;(execution_context.switchToHttp().getRequest as jest.Mock).mockReturnValue(
-        createRequestStub('any-tenant'),
-      )
+      jest
+        .spyOn(reflector, 'getAllAndOverride')
+        .mockReturnValue(['system_admin'])
+      ;(
+        execution_context.switchToHttp().getRequest as jest.Mock
+      ).mockReturnValue(createRequestStub('any-tenant'))
       // Act & Assert - system admin should be able to access any tenant via header
       expect(await rolesGuard.canActivate(execution_context)).toBeTruthy()
     })
@@ -132,9 +138,9 @@ describe('RolesGuard', () => {
       // Arrange - user without custom:tenant trying to use header
       mockJwtDecode.mockReturnValue(userWithoutTenantClaims)
       jest.spyOn(reflector, 'getAllAndOverride').mockReturnValue(['user'])
-      ;(execution_context.switchToHttp().getRequest as jest.Mock).mockReturnValue(
-        createRequestStub('attempted-tenant'),
-      )
+      ;(
+        execution_context.switchToHttp().getRequest as jest.Mock
+      ).mockReturnValue(createRequestStub('attempted-tenant'))
       // Act & Assert - should fail because non-admin cannot use header tenant
       expect(await rolesGuard.canActivate(execution_context)).toBeFalsy()
     })
@@ -144,9 +150,9 @@ describe('RolesGuard', () => {
       // Arrange - user without custom:tenant accessing common tenant
       mockJwtDecode.mockReturnValue(userWithoutTenantClaims)
       jest.spyOn(reflector, 'getAllAndOverride').mockReturnValue(['user'])
-      ;(execution_context.switchToHttp().getRequest as jest.Mock).mockReturnValue(
-        createRequestStub('common'),
-      )
+      ;(
+        execution_context.switchToHttp().getRequest as jest.Mock
+      ).mockReturnValue(createRequestStub('common'))
       // Act & Assert - common tenant should be accessible
       expect(await rolesGuard.canActivate(execution_context)).toBeTruthy()
     })
@@ -157,13 +163,15 @@ describe('RolesGuard', () => {
       const claimsWithTenant = {
         ...userWithoutTenantClaims,
         'custom:tenant': 'my-tenant',
-        'custom:roles': JSON.stringify([{ tenant: 'my-tenant', role: 'admin' }]),
+        'custom:roles': JSON.stringify([
+          { tenant: 'my-tenant', role: 'admin' },
+        ]),
       }
       mockJwtDecode.mockReturnValue(claimsWithTenant)
       jest.spyOn(reflector, 'getAllAndOverride').mockReturnValue(['admin'])
-      ;(execution_context.switchToHttp().getRequest as jest.Mock).mockReturnValue(
-        createRequestStub('other-tenant'),
-      )
+      ;(
+        execution_context.switchToHttp().getRequest as jest.Mock
+      ).mockReturnValue(createRequestStub('other-tenant'))
       // Act & Assert - should use custom:tenant, not header
       expect(await rolesGuard.canActivate(execution_context)).toBeTruthy()
     })
@@ -174,10 +182,12 @@ describe('RolesGuard', () => {
     it('should return true if the user has the system admin role', async () => {
       // Arrange
       mockJwtDecode.mockReturnValue(systemAdminClaims)
-      jest.spyOn(reflector, 'getAllAndOverride').mockReturnValue(['system_admin'])
-      ;(execution_context.switchToHttp().getRequest as jest.Mock).mockReturnValue(
-        createRequestStub(),
-      )
+      jest
+        .spyOn(reflector, 'getAllAndOverride')
+        .mockReturnValue(['system_admin'])
+      ;(
+        execution_context.switchToHttp().getRequest as jest.Mock
+      ).mockReturnValue(createRequestStub())
       // Act & Assert
       expect(await rolesGuard.canActivate(execution_context)).toBeTruthy()
       expect(reflector.getAllAndOverride).toHaveBeenCalledWith(ROLE_METADATA, [
@@ -193,9 +203,9 @@ describe('RolesGuard', () => {
       jest
         .spyOn(reflector, 'getAllAndOverride')
         .mockReturnValue(['system_admin', 'user'])
-      ;(execution_context.switchToHttp().getRequest as jest.Mock).mockReturnValue(
-        createRequestStub(),
-      )
+      ;(
+        execution_context.switchToHttp().getRequest as jest.Mock
+      ).mockReturnValue(createRequestStub())
       // Act & Assert
       expect(await rolesGuard.canActivate(execution_context)).toBeTruthy()
       expect(reflector.getAllAndOverride).toHaveBeenCalledWith(ROLE_METADATA, [
@@ -208,10 +218,12 @@ describe('RolesGuard', () => {
     it('should return false if the user has only the user role', async () => {
       // Arrange
       mockJwtDecode.mockReturnValue(tenantUserClaims)
-      jest.spyOn(reflector, 'getAllAndOverride').mockReturnValue(['system_admin'])
-      ;(execution_context.switchToHttp().getRequest as jest.Mock).mockReturnValue(
-        createRequestStub(),
-      )
+      jest
+        .spyOn(reflector, 'getAllAndOverride')
+        .mockReturnValue(['system_admin'])
+      ;(
+        execution_context.switchToHttp().getRequest as jest.Mock
+      ).mockReturnValue(createRequestStub())
       // Act & Assert
       expect(await rolesGuard.canActivate(execution_context)).toBeFalsy()
       expect(reflector.getAllAndOverride).toHaveBeenCalledWith(ROLE_METADATA, [
@@ -227,9 +239,9 @@ describe('RolesGuard', () => {
       jest
         .spyOn(reflector, 'getAllAndOverride')
         .mockReturnValue(['specific_role_only'])
-      ;(execution_context.switchToHttp().getRequest as jest.Mock).mockReturnValue(
-        createRequestStub(),
-      )
+      ;(
+        execution_context.switchToHttp().getRequest as jest.Mock
+      ).mockReturnValue(createRequestStub())
       // Act & Assert
       expect(await rolesGuard.canActivate(execution_context)).toBeTruthy()
     })
@@ -239,9 +251,9 @@ describe('RolesGuard', () => {
       // Arrange
       mockJwtDecode.mockReturnValue(tenantUserClaims)
       jest.spyOn(reflector, 'getAllAndOverride').mockReturnValue(undefined)
-      ;(execution_context.switchToHttp().getRequest as jest.Mock).mockReturnValue(
-        createRequestStub(),
-      )
+      ;(
+        execution_context.switchToHttp().getRequest as jest.Mock
+      ).mockReturnValue(createRequestStub())
       // Act & Assert
       expect(await rolesGuard.canActivate(execution_context)).toBeTruthy()
     })
@@ -250,9 +262,9 @@ describe('RolesGuard', () => {
       // Arrange
       mockJwtDecode.mockReturnValue(tenantUserClaims)
       jest.spyOn(reflector, 'getAllAndOverride').mockReturnValue([])
-      ;(execution_context.switchToHttp().getRequest as jest.Mock).mockReturnValue(
-        createRequestStub(),
-      )
+      ;(
+        execution_context.switchToHttp().getRequest as jest.Mock
+      ).mockReturnValue(createRequestStub())
       // Act & Assert
       expect(await rolesGuard.canActivate(execution_context)).toBeTruthy()
     })
@@ -272,10 +284,12 @@ describe('RolesGuard', () => {
         // No custom:tenant - trying to use header
       }
       mockJwtDecode.mockReturnValue(tenantSpecificAdminClaims)
-      jest.spyOn(reflector, 'getAllAndOverride').mockReturnValue(['system_admin'])
-      ;(execution_context.switchToHttp().getRequest as jest.Mock).mockReturnValue(
-        createRequestStub('tenant-b'),
-      )
+      jest
+        .spyOn(reflector, 'getAllAndOverride')
+        .mockReturnValue(['system_admin'])
+      ;(
+        execution_context.switchToHttp().getRequest as jest.Mock
+      ).mockReturnValue(createRequestStub('tenant-b'))
       // Act & Assert - tenant-specific admin should NOT access other tenants
       expect(await rolesGuard.canActivate(execution_context)).toBeFalsy()
     })
@@ -291,10 +305,12 @@ describe('RolesGuard', () => {
         // No custom:tenant - using header
       }
       mockJwtDecode.mockReturnValue(globalAdminClaims)
-      jest.spyOn(reflector, 'getAllAndOverride').mockReturnValue(['system_admin'])
-      ;(execution_context.switchToHttp().getRequest as jest.Mock).mockReturnValue(
-        createRequestStub('any-tenant'),
-      )
+      jest
+        .spyOn(reflector, 'getAllAndOverride')
+        .mockReturnValue(['system_admin'])
+      ;(
+        execution_context.switchToHttp().getRequest as jest.Mock
+      ).mockReturnValue(createRequestStub('any-tenant'))
       // Act & Assert - global admin should access any tenant
       expect(await rolesGuard.canActivate(execution_context)).toBeTruthy()
     })
@@ -310,9 +326,9 @@ describe('RolesGuard', () => {
       }
       mockJwtDecode.mockReturnValue(emptyRoleClaims)
       jest.spyOn(reflector, 'getAllAndOverride').mockReturnValue(['user'])
-      ;(execution_context.switchToHttp().getRequest as jest.Mock).mockReturnValue(
-        createRequestStub('any-tenant'),
-      )
+      ;(
+        execution_context.switchToHttp().getRequest as jest.Mock
+      ).mockReturnValue(createRequestStub('any-tenant'))
       // Act & Assert - empty role should not grant cross-tenant access
       expect(await rolesGuard.canActivate(execution_context)).toBeFalsy()
     })
@@ -327,10 +343,12 @@ describe('RolesGuard', () => {
         'custom:roles': JSON.stringify([{ tenant: '', role: 'SYSTEM_ADMIN' }]),
       }
       mockJwtDecode.mockReturnValue(uppercaseAdminClaims)
-      jest.spyOn(reflector, 'getAllAndOverride').mockReturnValue(['system_admin'])
-      ;(execution_context.switchToHttp().getRequest as jest.Mock).mockReturnValue(
-        createRequestStub('any-tenant'),
-      )
+      jest
+        .spyOn(reflector, 'getAllAndOverride')
+        .mockReturnValue(['system_admin'])
+      ;(
+        execution_context.switchToHttp().getRequest as jest.Mock
+      ).mockReturnValue(createRequestStub('any-tenant'))
       // Act & Assert - SYSTEM_ADMIN != system_admin, should fail cross-tenant
       expect(await rolesGuard.canActivate(execution_context)).toBeFalsy()
     })
@@ -340,9 +358,9 @@ describe('RolesGuard', () => {
       // Arrange - 'COMMON' should match 'common' because tenantCode is normalized
       mockJwtDecode.mockReturnValue(userWithoutTenantClaims)
       jest.spyOn(reflector, 'getAllAndOverride').mockReturnValue(['user'])
-      ;(execution_context.switchToHttp().getRequest as jest.Mock).mockReturnValue(
-        createRequestStub('COMMON'),
-      )
+      ;(
+        execution_context.switchToHttp().getRequest as jest.Mock
+      ).mockReturnValue(createRequestStub('COMMON'))
       // Act & Assert - 'COMMON' is normalized to 'common', should succeed
       expect(await rolesGuard.canActivate(execution_context)).toBeTruthy()
     })
@@ -359,7 +377,9 @@ describe('RolesGuard', () => {
       }
       mockJwtDecode.mockReturnValue(claimsWithTenant)
       jest.spyOn(reflector, 'getAllAndOverride').mockReturnValue(['user'])
-      ;(execution_context.switchToHttp().getRequest as jest.Mock).mockReturnValue(
+      ;(
+        execution_context.switchToHttp().getRequest as jest.Mock
+      ).mockReturnValue(
         createRequestStub('attacker-tenant'), // malicious header should be ignored
       )
       // Act & Assert - should succeed because custom:tenant exists
@@ -380,10 +400,12 @@ describe('RolesGuard', () => {
         // No custom:tenant
       }
       mockJwtDecode.mockReturnValue(mixedRolesClaims)
-      jest.spyOn(reflector, 'getAllAndOverride').mockReturnValue(['system_admin'])
-      ;(execution_context.switchToHttp().getRequest as jest.Mock).mockReturnValue(
-        createRequestStub('any-tenant'),
-      )
+      jest
+        .spyOn(reflector, 'getAllAndOverride')
+        .mockReturnValue(['system_admin'])
+      ;(
+        execution_context.switchToHttp().getRequest as jest.Mock
+      ).mockReturnValue(createRequestStub('any-tenant'))
       // Act & Assert - should succeed because global system_admin role exists
       expect(await rolesGuard.canActivate(execution_context)).toBeTruthy()
     })
@@ -395,13 +417,17 @@ describe('RolesGuard', () => {
         sub: '12345678-1234-1234-1234-123456789012',
         'cognito:username': 'user',
         email: 'user@test.com',
-        'custom:roles': JSON.stringify([{ tenant: '', role: ' system_admin ' }]),
+        'custom:roles': JSON.stringify([
+          { tenant: '', role: ' system_admin ' },
+        ]),
       }
       mockJwtDecode.mockReturnValue(whitespaceRoleClaims)
-      jest.spyOn(reflector, 'getAllAndOverride').mockReturnValue(['system_admin'])
-      ;(execution_context.switchToHttp().getRequest as jest.Mock).mockReturnValue(
-        createRequestStub('any-tenant'),
-      )
+      jest
+        .spyOn(reflector, 'getAllAndOverride')
+        .mockReturnValue(['system_admin'])
+      ;(
+        execution_context.switchToHttp().getRequest as jest.Mock
+      ).mockReturnValue(createRequestStub('any-tenant'))
       // Act & Assert - ' system_admin ' != 'system_admin', should fail
       expect(await rolesGuard.canActivate(execution_context)).toBeFalsy()
     })
@@ -417,9 +443,9 @@ describe('RolesGuard', () => {
       }
       mockJwtDecode.mockReturnValue(noRoleClaims)
       jest.spyOn(reflector, 'getAllAndOverride').mockReturnValue([])
-      ;(execution_context.switchToHttp().getRequest as jest.Mock).mockReturnValue(
-        createRequestStub('any-tenant'),
-      )
+      ;(
+        execution_context.switchToHttp().getRequest as jest.Mock
+      ).mockReturnValue(createRequestStub('any-tenant'))
       // Act & Assert - no cross-tenant role, should fail header override
       expect(await rolesGuard.canActivate(execution_context)).toBeFalsy()
     })
@@ -439,9 +465,9 @@ describe('RolesGuard', () => {
       // This is the most common case - user bound to tenant via Cognito
       mockJwtDecode.mockReturnValue(tenantUserClaims)
       jest.spyOn(reflector, 'getAllAndOverride').mockReturnValue(['user'])
-      ;(execution_context.switchToHttp().getRequest as jest.Mock).mockReturnValue(
-        createRequestStub('test'),
-      )
+      ;(
+        execution_context.switchToHttp().getRequest as jest.Mock
+      ).mockReturnValue(createRequestStub('test'))
       // Act & Assert - should work exactly as before
       expect(await rolesGuard.canActivate(execution_context)).toBeTruthy()
     })
@@ -450,10 +476,12 @@ describe('RolesGuard', () => {
     it('should maintain existing behavior for system admin header override', async () => {
       // System admin using header - this should work as before
       mockJwtDecode.mockReturnValue(systemAdminClaims)
-      jest.spyOn(reflector, 'getAllAndOverride').mockReturnValue(['system_admin'])
-      ;(execution_context.switchToHttp().getRequest as jest.Mock).mockReturnValue(
-        createRequestStub('any-tenant'),
-      )
+      jest
+        .spyOn(reflector, 'getAllAndOverride')
+        .mockReturnValue(['system_admin'])
+      ;(
+        execution_context.switchToHttp().getRequest as jest.Mock
+      ).mockReturnValue(createRequestStub('any-tenant'))
       // Act & Assert - should work exactly as before
       expect(await rolesGuard.canActivate(execution_context)).toBeTruthy()
     })
@@ -463,9 +491,9 @@ describe('RolesGuard', () => {
       // User accessing 'common' tenant without custom:tenant should work
       mockJwtDecode.mockReturnValue(userWithoutTenantClaims)
       jest.spyOn(reflector, 'getAllAndOverride').mockReturnValue(['user'])
-      ;(execution_context.switchToHttp().getRequest as jest.Mock).mockReturnValue(
-        createRequestStub('common'),
-      )
+      ;(
+        execution_context.switchToHttp().getRequest as jest.Mock
+      ).mockReturnValue(createRequestStub('common'))
       // Act & Assert - 'common' is the default common tenant
       expect(await rolesGuard.canActivate(execution_context)).toBeTruthy()
     })
@@ -474,10 +502,12 @@ describe('RolesGuard', () => {
     it('should default to system_admin as cross-tenant role', async () => {
       // System admin should have cross-tenant access by default
       mockJwtDecode.mockReturnValue(systemAdminClaims)
-      jest.spyOn(reflector, 'getAllAndOverride').mockReturnValue(['system_admin'])
-      ;(execution_context.switchToHttp().getRequest as jest.Mock).mockReturnValue(
-        createRequestStub('any-tenant'),
-      )
+      jest
+        .spyOn(reflector, 'getAllAndOverride')
+        .mockReturnValue(['system_admin'])
+      ;(
+        execution_context.switchToHttp().getRequest as jest.Mock
+      ).mockReturnValue(createRequestStub('any-tenant'))
       // Act & Assert
       expect(await rolesGuard.canActivate(execution_context)).toBeTruthy()
 
@@ -488,9 +518,9 @@ describe('RolesGuard', () => {
       }
       mockJwtDecode.mockReturnValue(managerClaims)
       jest.spyOn(reflector, 'getAllAndOverride').mockReturnValue(['manager'])
-      ;(execution_context.switchToHttp().getRequest as jest.Mock).mockReturnValue(
-        createRequestStub('any-tenant'),
-      )
+      ;(
+        execution_context.switchToHttp().getRequest as jest.Mock
+      ).mockReturnValue(createRequestStub('any-tenant'))
       expect(await rolesGuard.canActivate(execution_context)).toBeFalsy()
     })
   })
@@ -519,9 +549,9 @@ describe('RolesGuard', () => {
       // Arrange - user without custom:tenant accessing 'shared' tenant
       mockJwtDecode.mockReturnValue(userWithoutTenantClaims)
       jest.spyOn(reflector, 'getAllAndOverride').mockReturnValue(['user'])
-      ;(execution_context.switchToHttp().getRequest as jest.Mock).mockReturnValue(
-        createRequestStub('shared'),
-      )
+      ;(
+        execution_context.switchToHttp().getRequest as jest.Mock
+      ).mockReturnValue(createRequestStub('shared'))
 
       // Act & Assert - 'shared' should be accessible
       expect(await customGuard.canActivate(execution_context)).toBeTruthy()
@@ -552,13 +582,17 @@ describe('RolesGuard', () => {
         sub: '12345678-1234-1234-1234-123456789012',
         'cognito:username': 'manager',
         email: 'manager@test.com',
-        'custom:roles': JSON.stringify([{ tenant: '', role: 'general_manager' }]),
+        'custom:roles': JSON.stringify([
+          { tenant: '', role: 'general_manager' },
+        ]),
       }
       mockJwtDecode.mockReturnValue(generalManagerClaims)
-      jest.spyOn(reflector, 'getAllAndOverride').mockReturnValue(['general_manager'])
-      ;(execution_context.switchToHttp().getRequest as jest.Mock).mockReturnValue(
-        createRequestStub('any-tenant'),
-      )
+      jest
+        .spyOn(reflector, 'getAllAndOverride')
+        .mockReturnValue(['general_manager'])
+      ;(
+        execution_context.switchToHttp().getRequest as jest.Mock
+      ).mockReturnValue(createRequestStub('any-tenant'))
 
       // Act & Assert - general_manager should have cross-tenant access
       expect(await customGuard.canActivate(execution_context)).toBeTruthy()
@@ -603,17 +637,17 @@ describe('RolesGuard', () => {
       }
       mockJwtDecode.mockReturnValue(supervisorClaims)
       jest.spyOn(reflector, 'getAllAndOverride').mockReturnValue(['supervisor'])
-      ;(execution_context.switchToHttp().getRequest as jest.Mock).mockReturnValue(
-        createRequestStub('dept-sales'),
-      )
+      ;(
+        execution_context.switchToHttp().getRequest as jest.Mock
+      ).mockReturnValue(createRequestStub('dept-sales'))
 
       // Act & Assert - supervisor should access dept- tenants
       expect(await customGuard.canActivate(execution_context)).toBeTruthy()
 
       // But not other tenants
-      ;(execution_context.switchToHttp().getRequest as jest.Mock).mockReturnValue(
-        createRequestStub('other-tenant'),
-      )
+      ;(
+        execution_context.switchToHttp().getRequest as jest.Mock
+      ).mockReturnValue(createRequestStub('other-tenant'))
       expect(await customGuard.canActivate(execution_context)).toBeFalsy()
     })
 
@@ -656,9 +690,9 @@ describe('RolesGuard', () => {
       }
       mockJwtDecode.mockReturnValue(specialAccessClaims)
       jest.spyOn(reflector, 'getAllAndOverride').mockReturnValue(['user'])
-      ;(execution_context.switchToHttp().getRequest as jest.Mock).mockReturnValue(
-        createRequestStub('any-tenant'),
-      )
+      ;(
+        execution_context.switchToHttp().getRequest as jest.Mock
+      ).mockReturnValue(createRequestStub('any-tenant'))
 
       // Act & Assert - special access bypasses header override check
       expect(await customGuard.canActivate(execution_context)).toBeTruthy()
@@ -687,9 +721,9 @@ describe('RolesGuard', () => {
       // Arrange - user trying to access 'common' tenant
       mockJwtDecode.mockReturnValue(userWithoutTenantClaims)
       jest.spyOn(reflector, 'getAllAndOverride').mockReturnValue(['user'])
-      ;(execution_context.switchToHttp().getRequest as jest.Mock).mockReturnValue(
-        createRequestStub('common'),
-      )
+      ;(
+        execution_context.switchToHttp().getRequest as jest.Mock
+      ).mockReturnValue(createRequestStub('common'))
 
       // Act & Assert - 'common' should no longer be accessible
       expect(await customGuard.canActivate(execution_context)).toBeFalsy()
@@ -717,18 +751,20 @@ describe('RolesGuard', () => {
 
       // Arrange - system admin trying to access via header
       mockJwtDecode.mockReturnValue(systemAdminClaims)
-      jest.spyOn(reflector, 'getAllAndOverride').mockReturnValue(['system_admin'])
-      ;(execution_context.switchToHttp().getRequest as jest.Mock).mockReturnValue(
-        createRequestStub('any-tenant'),
-      )
+      jest
+        .spyOn(reflector, 'getAllAndOverride')
+        .mockReturnValue(['system_admin'])
+      ;(
+        execution_context.switchToHttp().getRequest as jest.Mock
+      ).mockReturnValue(createRequestStub('any-tenant'))
 
       // Act & Assert - even system_admin should not have cross-tenant access
       expect(await customGuard.canActivate(execution_context)).toBeFalsy()
 
       // But common tenant should still work (common tenant check comes first)
-      ;(execution_context.switchToHttp().getRequest as jest.Mock).mockReturnValue(
-        createRequestStub('common'),
-      )
+      ;(
+        execution_context.switchToHttp().getRequest as jest.Mock
+      ).mockReturnValue(createRequestStub('common'))
       expect(await customGuard.canActivate(execution_context)).toBeTruthy()
     })
 
@@ -757,7 +793,10 @@ describe('RolesGuard', () => {
         }
 
         protected getCrossTenantRoles(): string[] {
-          const roles = this.configService.get('CROSS_TENANT_ROLES', 'system_admin')
+          const roles = this.configService.get(
+            'CROSS_TENANT_ROLES',
+            'system_admin',
+          )
           return roles.split(',').map((r: string) => r.trim())
         }
       }
@@ -767,17 +806,17 @@ describe('RolesGuard', () => {
       // Arrange - user accessing 'shared' tenant (configured as common)
       mockJwtDecode.mockReturnValue(userWithoutTenantClaims)
       jest.spyOn(reflector, 'getAllAndOverride').mockReturnValue(['user'])
-      ;(execution_context.switchToHttp().getRequest as jest.Mock).mockReturnValue(
-        createRequestStub('shared'),
-      )
+      ;(
+        execution_context.switchToHttp().getRequest as jest.Mock
+      ).mockReturnValue(createRequestStub('shared'))
 
       // Act & Assert - 'shared' should be accessible via config
       expect(await guard.canActivate(execution_context)).toBeTruthy()
 
       // Also verify 'global' works
-      ;(execution_context.switchToHttp().getRequest as jest.Mock).mockReturnValue(
-        createRequestStub('global'),
-      )
+      ;(
+        execution_context.switchToHttp().getRequest as jest.Mock
+      ).mockReturnValue(createRequestStub('global'))
       expect(await guard.canActivate(execution_context)).toBeTruthy()
     })
   })
@@ -788,9 +827,9 @@ describe('RolesGuard', () => {
       // Arrange - valid tenant but wrong role
       mockJwtDecode.mockReturnValue(tenantUserClaims)
       jest.spyOn(reflector, 'getAllAndOverride').mockReturnValue(['admin']) // user has 'user' role
-      ;(execution_context.switchToHttp().getRequest as jest.Mock).mockReturnValue(
-        createRequestStub('test'),
-      )
+      ;(
+        execution_context.switchToHttp().getRequest as jest.Mock
+      ).mockReturnValue(createRequestStub('test'))
 
       // Act & Assert - should fail on role check (tenant passes)
       expect(await rolesGuard.canActivate(execution_context)).toBeFalsy()
@@ -803,9 +842,9 @@ describe('RolesGuard', () => {
       // Arrange - invalid tenant access
       mockJwtDecode.mockReturnValue(userWithoutTenantClaims)
       jest.spyOn(reflector, 'getAllAndOverride').mockReturnValue(['user'])
-      ;(execution_context.switchToHttp().getRequest as jest.Mock).mockReturnValue(
-        createRequestStub('unauthorized-tenant'),
-      )
+      ;(
+        execution_context.switchToHttp().getRequest as jest.Mock
+      ).mockReturnValue(createRequestStub('unauthorized-tenant'))
 
       // Act & Assert
       expect(await rolesGuard.canActivate(execution_context)).toBeFalsy()
@@ -824,9 +863,9 @@ describe('RolesGuard', () => {
       }
       mockJwtDecode.mockReturnValue(noRolesClaims)
       jest.spyOn(reflector, 'getAllAndOverride').mockReturnValue([])
-      ;(execution_context.switchToHttp().getRequest as jest.Mock).mockReturnValue(
-        createRequestStub('any-tenant'),
-      )
+      ;(
+        execution_context.switchToHttp().getRequest as jest.Mock
+      ).mockReturnValue(createRequestStub('any-tenant'))
 
       // Act & Assert - should not throw, should return false
       expect(await rolesGuard.canActivate(execution_context)).toBeFalsy()
@@ -837,17 +876,17 @@ describe('RolesGuard', () => {
       // 'Common' (capital C) should match 'common' because tenantCode is normalized
       mockJwtDecode.mockReturnValue(userWithoutTenantClaims)
       jest.spyOn(reflector, 'getAllAndOverride').mockReturnValue(['user'])
-      ;(execution_context.switchToHttp().getRequest as jest.Mock).mockReturnValue(
-        createRequestStub('Common'),
-      )
+      ;(
+        execution_context.switchToHttp().getRequest as jest.Mock
+      ).mockReturnValue(createRequestStub('Common'))
 
       // Both 'Common' and 'common' should work (normalized to lowercase)
       expect(await rolesGuard.canActivate(execution_context)).toBeTruthy()
 
       // 'common' should also work
-      ;(execution_context.switchToHttp().getRequest as jest.Mock).mockReturnValue(
-        createRequestStub('common'),
-      )
+      ;(
+        execution_context.switchToHttp().getRequest as jest.Mock
+      ).mockReturnValue(createRequestStub('common'))
       expect(await rolesGuard.canActivate(execution_context)).toBeTruthy()
     })
 
@@ -857,7 +896,9 @@ describe('RolesGuard', () => {
       // Should use custom:tenant and succeed
       mockJwtDecode.mockReturnValue(tenantUserClaims) // custom:tenant = 'test'
       jest.spyOn(reflector, 'getAllAndOverride').mockReturnValue(['user'])
-      ;(execution_context.switchToHttp().getRequest as jest.Mock).mockReturnValue(
+      ;(
+        execution_context.switchToHttp().getRequest as jest.Mock
+      ).mockReturnValue(
         createRequestStub('other-tenant'), // header says different tenant
       )
 
@@ -876,10 +917,12 @@ describe('RolesGuard', () => {
         'custom:roles': JSON.stringify([{ tenant: '', role: 'system_admin' }]),
       }
       mockJwtDecode.mockReturnValue(systemAdminWithTenant)
-      jest.spyOn(reflector, 'getAllAndOverride').mockReturnValue(['system_admin'])
-      ;(execution_context.switchToHttp().getRequest as jest.Mock).mockReturnValue(
-        createRequestStub('other-tenant'),
-      )
+      jest
+        .spyOn(reflector, 'getAllAndOverride')
+        .mockReturnValue(['system_admin'])
+      ;(
+        execution_context.switchToHttp().getRequest as jest.Mock
+      ).mockReturnValue(createRequestStub('other-tenant'))
 
       // Act & Assert - should succeed, using custom:tenant (not header)
       expect(await rolesGuard.canActivate(execution_context)).toBeTruthy()
@@ -903,12 +946,13 @@ describe('RolesGuard', () => {
           },
         ],
       }).compile()
-      const testableGuard = moduleRef.get<TestableRolesGuard>(TestableRolesGuard)
+      const testableGuard =
+        moduleRef.get<TestableRolesGuard>(TestableRolesGuard)
 
       mockJwtDecode.mockReturnValue(tenantUserClaims)
-      ;(execution_context.switchToHttp().getRequest as jest.Mock).mockReturnValue(
-        createRequestStub('test'),
-      )
+      ;(
+        execution_context.switchToHttp().getRequest as jest.Mock
+      ).mockReturnValue(createRequestStub('test'))
 
       const claims = testableGuard.testGetClaims(execution_context)
       expect(claims['custom:tenant']).toBe('test')
@@ -926,7 +970,9 @@ describe('RolesGuard', () => {
       for (const { header, description } of falsyTenantTests) {
         mockJwtDecode.mockReturnValue(userWithoutTenantClaims)
         jest.spyOn(reflector, 'getAllAndOverride').mockReturnValue(['user'])
-        ;(execution_context.switchToHttp().getRequest as jest.Mock).mockReturnValue({
+        ;(
+          execution_context.switchToHttp().getRequest as jest.Mock
+        ).mockReturnValue({
           headers: { 'x-tenant-code': header },
           get: () => dummyToken,
         })
@@ -952,36 +998,42 @@ describe('RolesGuard', () => {
           },
         ],
       }).compile()
-      const multiGuard = moduleRef.get<MultiCommonRolesGuard>(MultiCommonRolesGuard)
+      const multiGuard = moduleRef.get<MultiCommonRolesGuard>(
+        MultiCommonRolesGuard,
+      )
 
       mockJwtDecode.mockReturnValue(userWithoutTenantClaims)
       jest.spyOn(reflector, 'getAllAndOverride').mockReturnValue(['user'])
 
       // All three should work
       for (const tenant of ['common', 'public', 'shared']) {
-        ;(execution_context.switchToHttp().getRequest as jest.Mock).mockReturnValue(
-          createRequestStub(tenant),
-        )
+        ;(
+          execution_context.switchToHttp().getRequest as jest.Mock
+        ).mockReturnValue(createRequestStub(tenant))
         expect(await multiGuard.canActivate(execution_context)).toBeTruthy()
       }
 
       // But others should not
-      ;(execution_context.switchToHttp().getRequest as jest.Mock).mockReturnValue(
-        createRequestStub('private'),
-      )
+      ;(
+        execution_context.switchToHttp().getRequest as jest.Mock
+      ).mockReturnValue(createRequestStub('private'))
       expect(await multiGuard.canActivate(execution_context)).toBeFalsy()
     })
 
     /** Verify verifyTenant and verifyRole are async (for subclass override) */
     it('should support async overrides of verifyTenant and verifyRole', async () => {
       class AsyncRolesGuard extends RolesGuard {
-        protected async verifyTenant(context: ExecutionContext): Promise<boolean> {
+        protected async verifyTenant(
+          context: ExecutionContext,
+        ): Promise<boolean> {
           // Simulate async operation
           await new Promise((resolve) => setTimeout(resolve, 1))
           return super.verifyTenant(context)
         }
 
-        protected async verifyRole(context: ExecutionContext): Promise<boolean> {
+        protected async verifyRole(
+          context: ExecutionContext,
+        ): Promise<boolean> {
           // Simulate async operation
           await new Promise((resolve) => setTimeout(resolve, 1))
           return super.verifyRole(context)
@@ -1001,12 +1053,179 @@ describe('RolesGuard', () => {
 
       mockJwtDecode.mockReturnValue(tenantUserClaims)
       jest.spyOn(reflector, 'getAllAndOverride').mockReturnValue(['user'])
-      ;(execution_context.switchToHttp().getRequest as jest.Mock).mockReturnValue(
-        createRequestStub('test'),
-      )
+      ;(
+        execution_context.switchToHttp().getRequest as jest.Mock
+      ).mockReturnValue(createRequestStub('test'))
 
       // Should work with async overrides
       expect(await asyncGuard.canActivate(execution_context)).toBeTruthy()
+    })
+  })
+
+  describe('group role resolution', () => {
+    const claimsWithGroups = {
+      sub: 'user-a',
+      'cognito:username': 'user1',
+      email: 'user@test.com',
+      'custom:tenant': 'test',
+      'custom:roles': JSON.stringify([{ tenant: 'test', role: 'user' }]),
+      'custom:groups': JSON.stringify([
+        { tenant: 'test', groups: ['sales-team'] },
+      ]),
+    }
+
+    let resolveRoles: jest.Mock
+
+    beforeEach(() => {
+      resolveRoles = jest.fn()
+    })
+
+    async function createGuardWithResolver(): Promise<{
+      guard: RolesGuard
+      reflector: Reflector
+    }> {
+      const registry = new GroupRoleResolverRegistry()
+      const resolver: IGroupRoleResolver = { resolveRoles }
+      registry.set(resolver)
+      const moduleRef: TestingModule = await Test.createTestingModule({
+        providers: [
+          RolesGuard,
+          { provide: GroupRoleResolverRegistry, useValue: registry },
+        ],
+      }).compile()
+      return {
+        guard: moduleRef.get<RolesGuard>(RolesGuard),
+        reflector: moduleRef.get<Reflector>(Reflector),
+      }
+    }
+
+    it('should pass via direct role without calling resolver', async () => {
+      const { guard, reflector } = await createGuardWithResolver()
+      mockJwtDecode.mockReturnValue({
+        ...claimsWithGroups,
+        'custom:roles': JSON.stringify([{ tenant: 'test', role: 'admin' }]),
+      })
+      jest.spyOn(reflector, 'getAllAndOverride').mockReturnValue(['admin'])
+      ;(
+        execution_context.switchToHttp().getRequest as jest.Mock
+      ).mockReturnValue(createRequestStub('test'))
+      expect(await guard.canActivate(execution_context)).toBe(true)
+      expect(resolveRoles).not.toHaveBeenCalled()
+    })
+
+    it('should pass via group role when direct role misses', async () => {
+      resolveRoles.mockResolvedValue(['viewer', 'reporter'])
+      const { guard, reflector } = await createGuardWithResolver()
+      mockJwtDecode.mockReturnValue(claimsWithGroups)
+      jest.spyOn(reflector, 'getAllAndOverride').mockReturnValue(['viewer'])
+      ;(
+        execution_context.switchToHttp().getRequest as jest.Mock
+      ).mockReturnValue(createRequestStub('test'))
+      expect(await guard.canActivate(execution_context)).toBe(true)
+      expect(resolveRoles).toHaveBeenCalledWith(
+        expect.objectContaining({
+          tenantCode: 'test',
+          groupIds: ['sales-team'],
+        }),
+      )
+    })
+
+    it('should deny when neither direct nor group roles match', async () => {
+      resolveRoles.mockResolvedValue(['viewer'])
+      const { guard, reflector } = await createGuardWithResolver()
+      mockJwtDecode.mockReturnValue(claimsWithGroups)
+      jest.spyOn(reflector, 'getAllAndOverride').mockReturnValue(['manager'])
+      ;(
+        execution_context.switchToHttp().getRequest as jest.Mock
+      ).mockReturnValue(createRequestStub('test'))
+      expect(await guard.canActivate(execution_context)).toBe(false)
+    })
+
+    it('should propagate resolver errors (5xx), not deny as 403', async () => {
+      resolveRoles.mockRejectedValue(new Error('db down'))
+      const { guard, reflector } = await createGuardWithResolver()
+      mockJwtDecode.mockReturnValue(claimsWithGroups)
+      jest.spyOn(reflector, 'getAllAndOverride').mockReturnValue(['viewer'])
+      ;(
+        execution_context.switchToHttp().getRequest as jest.Mock
+      ).mockReturnValue(createRequestStub('test'))
+      await expect(guard.canActivate(execution_context)).rejects.toThrow(
+        'db down',
+      )
+    })
+
+    it('should ignore group path when no registry (backward compat)', async () => {
+      const moduleRef = await Test.createTestingModule({
+        providers: [RolesGuard],
+      }).compile()
+      const guard = moduleRef.get<RolesGuard>(RolesGuard)
+      const reflector = moduleRef.get<Reflector>(Reflector)
+      mockJwtDecode.mockReturnValue(claimsWithGroups)
+      jest.spyOn(reflector, 'getAllAndOverride').mockReturnValue(['viewer'])
+      ;(
+        execution_context.switchToHttp().getRequest as jest.Mock
+      ).mockReturnValue(createRequestStub('test'))
+      expect(await guard.canActivate(execution_context)).toBe(false)
+    })
+
+    it('should not treat group-resolved system_admin as bypass', async () => {
+      resolveRoles.mockResolvedValue(['system_admin'])
+      const { guard, reflector } = await createGuardWithResolver()
+      mockJwtDecode.mockReturnValue({
+        ...claimsWithGroups,
+        'custom:roles': JSON.stringify([{ tenant: 'test', role: 'user' }]),
+      })
+      jest.spyOn(reflector, 'getAllAndOverride').mockReturnValue(['manager'])
+      ;(
+        execution_context.switchToHttp().getRequest as jest.Mock
+      ).mockReturnValue(createRequestStub('test'))
+      expect(await guard.canActivate(execution_context)).toBe(false)
+      expect(resolveRoles).toHaveBeenCalled()
+    })
+
+    it('should pass @Roles OR when any group-resolved role matches', async () => {
+      resolveRoles.mockResolvedValue(['viewer', 'reporter'])
+      const { guard, reflector } = await createGuardWithResolver()
+      mockJwtDecode.mockReturnValue(claimsWithGroups)
+      jest
+        .spyOn(reflector, 'getAllAndOverride')
+        .mockReturnValue(['admin', 'reporter'])
+      ;(
+        execution_context.switchToHttp().getRequest as jest.Mock
+      ).mockReturnValue(createRequestStub('test'))
+      expect(await guard.canActivate(execution_context)).toBe(true)
+    })
+
+    it('should pass JWT claims to resolveRoles', async () => {
+      resolveRoles.mockResolvedValue(['viewer'])
+      const { guard, reflector } = await createGuardWithResolver()
+      mockJwtDecode.mockReturnValue(claimsWithGroups)
+      jest.spyOn(reflector, 'getAllAndOverride').mockReturnValue(['viewer'])
+      ;(
+        execution_context.switchToHttp().getRequest as jest.Mock
+      ).mockReturnValue(createRequestStub('test'))
+      await guard.canActivate(execution_context)
+      expect(resolveRoles).toHaveBeenCalledWith(
+        expect.objectContaining({
+          tenantCode: 'test',
+          groupIds: ['sales-team'],
+          claims: expect.objectContaining({ sub: 'user-a' }),
+        }),
+      )
+    })
+
+    it('should not call resolver when tenantGroupIds is empty', async () => {
+      const { guard, reflector } = await createGuardWithResolver()
+      mockJwtDecode.mockReturnValue({
+        ...claimsWithGroups,
+        'custom:groups': JSON.stringify([]),
+      })
+      jest.spyOn(reflector, 'getAllAndOverride').mockReturnValue(['viewer'])
+      ;(
+        execution_context.switchToHttp().getRequest as jest.Mock
+      ).mockReturnValue(createRequestStub('test'))
+      expect(await guard.canActivate(execution_context)).toBe(false)
+      expect(resolveRoles).not.toHaveBeenCalled()
     })
   })
 })

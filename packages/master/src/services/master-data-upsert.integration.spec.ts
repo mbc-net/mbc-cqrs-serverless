@@ -28,6 +28,8 @@ describe('Master Data Upsert Integration', () => {
     tenantCode: 'TEST_TENANT',
     userId: 'test-user-id',
     tenantRole: 'ADMIN',
+    tenantRoles: ['ADMIN'],
+    tenantGroupIds: [],
   }
 
   const mockInvokeContext = {

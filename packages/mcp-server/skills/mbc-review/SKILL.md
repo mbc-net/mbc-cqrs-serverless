@@ -60,6 +60,7 @@ This codebase currently has **two independent `AP00X` numbering systems** that a
 | AP024 HTTP Request Without Timeout | — (detector only) | Local DoS via stalled upstream (CWE-400) |
 | AP025 Logging process.env or full request object | — (detector only) | Sensitive data exposure (CWE-312, CWE-532) |
 | AP026 @Injectable instead of @NotificationTransport | — (detector only) | INotificationTransport implementor never invoked |
+| AP027 GroupRoleResolver also annotated with @Injectable | AP022 | Incorrect group-based role resolver (v1.3.1+) |
 
 When you receive `mbc_check_anti_patterns` output, look up the detector code in this table to find the corresponding skill-doc section for full context and recommended fixes. Future versions of this framework should consolidate the two systems; until then, treat them as separate identifier spaces.
 
@@ -604,6 +605,53 @@ The `IDataSyncHandler.up()` pattern above is still required when other users, ba
 
 ---
 
+### AP022: Incorrect Group-Based Role Resolver Implementation (v1.3.1+)
+
+> Detector counterpart: **AP027** (`mbc_check_anti_patterns`). Note this skill-doc `AP022` is unrelated to the detector's `AP022` (eval/Function) — see the cross-reference table above.
+
+**Problem:** Group-based roles (`@GroupRoleResolver`, `custom:groups`) are implemented in ways that break bootstrap or leak across requests.
+
+**❌ Incorrect — adding `@Injectable()` alongside `@GroupRoleResolver()`:**
+```typescript
+@GroupRoleResolver()
+@Injectable({ scope: Scope.REQUEST }) // ❌ overrides the singleton scope; breaks bootstrap
+export class AppGroupRoleResolver implements IGroupRoleResolver { /* ... */ }
+```
+
+**❌ Incorrect — swallowing resolver errors to "fail open":**
+```typescript
+async resolveRoles(input) {
+  try {
+    return await this.lookup(input); // ❌ catching and returning roles on error
+  } catch {
+    return ['admin']; // ❌ grants access on backend failure
+  }
+}
+```
+
+**❌ Incorrect — more than one resolver, or stateful instance shared across requests:**
+```typescript
+@GroupRoleResolver() class ResolverA ... // ❌ only one @GroupRoleResolver() per app
+@GroupRoleResolver() class ResolverB ... //    (bootstrap throws)
+```
+
+**✅ Correct:**
+```typescript
+import { GroupRoleResolver, IGroupRoleResolver, ResolveGroupRolesInput } from '@mbc-cqrs-serverless/core';
+
+// No @Injectable() — @GroupRoleResolver() already registers a singleton provider.
+@GroupRoleResolver()
+export class AppGroupRoleResolver implements IGroupRoleResolver {
+  async resolveRoles({ tenantCode, groupIds, claims }: ResolveGroupRolesInput): Promise<string[]> {
+    return this.mapGroupsToRoles(tenantCode, groupIds); // stateless; let failures throw
+  }
+}
+```
+
+**Explanation:** `@GroupRoleResolver()` already applies `@Injectable()` with the default (singleton) scope. Adding another `@Injectable()` — especially with `REQUEST`/`TRANSIENT` scope — overrides it and breaks bootstrap, which resolves a single instance once at startup. Exactly one resolver is allowed per app. The default `RolesGuard` deliberately **rethrows** resolver failures so a backend outage surfaces as a 5xx instead of a silent 403; do not catch-and-grant inside the resolver. Use `tenantRoles` / `tenantGroupIds` from `getUserContext()` for direct/group context; do not rely on the deprecated `RolesGuard.getUserRole()`.
+
+---
+
 ## Review Checklist
 
 When reviewing MBC CQRS Serverless code, check:
@@ -649,6 +697,14 @@ When reviewing MBC CQRS Serverless code, check:
 ### Notification Transport (when implementing INotificationTransport)
 - [ ] Uses `@NotificationTransport('transport-name')` decorator instead of `@Injectable()` (AP026)
 - [ ] Transport name is registered in `NOTIFICATION_TRANSPORTS` env var to be active
+
+### Group Role Resolver (when implementing IGroupRoleResolver, v1.3.1+) (AP022)
+- [ ] Uses `@GroupRoleResolver()` only — no extra `@Injectable()` on the same class
+- [ ] Resolver is singleton-scoped (no `REQUEST`/`TRANSIENT` scope)
+- [ ] Exactly one `@GroupRoleResolver()` per application
+- [ ] Resolver is stateless and does NOT catch-and-grant on failure (let errors propagate as 5xx)
+- [ ] Registered in the module `providers`
+- [ ] Uses `tenantRoles` / `tenantGroupIds` from `getUserContext()`, not the deprecated `RolesGuard.getUserRole()`
 
 ## Output Format
 
