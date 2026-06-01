@@ -62,6 +62,8 @@ describe('MyTaskService', () => {
         userId: 'test-user-id',
         tenantCode: 'test-tenant',
         tenantRole: 'admin',
+        tenantRoles: ['admin'],
+        tenantGroupIds: [],
       })
 
       taskService.listItemsByPk.mockResolvedValue({

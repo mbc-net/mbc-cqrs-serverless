@@ -4,6 +4,7 @@ import { createMock } from '@golevelup/ts-jest'
 import { ExplorerService } from './explorer.service'
 import { MockEventHandler } from './mocks/event-handler.mock'
 import { MockEventFactory } from './mocks/event-factory.mock'
+import { MockGroupRoleResolver } from './mocks/group-role-resolver.mock'
 import { DataSyncHandlerMock } from './mocks/sync-data.handler.mock'
 
 describe('ExplorerService', () => {
@@ -85,6 +86,25 @@ describe('ExplorerService', () => {
       // Assert
       expect(dataSyncHandlers).toBeDefined()
       expect(dataSyncHandlers.length).toEqual(0)
+    })
+  })
+
+  describe('exploreGroupRoleResolvers', () => {
+    let explorerService: ExplorerService
+
+    beforeEach(async () => {
+      const module: TestingModule = await Test.createTestingModule({
+        providers: [ExplorerService, MockGroupRoleResolver],
+      }).compile()
+
+      explorerService = module.get<ExplorerService>(ExplorerService)
+    })
+
+    it('should discover @GroupRoleResolver provider', () => {
+      const types = explorerService.exploreGroupRoleResolvers()
+
+      expect(types.length).toBe(1)
+      expect(new types[0]()).toBeInstanceOf(MockGroupRoleResolver)
     })
   })
 

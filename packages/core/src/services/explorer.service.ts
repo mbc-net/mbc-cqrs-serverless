@@ -3,10 +3,12 @@ import { InstanceWrapper } from '@nestjs/core/injector/instance-wrapper'
 import { Module } from '@nestjs/core/injector/module'
 import { ModulesContainer } from '@nestjs/core/injector/modules-container'
 
+import { IGroupRoleResolver } from '../auth/group-role-resolver.interface'
 import {
   DATA_SYNC_HANDLER_METADATA,
   EVENT_FACTORY_METADATA,
   EVENT_HANDLER_METADATA,
+  GROUP_ROLE_RESOLVER_METADATA,
   NOTIFICATION_TRANSPORT_METADATA,
 } from '../decorators'
 import { IDataSyncHandler, IEventFactory, IEventHandler } from '../interfaces'
@@ -49,6 +51,13 @@ export class ExplorerService {
       this.filterProvider(instance, NOTIFICATION_TRANSPORT_METADATA),
     )
     return { notificationTransports }
+  }
+
+  exploreGroupRoleResolvers(): Type<IGroupRoleResolver>[] {
+    const modules = [...this.modulesContainer.values()]
+    return this.flatMap<IGroupRoleResolver>(modules, (instance) =>
+      this.filterProvider(instance, GROUP_ROLE_RESOLVER_METADATA),
+    )
   }
 
   flatMap<T>(

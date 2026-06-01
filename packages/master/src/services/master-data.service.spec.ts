@@ -40,6 +40,8 @@ describe('MasterDataService', () => {
     tenantCode: 'TEST_TENANT',
     userId: 'test-user-id',
     tenantRole: 'ADMIN',
+    tenantRoles: ['ADMIN'],
+    tenantGroupIds: [],
   }
 
   const mockInvokeContext = {
