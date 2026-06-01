@@ -198,6 +198,61 @@ describe('analyze tools', () => {
       )
     })
 
+    it('should detect @GroupRoleResolver also annotated with @Injectable (AP027)', async () => {
+      const testFile = path.join(testDir, 'src', 'test.ts')
+      fs.writeFileSync(
+        testFile,
+        `
+        import { Injectable } from '@nestjs/common';
+        import { GroupRoleResolver, IGroupRoleResolver } from '@mbc-cqrs-serverless/core';
+
+        @GroupRoleResolver()
+        @Injectable()
+        export class AppGroupRoleResolver implements IGroupRoleResolver {
+          async resolveRoles() {
+            return [];
+          }
+        }
+      `,
+      )
+
+      const result = await handleAnalyzeTool(
+        'mbc_check_anti_patterns',
+        { path: 'src' },
+        testDir,
+      )
+
+      expect(result.content[0].text).toContain('AP027')
+      expect(result.content[0].text).toContain(
+        'GroupRoleResolver class also annotated with @Injectable',
+      )
+    })
+
+    it('should NOT flag a correctly-decorated GroupRoleResolver (AP027 negative)', async () => {
+      const testFile = path.join(testDir, 'src', 'test.ts')
+      fs.writeFileSync(
+        testFile,
+        `
+        import { GroupRoleResolver, IGroupRoleResolver } from '@mbc-cqrs-serverless/core';
+
+        @GroupRoleResolver()
+        export class AppGroupRoleResolver implements IGroupRoleResolver {
+          async resolveRoles() {
+            return [];
+          }
+        }
+      `,
+      )
+
+      const result = await handleAnalyzeTool(
+        'mbc_check_anti_patterns',
+        { path: 'src' },
+        testDir,
+      )
+
+      expect(result.content[0].text).not.toContain('AP027')
+    })
+
     it('should return error for non-existent path', async () => {
       const result = await handleAnalyzeTool(
         'mbc_check_anti_patterns',
