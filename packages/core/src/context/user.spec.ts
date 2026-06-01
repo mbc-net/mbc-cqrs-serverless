@@ -25,7 +25,9 @@ describe('getUserContext', () => {
         {
           sub: 'user-123',
           'custom:tenant': 'tenant-a',
-          'custom:roles': JSON.stringify([{ tenant: 'tenant-a', role: 'user' }]),
+          'custom:roles': JSON.stringify([
+            { tenant: 'tenant-a', role: 'user' },
+          ]),
         },
         { [HEADER_TENANT_CODE]: 'tenant-b' },
       )
@@ -40,7 +42,9 @@ describe('getUserContext', () => {
       const ctx = createMockContext(
         {
           sub: 'user-123',
-          'custom:roles': JSON.stringify([{ tenant: 'tenant-a', role: 'user' }]),
+          'custom:roles': JSON.stringify([
+            { tenant: 'tenant-a', role: 'user' },
+          ]),
         },
         { [HEADER_TENANT_CODE]: 'tenant-b' },
       )
@@ -204,9 +208,7 @@ describe('getUserContext', () => {
       const ctx = createMockContext({
         sub: 'user-123',
         'custom:tenant': 'tenant-a',
-        'custom:roles': JSON.stringify([
-          { tenant: 'TENANT-A', role: 'admin' },
-        ]),
+        'custom:roles': JSON.stringify([{ tenant: 'TENANT-A', role: 'admin' }]),
       })
 
       const result = getUserContext(ctx)
@@ -219,7 +221,9 @@ describe('getUserContext', () => {
         {
           sub: 'user-123',
           'custom:tenant': 'Tenant-A',
-          'custom:roles': JSON.stringify([{ tenant: 'tenant-a', role: 'user' }]),
+          'custom:roles': JSON.stringify([
+            { tenant: 'tenant-a', role: 'user' },
+          ]),
         },
         { [HEADER_TENANT_CODE]: 'tenant-b' },
       )
@@ -303,7 +307,9 @@ describe('getUserContext', () => {
       const ctx = createMockContext(
         {
           sub: 'user-123',
-          'custom:roles': JSON.stringify([{ tenant: 'tenant-a', role: 'admin' }]),
+          'custom:roles': JSON.stringify([
+            { tenant: 'tenant-a', role: 'admin' },
+          ]),
         },
         { [HEADER_TENANT_CODE]: 'tenant-b' },
       )
@@ -320,7 +326,9 @@ describe('getUserContext', () => {
         {
           sub: 'user-123',
           'custom:tenant': 'tenant-a',
-          'custom:roles': JSON.stringify([{ tenant: 'tenant-a', role: 'admin' }]),
+          'custom:roles': JSON.stringify([
+            { tenant: 'tenant-a', role: 'admin' },
+          ]),
         },
         { [HEADER_TENANT_CODE]: 'tenant-b' },
       )
@@ -342,6 +350,16 @@ describe('getUserContext', () => {
         },
         { [HEADER_TENANT_CODE]: 'target-tenant' },
       )
+
+      expect(() => getUserContext(ctx)).toThrow()
+    })
+
+    it('should throw on malformed custom:groups JSON', () => {
+      const ctx = createMockContext({
+        sub: 'user-a',
+        'custom:tenant': 'tenant-a',
+        'custom:groups': 'invalid json',
+      })
 
       expect(() => getUserContext(ctx)).toThrow()
     })
@@ -368,7 +386,11 @@ describe('getUserContext', () => {
         {
           sub: 'attacker-123',
           'custom:roles': JSON.stringify([
-            { tenant: '', role: 'user', __proto__: { role: ROLE_SYSTEM_ADMIN } },
+            {
+              tenant: '',
+              role: 'user',
+              __proto__: { role: ROLE_SYSTEM_ADMIN },
+            },
           ]),
         },
         { [HEADER_TENANT_CODE]: 'target-tenant' },
@@ -413,6 +435,8 @@ describe('getUserContext', () => {
         userId: 'user-123',
         tenantCode: 'tenant-a',
         tenantRole: 'user',
+        tenantRoles: ['user'],
+        tenantGroupIds: [],
       })
       // Note: It's a plain object, not a UserContext instance
       expect(result.constructor.name).toBe('Object')
@@ -485,7 +509,9 @@ describe('getUserContext', () => {
       const ctx = createMockContext(
         {
           sub: 'user-123',
-          'custom:roles': JSON.stringify([{ tenant: 'tenant-b', role: 'admin' }]),
+          'custom:roles': JSON.stringify([
+            { tenant: 'tenant-b', role: 'admin' },
+          ]),
         },
         { [HEADER_TENANT_CODE]: 'TENANT-B' },
       )
@@ -509,7 +535,9 @@ describe('getUserContext', () => {
         const ctx = createMockContext({
           sub: 'user-123',
           'custom:tenant': tenant,
-          'custom:roles': JSON.stringify([{ tenant: roleTenant, role: 'user' }]),
+          'custom:roles': JSON.stringify([
+            { tenant: roleTenant, role: 'user' },
+          ]),
         })
 
         const result = getUserContext(ctx)
@@ -597,6 +625,77 @@ describe('getUserContext', () => {
 
       const result = getUserContext(ctx)
 
+      expect(result.tenantRole).toBe('')
+    })
+  })
+
+  describe('custom:groups parsing', () => {
+    it('should parse tenant-scoped groups for active tenant', () => {
+      const ctx = createMockContext({
+        sub: 'user-a',
+        'custom:tenant': 'tenant-a',
+        'custom:roles': JSON.stringify([{ tenant: 'tenant-a', role: 'admin' }]),
+        'custom:groups': JSON.stringify([
+          { tenant: 'tenant-a', groups: ['sales-team', 'reporting-team'] },
+          { tenant: 'tenant-b', groups: ['other'] },
+        ]),
+      })
+
+      const result = getUserContext(ctx)
+
+      expect(result.tenantGroupIds).toEqual(['sales-team', 'reporting-team'])
+    })
+
+    it('should return empty tenantGroupIds when no matching tenant entry', () => {
+      const ctx = createMockContext({
+        sub: 'user-a',
+        'custom:tenant': 'tenant-x',
+        'custom:groups': JSON.stringify([
+          { tenant: 'tenant-a', groups: ['sales-team'] },
+        ]),
+      })
+
+      expect(getUserContext(ctx).tenantGroupIds).toEqual([])
+    })
+
+    it('should return empty tenantGroupIds when claim missing', () => {
+      const ctx = createMockContext({
+        sub: 'user-a',
+        'custom:tenant': 'tenant-a',
+      })
+
+      expect(getUserContext(ctx).tenantGroupIds).toEqual([])
+    })
+  })
+
+  describe('tenantRoles', () => {
+    it('should collect tenant-specific and global direct roles', () => {
+      const ctx = createMockContext({
+        sub: 'user-a',
+        'custom:tenant': 'tenant-a',
+        'custom:roles': JSON.stringify([
+          { tenant: 'tenant-a', role: 'admin' },
+          { tenant: 'tenant-a', role: 'editor' },
+          { tenant: '', role: 'system_admin' },
+          { tenant: 'tenant-b', role: 'user' },
+        ]),
+      })
+
+      const result = getUserContext(ctx)
+
+      expect(result.tenantRoles).toEqual(['admin', 'editor', 'system_admin'])
+      expect(result.tenantRole).toBe('admin')
+    })
+
+    it('should default tenantRoles to empty when no custom:roles', () => {
+      const ctx = createMockContext({
+        sub: 'user-a',
+        'custom:tenant': 'tenant-a',
+      })
+
+      const result = getUserContext(ctx)
+
+      expect(result.tenantRoles).toEqual([])
       expect(result.tenantRole).toBe('')
     })
   })

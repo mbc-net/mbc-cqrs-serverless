@@ -3,9 +3,11 @@ import {
   ExecutionContext,
   Injectable,
   Logger,
+  Optional,
 } from '@nestjs/common'
 import { Reflector } from '@nestjs/core'
 
+import { GroupRoleResolverRegistry } from '../auth/group-role-resolver.registry'
 import {
   DEFAULT_COMMON_TENANT_CODES,
   DEFAULT_CROSS_TENANT_ROLES,
@@ -23,7 +25,10 @@ import { ROLE_METADATA } from '../decorators'
 export class RolesGuard implements CanActivate {
   protected readonly logger = new Logger(RolesGuard.name)
 
-  constructor(protected reflector: Reflector) {}
+  constructor(
+    protected reflector: Reflector,
+    @Optional() protected registry?: GroupRoleResolverRegistry,
+  ) {}
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
     // check tenant
@@ -135,6 +140,34 @@ export class RolesGuard implements CanActivate {
     return getAuthorizerClaims(invokeContext)
   }
 
+  protected hasAnyRole(requiredRoles: string[], userRoles: string[]): boolean {
+    return requiredRoles.some((role) => userRoles.includes(role))
+  }
+
+  protected async resolveGroupRoles(
+    context: ExecutionContext,
+    groupIds: string[],
+  ): Promise<string[]> {
+    const resolver = this.registry?.get()
+    if (!resolver || !groupIds.length) {
+      return []
+    }
+
+    const userContext = getUserContext(context)
+    const claims = this.getAuthorizerClaims(context)
+
+    try {
+      return await resolver.resolveRoles({
+        tenantCode: userContext.tenantCode,
+        groupIds,
+        claims,
+      })
+    } catch (err) {
+      this.logger.error('GroupRoleResolver.resolveRoles failed', err)
+      return []
+    }
+  }
+
   protected async verifyRole(context: ExecutionContext): Promise<boolean> {
     const requiredRoles = this.reflector.getAllAndOverride<string[]>(
       ROLE_METADATA,
@@ -145,15 +178,18 @@ export class RolesGuard implements CanActivate {
       return true
     }
 
-    const userRole = await this.getUserRole(context)
-    if (!userRole) {
-      return false
+    const userContext = getUserContext(context)
+    const { tenantRoles, tenantGroupIds } = userContext
+
+    if (tenantRoles.includes(ROLE_SYSTEM_ADMIN)) {
+      return true
     }
-    if (userRole === ROLE_SYSTEM_ADMIN) {
+    if (this.hasAnyRole(requiredRoles, tenantRoles)) {
       return true
     }
 
-    return requiredRoles.includes(userRole)
+    const groupRoles = await this.resolveGroupRoles(context, tenantGroupIds)
+    return this.hasAnyRole(requiredRoles, groupRoles)
   }
 
   // eslint-disable-next-line @typescript-eslint/no-unused-vars

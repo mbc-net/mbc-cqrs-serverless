@@ -1,5 +1,6 @@
 import { ExecutionContext } from '@nestjs/common'
 
+import { TenantGroupMembership } from '../auth/group-role-resolver.interface'
 import { HEADER_TENANT_CODE } from '../constants'
 import { extractInvokeContext, getAuthorizerClaims, IInvoke } from './invoke'
 
@@ -12,10 +13,61 @@ export class UserContext {
   userId: string
   tenantRole: string
   tenantCode: string
+  /** Direct roles from custom:roles for the active tenant (excludes group-derived roles). */
+  tenantRoles: string[]
+  /** Group IDs from custom:groups for the active tenant. */
+  tenantGroupIds: string[]
 
   constructor(partial: Partial<UserContext>) {
     Object.assign(this, partial)
   }
+}
+
+function parseTenantGroups(
+  raw: string | undefined,
+  tenantCode: string | undefined,
+): string[] {
+  const memberships = (JSON.parse(raw || '[]') as TenantGroupMembership[]).map(
+    (membership) => ({
+      ...membership,
+      tenant: (membership.tenant || '').toLowerCase(),
+    }),
+  )
+  if (!tenantCode) {
+    return []
+  }
+  const match = memberships.find(
+    (membership) => membership.tenant === tenantCode,
+  )
+  return match?.groups ?? []
+}
+
+function collectTenantRoles(
+  roles: CustomRole[],
+  tenantCode: string | undefined,
+): string[] {
+  if (!tenantCode) {
+    return []
+  }
+  const seen = new Set<string>()
+  const result: string[] = []
+  const add = (role: string) => {
+    if (!seen.has(role)) {
+      seen.add(role)
+      result.push(role)
+    }
+  }
+  for (const { tenant, role } of roles) {
+    if (tenant === tenantCode) {
+      add(role)
+    }
+  }
+  for (const { tenant, role } of roles) {
+    if (tenant === '') {
+      add(role)
+    }
+  }
+  return result
 }
 
 /**
@@ -49,6 +101,9 @@ export function getUserContext(ctx: IInvoke | ExecutionContext): UserContext {
     claims['custom:tenant'] || (ctx?.event?.headers || {})[HEADER_TENANT_CODE]
   )?.toLowerCase()
 
+  const tenantGroupIds = parseTenantGroups(claims['custom:groups'], tenantCode)
+  const tenantRoles = collectTenantRoles(roles, tenantCode)
+
   // Find tenantRole (case-insensitive matching - both tenantCode and role.tenant are lowercase)
   let tenantRole = ''
   for (const { tenant, role } of roles) {
@@ -64,5 +119,7 @@ export function getUserContext(ctx: IInvoke | ExecutionContext): UserContext {
     userId,
     tenantRole,
     tenantCode,
+    tenantRoles,
+    tenantGroupIds,
   }
 }

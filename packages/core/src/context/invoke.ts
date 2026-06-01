@@ -21,6 +21,7 @@ export interface JwtClaims {
   name: string
   'custom:tenant'?: string // tenant code
   'custom:roles'?: string
+  'custom:groups'?: string
   exp: number
   email: string
   email_verified?: boolean

@@ -215,6 +215,38 @@ export class TodoDataSyncHandler implements IDataSyncHandler {
 }
 ```
 
+## Group-based roles
+
+`RolesGuard` checks direct roles from JWT `custom:roles` first, then roles from groups in `custom:groups` (tenant-scoped). Group → role mappings are **not** stored in the JWT; implement a resolver in your app.
+
+**JWT example:**
+
+```json
+{
+  "custom:roles": "[{\"tenant\":\"tenant-a\",\"role\":\"admin\"}]",
+  "custom:groups": "[{\"tenant\":\"tenant-a\",\"groups\":[\"sales-team\"]}]"
+}
+```
+
+**Resolver (one per app):**
+
+```typescript
+import {
+  GroupRoleResolver,
+  IGroupRoleResolver,
+} from '@mbc-cqrs-serverless/core';
+
+@GroupRoleResolver()
+export class AppGroupRoleResolver implements IGroupRoleResolver {
+  async resolveRoles({ tenantCode, groupIds, claims }) {
+    // Load roles from DynamoDB, RDS, config, etc.
+    return ['viewer', 'reporter'];
+  }
+}
+```
+
+Register the class in your NestJS module `providers`. `AuthModule` is imported automatically via core `AppModule.forRoot()` and exports `GroupRoleResolverRegistry` globally for `@Auth()` / `RolesGuard`.
+
 ## Environment Variables
 
 | Variable | Description | Default |
