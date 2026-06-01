@@ -117,7 +117,7 @@ See [Conventional Commits](https://conventionalcommits.org) for commit guideline
 
 ### Bug Fixes
 
-- **import:** Correct import status handling for ZIP orchestrator ([#371](https://github.com/mbc-net/mbc-cqrs-serverless/pull/371))
+- **import:** Correct import status handling for ZIP orchestrator ([#370](https://github.com/mbc-net/mbc-cqrs-serverless/pull/370), [#371](https://github.com/mbc-net/mbc-cqrs-serverless/pull/371))
 
 ## [1.1.5](https://github.com/mbc-net/mbc-cqrs-serverless/releases/tag/v1.1.5) (2026-03-28)
 
@@ -223,7 +223,7 @@ See [Conventional Commits](https://conventionalcommits.org) for commit guideline
   - The `serverless.yml` references `LOCAL_DDB_IMPORT_TMP_STREAM` environment variable, which requires the table to be created during migration
   - See [Common Issues](/docs/common-issues#missing-import-tmp-table) for workaround if using older versions
 
-## [1.1.0](https://github.com/mbc-net/mbc-cqrs-serverless/releases/tag/v1.1.0) - TBD
+## [1.1.0](https://github.com/mbc-net/mbc-cqrs-serverless/releases/tag/v1.1.0) (2026-02-03)
 
 ### Breaking Changes
 
@@ -366,7 +366,7 @@ See [Conventional Commits](https://conventionalcommits.org) for commit guideline
   - Register hooks via `zipFinalizationHooks` option in `ImportModule.register()`
   - Hooks receive `ZipFinalizationContext` with results, status, and execution input
 
-## [1.0.20](https://github.com/mbc-net/mbc-cqrs-serverless/releases/tag/v1.0.20)
+## [1.0.20](https://github.com/mbc-net/mbc-cqrs-serverless/releases/tag/v1.0.20) (2026-01-11)
 
 ### Bug Fixes
 
@@ -390,7 +390,7 @@ See [Conventional Commits](https://conventionalcommits.org) for commit guideline
   - This fix completes the Step Functions error handling started in v1.0.18, ensuring `SendTaskFailure` is properly triggered
   - See [ImportQueueEventHandler Error Handling](/docs/import-export-patterns#import-error-handling) for details
 
-## [1.0.18](https://github.com/mbc-net/mbc-cqrs-serverless/releases/tag/v1.0.18)
+## [1.0.18](https://github.com/mbc-net/mbc-cqrs-serverless/releases/tag/v1.0.18) (2026-01-10)
 
 ### Bug Fixes
 

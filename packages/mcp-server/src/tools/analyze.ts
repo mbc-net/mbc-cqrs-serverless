@@ -725,11 +725,13 @@ const ANTI_PATTERNS = [
     severity: 'high' as const,
     // Detect classes decorated with @GroupRoleResolver() that ALSO carry @Injectable().
     // @GroupRoleResolver() already applies @Injectable() with the default (singleton)
-    // scope; a second @Injectable() — especially @Injectable({ scope: ... }) — overrides
-    // that scope and breaks bootstrap, which resolves a single instance once at startup.
-    // Matches in either decorator order.
+    // scope; a second @Injectable() overrides that scope and breaks bootstrap, which
+    // resolves a single instance once at startup. The two decorators must be ADJACENT
+    // (only whitespace or other decorators between them) so we don't match
+    // @GroupRoleResolver on one class and @Injectable on a different class below it.
+    // Decorator arguments are allowed. Matches either order.
     pattern:
-      /@GroupRoleResolver\(\)[\s\S]{0,120}@Injectable\(|@Injectable\([\s\S]{0,120}@GroupRoleResolver\(\)/,
+      /@GroupRoleResolver\([^)]*\)(?:\s|@[A-Za-z]+\([^)]*\))*@Injectable\(|@Injectable\([^)]*\)(?:\s|@[A-Za-z]+\([^)]*\))*@GroupRoleResolver\(/,
     recommendation:
       'Do not annotate a @GroupRoleResolver() class with @Injectable(). @GroupRoleResolver() already registers the class as a singleton provider; adding @Injectable() (particularly with REQUEST/TRANSIENT scope) overrides the scope and breaks bootstrap, which resolves the resolver exactly once at application startup. Remove the extra @Injectable().',
   },
