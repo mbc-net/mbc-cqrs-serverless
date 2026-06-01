@@ -35,13 +35,13 @@ Generate code and analyze projects:
 | `mbc_validate_cqrs` | Validate CQRS pattern implementation |
 | `mbc_analyze_project` | Analyze project structure and detect framework usage |
 | `mbc_lookup_error` | Look up error solutions from the error catalog |
-| `mbc_check_anti_patterns` | Detect anti-patterns (AP001–AP020) in project source files |
+| `mbc_check_anti_patterns` | Detect anti-patterns (AP001–AP027) in project source files |
 | `mbc_health_check` | Health check for dependencies, structure, and configuration |
 | `mbc_explain_code` | Explain a file or code section in the MBC CQRS context |
 
 #### Anti-Pattern Detection (`mbc_check_anti_patterns`)
 
-Detects 20 anti-patterns including v1.1.x and v1.2.x breaking changes:
+Detects 27 anti-patterns including v1.1.x, v1.2.x, and v1.3.x breaking changes and security issues:
 
 | Code | Name | Severity |
 |------|------|----------|
@@ -65,6 +65,13 @@ Detects 20 anti-patterns including v1.1.x and v1.2.x breaking changes:
 | AP018 | Missing Swagger Documentation | Low |
 | AP019 | Missing Pagination in List Queries | High |
 | AP020 | Missing getCommandSource for Tracing | Low |
+| AP021 | Event Emit Directly After publishAsync in CommandService | High |
+| AP022 | Use of eval() or Function() Constructor | Critical |
+| AP023 | Shell Command Built from String Concatenation | Critical |
+| AP024 | HTTP Request Without Timeout | Medium |
+| AP025 | Logging process.env or full request object | High |
+| AP026 | Notification service class using @Injectable instead of @NotificationTransport | High |
+| AP027 | GroupRoleResolver class also annotated with @Injectable (v1.3.1+) | High |
 
 ### Prompts
 

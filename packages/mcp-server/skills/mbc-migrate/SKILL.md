@@ -42,6 +42,7 @@ This skill helps migrate MBC CQRS Serverless projects between versions.
 | v1.2.4 | v1.2.5 | Low | ZIP import refactor (transparent); MCP AP016–AP020 added |
 | v1.2.5 | v1.2.6 | Low | Repository RYW improvements (transparent); `getVersion` API |
 | v1.2.7 | v1.3.0 | Low | AppSync Events API support (opt-in, no breaking changes) |
+| v1.3.0 | v1.3.1 | Low | Group-based roles (`@GroupRoleResolver`, `custom:groups`); `UserContext.tenantRoles`/`tenantGroupIds` added (opt-in, no breaking changes) |
 
 ## Migration Guides
 
@@ -619,6 +620,58 @@ Non-alphanumeric characters in `id` (e.g. `#`, `@` from DynamoDB pk/sk) are sani
 2. Verify events arrive via both transports (dual-publish phase)
 3. Migrate frontend clients to subscribe via AppSync Events API channels
 4. Once all clients migrated, set `notificationTransports: 'appsync-event'` and redeploy
+
+---
+
+### v1.3.0 → v1.3.1
+
+**Change:** Group-based roles added (opt-in, no breaking changes).
+
+`RolesGuard` now checks direct roles from `custom:roles` first, then roles derived from the user's groups in `custom:groups`. `UserContext` gains two fields — `tenantRoles` (direct roles array) and `tenantGroupIds` (group IDs for the active tenant) — while `tenantRole` (singular) is kept for backward compatibility. No code changes are required to upgrade; existing role checks keep working.
+
+**To adopt group-based roles:**
+
+**Step 1 — Add `custom:groups` to the JWT** (tenant-scoped; group → role mappings are NOT in the token):
+
+```json
+{
+  "custom:roles": "[{\"tenant\":\"tenant-a\",\"role\":\"admin\"}]",
+  "custom:groups": "[{\"tenant\":\"tenant-a\",\"groups\":[\"sales-team\"]}]"
+}
+```
+
+**Step 2 — Implement exactly one resolver** that maps group IDs to roles (loaded from DynamoDB/RDS/config):
+
+```typescript
+import {
+  GroupRoleResolver,
+  IGroupRoleResolver,
+} from '@mbc-cqrs-serverless/core';
+
+// Do NOT add @Injectable() — @GroupRoleResolver() already registers the provider
+// as a singleton. A second @Injectable() can override the scope and break bootstrap.
+@GroupRoleResolver()
+export class AppGroupRoleResolver implements IGroupRoleResolver {
+  async resolveRoles({ tenantCode, groupIds, claims }) {
+    // Map the user's group IDs to roles for this tenant
+    return ['viewer', 'reporter'];
+  }
+}
+```
+
+Register the class in your module `providers`. `AuthModule` is imported automatically via `AppModule.forRoot()`.
+
+**Notes / gotchas:**
+- The resolver must be a **singleton** — it is resolved once at bootstrap. Avoid `REQUEST`/`TRANSIENT` scope.
+- A resolver failure (e.g. DB outage) **propagates as a 5xx**, not a silent 403, so a backend outage is distinguishable from a genuine access denial. Make the resolver resilient (timeouts/retries) if its backing store can be unavailable.
+- Malformed `custom:groups` is tolerated (fail-closed → no group roles), so a bad token degrades to direct-role-only checks rather than crashing.
+- `getUserRole()` on `RolesGuard` is **deprecated** and no longer called by the default guard. For custom authorization, override `verifyRole`, `resolveGroupRoles`, or `canOverrideTenant` instead.
+- Role-name matching is case-sensitive; keep the casing in `custom:roles` consistent with your `@Roles(...)` values.
+
+**Migration Steps:**
+1. Upgrade to v1.3.1 — no code changes required; existing `@Roles()` checks keep working.
+2. (Optional) Populate `custom:groups` in the JWT and implement one `@GroupRoleResolver()`.
+3. Register the resolver in your NestJS module `providers`.
 
 ---
 

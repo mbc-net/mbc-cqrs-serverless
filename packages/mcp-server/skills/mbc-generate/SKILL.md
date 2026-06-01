@@ -661,6 +661,40 @@ export class [Entity]Resolver {
 }
 ```
 
+### Group Role Resolver (`auth/app-group-role.resolver.ts`) — since v1.3.1
+
+Generate this only when the app uses **group-based roles**. `RolesGuard` checks direct roles from the JWT `custom:roles` first, then roles derived from the user's groups in `custom:groups`. The group → role mapping is **not** in the JWT — you implement it here. Exactly **one** resolver is allowed per application.
+
+```typescript
+import {
+  GroupRoleResolver,
+  IGroupRoleResolver,
+  ResolveGroupRolesInput,
+} from '@mbc-cqrs-serverless/core';
+
+// Do NOT add @Injectable() — @GroupRoleResolver() already registers this as a
+// singleton provider. A second @Injectable() can override the scope and break bootstrap.
+@GroupRoleResolver()
+export class AppGroupRoleResolver implements IGroupRoleResolver {
+  async resolveRoles({
+    tenantCode,
+    groupIds,
+    claims,
+  }: ResolveGroupRolesInput): Promise<string[]> {
+    // Map the user's group IDs to roles for this tenant.
+    // Load from DynamoDB, RDS, config, etc. Return an array of role strings.
+    // Keep this resolver stateless and resilient — failures propagate as 5xx.
+    return [];
+  }
+}
+```
+
+**Rules:**
+- Register the class in your NestJS module `providers`. `AuthModule` is imported automatically via `AppModule.forRoot()`.
+- The resolver must be a **singleton** (resolved once at bootstrap). Do not use `REQUEST`/`TRANSIENT` scope.
+- A resolver throw propagates as a **5xx** (not a silent 403), so a backend outage is distinguishable from a real access denial.
+- Role-name matching is case-sensitive — keep the casing consistent with `@Roles(...)`.
+
 ## Customization Questions
 
 Before generating, ask the user these questions to customize the output:

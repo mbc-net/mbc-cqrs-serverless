@@ -461,7 +461,7 @@ interface AntiPatternMatch {
 /**
  * Anti-patterns to check for.
  *
- * Codes are sequential from AP001 to AP025 in detector-implementation order.
+ * Codes are sequential from AP001 to AP027 in detector-implementation order.
  *
  * IMPORTANT: These detector codes are a SEPARATE numbering system from the AP codes
  * used in `skills/mbc-review/SKILL.md`. Only AP016, AP017, AP018, AP019, and AP021
@@ -719,6 +719,22 @@ const ANTI_PATTERNS = [
     recommendation:
       "Classes that implement INotificationTransport must use @NotificationTransport('transport-name') instead of @Injectable(). The decorator registers the transport name as metadata so NotificationEventHandler can discover and activate it via NOTIFICATION_TRANSPORTS env var. With @Injectable() alone, the transport will never be invoked.",
   },
+  {
+    code: 'AP027',
+    name: 'GroupRoleResolver class also annotated with @Injectable (v1.3.1+)',
+    severity: 'high' as const,
+    // Detect classes decorated with @GroupRoleResolver() that ALSO carry @Injectable().
+    // @GroupRoleResolver() already applies @Injectable() with the default (singleton)
+    // scope; a second @Injectable() overrides that scope and breaks bootstrap, which
+    // resolves a single instance once at startup. The two decorators must be ADJACENT
+    // (only whitespace or other decorators between them) so we don't match
+    // @GroupRoleResolver on one class and @Injectable on a different class below it.
+    // Decorator arguments are allowed. Matches either order.
+    pattern:
+      /@GroupRoleResolver\([^)]*\)(?:\s|@[A-Za-z]+\([^)]*\))*@Injectable\(|@Injectable\([^)]*\)(?:\s|@[A-Za-z]+\([^)]*\))*@GroupRoleResolver\(/,
+    recommendation:
+      'Do not annotate a @GroupRoleResolver() class with @Injectable(). @GroupRoleResolver() already registers the class as a singleton provider; adding @Injectable() (particularly with REQUEST/TRANSIENT scope) overrides the scope and breaks bootstrap, which resolves the resolver exactly once at application startup. Remove the extra @Injectable().',
+  },
 ]
 
 /**
@@ -744,6 +760,7 @@ const DETECTOR_TO_SKILL_AP: Record<string, string> = {
   AP020: 'AP011', // Missing getCommandSource for Tracing → Missing getCommandSource for Tracing
   AP021: 'AP021', // Event Emit After publishAsync ✅
   // AP026: detector-only (no skill-doc AP counterpart)
+  AP027: 'AP022', // GroupRoleResolver + @Injectable → Incorrect Group-Based Role Resolver Implementation
 }
 
 /**
@@ -1174,7 +1191,7 @@ async function explainCode(
   }
   if (content.includes('getUserContext(')) {
     explanations.push(
-      'Extracts user context (tenantCode, userId, role) from the invocation context.',
+      'Extracts user context (userId, tenantCode, tenantRole, tenantRoles, tenantGroupIds) from the invocation context. Since v1.3.1, tenantRoles is the array of direct roles from custom:roles and tenantGroupIds holds the group IDs from custom:groups; tenantRole (singular) is kept for backward compatibility. A malformed custom:groups claim is tolerated (fail-closed to no group roles), but a malformed custom:roles claim still throws — guard accordingly when the claim source is untrusted.',
     )
   }
 
