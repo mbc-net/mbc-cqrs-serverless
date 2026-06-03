@@ -117,7 +117,7 @@ export class DirectoryService {
   }
 
   async getTenantFileSizeSummary() {
-    const fileSizeSummary = await this.prismaService.directory.groupBy({
+    const fileSizeSummary = await this.prismaService.document.groupBy({
       by: ['tenantCode'],
 
       _sum: {
@@ -452,7 +452,7 @@ export class DirectoryService {
       skAttributeValues: { ':typeCode': `${item.code}${VER_SEPARATOR}` },
     }
 
-    const table = `${process.env.NODE_ENV}-${process.env.APP_NAME}-directory-history`
+    const table = `${process.env.NODE_ENV}-${process.env.APP_NAME}-document-history`
     const directoryHistories = await this.customDynamoService.listItemsByPk(
       table,
       item.pk,
