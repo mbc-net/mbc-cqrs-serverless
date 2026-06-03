@@ -1338,12 +1338,12 @@ describe('DirectoryService', () => {
         },
       ]
 
-      prismaService.directory.groupBy.mockResolvedValue(mockSummary)
+      prismaService.document.groupBy.mockResolvedValue(mockSummary)
 
       const result = await service.getTenantFileSizeSummary()
 
       expect(result).toHaveLength(2)
-      expect(prismaService.directory.groupBy).toHaveBeenCalledWith(
+      expect(prismaService.document.groupBy).toHaveBeenCalledWith(
         expect.objectContaining({
           by: ['tenantCode'],
           _sum: { fileSize: true },
