@@ -52,7 +52,7 @@ export class DirectoryStorageModule extends ConfigurableModuleClass {
 
     imports.push(
       CommandModule.register({
-        tableName: 'directory',
+        tableName: 'document',
         dataSyncHandlers: options?.dataSyncHandlers,
       }),
     )

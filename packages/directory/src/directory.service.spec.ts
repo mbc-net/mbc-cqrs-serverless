@@ -65,9 +65,9 @@ describe('DirectoryService', () => {
     overrides?: Partial<DirectoryDataEntity>,
   ): DirectoryDataEntity => {
     return {
-      pk: 'DIRECTORY#TEST_TENANT',
+      pk: 'DOCUMENT#TEST_TENANT',
       sk: 'test-ulid-123',
-      id: 'DIRECTORY#TEST_TENANT#test-ulid-123',
+      id: 'DOCUMENT#TEST_TENANT#test-ulid-123',
       code: 'test-ulid-123',
       name: 'Test Directory',
       version: 1,
@@ -267,7 +267,7 @@ describe('DirectoryService', () => {
       dataService.getItem.mockResolvedValue(mockData)
 
       const result = await service.hasPermission(
-        { pk: 'DIRECTORY#TEST_TENANT', sk: 'test-ulid' },
+        { pk: 'DOCUMENT#TEST_TENANT', sk: 'test-ulid' },
         [FileRole.WRITE],
         { email: 'user@example.com', tenant: 'TEST_TENANT' },
       )
@@ -289,7 +289,7 @@ describe('DirectoryService', () => {
       dataService.getItem.mockResolvedValue(mockData)
 
       const result = await service.hasPermission(
-        { pk: 'DIRECTORY#TEST_TENANT', sk: 'test-ulid' },
+        { pk: 'DOCUMENT#TEST_TENANT', sk: 'test-ulid' },
         [FileRole.WRITE],
         { email: 'user@example.com', tenant: 'TEST_TENANT' },
       )
@@ -315,7 +315,7 @@ describe('DirectoryService', () => {
       dataService.getItem.mockResolvedValue(mockData)
 
       const result = await service.hasPermission(
-        { pk: 'DIRECTORY#TEST_TENANT', sk: 'test-ulid' },
+        { pk: 'DOCUMENT#TEST_TENANT', sk: 'test-ulid' },
         [FileRole.WRITE],
         { email: 'user@example.com', tenant: 'TEST_TENANT' },
       )
@@ -341,7 +341,7 @@ describe('DirectoryService', () => {
       dataService.getItem.mockResolvedValue(mockData)
 
       const result = await service.hasPermission(
-        { pk: 'DIRECTORY#TEST_TENANT', sk: 'test-ulid' },
+        { pk: 'DOCUMENT#TEST_TENANT', sk: 'test-ulid' },
         [FileRole.WRITE],
         { email: 'user@example.com', tenant: 'TEST_TENANT' },
       )
@@ -374,7 +374,7 @@ describe('DirectoryService', () => {
       dataService.getItem.mockResolvedValue(mockData)
 
       const result = await service.hasPermission(
-        { pk: 'DIRECTORY#TEST_TENANT', sk: 'test-ulid' },
+        { pk: 'DOCUMENT#TEST_TENANT', sk: 'test-ulid' },
         [FileRole.WRITE],
         { email: 'allowed@example.com', tenant: 'TEST_TENANT' },
       )
@@ -407,7 +407,7 @@ describe('DirectoryService', () => {
       dataService.getItem.mockResolvedValue(mockData)
 
       const result = await service.hasPermission(
-        { pk: 'DIRECTORY#TEST_TENANT', sk: 'test-ulid' },
+        { pk: 'DOCUMENT#TEST_TENANT', sk: 'test-ulid' },
         [FileRole.WRITE],
         { email: 'notallowed@example.com', tenant: 'TEST_TENANT' },
       )
@@ -429,7 +429,7 @@ describe('DirectoryService', () => {
       dataService.getItem.mockResolvedValue(mockData)
 
       const result = await service.hasPermission(
-        { pk: 'DIRECTORY#TEST_TENANT', sk: 'test-ulid' },
+        { pk: 'DOCUMENT#TEST_TENANT', sk: 'test-ulid' },
         [FileRole.WRITE],
         { email: 'user@example.com', tenant: 'TEST_TENANT' },
       )
@@ -451,7 +451,7 @@ describe('DirectoryService', () => {
       dataService.getItem.mockResolvedValue(mockData)
 
       const result = await service.hasPermission(
-        { pk: 'DIRECTORY#TEST_TENANT', sk: 'test-ulid' },
+        { pk: 'DOCUMENT#TEST_TENANT', sk: 'test-ulid' },
         [FileRole.WRITE],
         { email: 'user@example.com', tenant: 'OTHER_TENANT' },
       )
@@ -465,7 +465,7 @@ describe('DirectoryService', () => {
       dataService.getItem.mockResolvedValue(null)
 
       const result = await service.getEffectiveRole(
-        { pk: 'DIRECTORY#TEST_TENANT', sk: 'non-existent' },
+        { pk: 'DOCUMENT#TEST_TENANT', sk: 'non-existent' },
         { email: 'user@example.com', tenant: 'TEST_TENANT' },
       )
 
@@ -501,7 +501,7 @@ describe('DirectoryService', () => {
         .mockResolvedValueOnce(parentData)
 
       const result = await service.getEffectiveRole(
-        { pk: 'DIRECTORY#TEST_TENANT', sk: 'child-ulid' },
+        { pk: 'DOCUMENT#TEST_TENANT', sk: 'child-ulid' },
         { email: 'user@example.com', tenant: 'TEST_TENANT' },
       )
 
@@ -524,7 +524,7 @@ describe('DirectoryService', () => {
       dataService.getItem.mockResolvedValue(childData)
 
       const result = await service.getEffectiveRole(
-        { pk: 'DIRECTORY#TEST_TENANT', sk: 'child-ulid' },
+        { pk: 'DOCUMENT#TEST_TENANT', sk: 'child-ulid' },
         { email: 'user@example.com', tenant: 'TEST_TENANT' },
       )
 
@@ -539,11 +539,10 @@ describe('DirectoryService', () => {
         role: FileRole.WRITE,
       }
 
-      const result = service.checkPermissionObject(
-        permission,
-        'TEST_TENANT',
-        { email: 'anyone@example.com', tenant: 'TEST_TENANT' },
-      )
+      const result = service.checkPermissionObject(permission, 'TEST_TENANT', {
+        email: 'anyone@example.com',
+        tenant: 'TEST_TENANT',
+      })
 
       expect(result).toBe(FileRole.WRITE)
     })
@@ -555,11 +554,10 @@ describe('DirectoryService', () => {
         users: [],
       }
 
-      const result = service.checkPermissionObject(
-        permission,
-        'TEST_TENANT',
-        { email: 'user@example.com', tenant: 'TEST_TENANT' },
-      )
+      const result = service.checkPermissionObject(permission, 'TEST_TENANT', {
+        email: 'user@example.com',
+        tenant: 'TEST_TENANT',
+      })
 
       expect(result).toBeNull()
     })
@@ -574,7 +572,7 @@ describe('DirectoryService', () => {
       dataService.getItem.mockResolvedValue(mockData)
 
       const result = await service.findOne(
-        { pk: 'DIRECTORY#TEST_TENANT', sk: 'test-ulid' },
+        { pk: 'DOCUMENT#TEST_TENANT', sk: 'test-ulid' },
         { invokeContext: mockInvokeContext },
         { email: 'user@example.com' },
       )
@@ -609,7 +607,7 @@ describe('DirectoryService', () => {
 
       await expect(
         service.findOne(
-          { pk: 'DIRECTORY#TEST_TENANT', sk: 'test-ulid' },
+          { pk: 'DOCUMENT#TEST_TENANT', sk: 'test-ulid' },
           { invokeContext: mockInvokeContext },
           { email: 'unauthorized@example.com' },
         ),
@@ -625,7 +623,7 @@ describe('DirectoryService', () => {
 
       await expect(
         service.findOne(
-          { pk: 'DIRECTORY#TEST_TENANT', sk: 'non-existent' },
+          { pk: 'DOCUMENT#TEST_TENANT', sk: 'non-existent' },
           { invokeContext: mockInvokeContext },
           { email: 'user@example.com' },
         ),
@@ -645,7 +643,7 @@ describe('DirectoryService', () => {
       dynamoService.listItemsByPk.mockResolvedValue({ items: mockHistoryItems })
 
       const result = await service.findHistory(
-        { pk: 'DIRECTORY#TEST_TENANT', sk: 'test-ulid' },
+        { pk: 'DOCUMENT#TEST_TENANT', sk: 'test-ulid' },
         { invokeContext: mockInvokeContext },
         { email: 'user@example.com' },
       )
@@ -669,7 +667,7 @@ describe('DirectoryService', () => {
 
       await expect(
         service.findHistory(
-          { pk: 'DIRECTORY#TEST_TENANT', sk: 'test-ulid' },
+          { pk: 'DOCUMENT#TEST_TENANT', sk: 'test-ulid' },
           { invokeContext: mockInvokeContext },
           { email: 'user@example.com' },
         ),
@@ -695,7 +693,7 @@ describe('DirectoryService', () => {
       )
 
       const result = await service.update(
-        { pk: 'DIRECTORY#TEST_TENANT', sk: 'test-ulid' },
+        { pk: 'DOCUMENT#TEST_TENANT', sk: 'test-ulid' },
         updateDto,
         { invokeContext: mockInvokeContext },
       )
@@ -716,7 +714,7 @@ describe('DirectoryService', () => {
 
       await expect(
         service.update(
-          { pk: 'DIRECTORY#TEST_TENANT', sk: 'test-ulid' },
+          { pk: 'DOCUMENT#TEST_TENANT', sk: 'test-ulid' },
           updateDto,
           { invokeContext: mockInvokeContext },
         ),
@@ -733,7 +731,7 @@ describe('DirectoryService', () => {
 
       await expect(
         service.update(
-          { pk: 'DIRECTORY#TEST_TENANT', sk: 'non-existent' },
+          { pk: 'DOCUMENT#TEST_TENANT', sk: 'non-existent' },
           updateDto,
           { invokeContext: mockInvokeContext },
         ),
@@ -754,7 +752,7 @@ describe('DirectoryService', () => {
 
       await expect(
         service.update(
-          { pk: 'DIRECTORY#TEST_TENANT', sk: 'test-ulid' },
+          { pk: 'DOCUMENT#TEST_TENANT', sk: 'test-ulid' },
           updateDto,
           { invokeContext: mockInvokeContext },
         ),
@@ -781,7 +779,7 @@ describe('DirectoryService', () => {
 
       await expect(
         service.update(
-          { pk: 'DIRECTORY#TEST_TENANT', sk: 'test-ulid' },
+          { pk: 'DOCUMENT#TEST_TENANT', sk: 'test-ulid' },
           updateDto,
           { invokeContext: mockInvokeContext },
         ),
@@ -810,7 +808,7 @@ describe('DirectoryService', () => {
       )
 
       const result = await service.updatePermission(
-        { pk: 'DIRECTORY#TEST_TENANT', sk: 'test-ulid' },
+        { pk: 'DOCUMENT#TEST_TENANT', sk: 'test-ulid' },
         {
           email: 'user@example.com',
           attributes: {
@@ -841,7 +839,7 @@ describe('DirectoryService', () => {
       }
 
       const result = await service.rename(
-        { pk: 'DIRECTORY#TEST_TENANT', sk: 'test-ulid' },
+        { pk: 'DOCUMENT#TEST_TENANT', sk: 'test-ulid' },
         renameDto,
         { invokeContext: mockInvokeContext },
       )
@@ -854,7 +852,7 @@ describe('DirectoryService', () => {
 
       await expect(
         service.rename(
-          { pk: 'DIRECTORY#TEST_TENANT', sk: 'non-existent' },
+          { pk: 'DOCUMENT#TEST_TENANT', sk: 'non-existent' },
           { name: 'New Name', email: 'user@example.com' },
           { invokeContext: mockInvokeContext },
         ),
@@ -888,7 +886,7 @@ describe('DirectoryService', () => {
       }
 
       const result = await service.copy(
-        { pk: 'DIRECTORY#TEST_TENANT', sk: 'test-ulid' },
+        { pk: 'DOCUMENT#TEST_TENANT', sk: 'test-ulid' },
         copyDto,
         { invokeContext: mockInvokeContext },
       )
@@ -908,7 +906,7 @@ describe('DirectoryService', () => {
 
       await expect(
         service.copy(
-          { pk: 'DIRECTORY#TEST_TENANT', sk: 'non-existent' },
+          { pk: 'DOCUMENT#TEST_TENANT', sk: 'non-existent' },
           copyDto,
           { invokeContext: mockInvokeContext },
         ),
@@ -957,7 +955,7 @@ describe('DirectoryService', () => {
       }
 
       const result = await service.move(
-        { pk: 'DIRECTORY#TEST_TENANT', sk: 'test-ulid' },
+        { pk: 'DOCUMENT#TEST_TENANT', sk: 'test-ulid' },
         moveDto,
         { invokeContext: mockInvokeContext },
       )
@@ -1004,7 +1002,7 @@ describe('DirectoryService', () => {
 
       await expect(
         service.move(
-          { pk: 'DIRECTORY#TEST_TENANT', sk: 'folder-ulid' },
+          { pk: 'DOCUMENT#TEST_TENANT', sk: 'folder-ulid' },
           moveDto,
           { invokeContext: mockInvokeContext },
         ),
@@ -1030,11 +1028,9 @@ describe('DirectoryService', () => {
       }
 
       await expect(
-        service.move(
-          { pk: 'DIRECTORY#TEST_TENANT', sk: 'test-ulid' },
-          moveDto,
-          { invokeContext: mockInvokeContext },
-        ),
+        service.move({ pk: 'DOCUMENT#TEST_TENANT', sk: 'test-ulid' }, moveDto, {
+          invokeContext: mockInvokeContext,
+        }),
       ).rejects.toThrow(ForbiddenException)
     })
   })
@@ -1061,7 +1057,7 @@ describe('DirectoryService', () => {
       )
 
       const result = await service.remove(
-        { pk: 'DIRECTORY#TEST_TENANT', sk: 'test-ulid' },
+        { pk: 'DOCUMENT#TEST_TENANT', sk: 'test-ulid' },
         { invokeContext: mockInvokeContext },
         { email: 'user@example.com' },
       )
@@ -1077,7 +1073,7 @@ describe('DirectoryService', () => {
 
       await expect(
         service.remove(
-          { pk: 'DIRECTORY#TEST_TENANT', sk: 'test-ulid' },
+          { pk: 'DOCUMENT#TEST_TENANT', sk: 'test-ulid' },
           { invokeContext: mockInvokeContext },
           { email: 'user@example.com' },
         ),
@@ -1089,7 +1085,7 @@ describe('DirectoryService', () => {
 
       await expect(
         service.remove(
-          { pk: 'DIRECTORY#TEST_TENANT', sk: 'non-existent' },
+          { pk: 'DOCUMENT#TEST_TENANT', sk: 'non-existent' },
           { invokeContext: mockInvokeContext },
           { email: 'user@example.com' },
         ),
@@ -1122,7 +1118,7 @@ describe('DirectoryService', () => {
       )
 
       const result = await service.removeFile(
-        { pk: 'DIRECTORY#TEST_TENANT', sk: 'test-ulid' },
+        { pk: 'DOCUMENT#TEST_TENANT', sk: 'test-ulid' },
         { invokeContext: mockInvokeContext },
         { email: 'user@example.com' },
       )
@@ -1151,7 +1147,7 @@ describe('DirectoryService', () => {
       } as any)
 
       await service.removeFile(
-        { pk: 'DIRECTORY#TEST_TENANT', sk: 'test-ulid' },
+        { pk: 'DOCUMENT#TEST_TENANT', sk: 'test-ulid' },
         { invokeContext: mockInvokeContext },
         { email: 'user@example.com' },
       )
@@ -1173,7 +1169,7 @@ describe('DirectoryService', () => {
       commandService.publishAsync.mockResolvedValue(historyItem as any)
 
       const result = await service.restoreHistoryItem(
-        { pk: 'DIRECTORY#TEST_TENANT', sk: 'test-ulid' },
+        { pk: 'DOCUMENT#TEST_TENANT', sk: 'test-ulid' },
         '2',
         { email: 'user@example.com' },
         { invokeContext: mockInvokeContext },
@@ -1192,7 +1188,7 @@ describe('DirectoryService', () => {
 
       await expect(
         service.restoreHistoryItem(
-          { pk: 'DIRECTORY#TEST_TENANT', sk: 'test-ulid' },
+          { pk: 'DOCUMENT#TEST_TENANT', sk: 'test-ulid' },
           '999',
           { email: 'user@example.com' },
           { invokeContext: mockInvokeContext },
@@ -1218,7 +1214,7 @@ describe('DirectoryService', () => {
 
       await expect(
         service.restoreHistoryItem(
-          { pk: 'DIRECTORY#TEST_TENANT', sk: 'test-ulid' },
+          { pk: 'DOCUMENT#TEST_TENANT', sk: 'test-ulid' },
           '2',
           { email: 'user@example.com' },
           { invokeContext: mockInvokeContext },
@@ -1240,7 +1236,7 @@ describe('DirectoryService', () => {
       )
 
       const result = await service.restoreTemporary(
-        { pk: 'DIRECTORY#TEST_TENANT', sk: 'test-ulid' },
+        { pk: 'DOCUMENT#TEST_TENANT', sk: 'test-ulid' },
         { email: 'user@example.com' },
         { invokeContext: mockInvokeContext },
       )
@@ -1253,7 +1249,7 @@ describe('DirectoryService', () => {
 
       await expect(
         service.restoreTemporary(
-          { pk: 'DIRECTORY#TEST_TENANT', sk: 'non-existent' },
+          { pk: 'DOCUMENT#TEST_TENANT', sk: 'non-existent' },
           { email: 'user@example.com' },
           { invokeContext: mockInvokeContext },
         ),
@@ -1266,7 +1262,7 @@ describe('DirectoryService', () => {
 
       await expect(
         service.restoreTemporary(
-          { pk: 'DIRECTORY#TEST_TENANT', sk: 'test-ulid' },
+          { pk: 'DOCUMENT#TEST_TENANT', sk: 'test-ulid' },
           { email: 'user@example.com' },
           { invokeContext: mockInvokeContext },
         ),
@@ -1283,7 +1279,7 @@ describe('DirectoryService', () => {
       dataService.getItem.mockResolvedValue(mockData)
 
       const result = await service.getItemAttributes({
-        pk: 'DIRECTORY#TEST_TENANT',
+        pk: 'DOCUMENT#TEST_TENANT',
         sk: 'test-ulid',
       })
 
@@ -1295,7 +1291,7 @@ describe('DirectoryService', () => {
 
       await expect(
         service.getItemAttributes({
-          pk: 'DIRECTORY#TEST_TENANT',
+          pk: 'DOCUMENT#TEST_TENANT',
           sk: 'non-existent',
         }),
       ).rejects.toThrow(NotFoundException)
@@ -1308,7 +1304,7 @@ describe('DirectoryService', () => {
       dataService.getItem.mockResolvedValue(mockData)
 
       const result = await service.getItem({
-        pk: 'DIRECTORY#TEST_TENANT',
+        pk: 'DOCUMENT#TEST_TENANT',
         sk: 'test-ulid',
       })
 
@@ -1320,7 +1316,7 @@ describe('DirectoryService', () => {
 
       await expect(
         service.getItem({
-          pk: 'DIRECTORY#TEST_TENANT',
+          pk: 'DOCUMENT#TEST_TENANT',
           sk: 'non-existent',
         }),
       ).rejects.toThrow(NotFoundException)
