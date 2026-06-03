@@ -18,7 +18,7 @@ import { DynamoService } from './dynamodb.service'
 @Module({
   imports: [DataStoreModule, QueueModule],
   providers: [DirectoryService, DirectoryFileService, DynamoService],
-  exports: [DirectoryService, DirectoryFileService, DynamoService],
+  exports: [DirectoryService, DirectoryFileService],
 })
 export class DirectoryStorageModule extends ConfigurableModuleClass {
   static register(options: typeof OPTIONS_TYPE): DynamicModule {

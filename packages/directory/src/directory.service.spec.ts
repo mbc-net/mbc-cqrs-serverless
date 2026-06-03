@@ -123,7 +123,7 @@ describe('DirectoryService', () => {
         {
           provide: PRISMA_SERVICE,
           useValue: {
-            directory: {
+            document: {
               groupBy: jest.fn(),
             },
           },
