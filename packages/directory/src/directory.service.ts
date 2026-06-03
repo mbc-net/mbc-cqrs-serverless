@@ -63,7 +63,7 @@ export class DirectoryService {
     opts: { invokeContext: IInvoke },
   ) {
     const { tenantCode } = getUserContext(opts.invokeContext)
-    const pk = `DIRECTORY${KEY_SEPARATOR}${tenantCode}`
+    const pk = `DOCUMENT${KEY_SEPARATOR}${tenantCode}`
     const sk = ulid()
 
     const attrs = createDto.attributes as DirectoryAttributes
@@ -155,7 +155,7 @@ export class DirectoryService {
       throw new NotFoundException('Directory not found!')
     }
 
-    const pk = `DIRECTORY${KEY_SEPARATOR}${tenantCode}`
+    const pk = `DOCUMENT${KEY_SEPARATOR}${tenantCode}`
     const sk = ulid()
     const attrs = data.attributes as DirectoryAttributes
     let newAncestors = []
@@ -235,7 +235,7 @@ export class DirectoryService {
       )
     }
 
-    const pk = `DIRECTORY${KEY_SEPARATOR}${tenantCode}`
+    const pk = `DOCUMENT${KEY_SEPARATOR}${tenantCode}`
     const sk = ulid()
     const attrs = data.attributes as DirectoryAttributes
     let newAncestors = []
