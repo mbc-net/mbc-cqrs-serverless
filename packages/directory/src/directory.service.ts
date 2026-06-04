@@ -71,7 +71,7 @@ export class DirectoryService {
     const parentId = attrs.parentId
     const ancestors = attrs.ancestors
 
-    const isRoot = !parentId && ancestors.length === 0
+    const isRoot = !parentId && ancestors?.length === 0
     let newAncestors = []
 
     if (!isRoot) {
@@ -226,14 +226,10 @@ export class DirectoryService {
       FileRole.TAKE_OWNERSHIP,
     ]
     const itemDto = { pk: data.pk, sk: data.sk }
-    const user = { email: copyDto.email, tenant: tenantCode }
-    const canModify = await this.hasPermission(itemDto, allowPermissions, user)
-
-    if (!canModify) {
-      throw new ForbiddenException(
-        'You do not have permission to modify this item.',
-      )
-    }
+    await this.assertModifyPermission(itemDto, allowPermissions, {
+      email: copyDto.email,
+      tenant: tenantCode,
+    })
 
     const pk = `DOCUMENT${KEY_SEPARATOR}${tenantCode}`
     const sk = ulid()
@@ -300,6 +296,24 @@ export class DirectoryService {
     }
 
     return requiredRole.includes(effectiveRole)
+  }
+
+  /**
+   * Verifies the user has one of the allowed roles on the directory item.
+   *
+   * @throws ForbiddenException when permission is denied.
+   */
+  private async assertModifyPermission(
+    itemDto: DetailDto,
+    allowPermissions: FileRole[],
+    user: { email?: string; tenant?: string },
+  ): Promise<void> {
+    const canModify = await this.hasPermission(itemDto, allowPermissions, user)
+    if (!canModify) {
+      throw new ForbiddenException(
+        'You do not have permission to modify this item.',
+      )
+    }
   }
 
   async getEffectiveRole(
@@ -397,13 +411,19 @@ export class DirectoryService {
       FileRole.TAKE_OWNERSHIP,
     ]
 
-    const user = { email: email, tenant: tenant }
-    const canRead = await this.hasPermission(detailDto, allowPermissions, user)
-
-    if (!canRead) {
-      throw new ForbiddenException(
-        'You do not have permission to read this item.',
+    if (email) {
+      const user = { email: email, tenant: tenant }
+      const canRead = await this.hasPermission(
+        detailDto,
+        allowPermissions,
+        user,
       )
+
+      if (!canRead) {
+        throw new ForbiddenException(
+          'You do not have permission to read this item.',
+        )
+      }
     }
 
     const item = await this.dataService.getItem(detailDto)
@@ -431,13 +451,18 @@ export class DirectoryService {
       FileRole.TAKE_OWNERSHIP,
     ]
 
-    const user = { email: email, tenant: tenant }
-    const canRead = await this.hasPermission(detailDto, allowPermissions, user)
-
-    if (!canRead) {
-      throw new ForbiddenException(
-        'You do not have permission to read this item.',
+    if (email) {
+      const user = { email: email, tenant: tenant }
+      const canRead = await this.hasPermission(
+        detailDto,
+        allowPermissions,
+        user,
       )
+      if (!canRead) {
+        throw new ForbiddenException(
+          'You do not have permission to read this item.',
+        )
+      }
     }
 
     const item = await this.dataService.getItem(detailDto)
@@ -497,13 +522,19 @@ export class DirectoryService {
       FileRole.TAKE_OWNERSHIP,
     ]
 
-    const user = { email: email, tenant: tenant }
-    const canWrite = await this.hasPermission(detailDto, allowPermissions, user)
-
-    if (!canWrite) {
-      throw new ForbiddenException(
-        'You do not have permission to write this item.',
+    if (email) {
+      const user = { email: email, tenant: tenant }
+      const canWrite = await this.hasPermission(
+        detailDto,
+        allowPermissions,
+        user,
       )
+
+      if (!canWrite) {
+        throw new ForbiddenException(
+          'You do not have permission to write this item.',
+        )
+      }
     }
 
     const cmdDto: DirectoryCommandDto = {
@@ -555,16 +586,22 @@ export class DirectoryService {
       FileRole.TAKE_OWNERSHIP,
     ]
 
-    const user = {
-      email: email,
-      tenant: tenant,
-    }
+    if (email) {
+      const user = {
+        email: email,
+        tenant: tenant,
+      }
 
-    const canWrite = await this.hasPermission(detailDto, allowPermissions, user)
-    if (!canWrite) {
-      throw new ForbiddenException(
-        'You do not have permission to write this item.',
+      const canWrite = await this.hasPermission(
+        detailDto,
+        allowPermissions,
+        user,
       )
+      if (!canWrite) {
+        throw new ForbiddenException(
+          'You do not have permission to write this item.',
+        )
+      }
     }
 
     const cmdDto = new DirectoryCommandDto({
@@ -622,13 +659,12 @@ export class DirectoryService {
 
     const itemDto = { pk: data.pk, sk: data.sk }
     const attrs = updateDto.attributes as DirectoryAttributes
-    const user = { email: updateDto.email, tenant: tenant }
-    const canModify = await this.hasPermission(itemDto, allowPermissions, user)
 
-    if (!canModify) {
-      throw new ForbiddenException(
-        'You do not have permission to modify this item.',
-      )
+    if (updateDto.email) {
+      await this.assertModifyPermission(itemDto, allowPermissions, {
+        email: updateDto.email,
+        tenant,
+      })
     }
 
     if (attrs && attrs.parentId !== data.attributes.parentId) {
@@ -691,18 +727,10 @@ export class DirectoryService {
     }
 
     const attrs = updateDto.attributes as DirectoryUpdatePermissionAttributes
-    const user = {
+    await this.assertModifyPermission(itemDto, allowPermissions, {
       email: updateDto.email,
-      tenant: tenant,
-    }
-
-    const canModify = await this.hasPermission(itemDto, allowPermissions, user)
-
-    if (!canModify) {
-      throw new ForbiddenException(
-        'You do not have permission to modify this item.',
-      )
-    }
+      tenant,
+    })
 
     const commandDto = new DirectoryCommandDto({
       pk: data.pk,
@@ -744,14 +772,10 @@ export class DirectoryService {
       FileRole.TAKE_OWNERSHIP,
     ]
     const itemDto = { pk: data.pk, sk: data.sk }
-    const user = { email: updateDto.email, tenant: tenant }
-    const canModify = await this.hasPermission(itemDto, allowPermissions, user)
-
-    if (!canModify) {
-      throw new ForbiddenException(
-        'You do not have permission to modify this item.',
-      )
-    }
+    await this.assertModifyPermission(itemDto, allowPermissions, {
+      email: updateDto.email,
+      tenant,
+    })
 
     const commandDto = new DirectoryCommandDto({
       pk: data.pk,
@@ -789,13 +813,12 @@ export class DirectoryService {
 
     const allowPermissions = [FileRole.DELETE, FileRole.TAKE_OWNERSHIP]
     const itemDto = { pk: data.pk, sk: data.sk }
-    const user = { email: queryDto.email, tenant: tenant }
-    const canModify = await this.hasPermission(itemDto, allowPermissions, user)
 
-    if (!canModify) {
-      throw new ForbiddenException(
-        'You do not have permission to modify this item.',
-      )
+    if (queryDto.email) {
+      await this.assertModifyPermission(itemDto, allowPermissions, {
+        email: queryDto.email,
+        tenant,
+      })
     }
 
     const commandDto: CommandPartialInputModel = {
@@ -835,16 +858,12 @@ export class DirectoryService {
       pk: data.pk,
       sk: data.sk,
     }
-    const user = {
-      email: queryDto.email,
-      tenant: tenant,
-    }
 
-    const canModify = await this.hasPermission(itemDto, allowPermissions, user)
-    if (!canModify) {
-      throw new ForbiddenException(
-        'You do not have permission to modify this item.',
-      )
+    if (queryDto.email) {
+      await this.assertModifyPermission(itemDto, allowPermissions, {
+        email: queryDto.email,
+        tenant,
+      })
     }
 
     if (data.attributes.s3Key) {

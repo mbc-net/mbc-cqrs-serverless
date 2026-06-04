@@ -15,7 +15,8 @@ export class DirectoryUpdateAttributes extends PartialType(
 
 export class DirectoryUpdateDto {
   @IsString()
-  email: string
+  @IsOptional()
+  email?: string
 
   @IsString()
   @IsOptional()
