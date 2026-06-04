@@ -43,7 +43,7 @@ import {
 import { DynamoService } from './dynamodb.service'
 import { DirectoryDataEntity } from './entity/directory-data.entity'
 import { DirectoryDataListEntity } from './entity/directory-data-list.entity'
-import { parsePk } from './helpers'
+import { parseId, parsePk } from './helpers'
 
 @Injectable()
 export class DirectoryService {
@@ -75,7 +75,7 @@ export class DirectoryService {
     let newAncestors = []
 
     if (!isRoot) {
-      const parenDto = { pk, sk: parentId }
+      const parenDto = parseId(parentId)
       const allowPermissions = [
         FileRole.WRITE,
         FileRole.CHANGE_PERMISSION,
@@ -161,7 +161,7 @@ export class DirectoryService {
     let newAncestors = []
 
     if (parentId) {
-      const parenDto = { pk, sk: parentId }
+      const parenDto = parseId(parentId)
       const parentAttrs = await this.getItemAttributes(parenDto)
       const parentAncestors = parentAttrs.ancestors || []
       newAncestors = [...parentAncestors, parentId]
@@ -237,7 +237,7 @@ export class DirectoryService {
     let newAncestors = []
 
     if (parentId) {
-      const parenDto = { pk, sk: parentId }
+      const parenDto = parseId(parentId)
       const parentAttrs = await this.getItemAttributes(parenDto)
       const parentAncestors = parentAttrs.ancestors || []
       newAncestors = [...parentAncestors, parentId]
@@ -354,7 +354,7 @@ export class DirectoryService {
       return null
     }
 
-    const parentDto = { pk: itemId.pk, sk: parentId }
+    const parentDto = parseId(parentId)
 
     return this.getEffectiveRole(parentDto, user)
   }
