@@ -37,10 +37,18 @@ export class DomainDto {
 }
 
 export class OwnerDto {
+  @ApiProperty({
+    description: 'Email of the owner.',
+    required: true,
+  })
   @IsEmail()
   @IsString()
   email: string
 
+  @ApiProperty({
+    description: 'ID of the owner.',
+    required: true,
+  })
   @IsString()
   ownerId: string
 }
