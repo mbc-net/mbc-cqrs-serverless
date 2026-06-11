@@ -104,16 +104,16 @@
     "webpack": "^5.105.0"
   },
   "optionalDependencies": {
-    "@aws-sdk/client-dynamodb": "^3.606.0",
-    "@aws-sdk/client-s3": "^3.608.0",
-    "@aws-sdk/client-sesv2": "^3.608.0",
-    "@aws-sdk/client-sfn": "^3.606.0",
-    "@aws-sdk/client-sns": "^3.606.0",
-    "@aws-sdk/client-sqs": "^3.606.0",
-    "@aws-sdk/client-ssm": "^3.606.0",
-    "@aws-sdk/credential-provider-node": "^3.600.0",
-    "@aws-sdk/lib-storage": "^3.608.0",
-    "@aws-sdk/s3-request-presigner": "^3.608.0",
+    "@aws-sdk/client-dynamodb": "^3.981.0",
+    "@aws-sdk/client-s3": "^3.981.0",
+    "@aws-sdk/client-sesv2": "^3.981.0",
+    "@aws-sdk/client-sfn": "^3.981.0",
+    "@aws-sdk/client-sns": "^3.981.0",
+    "@aws-sdk/client-sqs": "^3.981.0",
+    "@aws-sdk/client-ssm": "^3.981.0",
+    "@aws-sdk/credential-provider-node": "^3.972.4",
+    "@aws-sdk/lib-storage": "^3.932.0",
+    "@aws-sdk/s3-request-presigner": "^3.981.0",
     "@aws-sdk/signature-v4": "^3.374.0",
     "@aws-sdk/util-create-request": "^3.598.0",
     "@aws-sdk/util-dynamodb": "^3.606.0"
@@ -135,6 +135,9 @@
       "picomatch": "^4.0.4"
     },
     "shell-quote": "^1.8.4",
-    "uuid": "^11.1.1"
+    "uuid": "^11.1.1",
+    "@aws-sdk/core": {
+      "fast-xml-parser": "^5.7.3"
+    }
   }
 }
