@@ -101,7 +101,7 @@ export function extractInvokeContext(ctx?: ExecutionContext): IInvoke {
           scopes: claims?.scope?.split(','),
         },
       }
-    } catch (error) {
+    } catch {
       throw new UnauthorizedException(
         'Invalid or malformed authorization token',
       )
