@@ -83,11 +83,12 @@ export class CommandService implements OnModuleInit, ICommandService {
       this[DATA_SYNC_HANDLER] = [this.dataSyncDdsHandler]
     }
     if (this.options.dataSyncHandlers?.length) {
-      // this.logger.debug('init data sync handlers')
       this[DATA_SYNC_HANDLER].push(
-        ...this.options.dataSyncHandlers.map((HandlerClass) =>
-          this.moduleRef.get(HandlerClass, { strict: false }),
-        ),
+        ...this.options.dataSyncHandlers
+          .map((HandlerClass) =>
+            this.moduleRef.get(HandlerClass, { strict: false }),
+          )
+          .filter((handler) => !!handler),
       )
     }
     this.logger.debug('find data sync handlers from decorator')
@@ -100,9 +101,27 @@ export class CommandService implements OnModuleInit, ICommandService {
         .map((handler) => this.moduleRef.get(handler, { strict: false }))
         .filter((handler) => !!handler),
     )
-    // this.logger.debug(
-    //   'data sync handlers length: ' + this[DATA_SYNC_HANDLER].length,
-    // )
+
+    const allHandlers = this[DATA_SYNC_HANDLER]
+    const seen = new Map<string, IDataSyncHandler>()
+    const dupNames: string[] = []
+    for (const h of allHandlers) {
+      const name = h.constructor.name
+      if (seen.has(name)) {
+        dupNames.push(name)
+      } else {
+        seen.set(name, h)
+      }
+    }
+    if (dupNames.length > 0) {
+      this.logger.warn(
+        `[${this.options.tableName}] Duplicate DataSyncHandler instances detected ` +
+          `(${allHandlers.length} registered, ${seen.size} unique, ` +
+          `duplicates: ${[...new Set(dupNames)].join(', ')}). ` +
+          `Each @DataSyncHandler class must be registered as a provider in exactly one module.`,
+      )
+    }
+    this[DATA_SYNC_HANDLER] = [...seen.values()]
   }
 
   set tableName(name: string) {

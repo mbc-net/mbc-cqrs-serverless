@@ -89,6 +89,62 @@ describe('ExplorerService', () => {
     })
   })
 
+  describe('exploreDataSyncHandlers deduplication', () => {
+    it('should return deduplicated results when the same handler class is in multiple modules', () => {
+      const instance = new DataSyncHandlerMock()
+      const wrapper = { instance }
+      const moduleA = { providers: new Map([['a', wrapper]]) }
+      const moduleB = { providers: new Map([['b', wrapper]]) }
+
+      const fakeContainer = {
+        values: () => [moduleA, moduleB][Symbol.iterator](),
+      } as any
+      const service = new (ExplorerService as any)(fakeContainer)
+
+      const { dataSyncHandlers } = service.exploreDataSyncHandlers('table_name')
+
+      expect(dataSyncHandlers).toHaveLength(1)
+      expect(dataSyncHandlers[0]).toBe(DataSyncHandlerMock)
+    })
+  })
+
+  describe('flatMap - does NOT deduplicate (preserves raw results for callers)', () => {
+    it('should return duplicate entries when the same constructor appears in multiple modules', () => {
+      const instance = new DataSyncHandlerMock()
+      const wrapper = { instance }
+      const moduleA = { providers: new Map([['a', wrapper]]) }
+      const moduleB = { providers: new Map([['b', wrapper]]) }
+
+      const fakeContainer = { values: () => [][Symbol.iterator]() } as any
+      const service = new (ExplorerService as any)(fakeContainer)
+
+      const callback = () => DataSyncHandlerMock as any
+      const result = service.flatMap([moduleA, moduleB] as any, callback)
+
+      // flatMap does NOT dedup — callers decide dedup policy
+      expect(result).toHaveLength(2)
+    })
+  })
+
+  describe('exploreGroupRoleResolvers - same class in multiple modules still detected as duplicate', () => {
+    it('should return multiple entries when the same GroupRoleResolver class appears in two modules', () => {
+      const instance = new MockGroupRoleResolver()
+      const wrapper = { instance }
+      const moduleA = { providers: new Map([['a', wrapper]]) }
+      const moduleB = { providers: new Map([['b', wrapper]]) }
+
+      const fakeContainer = {
+        values: () => [moduleA, moduleB][Symbol.iterator](),
+      } as any
+      const service = new (ExplorerService as any)(fakeContainer)
+
+      const result = service.exploreGroupRoleResolvers()
+
+      // Must return 2 entries so AuthzBootstrapService can detect the misconfiguration
+      expect(result).toHaveLength(2)
+    })
+  })
+
   describe('exploreGroupRoleResolvers', () => {
     let explorerService: ExplorerService
 
