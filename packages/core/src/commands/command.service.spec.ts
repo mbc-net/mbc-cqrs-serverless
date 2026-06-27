@@ -767,4 +767,278 @@ describe('CommandService', () => {
       dynamoDBMock.reset()
     })
   })
+
+  describe('onModuleInit - DataSyncHandler deduplication', () => {
+    class FakeHandler {
+      type = 'rds'
+      up = jest.fn()
+      down = jest.fn()
+    }
+
+    function buildServiceWithOptions(options: {
+      dataSyncHandlers?: any[]
+      explorerHandlers?: any[]
+      disableDefaultHandler?: boolean
+    }) {
+      const fakeHandlerInstance = new FakeHandler()
+      const moduleRef = {
+        get: jest.fn().mockReturnValue(fakeHandlerInstance),
+      }
+      const explorerService = {
+        exploreDataSyncHandlers: jest.fn().mockReturnValue({
+          dataSyncHandlers: options.explorerHandlers ?? [],
+        }),
+      }
+      const warnSpy = jest.fn()
+      const dataSyncDdsHandler = new FakeHandler() as any
+
+      const svc = new (CommandService as any)(
+        {
+          tableName: 'test-table',
+          disableDefaultHandler: options.disableDefaultHandler ?? true,
+          dataSyncHandlers: options.dataSyncHandlers ?? [],
+        },
+        {
+          getTableName: jest.fn().mockReturnValue('test-table'),
+          putItem: jest.fn(),
+          getItem: jest.fn(),
+          updateItem: jest.fn(),
+        },
+        explorerService,
+        moduleRef,
+        { publish: jest.fn() },
+        dataSyncDdsHandler,
+        { getItem: jest.fn(), publish: jest.fn(), tableName: 'data' },
+        { calculateTtl: jest.fn() },
+        { publish: jest.fn() },
+        { put: jest.fn() },
+      )
+      ;(svc as any).logger = { debug: jest.fn(), warn: warnSpy }
+
+      return { svc, fakeHandlerInstance, warnSpy }
+    }
+
+    it('should deduplicate when options and decorator paths register the same handler', () => {
+      class MyHandler {}
+      const { svc, fakeHandlerInstance } = buildServiceWithOptions({
+        dataSyncHandlers: [MyHandler],
+        explorerHandlers: [MyHandler],
+      })
+
+      svc.onModuleInit()
+
+      // Both paths resolved the same instance; after dedup only one should remain
+      const handlers: any[] = (svc as any)[
+        Object.getOwnPropertySymbols(svc).find((s) =>
+          String(s).includes('__dataSyncHandler__'),
+        )
+      ]
+      expect(handlers).toHaveLength(1)
+      expect(handlers[0]).toBe(fakeHandlerInstance)
+    })
+
+    it('should emit a warn log including the duplicate class name when duplicates are detected', () => {
+      class MyHandler {}
+      const { svc, warnSpy } = buildServiceWithOptions({
+        dataSyncHandlers: [MyHandler],
+        explorerHandlers: [MyHandler],
+      })
+
+      svc.onModuleInit()
+
+      expect(warnSpy).toHaveBeenCalledTimes(1)
+      const message: string = warnSpy.mock.calls[0][0]
+      expect(message).toContain('Duplicate DataSyncHandler')
+      // The mock moduleRef.get() always returns FakeHandler instances;
+      // the warn log reports the constructor.name of the duplicate instances
+      expect(message).toContain('FakeHandler')
+    })
+
+    it('should NOT emit a warn log when there are no duplicates', () => {
+      class MyHandler {}
+      const { svc, warnSpy } = buildServiceWithOptions({
+        dataSyncHandlers: [],
+        explorerHandlers: [MyHandler],
+      })
+
+      svc.onModuleInit()
+
+      expect(warnSpy).not.toHaveBeenCalled()
+    })
+
+    it('should call handler.up() exactly once even when same class is registered via both paths (regression for duplicate execution bug)', async () => {
+      class MyHandler {}
+      const { svc, fakeHandlerInstance } = buildServiceWithOptions({
+        dataSyncHandlers: [MyHandler],
+        explorerHandlers: [MyHandler],
+      })
+
+      svc.onModuleInit()
+
+      // Simulate what publishSync does: call up() on all non-dynamodb handlers
+      const handlers: any[] = svc.dataSyncHandlers.filter(
+        (h) => h.type !== 'dynamodb',
+      )
+      await Promise.all(handlers.map((h) => h.up({})))
+
+      expect(fakeHandlerInstance.up).toHaveBeenCalledTimes(1)
+    })
+
+    it('should keep both handlers when options [HandlerA] and decorator [HandlerB] are distinct classes', () => {
+      class HandlerA {
+        type = 'rds'
+        up = jest.fn()
+        down = jest.fn()
+      }
+      class HandlerB {
+        type = 'rds'
+        up = jest.fn()
+        down = jest.fn()
+      }
+      const instanceA = new HandlerA()
+      const instanceB = new HandlerB()
+
+      const moduleRef = {
+        get: jest.fn().mockImplementation((cls: any) =>
+          cls === HandlerA ? instanceA : instanceB,
+        ),
+      }
+      const explorerService = {
+        exploreDataSyncHandlers: jest.fn().mockReturnValue({
+          dataSyncHandlers: [HandlerB],
+        }),
+      }
+      const svc = new (CommandService as any)(
+        {
+          tableName: 'test-table',
+          disableDefaultHandler: true,
+          dataSyncHandlers: [HandlerA],
+        },
+        { getTableName: jest.fn().mockReturnValue('test-table') },
+        explorerService,
+        moduleRef,
+        { publish: jest.fn() },
+        new FakeHandler(),
+        { getItem: jest.fn(), publish: jest.fn(), tableName: 'data' },
+        { calculateTtl: jest.fn() },
+        { publish: jest.fn() },
+        { put: jest.fn() },
+      )
+      ;(svc as any).logger = { debug: jest.fn(), warn: jest.fn() }
+
+      svc.onModuleInit()
+
+      const handlers: any[] = svc.dataSyncHandlers
+      expect(handlers).toHaveLength(2)
+      expect(handlers).toContain(instanceA)
+      expect(handlers).toContain(instanceB)
+    })
+
+    it('should include both default dds handler and custom handler when disableDefaultHandler is false', () => {
+      class DdsHandler {
+        type = 'dynamodb'
+        up = jest.fn()
+        down = jest.fn()
+      }
+      class CustomHandler {
+        type = 'rds'
+        up = jest.fn()
+        down = jest.fn()
+      }
+      const ddsInstance = new DdsHandler()
+      const customInstance = new CustomHandler()
+
+      const moduleRef = { get: jest.fn().mockReturnValue(customInstance) }
+      const explorerService = {
+        exploreDataSyncHandlers: jest
+          .fn()
+          .mockReturnValue({ dataSyncHandlers: [] }),
+      }
+      const svc = new (CommandService as any)(
+        {
+          tableName: 'test-table',
+          disableDefaultHandler: false,
+          dataSyncHandlers: [CustomHandler],
+        },
+        { getTableName: jest.fn().mockReturnValue('test-table') },
+        explorerService,
+        moduleRef,
+        { publish: jest.fn() },
+        ddsInstance,
+        { getItem: jest.fn(), publish: jest.fn(), tableName: 'data' },
+        { calculateTtl: jest.fn() },
+        { publish: jest.fn() },
+        { put: jest.fn() },
+      )
+      ;(svc as any).logger = { debug: jest.fn(), warn: jest.fn() }
+
+      svc.onModuleInit()
+
+      const handlers: any[] = svc.dataSyncHandlers
+      expect(handlers).toHaveLength(2)
+      expect(handlers).toContain(ddsInstance)
+      expect(handlers).toContain(customInstance)
+    })
+
+    it('should include registered and unique counts in the warn message', () => {
+      class MyHandler {}
+      const { svc, warnSpy } = buildServiceWithOptions({
+        dataSyncHandlers: [MyHandler],
+        explorerHandlers: [MyHandler],
+      })
+
+      svc.onModuleInit()
+
+      const message: string = warnSpy.mock.calls[0][0]
+      expect(message).toContain('2 registered')
+      expect(message).toContain('1 unique')
+    })
+
+    it('should not throw when moduleRef.get() returns null for an options handler', () => {
+      class UnregisteredHandler {}
+      const fakeHandlerInstance = new FakeHandler()
+      const moduleRef = {
+        // Returns null for UnregisteredHandler, valid instance for others
+        get: jest
+          .fn()
+          .mockImplementation((cls: any) =>
+            cls === UnregisteredHandler ? null : fakeHandlerInstance,
+          ),
+      }
+      const explorerService = {
+        exploreDataSyncHandlers: jest
+          .fn()
+          .mockReturnValue({ dataSyncHandlers: [] }),
+      }
+      const warnSpy = jest.fn()
+      const svc = new (CommandService as any)(
+        {
+          tableName: 'test-table',
+          disableDefaultHandler: true,
+          dataSyncHandlers: [UnregisteredHandler],
+        },
+        { getTableName: jest.fn().mockReturnValue('test-table') },
+        explorerService,
+        moduleRef,
+        { publish: jest.fn() },
+        new FakeHandler(),
+        { getItem: jest.fn(), publish: jest.fn(), tableName: 'data' },
+        { calculateTtl: jest.fn() },
+        { publish: jest.fn() },
+        { put: jest.fn() },
+      )
+      ;(svc as any).logger = { debug: jest.fn(), warn: warnSpy }
+
+      // Must not throw even though moduleRef.get returns null
+      expect(() => svc.onModuleInit()).not.toThrow()
+
+      // The null handler must be silently excluded (no crash on h.constructor.name)
+      const handlers: any[] = (svc as any)[
+        Object.getOwnPropertySymbols(svc).find((s) =>
+          String(s).includes('__dataSyncHandler__'),
+        )
+      ]
+      expect(handlers.every((h) => h !== null && h !== undefined)).toBe(true)
+    })
+  })
 })

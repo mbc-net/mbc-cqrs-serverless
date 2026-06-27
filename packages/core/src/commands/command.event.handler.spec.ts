@@ -447,7 +447,8 @@ describe('DataSyncCommandSfnEventHandler', () => {
 
       console.log('result,', result)
 
-      // Assert
+      // Assert: dedup が効いていれば MockedHandler は 1 件のみ
+      expect(result).toHaveLength(1)
       expect(result).toEqual(
         expect.arrayContaining([
           { prevStateName: 'transform_data', result: 'MockedHandler' },
@@ -613,6 +614,66 @@ describe('DataSyncCommandSfnEventHandler', () => {
           ':status': { S: 'finish:FINISHED' },
         }),
       })
+    })
+  })
+
+  describe('transformData - empty handler list warning', () => {
+    function makeHandler(handlers: any[]) {
+      const mockCommandService = {
+        dataSyncHandlers: handlers,
+        updateStatus: jest.fn().mockResolvedValue(undefined),
+      }
+      const warnSpy = jest.fn()
+      const h = new (CommandEventHandler as any)(
+        { tableName: 'test-table' },
+        mockCommandService,
+        null,
+        null,
+        null,
+        { publish: jest.fn().mockResolvedValue(undefined) },
+        { get: jest.fn().mockReturnValue('') },
+        null,
+      )
+      h.logger = { debug: jest.fn(), warn: warnSpy }
+      return { h, warnSpy }
+    }
+
+    it('should emit a warn log when dataSyncHandlers is empty', async () => {
+      const { h, warnSpy } = makeHandler([])
+      const event = createEvent(DataSyncCommandSfnName.TRANSFORM_DATA, {
+        result: 'ok',
+      })
+
+      await h['transformData'](event)
+
+      expect(warnSpy).toHaveBeenCalledTimes(1)
+      expect(warnSpy.mock.calls[0][0]).toContain('no sync will occur')
+    })
+
+    it('should NOT emit a warn log when dataSyncHandlers is non-empty', async () => {
+      const { h, warnSpy } = makeHandler([new MockedHandler()])
+      const event = createEvent(DataSyncCommandSfnName.TRANSFORM_DATA, {
+        result: 'ok',
+      })
+
+      await h['transformData'](event)
+
+      expect(warnSpy).not.toHaveBeenCalled()
+    })
+
+    it('should map each handler to its constructor.name in the SFN input', async () => {
+      const { h } = makeHandler([new MockedHandler()])
+      const event = createEvent(DataSyncCommandSfnName.TRANSFORM_DATA, {
+        result: 'ok',
+      })
+
+      const result = (await h['transformData'](event)) as any[]
+
+      expect(result).toHaveLength(1)
+      expect(result[0].result).toBe('MockedHandler')
+      expect(result[0].prevStateName).toBe(
+        DataSyncCommandSfnName.TRANSFORM_DATA,
+      )
     })
   })
 })

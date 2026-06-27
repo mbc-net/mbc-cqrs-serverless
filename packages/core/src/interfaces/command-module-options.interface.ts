@@ -17,7 +17,17 @@ export interface CommandModuleOptions {
   tableName: string
   /** If true, skips errors from previous command versions */
   skipError?: boolean
-  /** Custom handlers for syncing command data to read models */
+  /**
+   * Custom handlers for syncing command data to read models.
+   *
+   * **Recommended (primary) registration path.**
+   * Classes listed here are automatically added as providers and resolved
+   * by the NestJS DI container. This path is explicit about module ownership
+   * and is fully covered by the duplicate-detection guard in CommandService.
+   *
+   * Avoid combining this with `@DataSyncHandler` decorator on the same class —
+   * that causes duplicate registration (detected and warned at startup).
+   */
   dataSyncHandlers?: Type<IDataSyncHandler>[]
   /** If true, disables the default data sync handler */
   disableDefaultHandler?: boolean
