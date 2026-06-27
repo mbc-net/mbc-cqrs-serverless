@@ -461,7 +461,7 @@ interface AntiPatternMatch {
 /**
  * Anti-patterns to check for.
  *
- * Codes are sequential from AP001 to AP027 in detector-implementation order.
+ * Codes are sequential from AP001 to AP028 in detector-implementation order.
  *
  * IMPORTANT: These detector codes are a SEPARATE numbering system from the AP codes
  * used in `skills/mbc-review/SKILL.md`. Only AP016, AP017, AP018, AP019, and AP021
@@ -471,6 +471,10 @@ interface AntiPatternMatch {
  *
  * When adding a new detector, append at the end (do not renumber) and update the
  * cross-reference table in `skills/mbc-review/SKILL.md`.
+ *
+ * AP028 is a cross-file check implemented separately in
+ * checkDuplicateDataSyncHandlerRegistrations() and merged into the results
+ * inside checkAntiPatterns().
  */
 const ANTI_PATTERNS = [
   {
@@ -761,6 +765,90 @@ const DETECTOR_TO_SKILL_AP: Record<string, string> = {
   AP021: 'AP021', // Event Emit After publishAsync ✅
   // AP026: detector-only (no skill-doc AP counterpart)
   AP027: 'AP022', // GroupRoleResolver + @Injectable → Incorrect Group-Based Role Resolver Implementation
+  AP028: 'AP023', // Duplicate DataSyncHandler Registration → Duplicate DataSyncHandler Registration Across Modules
+}
+
+/**
+ * AP028: Detect @DataSyncHandler classes registered as providers in more than one module.
+ *
+ * ExplorerService.flatMap() collects providers from every NestJS module without
+ * class-level deduplication. If the same @DataSyncHandler class appears in the
+ * providers array (or dataSyncHandlers option) of N modules, handler.up()/down()
+ * is called N times per command event — causing duplicate DB writes and P2002 errors.
+ */
+async function checkDuplicateDataSyncHandlerRegistrations(
+  targetPath: string,
+  projectPath: string,
+): Promise<AntiPatternMatch[]> {
+  const allTsFiles = await findFiles(targetPath, '.ts')
+  const nonTestFiles = allTsFiles.filter(
+    (f) =>
+      !f.includes('.spec.') && !f.includes('.test.') && !f.endsWith('.d.ts'),
+  )
+
+  // Phase 1: find all @DataSyncHandler-decorated class names and their source files.
+  const handlerSourceFile = new Map<string, string>() // className → relative path
+  const handlerClassPattern =
+    /@DataSyncHandler\([^)]*\)[\s\S]{0,100}class\s+(\w+)/g
+
+  for (const file of nonTestFiles) {
+    const content = readFileSafe(file)
+    for (const m of content.matchAll(handlerClassPattern)) {
+      handlerSourceFile.set(m[1], path.relative(projectPath, file))
+    }
+  }
+
+  if (handlerSourceFile.size === 0) return []
+
+  // Phase 2: for each module file, check which handler classes are registered.
+  // A class is considered "registered" if it appears in a providers: [...] block
+  // or inside a dataSyncHandlers: [...] option of CommandModule.register().
+  const moduleFiles = nonTestFiles.filter((f) => f.endsWith('.module.ts'))
+  const registeredInModules = new Map<string, string[]>()
+
+  for (const modFile of moduleFiles) {
+    const content = readFileSafe(modFile)
+    if (!content.includes('@Module(')) continue
+
+    for (const className of handlerSourceFile.keys()) {
+      const inProviders = new RegExp(
+        `\\bproviders\\s*:\\s*\\[[^\\]]{0,2000}\\b${className}\\b`,
+      ).test(content)
+      const inDataSyncHandlersOption = new RegExp(
+        `\\bdataSyncHandlers\\s*:\\s*\\[[^\\]]{0,500}\\b${className}\\b`,
+      ).test(content)
+
+      if (inProviders || inDataSyncHandlersOption) {
+        if (!registeredInModules.has(className)) {
+          registeredInModules.set(className, [])
+        }
+        registeredInModules
+          .get(className)!
+          .push(path.relative(projectPath, modFile))
+      }
+    }
+  }
+
+  // Phase 3: report classes registered in more than one module.
+  const results: AntiPatternMatch[] = []
+  for (const [className, modules] of registeredInModules) {
+    if (modules.length <= 1) continue
+    results.push({
+      code: 'AP028',
+      name: 'Duplicate DataSyncHandler Registration',
+      severity: 'high' as const,
+      file: handlerSourceFile.get(className)!,
+      line: 1,
+      snippet: `class ${className}`,
+      recommendation:
+        `${className} is registered in ${modules.length} module(s): ${modules.join(', ')}. ` +
+        `ExplorerService scans all modules without class-level deduplication, so ` +
+        `handler.up()/down() is called ${modules.length} times per command event — ` +
+        `causing duplicate DB writes and potential P2002 unique-constraint errors. ` +
+        `Register the handler as a provider in exactly one module (the module that owns this concern).`,
+    })
+  }
+  return results
 }
 
 /**
@@ -817,6 +905,11 @@ async function checkAntiPatterns(
       }
     }
   }
+
+  // Cross-file check: AP028 Duplicate DataSyncHandler Registration
+  const duplicateHandlerMatches =
+    await checkDuplicateDataSyncHandlerRegistrations(targetPath, projectPath)
+  matches.push(...duplicateHandlerMatches)
 
   if (matches.length === 0) {
     let text =
@@ -902,7 +995,7 @@ async function healthCheck(
     }
     try {
       pkg = JSON.parse(readFileSafe(packageJsonPath))
-    } catch (err) {
+    } catch {
       result.checks.push({
         name: 'package.json',
         status: 'fail',

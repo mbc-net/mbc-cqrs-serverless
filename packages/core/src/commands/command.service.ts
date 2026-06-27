@@ -270,7 +270,10 @@ export class CommandService implements OnModuleInit, ICommandService {
       // 4. Write to Data table (same role as DataSyncDdsHandler in SYNC_DATA)
       await this.dataService.publish(command)
 
-      // 5. Execute custom data sync handlers
+      // 5. Execute custom data sync handlers.
+      //    Set versioned sk on command before calling handlers so they receive
+      //    the same sk that the SFN path provides (sk@version, not raw sk).
+      command.sk = versionedSk
       const targetSyncHandlers = this.dataSyncHandlers?.filter(
         (handler) => handler.type !== 'dynamodb',
       )
@@ -286,15 +289,22 @@ export class CommandService implements OnModuleInit, ICommandService {
       )
 
       command.status = getCommandStatus('finish', CommandStatus.STATUS_FINISHED)
-      command.sk = versionedSk
       return command
     } catch (error) {
-      // Mark as failed if the synchronous pipeline breaks
-      await this.updateStatus(
-        { pk: command.pk, sk: versionedSk },
-        getCommandStatus('publish_sync', CommandStatus.STATUS_FAILED),
-        requestId,
-      )
+      // Mark as failed if the synchronous pipeline breaks.
+      // Wrap updateStatus so its own failure cannot mask the original error.
+      try {
+        await this.updateStatus(
+          { pk: command.pk, sk: versionedSk },
+          getCommandStatus('publish_sync', CommandStatus.STATUS_FAILED),
+          requestId,
+        )
+      } catch (statusErr) {
+        this.logger.warn(
+          `[publishSync] Failed to mark command as FAILED (pk=${command.pk}, sk=${versionedSk}): ` +
+            `${statusErr instanceof Error ? statusErr.message : statusErr}`,
+        )
+      }
       throw error
     }
   }

@@ -246,7 +246,8 @@ export class CommandEventHandler {
         })
       } catch (e) {
         this.logger.warn(
-          `Could not resume command v${nextCommand.version}: ${e instanceof Error ? e.message : 'Unknown error'}`,
+          `[${event.commandKey.pk}] Could not resume command v${nextCommand.version} (sk: ${nextCommand.sk}): ` +
+            `${e instanceof Error ? e.message : 'Unknown error'}`,
         )
       }
     } else {

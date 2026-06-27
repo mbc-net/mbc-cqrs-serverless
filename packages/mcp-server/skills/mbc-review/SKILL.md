@@ -61,6 +61,7 @@ This codebase currently has **two independent `AP00X` numbering systems** that a
 | AP025 Logging process.env or full request object | — (detector only) | Sensitive data exposure (CWE-312, CWE-532) |
 | AP026 @Injectable instead of @NotificationTransport | — (detector only) | INotificationTransport implementor never invoked |
 | AP027 GroupRoleResolver also annotated with @Injectable | AP022 | Incorrect group-based role resolver (v1.3.1+) |
+| AP028 Duplicate DataSyncHandler Registration | AP023 | ✅ same code |
 
 When you receive `mbc_check_anti_patterns` output, look up the detector code in this table to find the corresponding skill-doc section for full context and recommended fixes. Future versions of this framework should consolidate the two systems; until then, treat them as separate identifier spaces.
 
@@ -652,6 +653,50 @@ export class AppGroupRoleResolver implements IGroupRoleResolver {
 
 ---
 
+### AP023: Duplicate DataSyncHandler Registration Across Modules
+
+> Detector counterpart: **AP028** (`mbc_check_anti_patterns`).
+
+**Severity:** High
+
+**Pattern:**
+```typescript
+// Bad — same handler class listed as a provider in multiple modules
+
+// tenant.module.ts  ← correct owner
+@Module({
+  providers: [TenantConfigRdsHandler],
+})
+export class TenantModule {}
+
+// agent.module.ts  ← WRONG: registered here too
+@Module({
+  providers: [TenantConfigRdsHandler],
+})
+export class AgentModule {}
+
+// Good — register the handler in exactly one module
+// tenant.module.ts
+@Module({
+  providers: [TenantConfigRdsHandler],
+})
+export class TenantModule {}
+// AgentModule must NOT list TenantConfigRdsHandler in its providers.
+```
+
+**Explanation:** `ExplorerService.exploreDataSyncHandlers()` scans the entire NestJS `ModulesContainer` and collects every provider whose class carries the `@DataSyncHandler(tableName)` decorator — **without deduplication by class reference**. If the same handler class appears as a provider in N modules, it is collected N times. `CommandService.onModuleInit()` then resolves each entry via `moduleRef.get(handler, { strict: false })` (which always returns the same singleton instance) and pushes it to the internal handler list N times. When a command event arrives, `handler.up()` is executed N times in parallel inside `Promise.all()` — causing N concurrent DB writes that produce duplicate rows or P2002 unique-constraint errors.
+
+This is a copy-paste mistake driven by the misconception that "each module must register the handler to pick it up." In reality, `ExplorerService` scans globally, so a single registration in any one module is sufficient.
+
+**Common symptoms:**
+- RDS records created in duplicate after a single command
+- P2002 / unique constraint violations in Step Functions logs
+- Alert/notification handlers firing multiple times per event
+
+**Fix:** Register each `@DataSyncHandler` class as a `provider` in exactly **one** NestJS module — the module that logically owns that handler's concern. No other module should list it in its `providers` array or in the `dataSyncHandlers` option of `CommandModule.register()`.
+
+---
+
 ## Review Checklist
 
 When reviewing MBC CQRS Serverless code, check:
@@ -690,7 +735,7 @@ When reviewing MBC CQRS Serverless code, check:
 - [ ] `@DataSyncHandler({ type: 'ENTITY' })` decorator is present (for RDS sync handlers)
 - [ ] Implements `IDataSyncHandler`
 - [ ] Handles both create/update and delete cases
-- [ ] Registered in module
+- [ ] Registered as a provider in **exactly one** module — not duplicated across multiple modules (AP023)
 - [ ] Event-emitting handlers implement `IDataSyncHandler` and emit in `up()` / `down()`
 - [ ] `_prev` metadata is stripped before RDS upsert if used for change-detection
 

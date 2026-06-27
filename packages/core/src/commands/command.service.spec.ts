@@ -685,6 +685,49 @@ describe('CommandService', () => {
       await commandService.publishSync(inputItem, { invokeContext: {} })
       expect(sessionPut).not.toHaveBeenCalled()
     })
+
+    /** H1: dataSyncHandlers must receive the versioned sk, not the raw sk */
+    it('should pass versioned sk to dataSyncHandlers at the time of handler.up() call', async () => {
+      let capturedSk: string | undefined
+      const mockHandler = {
+        type: 'rds',
+        up: jest.fn().mockImplementation((cmd: CommandModel) => {
+          capturedSk = cmd.sk
+          return Promise.resolve()
+        }),
+        down: jest.fn(),
+      }
+
+      const handlerSym = Object.getOwnPropertySymbols(commandService).find(
+        (s) => String(s).includes('__dataSyncHandler__'),
+      )
+      ;(commandService as any)[handlerSym] = [mockHandler]
+
+      await commandService.publishSync(dirtyPublishSyncInput(), {
+        invokeContext: {},
+      })
+
+      expect(mockHandler.up).toHaveBeenCalledTimes(1)
+      // handler must receive the versioned sk (max_value@6), not the raw sk (max_value)
+      expect(capturedSk).toBe(addSortKeyVersion('max_value', 6))
+    })
+
+    /** M1/M2: original pipeline error must not be masked by updateStatus failure */
+    it('should propagate original pipeline error even if updateStatus throws in catch block', async () => {
+      jest
+        .spyOn((commandService as any).historyService, 'publish')
+        .mockRejectedValueOnce(new Error('pipeline error'))
+
+      jest
+        .spyOn((commandService as any).snsService, 'publish')
+        .mockRejectedValueOnce(new Error('status update failed'))
+
+      await expect(
+        commandService.publishSync(dirtyPublishSyncInput(), {
+          invokeContext: {},
+        }),
+      ).rejects.toThrow('pipeline error')
+    })
   })
 })
 

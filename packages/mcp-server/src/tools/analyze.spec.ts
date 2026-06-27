@@ -282,6 +282,89 @@ describe('analyze tools', () => {
       expect(result.content[0].text).not.toContain('AP027')
     })
 
+    it('should detect duplicate DataSyncHandler registration across modules (AP028)', async () => {
+      // Handler defined in its own file
+      fs.writeFileSync(
+        path.join(testDir, 'src', 'tenant-config-rds.handler.ts'),
+        `
+        import { DataSyncHandler } from '@mbc-cqrs-serverless/core';
+
+        @DataSyncHandler('tenant-table')
+        export class TenantConfigRdsHandler implements IDataSyncHandler {
+          async up(cmd) {}
+          async down(cmd) {}
+        }
+      `,
+      )
+
+      // Correctly registered in the owning module
+      fs.writeFileSync(
+        path.join(testDir, 'src', 'tenant.module.ts'),
+        `
+        @Module({
+          providers: [TenantConfigRdsHandler],
+        })
+        export class TenantModule {}
+      `,
+      )
+
+      // Incorrectly also registered in a second module
+      fs.writeFileSync(
+        path.join(testDir, 'src', 'agent.module.ts'),
+        `
+        @Module({
+          providers: [TenantConfigRdsHandler],
+        })
+        export class AgentModule {}
+      `,
+      )
+
+      const result = await handleAnalyzeTool(
+        'mbc_check_anti_patterns',
+        { path: 'src' },
+        testDir,
+      )
+
+      expect(result.content[0].text).toContain('AP028')
+      expect(result.content[0].text).toContain(
+        'Duplicate DataSyncHandler Registration',
+      )
+      expect(result.content[0].text).toContain('TenantConfigRdsHandler')
+    })
+
+    it('should NOT flag a DataSyncHandler registered in only one module (AP028 negative)', async () => {
+      fs.writeFileSync(
+        path.join(testDir, 'src', 'order-rds.handler.ts'),
+        `
+        import { DataSyncHandler } from '@mbc-cqrs-serverless/core';
+
+        @DataSyncHandler('order-table')
+        export class OrderRdsHandler implements IDataSyncHandler {
+          async up(cmd) {}
+          async down(cmd) {}
+        }
+      `,
+      )
+
+      fs.writeFileSync(
+        path.join(testDir, 'src', 'order.module.ts'),
+        `
+        @Module({
+          providers: [OrderRdsHandler],
+        })
+        export class OrderModule {}
+      `,
+      )
+
+      const result = await handleAnalyzeTool(
+        'mbc_check_anti_patterns',
+        { path: 'src' },
+        testDir,
+      )
+
+      expect(result.content[0].text).not.toContain('AP028')
+    })
+
     it('should return error for non-existent path', async () => {
       const result = await handleAnalyzeTool(
         'mbc_check_anti_patterns',
