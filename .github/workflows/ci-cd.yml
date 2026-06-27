@@ -48,6 +48,13 @@ jobs:
         run: npm run lint
         continue-on-error: true
 
+      # Blocking: ESLint must at least start. A broken dependency tree
+      # (e.g. an override forcing an incompatible ajv onto @eslint/eslintrc,
+      # see PR #446) crashes ESLint before any file is linted, which the
+      # non-blocking lint step above cannot surface.
+      - name: ESLint startup check
+        run: npx eslint --print-config .eslintrc.js > /dev/null
+
       - name: Type Check
         run: npx tsc --noEmit
         continue-on-error: true
@@ -55,6 +62,13 @@ jobs:
       - name: Security Audit (npm)
         run: npm audit --audit-level=high
         continue-on-error: true
+
+      # Blocking: production dependencies must stay free of high/critical
+      # advisories. npm re-resolution (npm install/update/audit fix) can
+      # silently resurrect vulnerable nested copies that root overrides do
+      # not reach through workspace packages (see PRs #445/#447).
+      - name: Security Audit (production, blocking)
+        run: npm audit --omit=dev --audit-level=high
 
       - name: Security Scan (Trivy)
         uses: aquasecurity/trivy-action@v0.36.0

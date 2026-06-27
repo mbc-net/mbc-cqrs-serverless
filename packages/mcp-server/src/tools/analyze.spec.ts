@@ -282,6 +282,89 @@ describe('analyze tools', () => {
       expect(result.content[0].text).not.toContain('AP027')
     })
 
+    it('should detect duplicate DataSyncHandler registration across modules (AP028)', async () => {
+      // Handler defined in its own file
+      fs.writeFileSync(
+        path.join(testDir, 'src', 'tenant-config-rds.handler.ts'),
+        `
+        import { DataSyncHandler } from '@mbc-cqrs-serverless/core';
+
+        @DataSyncHandler('tenant-table')
+        export class TenantConfigRdsHandler implements IDataSyncHandler {
+          async up(cmd) {}
+          async down(cmd) {}
+        }
+      `,
+      )
+
+      // Correctly registered in the owning module
+      fs.writeFileSync(
+        path.join(testDir, 'src', 'tenant.module.ts'),
+        `
+        @Module({
+          providers: [TenantConfigRdsHandler],
+        })
+        export class TenantModule {}
+      `,
+      )
+
+      // Incorrectly also registered in a second module
+      fs.writeFileSync(
+        path.join(testDir, 'src', 'agent.module.ts'),
+        `
+        @Module({
+          providers: [TenantConfigRdsHandler],
+        })
+        export class AgentModule {}
+      `,
+      )
+
+      const result = await handleAnalyzeTool(
+        'mbc_check_anti_patterns',
+        { path: 'src' },
+        testDir,
+      )
+
+      expect(result.content[0].text).toContain('AP028')
+      expect(result.content[0].text).toContain(
+        'Duplicate DataSyncHandler Registration',
+      )
+      expect(result.content[0].text).toContain('TenantConfigRdsHandler')
+    })
+
+    it('should NOT flag a DataSyncHandler registered in only one module (AP028 negative)', async () => {
+      fs.writeFileSync(
+        path.join(testDir, 'src', 'order-rds.handler.ts'),
+        `
+        import { DataSyncHandler } from '@mbc-cqrs-serverless/core';
+
+        @DataSyncHandler('order-table')
+        export class OrderRdsHandler implements IDataSyncHandler {
+          async up(cmd) {}
+          async down(cmd) {}
+        }
+      `,
+      )
+
+      fs.writeFileSync(
+        path.join(testDir, 'src', 'order.module.ts'),
+        `
+        @Module({
+          providers: [OrderRdsHandler],
+        })
+        export class OrderModule {}
+      `,
+      )
+
+      const result = await handleAnalyzeTool(
+        'mbc_check_anti_patterns',
+        { path: 'src' },
+        testDir,
+      )
+
+      expect(result.content[0].text).not.toContain('AP028')
+    })
+
     it('should return error for non-existent path', async () => {
       const result = await handleAnalyzeTool(
         'mbc_check_anti_patterns',
@@ -291,6 +374,106 @@ describe('analyze tools', () => {
 
       expect(result.isError).toBe(true)
       expect(result.content[0].text).toContain('Path not found')
+    })
+
+    /** AP029: custom DataSyncHandler using reserved type = 'dynamodb' */
+    it('should detect reserved type dynamodb in custom DataSyncHandler (AP029)', async () => {
+      fs.writeFileSync(
+        path.join(testDir, 'src', 'bad-handler.ts'),
+        `
+        import { DataSyncHandler, IDataSyncHandler } from '@mbc-cqrs-serverless/core';
+
+        @DataSyncHandler('my-table')
+        export class BadHandler implements IDataSyncHandler {
+          readonly type = 'dynamodb'
+          async up(cmd) {}
+          async down(cmd) {}
+        }
+      `,
+      )
+
+      const result = await handleAnalyzeTool(
+        'mbc_check_anti_patterns',
+        { path: 'src' },
+        testDir,
+      )
+
+      expect(result.content[0].text).toContain('AP029')
+      expect(result.content[0].text).toContain('Reserved DataSyncHandler Type')
+    })
+
+    it('should NOT flag DataSyncHandler with a non-reserved type (AP029 negative)', async () => {
+      fs.writeFileSync(
+        path.join(testDir, 'src', 'ok-handler.ts'),
+        `
+        import { DataSyncHandler, IDataSyncHandler } from '@mbc-cqrs-serverless/core';
+
+        @DataSyncHandler('my-table')
+        export class OkHandler implements IDataSyncHandler {
+          readonly type = 'rds'
+          async up(cmd) {}
+          async down(cmd) {}
+        }
+      `,
+      )
+
+      const result = await handleAnalyzeTool(
+        'mbc_check_anti_patterns',
+        { path: 'src' },
+        testDir,
+      )
+
+      expect(result.content[0].text).not.toContain('AP029')
+    })
+
+    /** AP030: @DataSyncHandler with fully-qualified table name ending in -command */
+    it('should detect fully-qualified table name with -command suffix (AP030)', async () => {
+      fs.writeFileSync(
+        path.join(testDir, 'src', 'bad-table-name.ts'),
+        `
+        import { DataSyncHandler, IDataSyncHandler } from '@mbc-cqrs-serverless/core';
+
+        @DataSyncHandler('dev-my-table-command')
+        export class MyHandler implements IDataSyncHandler {
+          async up(cmd) {}
+          async down(cmd) {}
+        }
+      `,
+      )
+
+      const result = await handleAnalyzeTool(
+        'mbc_check_anti_patterns',
+        { path: 'src' },
+        testDir,
+      )
+
+      expect(result.content[0].text).toContain('AP030')
+      expect(result.content[0].text).toContain(
+        'Fully-Qualified Table Name in @DataSyncHandler',
+      )
+    })
+
+    it('should NOT flag DataSyncHandler with raw table name (AP030 negative)', async () => {
+      fs.writeFileSync(
+        path.join(testDir, 'src', 'ok-table-name.ts'),
+        `
+        import { DataSyncHandler, IDataSyncHandler } from '@mbc-cqrs-serverless/core';
+
+        @DataSyncHandler('my-table')
+        export class MyHandler implements IDataSyncHandler {
+          async up(cmd) {}
+          async down(cmd) {}
+        }
+      `,
+      )
+
+      const result = await handleAnalyzeTool(
+        'mbc_check_anti_patterns',
+        { path: 'src' },
+        testDir,
+      )
+
+      expect(result.content[0].text).not.toContain('AP030')
     })
   })
 

@@ -33,15 +33,17 @@ export class ExplorerService {
 
   exploreDataSyncHandlers(commandTableName: string) {
     const modules = [...this.modulesContainer.values()]
-    const dataSyncHandlers = this.flatMap<IDataSyncHandler>(
-      modules,
-      (instance) =>
-        this.filterProvider(
-          instance,
-          DATA_SYNC_HANDLER_METADATA,
-          commandTableName,
+    const dataSyncHandlers = [
+      ...new Set(
+        this.flatMap<IDataSyncHandler>(modules, (instance) =>
+          this.filterProvider(
+            instance,
+            DATA_SYNC_HANDLER_METADATA,
+            commandTableName,
+          ),
         ),
-    )
+      ),
+    ]
     return { dataSyncHandlers }
   }
 

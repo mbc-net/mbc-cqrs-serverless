@@ -59,8 +59,8 @@
     "@types/node": "^20.10.5",
     "@types/node-fetch": "^2.6.9",
     "@types/supertest": "^6.0.1",
-    "@typescript-eslint/eslint-plugin": "^6.15.0",
-    "@typescript-eslint/parser": "^6.15.0",
+    "@typescript-eslint/eslint-plugin": "^8.61.0",
+    "@typescript-eslint/parser": "^8.61.0",
     "class-transformer": "^0.5.1",
     "class-validator": "^0.14.0",
     "concurrently": "^9.0.1",
@@ -101,21 +101,43 @@
     "tsconfig-paths": "4.2.0",
     "typescript": "^5.3.3",
     "ulid": "^2.3.0",
-    "webpack": "^5.88.2"
+    "webpack": "^5.105.0"
   },
   "optionalDependencies": {
-    "@aws-sdk/client-dynamodb": "^3.606.0",
-    "@aws-sdk/client-s3": "^3.608.0",
-    "@aws-sdk/client-sesv2": "^3.608.0",
-    "@aws-sdk/client-sfn": "^3.606.0",
-    "@aws-sdk/client-sns": "^3.606.0",
-    "@aws-sdk/client-sqs": "^3.606.0",
-    "@aws-sdk/client-ssm": "^3.606.0",
-    "@aws-sdk/credential-provider-node": "^3.600.0",
-    "@aws-sdk/lib-storage": "^3.608.0",
-    "@aws-sdk/s3-request-presigner": "^3.608.0",
+    "@aws-sdk/client-dynamodb": "^3.981.0",
+    "@aws-sdk/client-s3": "^3.981.0",
+    "@aws-sdk/client-sesv2": "^3.981.0",
+    "@aws-sdk/client-sfn": "^3.981.0",
+    "@aws-sdk/client-sns": "^3.981.0",
+    "@aws-sdk/client-sqs": "^3.981.0",
+    "@aws-sdk/client-ssm": "^3.981.0",
+    "@aws-sdk/credential-provider-node": "^3.972.4",
+    "@aws-sdk/lib-storage": "^3.932.0",
+    "@aws-sdk/s3-request-presigner": "^3.981.0",
     "@aws-sdk/signature-v4": "^3.374.0",
     "@aws-sdk/util-create-request": "^3.598.0",
     "@aws-sdk/util-dynamodb": "^3.606.0"
+  },
+  "overrides": {
+    "xml2js": "^0.6.2",
+    "trim-newlines": "^3.0.1",
+    "jsonwebtoken": "^9.0.2",
+    "lodash": "^4.18.0",
+    "js-yaml": "4.1.1",
+    "tmp": "^0.2.6",
+    "qs": "^6.14.2",
+    "yaml": "^2.8.3",
+    "follow-redirects": "^1.16.0",
+    "flatted": "^3.4.2",
+    "multer": "^2.2.0",
+    "@angular-devkit/core": {
+      "ajv": "^8.18.0",
+      "picomatch": "^4.0.4"
+    },
+    "shell-quote": "^1.8.4",
+    "uuid": "^11.1.1",
+    "@aws-sdk/core": {
+      "fast-xml-parser": "^5.7.3"
+    }
   }
 }
