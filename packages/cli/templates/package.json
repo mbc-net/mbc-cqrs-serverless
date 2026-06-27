@@ -129,7 +129,7 @@
     "yaml": "^2.8.3",
     "follow-redirects": "^1.16.0",
     "flatted": "^3.4.2",
-    "multer": "^2.1.1",
+    "multer": "^2.2.0",
     "@angular-devkit/core": {
       "ajv": "^8.18.0",
       "picomatch": "^4.0.4"
