@@ -739,6 +739,31 @@ const ANTI_PATTERNS = [
     recommendation:
       'Do not annotate a @GroupRoleResolver() class with @Injectable(). @GroupRoleResolver() already registers the class as a singleton provider; adding @Injectable() (particularly with REQUEST/TRANSIENT scope) overrides the scope and breaks bootstrap, which resolves the resolver exactly once at application startup. Remove the extra @Injectable().',
   },
+  {
+    code: 'AP029',
+    name: 'Reserved DataSyncHandler Type',
+    severity: 'high' as const,
+    // Detect a @DataSyncHandler-decorated class that sets readonly type = 'dynamodb'.
+    // 'dynamodb' is reserved for the internal DataSyncDdsHandler. Any user-defined
+    // handler with this type is silently excluded from publishSync's handler pipeline
+    // (which filters out type === 'dynamodb'), causing data loss with no error or warning.
+    pattern:
+      /@DataSyncHandler[\s\S]{0,500}readonly\s+type\s*=\s*['"`]dynamodb['"`]/,
+    recommendation:
+      "Remove or rename the 'dynamodb' type value. This string is reserved for the internal DataSyncDdsHandler. Setting readonly type = 'dynamodb' on a custom handler causes publishSync to silently exclude it from the synchronous pipeline (CommandService filters handler.type !== 'dynamodb'), resulting in data loss with no error or warning. Use any other string (e.g. 'rds', 'opensearch') or omit the type property entirely.",
+  },
+  {
+    code: 'AP030',
+    name: 'Fully-Qualified Table Name in @DataSyncHandler',
+    severity: 'high' as const,
+    // Detect @DataSyncHandler called with a table name ending in '-command'.
+    // The decorator expects the RAW table name as passed to CommandModule.register({ tableName }).
+    // Passing the DynamoDB-level name (e.g. 'dev-my-table-command') causes silent handler
+    // discovery failure: ExplorerService matches by this metadata key and finds nothing.
+    pattern: /@DataSyncHandler\s*\(\s*['"`][^'"`]+-command['"`]/,
+    recommendation:
+      "Pass the raw table name to @DataSyncHandler(), not the fully-qualified DynamoDB table name. Example: if CommandModule.register({ tableName: 'my-table' }), then use @DataSyncHandler('my-table'). Passing 'dev-my-table-command' (with environment prefix and -command suffix) causes the ExplorerService to find no matching metadata, so the handler is silently never called — no error is raised. Remove the environment prefix and the '-command' suffix.",
+  },
 ]
 
 /**
@@ -766,6 +791,8 @@ const DETECTOR_TO_SKILL_AP: Record<string, string> = {
   // AP026: detector-only (no skill-doc AP counterpart)
   AP027: 'AP022', // GroupRoleResolver + @Injectable → Incorrect Group-Based Role Resolver Implementation
   AP028: 'AP023', // Duplicate DataSyncHandler Registration → Duplicate DataSyncHandler Registration Across Modules
+  AP029: 'AP024', // Reserved DataSyncHandler Type → Reserved DataSyncHandler Type
+  AP030: 'AP025', // Fully-Qualified Table Name in @DataSyncHandler → Fully-Qualified Table Name
 }
 
 /**
