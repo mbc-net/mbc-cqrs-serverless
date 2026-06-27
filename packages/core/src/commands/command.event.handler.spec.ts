@@ -676,4 +676,54 @@ describe('DataSyncCommandSfnEventHandler', () => {
       )
     })
   })
+
+  describe('checkNextToken - warn log context', () => {
+    function makeCheckNextTokenHandler(
+      commandService: any,
+      sfnService: any,
+    ): { h: any; warnSpy: jest.Mock } {
+      const h = new (CommandEventHandler as any)(
+        { tableName: 'test-table' },
+        commandService,
+        null,
+        null,
+        null,
+        null,
+        { get: jest.fn().mockReturnValue('') },
+        sfnService,
+      )
+      const warnSpy = jest.fn()
+      h.logger = { debug: jest.fn(), log: jest.fn(), warn: warnSpy }
+      return { h, warnSpy }
+    }
+
+    it('should include pk and nextCommand.sk in warn log when resumeExecution fails', async () => {
+      const nextCommandSk = 'order#001@2'
+      const mockCommandService = {
+        getNextCommand: jest.fn().mockResolvedValue({
+          version: 2,
+          taskToken: 'some-token',
+          sk: nextCommandSk,
+          status: 'wait:WAIT_PREV_COMMAND',
+        }),
+      }
+      const mockSfnService = {
+        resumeExecution: jest.fn().mockRejectedValue(new Error('SFN error')),
+      }
+
+      const { h, warnSpy } = makeCheckNextTokenHandler(
+        mockCommandService,
+        mockSfnService,
+      )
+      const event = createEvent(DataSyncCommandSfnName.FINISH)
+
+      await h['checkNextToken'](event)
+
+      expect(warnSpy).toHaveBeenCalledTimes(1)
+      const message: string = warnSpy.mock.calls[0][0]
+      // Must include the pk from the event and the sk of the next command
+      expect(message).toContain(event.commandKey.pk)
+      expect(message).toContain(nextCommandSk)
+    })
+  })
 })
