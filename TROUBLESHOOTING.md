@@ -93,6 +93,25 @@ This guide covers common issues and their solutions when working with MBC CQRS S
 3. Check IAM permissions in AWS deployment
 4. Review CloudWatch logs for errors
 
+### Writes Via `publishAsync` Silently Stop Reaching the Read Side
+
+**Symptom**: A command (e.g. delete/update) returns success from `publishAsync`, and
+the command row in DynamoDB reflects the change, but the RDS/read-side projection
+never updates — the entity looks unchanged (or keeps "coming back") no matter how
+many times the write is retried.
+
+**Cause**: A known race condition in the command-version chaining mechanism
+(`wait_prev_command` / `checkNextToken`) can cause a version's Step Functions
+execution to stall permanently, taking every later version of the same entity down
+with it. This is not fixed by retrying the write — each retry adds another stalled
+version on top. See
+[Command Version Chain Race Condition](docs/architecture/command-version-chain-race-condition.md)
+for the full mechanism, how to confirm it (compare the entity's `version` in the
+read-side table vs. the highest `version` in the command table, and check for
+`RUNNING` Step Functions executions stuck on `wait_prev_command`), and data-repair
+guidance. There is currently no code-level fix — see that doc for suggested
+directions.
+
 ## Testing Issues
 
 ### Tests Timeout
