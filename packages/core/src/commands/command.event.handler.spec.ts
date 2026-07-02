@@ -27,6 +27,7 @@ import { CommandService } from './command.service'
 import { DataSyncDdsHandler } from './handlers/data-sync-dds.handler'
 import { HistoryService } from './history.service'
 import { DataSyncCommandSfnName } from '../command-events/sfn-name.enum'
+import { CommandStatus, getCommandStatus } from './enums/status.enum'
 import { TtlService } from './ttl.service'
 import { SnsClientFactory } from '../queue/sns-client-factory'
 import { SFNClient } from '@aws-sdk/client-sfn'
@@ -127,6 +128,78 @@ const sfnSyncDataEvent = createEvent(DataSyncCommandSfnName.SYNC_DATA, {
 })
 
 const sfnFinishDataEvent = createEvent(DataSyncCommandSfnName.FINISH)
+
+const createWaitConfirmEvent = (version: number, taskToken = 'test-task-token') => {
+  const sk = `1726027976@${version}`
+  return new DataSyncCommandSfnEvent({
+    taskToken,
+    input: undefined,
+    context: {
+      Execution: {
+        Id: 'arn:aws:states:ap-northeast-1:101010101010:execution:command:test-v2',
+        Input: {
+          eventSourceARN:
+            'arn:aws:dynamodb:ap-northeast-1:undefined:env-app_name-table_name-command',
+          awsRegion: 'ddblocal',
+          eventID: 'test-event-id',
+          eventName: 'INSERT',
+          eventVersion: '1.1',
+          eventSource: 'aws:dynamodb',
+          dynamodb: {
+            ApproximateCreationDateTime: '2024-09-13T08:02:00.000Z',
+            Keys: { sk: { S: sk }, pk: { S: 'tenantCode#test' } },
+            NewImage: {
+              pk: { S: 'tenantCode#test' },
+              sk: { S: sk },
+              version: { N: String(version) },
+              requestId: { S: 'req-1' },
+            },
+            SequenceNumber: '1',
+            SizeBytes: 100,
+            StreamViewType: 'NEW_IMAGE',
+          },
+          source:
+            'arn:aws:dynamodb:ap-northeast-1:undefined:env-app_name-table_name-command',
+        },
+        Name: 'test-execution',
+        RoleArn: 'arn:aws:iam::101010101010:role/DummyRole',
+        StartTime: '2024-09-13T08:02:52.094Z',
+      },
+      State: {
+        EnteredTime: '2024-09-13T08:02:54.849Z',
+        Name: DataSyncCommandSfnName.WAIT_PREV_COMMAND,
+        RetryCount: 0,
+      },
+      StateMachine: {
+        Id: 'arn:aws:states:ap-northeast-1:101010101010:stateMachine:command',
+        Name: 'command',
+      },
+    },
+  })
+}
+
+function makeWaitConfirmTokenHandler(
+  commandService: {
+    updateTaskToken: jest.Mock
+    getItem: jest.Mock
+  },
+  sfnService: { resumeExecution: jest.Mock },
+): { h: CommandEventHandler; logSpy: jest.Mock; warnSpy: jest.Mock } {
+  const h = new (CommandEventHandler as any)(
+    { tableName: 'test-table' },
+    commandService,
+    null,
+    null,
+    null,
+    null,
+    { get: jest.fn().mockReturnValue('') },
+    sfnService,
+  )
+  const logSpy = jest.fn()
+  const warnSpy = jest.fn()
+  h.logger = { debug: jest.fn(), log: logSpy, warn: warnSpy }
+  return { h, logSpy, warnSpy }
+}
 
 const keys = {
   NODE_ENV: 'env',
@@ -724,6 +797,131 @@ describe('DataSyncCommandSfnEventHandler', () => {
       // Must include the pk from the event and the sk of the next command
       expect(message).toContain(event.commandKey.pk)
       expect(message).toContain(nextCommandSk)
+    })
+  })
+
+  describe('waitConfirmToken - pull-side self-resume', () => {
+    const finishStatus = getCommandStatus(
+      DataSyncCommandSfnName.FINISH,
+      CommandStatus.STATUS_FINISHED,
+    )
+
+    it('should self-resume when predecessor is finish:FINISHED', async () => {
+      const taskToken = 'self-resume-token'
+      const mockCommandService = {
+        updateTaskToken: jest.fn().mockResolvedValue(undefined),
+        getItem: jest.fn().mockResolvedValue({
+          version: 1,
+          status: finishStatus,
+          sk: '1726027976@1',
+        }),
+      }
+      const mockSfnService = {
+        resumeExecution: jest.fn().mockResolvedValue(undefined),
+      }
+
+      const { h } = makeWaitConfirmTokenHandler(
+        mockCommandService,
+        mockSfnService,
+      )
+      const event = createWaitConfirmEvent(2, taskToken)
+
+      const result = await h['waitConfirmToken'](event)
+
+      expect(mockCommandService.updateTaskToken).toHaveBeenCalledWith(
+        event.commandKey,
+        taskToken,
+      )
+      expect(mockCommandService.getItem).toHaveBeenCalledWith({
+        pk: 'tenantCode#test',
+        sk: '1726027976@1',
+      })
+      expect(mockSfnService.resumeExecution).toHaveBeenCalledWith(taskToken, {
+        result: 'resumed_by_prev_version',
+        prevVersion: 1,
+      })
+      expect(result).toEqual({ result: { token: taskToken } })
+    })
+
+    it('should not resume when predecessor is not finish:FINISHED', async () => {
+      const taskToken = 'wait-token'
+      const mockCommandService = {
+        updateTaskToken: jest.fn().mockResolvedValue(undefined),
+        getItem: jest.fn().mockResolvedValue({
+          version: 1,
+          status: getCommandStatus(
+            DataSyncCommandSfnName.SYNC_DATA,
+            CommandStatus.STATUS_FINISHED,
+          ),
+          sk: '1726027976@1',
+        }),
+      }
+      const mockSfnService = {
+        resumeExecution: jest.fn().mockResolvedValue(undefined),
+      }
+
+      const { h } = makeWaitConfirmTokenHandler(
+        mockCommandService,
+        mockSfnService,
+      )
+      const event = createWaitConfirmEvent(2, taskToken)
+
+      await h['waitConfirmToken'](event)
+
+      expect(mockCommandService.updateTaskToken).toHaveBeenCalled()
+      expect(mockSfnService.resumeExecution).not.toHaveBeenCalled()
+    })
+
+    it('should not lookup predecessor when version is 1', async () => {
+      const mockCommandService = {
+        updateTaskToken: jest.fn().mockResolvedValue(undefined),
+        getItem: jest.fn(),
+      }
+      const mockSfnService = {
+        resumeExecution: jest.fn(),
+      }
+
+      const { h } = makeWaitConfirmTokenHandler(
+        mockCommandService,
+        mockSfnService,
+      )
+      const event = createWaitConfirmEvent(1, 'v1-token')
+
+      await h['waitConfirmToken'](event)
+
+      expect(mockCommandService.getItem).not.toHaveBeenCalled()
+      expect(mockSfnService.resumeExecution).not.toHaveBeenCalled()
+    })
+
+    it('should warn and not throw when resumeExecution fails (duplicate resume)', async () => {
+      const taskToken = 'dup-token'
+      const mockCommandService = {
+        updateTaskToken: jest.fn().mockResolvedValue(undefined),
+        getItem: jest.fn().mockResolvedValue({
+          version: 1,
+          status: finishStatus,
+          sk: '1726027976@1',
+        }),
+      }
+      const mockSfnService = {
+        resumeExecution: jest
+          .fn()
+          .mockRejectedValue(new Error('TaskDoesNotExist')),
+      }
+
+      const { h, warnSpy } = makeWaitConfirmTokenHandler(
+        mockCommandService,
+        mockSfnService,
+      )
+      const event = createWaitConfirmEvent(2, taskToken)
+
+      await expect(h['waitConfirmToken'](event)).resolves.toEqual({
+        result: { token: taskToken },
+      })
+
+      expect(warnSpy).toHaveBeenCalledTimes(1)
+      expect(warnSpy.mock.calls[0][0]).toContain('tenantCode#test')
+      expect(warnSpy.mock.calls[0][0]).toContain('Could not self-resume')
     })
   })
 })

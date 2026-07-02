@@ -102,7 +102,44 @@ export class CommandEventHandler {
     event: DataSyncCommandSfnEvent,
   ): Promise<StepFunctionStateInput> {
     this.logger.debug('waitConfirmToken::', event)
+
     await this.commandService.updateTaskToken(event.commandKey, event.taskToken)
+
+    if (event.commandRecord.version > 1) {
+      const prevSk = addSortKeyVersion(
+        removeSortKeyVersion(event.commandRecord.sk),
+        event.commandRecord.version - 1,
+      )
+      const prevCommand = await this.commandService.getItem({
+        pk: event.commandRecord.pk,
+        sk: prevSk,
+      })
+
+      const prevFinished =
+        prevCommand?.status ===
+        getCommandStatus(
+          DataSyncCommandSfnName.FINISH,
+          CommandStatus.STATUS_FINISHED,
+        )
+
+      if (prevFinished) {
+        this.logger.log(
+          `Prev command already finished before token was read — self-resuming v${event.commandRecord.version}`,
+        )
+        try {
+          await this.sfnService.resumeExecution(event.taskToken, {
+            result: 'resumed_by_prev_version',
+            prevVersion: event.commandRecord.version - 1,
+          })
+        } catch (e) {
+          this.logger.warn(
+            `[${event.commandKey.pk}] Could not self-resume command v${event.commandRecord.version}: ` +
+              `${e instanceof Error ? e.message : 'Unknown error'}`,
+          )
+        }
+      }
+    }
+
     return {
       result: {
         token: event.taskToken,
