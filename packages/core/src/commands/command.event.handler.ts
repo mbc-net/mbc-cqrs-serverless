@@ -190,7 +190,14 @@ export class CommandEventHandler {
   ): Promise<StepFunctionStateInput[]> {
     this.logger.debug('transformData:: ', event.commandRecord)
 
-    return this.commandService.dataSyncHandlers.map((cls) => ({
+    const handlers = this.commandService.dataSyncHandlers
+    if (handlers.length === 0) {
+      this.logger.warn(
+        `[${this.options.tableName}] transformData: no DataSyncHandlers registered — ` +
+          `no sync will occur for ${this.options.tableName}`,
+      )
+    }
+    return handlers.map((cls) => ({
       prevStateName: event.stepStateName,
       result: cls.constructor.name,
     }))
@@ -239,7 +246,8 @@ export class CommandEventHandler {
         })
       } catch (e) {
         this.logger.warn(
-          `Could not resume command v${nextCommand.version}: ${e instanceof Error ? e.message : 'Unknown error'}`,
+          `[${event.commandKey.pk}] Could not resume command v${nextCommand.version} (sk: ${nextCommand.sk}): ` +
+            `${e instanceof Error ? e.message : 'Unknown error'}`,
         )
       }
     } else {

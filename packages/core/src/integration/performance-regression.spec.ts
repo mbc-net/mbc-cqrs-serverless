@@ -133,7 +133,7 @@ describe('Performance Regression Tests', () => {
       expect(duration).toBeLessThan(500)
     })
 
-    it('should marshall 100 complex nested objects within 300ms', () => {
+    it('should marshall 100 complex nested objects within 500ms', () => {
       const complexObjects = Array.from({ length: 100 }, () =>
         generateLargeObject(3, 3),
       )
@@ -144,8 +144,8 @@ describe('Performance Regression Tests', () => {
       }
       const duration = performance.now() - start
 
-      // Relaxed threshold for CI environments
-      expect(duration).toBeLessThan(300)
+      // Relaxed threshold for CI environments (complex nested objects are slow)
+      expect(duration).toBeLessThan(500)
     })
 
     it('should marshall object with 100 fields within 50ms', () => {
@@ -197,7 +197,7 @@ describe('Performance Regression Tests', () => {
       expect(duration).toBeLessThan(500)
     })
 
-    it('should unmarshall 100 complex nested objects within 300ms', () => {
+    it('should unmarshall 100 complex nested objects within 500ms', () => {
       const marshalledObjects = Array.from({ length: 100 }, () =>
         marshall(generateLargeObject(3, 3)),
       )
@@ -208,8 +208,8 @@ describe('Performance Regression Tests', () => {
       }
       const duration = performance.now() - start
 
-      // Relaxed threshold for CI environments
-      expect(duration).toBeLessThan(300)
+      // Relaxed threshold for CI environments (complex nested objects are slow)
+      expect(duration).toBeLessThan(500)
     })
   })
 

@@ -447,7 +447,8 @@ describe('DataSyncCommandSfnEventHandler', () => {
 
       console.log('result,', result)
 
-      // Assert
+      // Assert: dedup が効いていれば MockedHandler は 1 件のみ
+      expect(result).toHaveLength(1)
       expect(result).toEqual(
         expect.arrayContaining([
           { prevStateName: 'transform_data', result: 'MockedHandler' },
@@ -613,6 +614,116 @@ describe('DataSyncCommandSfnEventHandler', () => {
           ':status': { S: 'finish:FINISHED' },
         }),
       })
+    })
+  })
+
+  describe('transformData - empty handler list warning', () => {
+    function makeHandler(handlers: any[]) {
+      const mockCommandService = {
+        dataSyncHandlers: handlers,
+        updateStatus: jest.fn().mockResolvedValue(undefined),
+      }
+      const warnSpy = jest.fn()
+      const h = new (CommandEventHandler as any)(
+        { tableName: 'test-table' },
+        mockCommandService,
+        null,
+        null,
+        null,
+        { publish: jest.fn().mockResolvedValue(undefined) },
+        { get: jest.fn().mockReturnValue('') },
+        null,
+      )
+      h.logger = { debug: jest.fn(), warn: warnSpy }
+      return { h, warnSpy }
+    }
+
+    it('should emit a warn log when dataSyncHandlers is empty', async () => {
+      const { h, warnSpy } = makeHandler([])
+      const event = createEvent(DataSyncCommandSfnName.TRANSFORM_DATA, {
+        result: 'ok',
+      })
+
+      await h['transformData'](event)
+
+      expect(warnSpy).toHaveBeenCalledTimes(1)
+      expect(warnSpy.mock.calls[0][0]).toContain('no sync will occur')
+    })
+
+    it('should NOT emit a warn log when dataSyncHandlers is non-empty', async () => {
+      const { h, warnSpy } = makeHandler([new MockedHandler()])
+      const event = createEvent(DataSyncCommandSfnName.TRANSFORM_DATA, {
+        result: 'ok',
+      })
+
+      await h['transformData'](event)
+
+      expect(warnSpy).not.toHaveBeenCalled()
+    })
+
+    it('should map each handler to its constructor.name in the SFN input', async () => {
+      const { h } = makeHandler([new MockedHandler()])
+      const event = createEvent(DataSyncCommandSfnName.TRANSFORM_DATA, {
+        result: 'ok',
+      })
+
+      const result = (await h['transformData'](event)) as any[]
+
+      expect(result).toHaveLength(1)
+      expect(result[0].result).toBe('MockedHandler')
+      expect(result[0].prevStateName).toBe(
+        DataSyncCommandSfnName.TRANSFORM_DATA,
+      )
+    })
+  })
+
+  describe('checkNextToken - warn log context', () => {
+    function makeCheckNextTokenHandler(
+      commandService: any,
+      sfnService: any,
+    ): { h: any; warnSpy: jest.Mock } {
+      const h = new (CommandEventHandler as any)(
+        { tableName: 'test-table' },
+        commandService,
+        null,
+        null,
+        null,
+        null,
+        { get: jest.fn().mockReturnValue('') },
+        sfnService,
+      )
+      const warnSpy = jest.fn()
+      h.logger = { debug: jest.fn(), log: jest.fn(), warn: warnSpy }
+      return { h, warnSpy }
+    }
+
+    it('should include pk and nextCommand.sk in warn log when resumeExecution fails', async () => {
+      const nextCommandSk = 'order#001@2'
+      const mockCommandService = {
+        getNextCommand: jest.fn().mockResolvedValue({
+          version: 2,
+          taskToken: 'some-token',
+          sk: nextCommandSk,
+          status: 'wait:WAIT_PREV_COMMAND',
+        }),
+      }
+      const mockSfnService = {
+        resumeExecution: jest.fn().mockRejectedValue(new Error('SFN error')),
+      }
+
+      const { h, warnSpy } = makeCheckNextTokenHandler(
+        mockCommandService,
+        mockSfnService,
+      )
+      const event = createEvent(DataSyncCommandSfnName.FINISH)
+
+      await h['checkNextToken'](event)
+
+      expect(warnSpy).toHaveBeenCalledTimes(1)
+      const message: string = warnSpy.mock.calls[0][0]
+      // Must include the pk from the event and the sk of the next command
+      expect(message).toContain(event.commandKey.pk)
+      expect(message).toContain(nextCommandSk)
     })
   })
 })

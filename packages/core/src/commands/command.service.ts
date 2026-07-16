@@ -83,11 +83,12 @@ export class CommandService implements OnModuleInit, ICommandService {
       this[DATA_SYNC_HANDLER] = [this.dataSyncDdsHandler]
     }
     if (this.options.dataSyncHandlers?.length) {
-      // this.logger.debug('init data sync handlers')
       this[DATA_SYNC_HANDLER].push(
-        ...this.options.dataSyncHandlers.map((HandlerClass) =>
-          this.moduleRef.get(HandlerClass, { strict: false }),
-        ),
+        ...this.options.dataSyncHandlers
+          .map((HandlerClass) =>
+            this.moduleRef.get(HandlerClass, { strict: false }),
+          )
+          .filter((handler) => !!handler),
       )
     }
     this.logger.debug('find data sync handlers from decorator')
@@ -100,9 +101,27 @@ export class CommandService implements OnModuleInit, ICommandService {
         .map((handler) => this.moduleRef.get(handler, { strict: false }))
         .filter((handler) => !!handler),
     )
-    // this.logger.debug(
-    //   'data sync handlers length: ' + this[DATA_SYNC_HANDLER].length,
-    // )
+
+    const allHandlers = this[DATA_SYNC_HANDLER]
+    const seen = new Map<string, IDataSyncHandler>()
+    const dupNames: string[] = []
+    for (const h of allHandlers) {
+      const name = h.constructor.name
+      if (seen.has(name)) {
+        dupNames.push(name)
+      } else {
+        seen.set(name, h)
+      }
+    }
+    if (dupNames.length > 0) {
+      this.logger.warn(
+        `[${this.options.tableName}] Duplicate DataSyncHandler instances detected ` +
+          `(${allHandlers.length} registered, ${seen.size} unique, ` +
+          `duplicates: ${[...new Set(dupNames)].join(', ')}). ` +
+          `Each @DataSyncHandler class must be registered as a provider in exactly one module.`,
+      )
+    }
+    this[DATA_SYNC_HANDLER] = [...seen.values()]
   }
 
   set tableName(name: string) {
@@ -251,7 +270,10 @@ export class CommandService implements OnModuleInit, ICommandService {
       // 4. Write to Data table (same role as DataSyncDdsHandler in SYNC_DATA)
       await this.dataService.publish(command)
 
-      // 5. Execute custom data sync handlers
+      // 5. Execute custom data sync handlers.
+      //    Set versioned sk on command before calling handlers so they receive
+      //    the same sk that the SFN path provides (sk@version, not raw sk).
+      command.sk = versionedSk
       const targetSyncHandlers = this.dataSyncHandlers?.filter(
         (handler) => handler.type !== 'dynamodb',
       )
@@ -267,15 +289,22 @@ export class CommandService implements OnModuleInit, ICommandService {
       )
 
       command.status = getCommandStatus('finish', CommandStatus.STATUS_FINISHED)
-      command.sk = versionedSk
       return command
     } catch (error) {
-      // Mark as failed if the synchronous pipeline breaks
-      await this.updateStatus(
-        { pk: command.pk, sk: versionedSk },
-        getCommandStatus('publish_sync', CommandStatus.STATUS_FAILED),
-        requestId,
-      )
+      // Mark as failed if the synchronous pipeline breaks.
+      // Wrap updateStatus so its own failure cannot mask the original error.
+      try {
+        await this.updateStatus(
+          { pk: command.pk, sk: versionedSk },
+          getCommandStatus('publish_sync', CommandStatus.STATUS_FAILED),
+          requestId,
+        )
+      } catch (statusErr) {
+        this.logger.warn(
+          `[publishSync] Failed to mark command as FAILED (pk=${command.pk}, sk=${versionedSk}): ` +
+            `${statusErr instanceof Error ? statusErr.message : statusErr}`,
+        )
+      }
       throw error
     }
   }
