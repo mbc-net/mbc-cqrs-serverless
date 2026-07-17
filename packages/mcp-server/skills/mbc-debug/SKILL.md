@@ -419,6 +419,23 @@ functions:
 
 ---
 
+### 11. States.DataLimitExceeded in Command State Machine (fixed in v1.3.3)
+
+**Symptom:** The command state machine execution fails with:
+```
+error: States.DataLimitExceeded
+cause: The state/task 'check_version' provided parameters with a size
+       exceeding the maximum number of bytes service limit.
+```
+
+**Cause:** `ATTRIBUTE_LIMIT_SIZE` was set too high. AWS Step Functions enforces a 256 KB payload limit per state, but the command state machine passes the DynamoDB stream event twice per state (`input.$` and `context.$`), so inline `attributes` above roughly 110 KB can exceed that limit even though DynamoDB itself allows items up to 400 KB. Prior to v1.3.3, the framework's default `ATTRIBUTE_LIMIT_SIZE` in generated CDK templates and env examples was `389120` (380 KB) — sized for DynamoDB's item limit rather than the Step Functions payload limit.
+
+**Fix:** As of v1.3.3, the default is lowered to `102400` (100 KB). If your `.env` or CDK stack (`infra/libs/infra-stack.ts`) still sets `ATTRIBUTE_LIMIT_SIZE=389120` (or another value above ~110 KB), lower it to `102400` or less. Attributes larger than this threshold are automatically offloaded to S3 by `DynamoDbService.objToDdbItem()`, so lowering the limit does not lose data — it just offloads to S3 earlier.
+
+**Related:** See migration guide v1.3.3.
+
+---
+
 ## CloudWatch Log Queries
 
 ### Find Errors by Request ID
