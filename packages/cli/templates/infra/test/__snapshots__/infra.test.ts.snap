@@ -1059,7 +1059,7 @@ exports[`snapshot test for InfraStack 1`] = `
               ],
             },
             "APP_NAME": "",
-            "ATTRIBUTE_LIMIT_SIZE": "389120",
+            "ATTRIBUTE_LIMIT_SIZE": "102400",
             "COGNITO_USER_POOL_ID": {
               "Ref": "devuserpool23B1805F",
             },
