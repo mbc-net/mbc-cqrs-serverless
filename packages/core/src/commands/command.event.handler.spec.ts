@@ -801,10 +801,51 @@ describe('DataSyncCommandSfnEventHandler', () => {
   })
 
   describe('waitConfirmToken - pull-side self-resume', () => {
+    const finishStartedStatus = getCommandStatus(
+      DataSyncCommandSfnName.FINISH,
+      CommandStatus.STATUS_STARTED,
+    )
     const finishStatus = getCommandStatus(
       DataSyncCommandSfnName.FINISH,
       CommandStatus.STATUS_FINISHED,
     )
+
+    it('should self-resume when predecessor is finish:STARTED', async () => {
+      const taskToken = 'self-resume-started-token'
+      const mockCommandService = {
+        updateTaskToken: jest.fn().mockResolvedValue(undefined),
+        getItem: jest.fn().mockResolvedValue({
+          version: 1,
+          status: finishStartedStatus,
+          sk: '1726027976@1',
+        }),
+      }
+      const mockSfnService = {
+        resumeExecution: jest.fn().mockResolvedValue(undefined),
+      }
+
+      const { h } = makeWaitConfirmTokenHandler(
+        mockCommandService,
+        mockSfnService,
+      )
+      const event = createWaitConfirmEvent(2, taskToken)
+
+      const result = await h['waitConfirmToken'](event)
+
+      expect(mockCommandService.updateTaskToken).toHaveBeenCalledWith(
+        event.commandKey,
+        taskToken,
+      )
+      expect(mockCommandService.getItem).toHaveBeenCalledWith(
+        { pk: 'tenantCode#test', sk: '1726027976@1' },
+        { consistentRead: true },
+      )
+      expect(mockSfnService.resumeExecution).toHaveBeenCalledWith(taskToken, {
+        result: 'resumed_by_prev_version',
+        prevVersion: 1,
+      })
+      expect(result).toEqual({ result: { token: taskToken } })
+    })
 
     it('should self-resume when predecessor is finish:FINISHED', async () => {
       const taskToken = 'self-resume-token'
@@ -832,15 +873,44 @@ describe('DataSyncCommandSfnEventHandler', () => {
         event.commandKey,
         taskToken,
       )
-      expect(mockCommandService.getItem).toHaveBeenCalledWith({
-        pk: 'tenantCode#test',
-        sk: '1726027976@1',
-      })
+      expect(mockCommandService.getItem).toHaveBeenCalledWith(
+        { pk: 'tenantCode#test', sk: '1726027976@1' },
+        { consistentRead: true },
+      )
       expect(mockSfnService.resumeExecution).toHaveBeenCalledWith(taskToken, {
         result: 'resumed_by_prev_version',
         prevVersion: 1,
       })
       expect(result).toEqual({ result: { token: taskToken } })
+    })
+
+    it('should not resume when predecessor is finish:FAILED', async () => {
+      const taskToken = 'wait-failed-token'
+      const mockCommandService = {
+        updateTaskToken: jest.fn().mockResolvedValue(undefined),
+        getItem: jest.fn().mockResolvedValue({
+          version: 1,
+          status: getCommandStatus(
+            DataSyncCommandSfnName.FINISH,
+            CommandStatus.STATUS_FAILED,
+          ),
+          sk: '1726027976@1',
+        }),
+      }
+      const mockSfnService = {
+        resumeExecution: jest.fn().mockResolvedValue(undefined),
+      }
+
+      const { h } = makeWaitConfirmTokenHandler(
+        mockCommandService,
+        mockSfnService,
+      )
+      const event = createWaitConfirmEvent(2, taskToken)
+
+      await h['waitConfirmToken'](event)
+
+      expect(mockCommandService.updateTaskToken).toHaveBeenCalled()
+      expect(mockSfnService.resumeExecution).not.toHaveBeenCalled()
     })
 
     it('should not resume when predecessor is not finish:FINISHED', async () => {

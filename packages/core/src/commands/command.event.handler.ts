@@ -110,21 +110,29 @@ export class CommandEventHandler {
         removeSortKeyVersion(event.commandRecord.sk),
         event.commandRecord.version - 1,
       )
-      const prevCommand = await this.commandService.getItem({
-        pk: event.commandRecord.pk,
-        sk: prevSk,
-      })
+      const prevCommand = await this.commandService.getItem(
+        {
+          pk: event.commandRecord.pk,
+          sk: prevSk,
+        },
+        { consistentRead: true },
+      )
 
-      const prevFinished =
-        prevCommand?.status ===
-        getCommandStatus(
-          DataSyncCommandSfnName.FINISH,
-          CommandStatus.STATUS_FINISHED,
-        )
+      const finishStarted = getCommandStatus(
+        DataSyncCommandSfnName.FINISH,
+        CommandStatus.STATUS_STARTED,
+      )
+      const finishFinished = getCommandStatus(
+        DataSyncCommandSfnName.FINISH,
+        CommandStatus.STATUS_FINISHED,
+      )
+      const prevEnteredFinish =
+        prevCommand?.status === finishStarted ||
+        prevCommand?.status === finishFinished
 
-      if (prevFinished) {
+      if (prevEnteredFinish) {
         this.logger.log(
-          `Prev command already finished before token was read — self-resuming v${event.commandRecord.version}`,
+          `Prev command already in finish step — self-resuming v${event.commandRecord.version}`,
         )
         try {
           await this.sfnService.resumeExecution(event.taskToken, {
