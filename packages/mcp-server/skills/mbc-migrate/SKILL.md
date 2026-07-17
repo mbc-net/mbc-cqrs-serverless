@@ -43,6 +43,7 @@ This skill helps migrate MBC CQRS Serverless projects between versions.
 | v1.2.5 | v1.2.6 | Low | Repository RYW improvements (transparent); `getVersion` API |
 | v1.2.7 | v1.3.0 | Low | AppSync Events API support (opt-in, no breaking changes) |
 | v1.3.0 | v1.3.1 | Low | Group-based roles (`@GroupRoleResolver`, `custom:groups`); `UserContext.tenantRoles`/`tenantGroupIds` added (opt-in, no breaking changes) |
+| v1.3.2 | v1.3.3 | Low | `ATTRIBUTE_LIMIT_SIZE` default lowered 389120 → 102400 for Step Functions payload limit (transparent unless overridden) |
 
 ## Migration Guides
 
@@ -672,6 +673,18 @@ Register the class in your module `providers`. `AuthModule` is imported automati
 1. Upgrade to v1.3.1 — no code changes required; existing `@Roles()` checks keep working.
 2. (Optional) Populate `custom:groups` in the JWT and implement one `@GroupRoleResolver()`.
 3. Register the resolver in your NestJS module `providers`.
+
+---
+
+### v1.3.2 → v1.3.3 (no code changes required, unless you hardcoded the old default)
+
+**Change:** The framework's default `ATTRIBUTE_LIMIT_SIZE` in generated CDK templates (`infra/libs/infra-stack.ts`) and env examples (`.env.local`, `.env.example`) is lowered from `389120` (380 KB) to `102400` (100 KB).
+
+**Why:** The old default was sized for DynamoDB's 400 KB item limit, but AWS Step Functions enforces a 256 KB payload limit per state. The command state machine passes the DynamoDB stream event twice per state (`input.$` + `context.$`), so inline attributes above ~110 KB could trigger `States.DataLimitExceeded` in production. See [Debug Guide — States.DataLimitExceeded](../mbc-debug/SKILL.md) for the full symptom/cause/fix.
+
+**Action required:**
+- If you never customized `ATTRIBUTE_LIMIT_SIZE` and redeploy your CDK stack, the new lower default takes effect automatically — no code changes needed.
+- If you explicitly set `ATTRIBUTE_LIMIT_SIZE=389120` (or another value above ~110 KB) in your own `.env` or CDK stack, lower it to `102400` or less to avoid `States.DataLimitExceeded`. Attributes above the limit are automatically offloaded to S3, so lowering the value does not lose data.
 
 ---
 
