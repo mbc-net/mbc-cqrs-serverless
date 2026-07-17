@@ -963,6 +963,37 @@ describe('DataSyncCommandSfnEventHandler', () => {
       expect(mockSfnService.resumeExecution).not.toHaveBeenCalled()
     })
 
+    it('should warn and not throw when getItem rejects during predecessor lookup', async () => {
+      const taskToken = 'get-item-fail-token'
+      const mockCommandService = {
+        updateTaskToken: jest.fn().mockResolvedValue(undefined),
+        getItem: jest
+          .fn()
+          .mockRejectedValue(new Error('ProvisionedThroughputExceededException')),
+      }
+      const mockSfnService = {
+        resumeExecution: jest.fn(),
+      }
+
+      const { h, warnSpy } = makeWaitConfirmTokenHandler(
+        mockCommandService,
+        mockSfnService,
+      )
+      const event = createWaitConfirmEvent(2, taskToken)
+
+      await expect(h['waitConfirmToken'](event)).resolves.toEqual({
+        result: { token: taskToken },
+      })
+
+      expect(mockCommandService.updateTaskToken).toHaveBeenCalled()
+      expect(mockSfnService.resumeExecution).not.toHaveBeenCalled()
+      expect(warnSpy).toHaveBeenCalledTimes(1)
+      expect(warnSpy.mock.calls[0][0]).toContain('tenantCode#test')
+      expect(warnSpy.mock.calls[0][0]).toContain(
+        'Could not read predecessor status',
+      )
+    })
+
     it('should warn and not throw when resumeExecution fails (duplicate resume)', async () => {
       const taskToken = 'dup-token'
       const mockCommandService = {

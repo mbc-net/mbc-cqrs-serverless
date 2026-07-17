@@ -8,7 +8,11 @@ import {
 import { DataSyncCommandSfnName } from '../command-events/sfn-name.enum'
 import { S3Service } from '../data-store'
 import { addSortKeyVersion, removeSortKeyVersion } from '../helpers/key'
-import { CommandModuleOptions, INotification } from '../interfaces'
+import {
+  CommandModel,
+  CommandModuleOptions,
+  INotification,
+} from '../interfaces'
 import { SnsService } from '../queue'
 import { StepFunctionService } from '../step-func/step-function.service'
 import { MODULE_OPTIONS_TOKEN } from './command.module-definition'
@@ -110,13 +114,22 @@ export class CommandEventHandler {
         removeSortKeyVersion(event.commandRecord.sk),
         event.commandRecord.version - 1,
       )
-      const prevCommand = await this.commandService.getItem(
-        {
-          pk: event.commandRecord.pk,
-          sk: prevSk,
-        },
-        { consistentRead: true },
-      )
+
+      let prevCommand: CommandModel | undefined
+      try {
+        prevCommand = await this.commandService.getItem(
+          {
+            pk: event.commandRecord.pk,
+            sk: prevSk,
+          },
+          { consistentRead: true },
+        )
+      } catch (e) {
+        this.logger.warn(
+          `[${event.commandKey.pk}] Could not read predecessor status for command v${event.commandRecord.version}: ` +
+            `${e instanceof Error ? e.message : 'Unknown error'}`,
+        )
+      }
 
       const finishStarted = getCommandStatus(
         DataSyncCommandSfnName.FINISH,
