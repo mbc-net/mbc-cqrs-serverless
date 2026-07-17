@@ -280,6 +280,11 @@ describe('Claude Code Skills', () => {
       expect(content).toContain('NestJS')
       expect(content).toContain('Node.js')
     })
+
+    it('should contain v1.3.3 migration guide (ATTRIBUTE_LIMIT_SIZE)', () => {
+      expect(content).toContain('v1.3.3')
+      expect(content).toContain('ATTRIBUTE_LIMIT_SIZE')
+    })
   })
 
   describe('mbc-debug skill', () => {
@@ -337,6 +342,11 @@ describe('Claude Code Skills', () => {
     it('should contain troubleshooting decision tree', () => {
       expect(content).toContain('Decision Tree')
       expect(content).toContain('Error Occurred')
+    })
+
+    it('should contain States.DataLimitExceeded troubleshooting (v1.3.3+)', () => {
+      expect(content).toContain('States.DataLimitExceeded')
+      expect(content).toContain('ATTRIBUTE_LIMIT_SIZE')
     })
   })
 

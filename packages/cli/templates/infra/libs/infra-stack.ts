@@ -459,7 +459,12 @@ export class InfraStack extends cdk.Stack {
       APP_NAME: name,
       LOG_LEVEL: props.config.logLevel?.level || 'info',
       EVENT_SOURCE_DISABLED: 'false',
-      ATTRIBUTE_LIMIT_SIZE: '389120',
+      // Max size (bytes) for `attributes` before S3 offload.
+      // Must account for Step Functions 256 KB payload limit: the SFN state passes
+      // the DynamoDB event twice (input + context.Execution.Input), so the safe
+      // limit is ~(256 KB - overhead) / 2 ≈ 110 KB. Default: 100 KB.
+      // DynamoDB item limit is 400 KB — do NOT use that as the reference.
+      ATTRIBUTE_LIMIT_SIZE: '102400',
       S3_BUCKET_NAME: ddbBucket.bucketName,
       SFN_COMMAND_ARN: commandSfnArn,
       SFN_TASK_ARN: taskSfnArn,
