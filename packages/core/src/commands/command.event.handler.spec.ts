@@ -964,6 +964,7 @@ describe('DataSyncCommandSfnEventHandler', () => {
     })
 
     it('should warn and not throw when getItem rejects during predecessor lookup', async () => {
+      jest.useFakeTimers()
       const taskToken = 'get-item-fail-token'
       const mockCommandService = {
         updateTaskToken: jest.fn().mockResolvedValue(undefined),
@@ -981,17 +982,122 @@ describe('DataSyncCommandSfnEventHandler', () => {
       )
       const event = createWaitConfirmEvent(2, taskToken)
 
-      await expect(h['waitConfirmToken'](event)).resolves.toEqual({
+      const pending = h['waitConfirmToken'](event)
+      await jest.runAllTimersAsync()
+      await expect(pending).resolves.toEqual({
         result: { token: taskToken },
       })
 
       expect(mockCommandService.updateTaskToken).toHaveBeenCalled()
+      expect(mockCommandService.getItem).toHaveBeenCalledTimes(3)
       expect(mockSfnService.resumeExecution).not.toHaveBeenCalled()
       expect(warnSpy).toHaveBeenCalledTimes(1)
       expect(warnSpy.mock.calls[0][0]).toContain('tenantCode#test')
+      expect(warnSpy.mock.calls[0][0]).toContain('after retries')
       expect(warnSpy.mock.calls[0][0]).toContain(
         'Could not read predecessor status',
       )
+
+      jest.useRealTimers()
+    })
+
+    it('should self-resume when getItem succeeds on retry after one failure', async () => {
+      const taskToken = 'retry-then-resume-token'
+      const mockCommandService = {
+        updateTaskToken: jest.fn().mockResolvedValue(undefined),
+        getItem: jest
+          .fn()
+          .mockRejectedValueOnce(new Error('ProvisionedThroughputExceededException'))
+          .mockResolvedValueOnce({
+            version: 1,
+            status: finishStartedStatus,
+            sk: '1726027976@1',
+          }),
+      }
+      const mockSfnService = {
+        resumeExecution: jest.fn().mockResolvedValue(undefined),
+      }
+
+      const { h } = makeWaitConfirmTokenHandler(mockCommandService, mockSfnService)
+      const event = createWaitConfirmEvent(2, taskToken)
+
+      await expect(h['waitConfirmToken'](event)).resolves.toEqual({
+        result: { token: taskToken },
+      })
+
+      expect(mockCommandService.getItem).toHaveBeenCalledTimes(2)
+      expect(mockSfnService.resumeExecution).toHaveBeenCalledWith(taskToken, {
+        result: 'resumed_by_prev_version',
+        prevVersion: 1,
+      })
+    })
+
+    it('should warn after retries and not throw when getItem rejects every attempt', async () => {
+      jest.useFakeTimers()
+      const taskToken = 'get-item-fail-all-token'
+      const mockCommandService = {
+        updateTaskToken: jest.fn().mockResolvedValue(undefined),
+        getItem: jest
+          .fn()
+          .mockRejectedValue(new Error('ProvisionedThroughputExceededException')),
+      }
+      const mockSfnService = { resumeExecution: jest.fn() }
+
+      const { h, warnSpy } = makeWaitConfirmTokenHandler(
+        mockCommandService,
+        mockSfnService,
+      )
+      const event = createWaitConfirmEvent(2, taskToken)
+
+      const pending = h['waitConfirmToken'](event)
+      await jest.runAllTimersAsync()
+      await expect(pending).resolves.toEqual({ result: { token: taskToken } })
+
+      expect(mockCommandService.getItem).toHaveBeenCalledTimes(3)
+      expect(mockSfnService.resumeExecution).not.toHaveBeenCalled()
+      expect(warnSpy).toHaveBeenCalledTimes(1)
+      expect(warnSpy.mock.calls[0][0]).toContain('after retries')
+      expect(warnSpy.mock.calls[0][0]).toContain('Could not read predecessor status')
+
+      jest.useRealTimers()
+    })
+
+    it('should back off exponentially between getItem attempts', async () => {
+      jest.useFakeTimers()
+      const mockCommandService = {
+        updateTaskToken: jest.fn().mockResolvedValue(undefined),
+        getItem: jest
+          .fn()
+          .mockRejectedValue(new Error('ThrottlingException')),
+      }
+      const mockSfnService = { resumeExecution: jest.fn() }
+
+      const { h } = makeWaitConfirmTokenHandler(mockCommandService, mockSfnService)
+      const event = createWaitConfirmEvent(2, 'backoff-token')
+
+      const pending = h['waitConfirmToken'](event)
+
+      // Attempt 1 fails immediately
+      await Promise.resolve()
+      expect(mockCommandService.getItem).toHaveBeenCalledTimes(1)
+
+      await jest.advanceTimersByTimeAsync(99)
+      expect(mockCommandService.getItem).toHaveBeenCalledTimes(1)
+
+      await jest.advanceTimersByTimeAsync(1)
+      expect(mockCommandService.getItem).toHaveBeenCalledTimes(2)
+
+      await jest.advanceTimersByTimeAsync(199)
+      expect(mockCommandService.getItem).toHaveBeenCalledTimes(2)
+
+      await jest.advanceTimersByTimeAsync(1)
+      expect(mockCommandService.getItem).toHaveBeenCalledTimes(3)
+
+      await expect(pending).resolves.toEqual({
+        result: { token: 'backoff-token' },
+      })
+
+      jest.useRealTimers()
     })
 
     it('should warn and not throw when resumeExecution fails (duplicate resume)', async () => {

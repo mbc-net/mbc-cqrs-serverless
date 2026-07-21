@@ -11,6 +11,7 @@ import { addSortKeyVersion, removeSortKeyVersion } from '../helpers/key'
 import {
   CommandModel,
   CommandModuleOptions,
+  DetailKey,
   INotification,
 } from '../interfaces'
 import { SnsService } from '../queue'
@@ -117,16 +118,21 @@ export class CommandEventHandler {
 
       let prevCommand: CommandModel | undefined
       try {
-        prevCommand = await this.commandService.getItem(
-          {
-            pk: event.commandRecord.pk,
-            sk: prevSk,
-          },
+        // consistentRead: true — predecessor status across independent SFN
+        // executions must not be a stale eventually-consistent read.
+        //
+        // Bounded retry (3 attempts, exponential backoff baseDelayMs * 2^(n-1)):
+        // best-effort check — updateTaskToken already succeeded; checkNextToken
+        // on the predecessor remains the primary resume path.
+        prevCommand = await this.getItemWithRetry(
+          { pk: event.commandRecord.pk, sk: prevSk },
           { consistentRead: true },
+          3,
+          100,
         )
       } catch (e) {
         this.logger.warn(
-          `[${event.commandKey.pk}] Could not read predecessor status for command v${event.commandRecord.version}: ` +
+          `[${event.commandKey.pk}] Could not read predecessor status for command v${event.commandRecord.version} after retries: ` +
             `${e instanceof Error ? e.message : 'Unknown error'}`,
         )
       }
@@ -166,6 +172,32 @@ export class CommandEventHandler {
         token: event.taskToken,
       },
     }
+  }
+
+  /**
+   * Retry wrapper around commandService.getItem for the cross-execution
+   * predecessor-status check in waitConfirmToken. Bounded and short —
+   * smooths a single transient DDB failure; does not wait out an outage.
+   */
+  protected async getItemWithRetry(
+    key: DetailKey,
+    options: { consistentRead: boolean },
+    maxAttempts: number,
+    baseDelayMs: number,
+  ): Promise<CommandModel> {
+    let lastError: unknown
+    for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+      try {
+        return await this.commandService.getItem(key, options)
+      } catch (e) {
+        lastError = e
+        if (attempt < maxAttempts) {
+          const delayMs = baseDelayMs * Math.pow(2, attempt - 1)
+          await new Promise((resolve) => setTimeout(resolve, delayMs))
+        }
+      }
+    }
+    throw lastError
   }
 
   protected async checkVersion(
