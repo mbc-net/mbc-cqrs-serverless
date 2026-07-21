@@ -90,7 +90,7 @@ exports[`snapshot test for InfraStack 1`] = `
             "Arn",
           ],
         },
-        "Runtime": "nodejs22.x",
+        "Runtime": "nodejs24.x",
         "Tags": [
           {
             "Key": "env",
@@ -251,7 +251,7 @@ exports[`snapshot test for InfraStack 1`] = `
                   "Arn",
                 ],
               },
-              "","Payload":{"input.$":"$","context.$":"$$"}}},"check_version_result":{"Type":"Choice","Choices":[{"Variable":"$.result","NumericEquals":0,"Next":"set_ttl_command"},{"Variable":"$.result","NumericEquals":1,"Next":"wait_prev_command"},{"Variable":"$.result","NumericEquals":-1,"Next":"fail"}],"Default":"wait_prev_command"},"wait_prev_command":{"Next":"set_ttl_command","Retry":[{"ErrorEquals":["Lambda.ClientExecutionTimeoutException","Lambda.ServiceException","Lambda.AWSLambdaException","Lambda.SdkClientException"],"IntervalSeconds":2,"MaxAttempts":6,"BackoffRate":2}],"Type":"Task","OutputPath":"$.Payload[0][0]","Resource":"arn:",
+              "","Payload":{"input.$":"$","context.$":"$$"}}},"check_version_result":{"Type":"Choice","Choices":[{"Variable":"$.result","NumericEquals":0,"Next":"set_ttl_command"},{"Variable":"$.result","NumericEquals":1,"Next":"wait_prev_command"},{"Variable":"$.result","NumericEquals":-1,"Next":"fail"}],"Default":"wait_prev_command"},"wait_prev_command":{"Next":"set_ttl_command","Retry":[{"ErrorEquals":["Lambda.ClientExecutionTimeoutException","Lambda.ServiceException","Lambda.AWSLambdaException","Lambda.SdkClientException"],"IntervalSeconds":2,"MaxAttempts":6,"BackoffRate":2}],"Catch":[{"ErrorEquals":["States.Timeout"],"ResultPath":"$.timeoutError","Next":"wait_prev_command_timeout"}],"Type":"Task","TimeoutSeconds":86400,"OutputPath":"$.Payload[0][0]","Resource":"arn:",
               {
                 "Ref": "AWS::Partition",
               },
@@ -317,7 +317,7 @@ exports[`snapshot test for InfraStack 1`] = `
                   "Arn",
                 ],
               },
-              "","Payload":{"input.$":"$","context.$":"$$"}}},"success":{"Type":"Succeed"},"fail":{"Type":"Fail","ErrorPath":"$.error","CausePath":"$.cause"}},"Comment":"A state machine that run the command stream handler"}",
+              "","Payload":{"input.$":"$","context.$":"$$"}}},"success":{"Type":"Succeed"},"wait_prev_command_timeout":{"Type":"Pass","Parameters":{"error":"States.Timeout","cause":"wait_prev_command exceeded taskTimeout (24h)"},"Next":"fail"},"fail":{"Type":"Fail","ErrorPath":"$.error","CausePath":"$.cause"}},"Comment":"A state machine that run the command stream handler"}",
             ],
           ],
         },
@@ -821,7 +821,7 @@ exports[`snapshot test for InfraStack 1`] = `
           "Fn::Join": [
             "",
             [
-              "{"StartAt":"import-csv","States":{"import-csv":{"Type":"Map","End":true,"ItemProcessor":{"ProcessorConfig":{"Mode":"DISTRIBUTED","ExecutionType":"EXPRESS"},"StartAt":"csv_rows_handler","States":{"csv_rows_handler":{"End":true,"Retry":[{"ErrorEquals":["Lambda.ClientExecutionTimeoutException","Lambda.ServiceException","Lambda.AWSLambdaException","Lambda.SdkClientException"],"IntervalSeconds":2,"MaxAttempts":6,"BackoffRate":2}],"Type":"Task","OutputPath":"$.Payload[0][0]","Resource":"arn:",
+              "{"StartAt":"import-csv","States":{"import-csv":{"Type":"Map","ResultPath":"$.mapOutput","Next":"finalize_parent_job","Catch":[{"ErrorEquals":["States.ALL"],"ResultPath":"$.errorOutput","Next":"finalize_parent_job"}],"ItemProcessor":{"ProcessorConfig":{"Mode":"DISTRIBUTED","ExecutionType":"STANDARD"},"StartAt":"csv_rows_handler","States":{"csv_rows_handler":{"End":true,"Retry":[{"ErrorEquals":["Lambda.ClientExecutionTimeoutException","Lambda.ServiceException","Lambda.AWSLambdaException","Lambda.SdkClientException"],"IntervalSeconds":2,"MaxAttempts":6,"BackoffRate":2}],"Type":"Task","OutputPath":"$.Payload[0][0]","Resource":"arn:",
               {
                 "Ref": "AWS::Partition",
               },
@@ -832,7 +832,18 @@ exports[`snapshot test for InfraStack 1`] = `
                   "Arn",
                 ],
               },
-              "","Payload":{"input.$":"$","context.$":"$$"}}}}},"MaxConcurrency":50,"ItemReader":{"Resource":"arn:aws:states:::s3:getObject","ReaderConfig":{"InputType":"CSV","CSVHeaderLocation":"FIRST_ROW"},"Parameters":{"Bucket.$":"$.bucket","Key.$":"$.key"}},"ItemBatcher":{"MaxInputBytesPerBatch":10,"BatchInput":{"Attributes.$":"$"}},"Label":"import-csv"}},"Comment":"A state machine for import-csv module handler"}",
+              "","Payload":{"input.$":"$","context.$":"$$"}}}}},"MaxConcurrency":50,"ItemReader":{"Resource":"arn:aws:states:::s3:getObject","ReaderConfig":{"InputType":"CSV","CSVHeaderLocation":"FIRST_ROW"},"Parameters":{"Bucket.$":"$.bucket","Key.$":"$.key"}},"ResultWriter":{"Resource":"arn:aws:states:::s3:putObject","Parameters":{"Bucket":"your-import-bucket-name","Prefix":"sfn-results/import-csv"}},"ItemBatcher":{"MaxItemsPerBatch":100,"BatchInput":{"Attributes.$":"$"}},"Label":"import-csv"},"finalize_parent_job":{"Next":"success","Retry":[{"ErrorEquals":["Lambda.ServiceException","Lambda.AWSLambdaException","Lambda.SdkClientException"],"IntervalSeconds":2,"MaxAttempts":5,"BackoffRate":2}],"Type":"Task","OutputPath":"$.Payload[0][0]","Resource":"arn:",
+              {
+                "Ref": "AWS::Partition",
+              },
+              ":states:::lambda:invoke","Parameters":{"FunctionName":"",
+              {
+                "Fn::GetAtt": [
+                  "lambdaapi893CD94E",
+                  "Arn",
+                ],
+              },
+              "","Payload":{"input.$":"$","context.$":"$$"}}},"success":{"Type":"Succeed"}},"Comment":"A state machine for import-csv module handler"}",
             ],
           ],
         },
@@ -1066,6 +1077,9 @@ exports[`snapshot test for InfraStack 1`] = `
             "DATABASE_URL": "postgresql://@/?schema=public",
             "EVENT_SOURCE_DISABLED": "false",
             "FRONT_BASE_URL": "",
+            "IMPORT_QUEUE_URL": {
+              "Ref": "importactionsqs5E43BE2E",
+            },
             "LOG_LEVEL": "verbose",
             "NODE_ENV": "dev",
             "NODE_OPTIONS": "--enable-source-maps",
@@ -1118,7 +1132,7 @@ exports[`snapshot test for InfraStack 1`] = `
             "Value": "",
           },
         ],
-        "Timeout": 31536000,
+        "Timeout": 30,
         "TracingConfig": {
           "Mode": "Active",
         },
@@ -1148,7 +1162,7 @@ exports[`snapshot test for InfraStack 1`] = `
         "FilterCriteria": {
           "Filters": [
             {
-              "Pattern": "{"eventName":["INSERT"]}",
+              "Pattern": "{"eventName":["INSERT"],"dynamodb":{"NewImage":{"syncMode":[{"exists":false}]}}}",
             },
           ],
         },
@@ -1181,7 +1195,7 @@ exports[`snapshot test for InfraStack 1`] = `
         "FilterCriteria": {
           "Filters": [
             {
-              "Pattern": "{"eventName":["INSERT"]}",
+              "Pattern": "{"eventName":["INSERT"],"dynamodb":{"NewImage":{"syncMode":[{"exists":false}]}}}",
             },
           ],
         },
@@ -1214,7 +1228,7 @@ exports[`snapshot test for InfraStack 1`] = `
         "FilterCriteria": {
           "Filters": [
             {
-              "Pattern": "{"eventName":["INSERT"]}",
+              "Pattern": "{"eventName":["INSERT"],"dynamodb":{"NewImage":{"syncMode":[{"exists":false}]}}}",
             },
           ],
         },
@@ -1594,6 +1608,20 @@ exports[`snapshot test for InfraStack 1`] = `
                 ],
               },
             },
+            {
+              "Action": [
+                "sqs:SendMessage",
+                "sqs:GetQueueAttributes",
+                "sqs:GetQueueUrl",
+              ],
+              "Effect": "Allow",
+              "Resource": {
+                "Fn::GetAtt": [
+                  "importactionsqs5E43BE2E",
+                  "Arn",
+                ],
+              },
+            },
           ],
           "Version": "2012-10-17",
         },
@@ -1926,7 +1954,7 @@ exports[`snapshot test for InfraStack 1`] = `
           "AllowOrigins": [
             "*",
           ],
-          "MaxAge": 31536000,
+          "MaxAge": 3600,
         },
         "Description": "HTTP API for Lambda integration",
         "Name": "dev--api",
@@ -3030,7 +3058,7 @@ schema {
                   "Arn",
                 ],
               },
-              "","Payload":{"input.$":"$","context.$":"$$"}}}}},"MaxConcurrency":2}},"TimeoutSeconds":525600,"Comment":"A state machine for task handler"}",
+              "","Payload":{"input.$":"$","context.$":"$$"}}}}},"MaxConcurrency":2}},"TimeoutSeconds":900,"Comment":"A state machine for task handler"}",
             ],
           ],
         },

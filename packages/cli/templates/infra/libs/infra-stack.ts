@@ -780,6 +780,10 @@ export class InfraStack extends cdk.Stack {
       stateName: string,
       nextState: cdk.aws_stepfunctions.IChainable | null,
       integrationPattern: cdk.aws_stepfunctions.IntegrationPattern,
+      taskTimeout?: cdk.aws_stepfunctions.Timeout,
+      configureTask?: (
+        task: cdk.aws_stepfunctions_tasks.LambdaInvoke,
+      ) => cdk.aws_stepfunctions.IChainable,
     ) => {
       const payloadObject: {
         [key: string]: any
@@ -791,7 +795,7 @@ export class InfraStack extends cdk.Stack {
         integrationPattern ===
         cdk.aws_stepfunctions.IntegrationPattern.WAIT_FOR_TASK_TOKEN
       ) {
-        payloadObject['taskToken'] = cdk.aws_stepfunctions.JsonPath.taskToken // '$$.Task.Token'
+        payloadObject['taskToken'] = cdk.aws_stepfunctions.JsonPath.taskToken
       }
       const lambdaTask = new cdk.aws_stepfunctions_tasks.LambdaInvoke(
         this,
@@ -803,12 +807,17 @@ export class InfraStack extends cdk.Stack {
           stateName,
           outputPath: '$.Payload[0][0]',
           integrationPattern,
+          ...(taskTimeout ? { taskTimeout } : {}),
         },
       )
+      // addCatch must run on the State before .next() turns it into a Chain.
+      const configuredTask = configureTask
+        ? (configureTask(lambdaTask) as cdk.aws_stepfunctions_tasks.LambdaInvoke)
+        : lambdaTask
       if (nextState) {
-        return lambdaTask.next(nextState)
+        return configuredTask.next(nextState)
       }
-      return lambdaTask
+      return configuredTask
     }
 
     // Define states
@@ -854,10 +863,28 @@ export class InfraStack extends cdk.Stack {
       cdk.aws_stepfunctions.IntegrationPattern.REQUEST_RESPONSE,
     )
 
+    const waitPrevCommandTimeoutHandler = new cdk.aws_stepfunctions.Pass(
+      this,
+      'wait_prev_command_timeout',
+      {
+        stateName: 'wait_prev_command_timeout',
+        parameters: {
+          error: 'States.Timeout',
+          cause: 'wait_prev_command exceeded taskTimeout (24h)',
+        },
+      },
+    ).next(fail)
+
     const waitPrevCommand = lambdaInvoke(
       'wait_prev_command',
       setTtlCommand,
       cdk.aws_stepfunctions.IntegrationPattern.WAIT_FOR_TASK_TOKEN,
+      cdk.aws_stepfunctions.Timeout.duration(cdk.Duration.hours(24)),
+      (task) =>
+        task.addCatch(waitPrevCommandTimeoutHandler, {
+          errors: ['States.Timeout'],
+          resultPath: '$.timeoutError',
+        }),
     )
 
     // Define Choice state
@@ -1045,7 +1072,7 @@ export class InfraStack extends cdk.Stack {
         },
       })
       .itemProcessor(csvRowsHandlerState, {
-        executionType: aws_stepfunctions.ProcessorType.STANDARD,
+        executionType: cdk.aws_stepfunctions.ProcessorType.STANDARD,
       })
 
     // Catch ALL Map state errors and route them to finalizeParentJobState

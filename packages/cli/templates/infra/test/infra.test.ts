@@ -29,18 +29,20 @@ jest.mock('crypto', () => ({
 jest.mock('aws-cdk-lib', () => ({
   ...jest.requireActual('aws-cdk-lib'),
   Duration: {
-    days: jest.fn(() => ({
-      toMilliseconds: jest.fn(() => 365 * 24 * 60 * 60 * 1000), // Mock milliseconds for 365 days
+    days: jest.fn((n: number) => ({
+      toMilliseconds: jest.fn(() => n * 24 * 60 * 60 * 1000),
+      toSeconds: jest.fn(() => n * 24 * 60 * 60),
     })),
-    hours: jest.fn(() => ({
-      minutes: jest.fn(() => 365 * 24 * 60),
-      toSeconds: jest.fn(() => 365 * 24 * 60 * 60),
+    hours: jest.fn((n: number) => ({
+      minutes: jest.fn(() => n * 60),
+      toSeconds: jest.fn(() => n * 60 * 60),
+      toMilliseconds: jest.fn(() => n * 60 * 60 * 1000),
     })),
-    minutes: jest.fn(() => ({
-      toSeconds: jest.fn(() => 365 * 24 * 60),
+    minutes: jest.fn((n: number) => ({
+      toSeconds: jest.fn(() => n * 60),
     })),
-    seconds: jest.fn(() => ({
-      toSeconds: jest.fn(() => 365 * 24 * 60 * 60),
+    seconds: jest.fn((n: number) => ({
+      toSeconds: jest.fn(() => n),
     })),
   },
   Expiration: {
