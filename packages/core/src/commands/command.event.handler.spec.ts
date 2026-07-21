@@ -813,6 +813,84 @@ describe('DataSyncCommandSfnEventHandler', () => {
     })
   })
 
+  describe('checkNextToken - push-side consistent read', () => {
+    const COMMAND_TABLE = 'env-app-table_name-command'
+
+    function makeCheckNextTokenWithRealCommandService() {
+      const dynamoGetItem = jest.fn()
+      const dynamoDbService = {
+        getItem: dynamoGetItem,
+        getTableName: jest.fn().mockReturnValue(COMMAND_TABLE),
+      }
+      const commandService = new (CommandService as any)(
+        { tableName: 'table_name' },
+        dynamoDbService,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+      )
+      const resumeExecution = jest.fn().mockResolvedValue(undefined)
+      const h = new (CommandEventHandler as any)(
+        { tableName: 'table_name' },
+        commandService,
+        null,
+        null,
+        null,
+        null,
+        { get: jest.fn().mockReturnValue('') },
+        { resumeExecution },
+      )
+      h.logger = { debug: jest.fn(), log: jest.fn(), warn: jest.fn() }
+      return { h, dynamoGetItem, resumeExecution }
+    }
+
+    it('should read next command with consistentRead via getNextCommand', async () => {
+      const { h, dynamoGetItem, resumeExecution } =
+        makeCheckNextTokenWithRealCommandService()
+      dynamoGetItem.mockResolvedValue(undefined)
+
+      const event = createEvent(DataSyncCommandSfnName.FINISH)
+      const result = await h['checkNextToken'](event)
+
+      expect(dynamoGetItem).toHaveBeenCalledTimes(1)
+      expect(dynamoGetItem).toHaveBeenCalledWith(
+        COMMAND_TABLE,
+        { pk: 'tenantCode#test', sk: '1726027976@2' },
+        { consistentRead: true },
+      )
+      expect(resumeExecution).not.toHaveBeenCalled()
+      expect(result).toBeNull()
+    })
+
+    it('should resume next command when getNextCommand finds a taskToken', async () => {
+      const { h, dynamoGetItem, resumeExecution } =
+        makeCheckNextTokenWithRealCommandService()
+      dynamoGetItem.mockResolvedValue({
+        version: 2,
+        taskToken: 'next-token',
+        sk: '1726027976@2',
+      })
+
+      const event = createEvent(DataSyncCommandSfnName.FINISH)
+      await h['checkNextToken'](event)
+
+      expect(dynamoGetItem).toHaveBeenCalledWith(
+        COMMAND_TABLE,
+        { pk: 'tenantCode#test', sk: '1726027976@2' },
+        { consistentRead: true },
+      )
+      expect(resumeExecution).toHaveBeenCalledWith('next-token', {
+        result: 'resumed_by_prev_version',
+        prevVersion: 1,
+      })
+    })
+  })
+
   describe('waitConfirmToken - pull-side self-resume', () => {
     const finishStartedStatus = getCommandStatus(
       DataSyncCommandSfnName.FINISH,
