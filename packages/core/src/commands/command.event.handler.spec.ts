@@ -184,21 +184,34 @@ function makeWaitConfirmTokenHandler(
     getItem: jest.Mock
   },
   sfnService: { resumeExecution: jest.Mock },
-): { h: CommandEventHandler; logSpy: jest.Mock; warnSpy: jest.Mock } {
+): {
+  h: CommandEventHandler
+  logSpy: jest.Mock
+  warnSpy: jest.Mock
+  errorSpy: jest.Mock
+  publishSpy: jest.Mock
+} {
+  const publishSpy = jest.fn().mockResolvedValue(undefined)
   const h = new (CommandEventHandler as any)(
     { tableName: 'test-table' },
     commandService,
     null,
     null,
     null,
-    null,
-    { get: jest.fn().mockReturnValue('') },
+    { publish: publishSpy },
+    { get: jest.fn().mockReturnValue('alarm_topic_arn') },
     sfnService,
   )
   const logSpy = jest.fn()
   const warnSpy = jest.fn()
-  h.logger = { debug: jest.fn(), log: logSpy, warn: warnSpy }
-  return { h, logSpy, warnSpy }
+  const errorSpy = jest.fn()
+  h.logger = {
+    debug: jest.fn(),
+    log: logSpy,
+    warn: warnSpy,
+    error: errorSpy,
+  }
+  return { h, logSpy, warnSpy, errorSpy, publishSpy }
 }
 
 const keys = {
@@ -963,7 +976,7 @@ describe('DataSyncCommandSfnEventHandler', () => {
       expect(mockSfnService.resumeExecution).not.toHaveBeenCalled()
     })
 
-    it('should warn and not throw when getItem rejects during predecessor lookup', async () => {
+    it('should error, publish alarm, and not throw when getItem rejects during predecessor lookup', async () => {
       jest.useFakeTimers()
       const taskToken = 'get-item-fail-token'
       const mockCommandService = {
@@ -976,7 +989,7 @@ describe('DataSyncCommandSfnEventHandler', () => {
         resumeExecution: jest.fn(),
       }
 
-      const { h, warnSpy } = makeWaitConfirmTokenHandler(
+      const { h, errorSpy, publishSpy } = makeWaitConfirmTokenHandler(
         mockCommandService,
         mockSfnService,
       )
@@ -991,11 +1004,23 @@ describe('DataSyncCommandSfnEventHandler', () => {
       expect(mockCommandService.updateTaskToken).toHaveBeenCalled()
       expect(mockCommandService.getItem).toHaveBeenCalledTimes(3)
       expect(mockSfnService.resumeExecution).not.toHaveBeenCalled()
-      expect(warnSpy).toHaveBeenCalledTimes(1)
-      expect(warnSpy.mock.calls[0][0]).toContain('tenantCode#test')
-      expect(warnSpy.mock.calls[0][0]).toContain('after retries')
-      expect(warnSpy.mock.calls[0][0]).toContain(
-        'Could not read predecessor status',
+      expect(errorSpy).toHaveBeenCalled()
+      expect(errorSpy.mock.calls[0][0]).toContain('tenantCode#test')
+      expect(errorSpy.mock.calls[0][0]).toContain('after retries')
+      expect(errorSpy.mock.calls[0][0]).toContain(
+        'self-resume backstop degraded',
+      )
+      expect(publishSpy).toHaveBeenCalledWith(
+        expect.objectContaining({
+          action: 'sfn-alarm',
+          content: expect.objectContaining({
+            errorMessage: expect.objectContaining({
+              self_resume_predecessor_read_failed: true,
+              cause: 'ProvisionedThroughputExceededException',
+            }),
+          }),
+        }),
+        'alarm_topic_arn',
       )
 
       jest.useRealTimers()
@@ -1032,7 +1057,7 @@ describe('DataSyncCommandSfnEventHandler', () => {
       })
     })
 
-    it('should warn after retries and not throw when getItem rejects every attempt', async () => {
+    it('should error, publish alarm, and not throw when getItem rejects every attempt', async () => {
       jest.useFakeTimers()
       const taskToken = 'get-item-fail-all-token'
       const mockCommandService = {
@@ -1043,7 +1068,7 @@ describe('DataSyncCommandSfnEventHandler', () => {
       }
       const mockSfnService = { resumeExecution: jest.fn() }
 
-      const { h, warnSpy } = makeWaitConfirmTokenHandler(
+      const { h, errorSpy, publishSpy } = makeWaitConfirmTokenHandler(
         mockCommandService,
         mockSfnService,
       )
@@ -1055,9 +1080,9 @@ describe('DataSyncCommandSfnEventHandler', () => {
 
       expect(mockCommandService.getItem).toHaveBeenCalledTimes(3)
       expect(mockSfnService.resumeExecution).not.toHaveBeenCalled()
-      expect(warnSpy).toHaveBeenCalledTimes(1)
-      expect(warnSpy.mock.calls[0][0]).toContain('after retries')
-      expect(warnSpy.mock.calls[0][0]).toContain('Could not read predecessor status')
+      expect(errorSpy.mock.calls[0][0]).toContain('after retries')
+      expect(errorSpy.mock.calls[0][0]).toContain('self-resume backstop degraded')
+      expect(publishSpy).toHaveBeenCalled()
 
       jest.useRealTimers()
     })
@@ -1100,7 +1125,7 @@ describe('DataSyncCommandSfnEventHandler', () => {
       jest.useRealTimers()
     })
 
-    it('should warn and not throw when resumeExecution fails (duplicate resume)', async () => {
+    it('should warn and not alarm when resumeExecution fails with TaskDoesNotExist', async () => {
       const taskToken = 'dup-token'
       const mockCommandService = {
         updateTaskToken: jest.fn().mockResolvedValue(undefined),
@@ -1110,13 +1135,13 @@ describe('DataSyncCommandSfnEventHandler', () => {
           sk: '1726027976@1',
         }),
       }
+      const duplicateError = new Error('Task does not exist')
+      duplicateError.name = 'TaskDoesNotExist'
       const mockSfnService = {
-        resumeExecution: jest
-          .fn()
-          .mockRejectedValue(new Error('TaskDoesNotExist')),
+        resumeExecution: jest.fn().mockRejectedValue(duplicateError),
       }
 
-      const { h, warnSpy } = makeWaitConfirmTokenHandler(
+      const { h, warnSpy, errorSpy, publishSpy } = makeWaitConfirmTokenHandler(
         mockCommandService,
         mockSfnService,
       )
@@ -1127,8 +1152,53 @@ describe('DataSyncCommandSfnEventHandler', () => {
       })
 
       expect(warnSpy).toHaveBeenCalledTimes(1)
-      expect(warnSpy.mock.calls[0][0]).toContain('tenantCode#test')
-      expect(warnSpy.mock.calls[0][0]).toContain('Could not self-resume')
+      expect(warnSpy.mock.calls[0][0]).toContain('already consumed')
+      expect(warnSpy.mock.calls[0][0]).toContain('TaskDoesNotExist')
+      expect(errorSpy).not.toHaveBeenCalled()
+      expect(publishSpy).not.toHaveBeenCalled()
+    })
+
+    it('should error and publish alarm when resumeExecution fails unexpectedly', async () => {
+      const taskToken = 'resume-fail-token'
+      const mockCommandService = {
+        updateTaskToken: jest.fn().mockResolvedValue(undefined),
+        getItem: jest.fn().mockResolvedValue({
+          version: 1,
+          status: finishStatus,
+          sk: '1726027976@1',
+        }),
+      }
+      const unexpected = new Error('AccessDeniedException')
+      unexpected.name = 'AccessDeniedException'
+      const mockSfnService = {
+        resumeExecution: jest.fn().mockRejectedValue(unexpected),
+      }
+
+      const { h, warnSpy, errorSpy, publishSpy } = makeWaitConfirmTokenHandler(
+        mockCommandService,
+        mockSfnService,
+      )
+      const event = createWaitConfirmEvent(2, taskToken)
+
+      await expect(h['waitConfirmToken'](event)).resolves.toEqual({
+        result: { token: taskToken },
+      })
+
+      expect(warnSpy).not.toHaveBeenCalled()
+      expect(errorSpy).toHaveBeenCalled()
+      expect(errorSpy.mock.calls[0][0]).toContain('failed unexpectedly')
+      expect(publishSpy).toHaveBeenCalledWith(
+        expect.objectContaining({
+          action: 'sfn-alarm',
+          content: expect.objectContaining({
+            errorMessage: expect.objectContaining({
+              self_resume_failed: true,
+              cause: 'AccessDeniedException',
+            }),
+          }),
+        }),
+        'alarm_topic_arn',
+      )
     })
   })
 })

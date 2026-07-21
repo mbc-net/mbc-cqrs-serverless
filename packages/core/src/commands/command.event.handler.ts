@@ -131,10 +131,17 @@ export class CommandEventHandler {
           100,
         )
       } catch (e) {
-        this.logger.warn(
-          `[${event.commandKey.pk}] Could not read predecessor status for command v${event.commandRecord.version} after retries: ` +
+        // After app + SDK retries, treat as persistent degradation of the
+        // self-resume backstop — do not fail the step (token already stored).
+        this.logger.error(
+          `[${event.commandKey.pk}] Could not read predecessor status for command v${event.commandRecord.version} after retries, self-resume backstop degraded: ` +
             `${e instanceof Error ? e.message : 'Unknown error'}`,
+          e instanceof Error ? e.stack : undefined,
         )
+        await this.publishAlarm(event, {
+          self_resume_predecessor_read_failed: true,
+          cause: e instanceof Error ? e.message : String(e),
+        })
       }
 
       const finishStarted = getCommandStatus(
@@ -151,7 +158,7 @@ export class CommandEventHandler {
 
       if (prevEnteredFinish) {
         this.logger.log(
-          `Prev command already in finish step — self-resuming v${event.commandRecord.version}`,
+          `[${event.commandKey.pk}] Prev command already in finish step — self-resuming v${event.commandRecord.version}`,
         )
         try {
           await this.sfnService.resumeExecution(event.taskToken, {
@@ -159,10 +166,23 @@ export class CommandEventHandler {
             prevVersion: event.commandRecord.version - 1,
           })
         } catch (e) {
-          this.logger.warn(
-            `[${event.commandKey.pk}] Could not self-resume command v${event.commandRecord.version}: ` +
-              `${e instanceof Error ? e.message : 'Unknown error'}`,
-          )
+          const name = e instanceof Error ? e.name : undefined
+          if (name === 'TaskDoesNotExist' || name === 'TaskTimedOut') {
+            // Push side (checkNextToken) already consumed this task token.
+            this.logger.warn(
+              `[${event.commandKey.pk}] Self-resume for v${event.commandRecord.version} already consumed (${name}) — resumed by push side first.`,
+            )
+          } else {
+            this.logger.error(
+              `[${event.commandKey.pk}] Self-resume for v${event.commandRecord.version} failed unexpectedly (${name ?? 'unknown'}): ` +
+                `${e instanceof Error ? e.message : 'Unknown error'}`,
+              e instanceof Error ? e.stack : undefined,
+            )
+            await this.publishAlarm(event, {
+              self_resume_failed: true,
+              cause: e instanceof Error ? e.message : String(e),
+            })
+          }
         }
       }
     }
