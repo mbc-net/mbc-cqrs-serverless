@@ -166,23 +166,11 @@ export class CommandEventHandler {
             prevVersion: event.commandRecord.version - 1,
           })
         } catch (e) {
-          const name = e instanceof Error ? e.name : undefined
-          if (name === 'TaskDoesNotExist' || name === 'TaskTimedOut') {
-            // Push side (checkNextToken) already consumed this task token.
-            this.logger.warn(
-              `[${event.commandKey.pk}] Self-resume for v${event.commandRecord.version} already consumed (${name}) — resumed by push side first.`,
-            )
-          } else {
-            this.logger.error(
-              `[${event.commandKey.pk}] Self-resume for v${event.commandRecord.version} failed unexpectedly (${name ?? 'unknown'}): ` +
-                `${e instanceof Error ? e.message : 'Unknown error'}`,
-              e instanceof Error ? e.stack : undefined,
-            )
-            await this.publishAlarm(event, {
-              self_resume_failed: true,
-              cause: e instanceof Error ? e.message : String(e),
-            })
-          }
+          await this.handleResumeExecutionError(event, e, {
+            benignNames: new Set(['TaskDoesNotExist', 'TaskTimedOut']),
+            logContext: `[${event.commandKey.pk}] Self-resume for v${event.commandRecord.version}`,
+            alarmPayload: { self_resume_failed: true },
+          })
         }
       }
     }
@@ -355,10 +343,15 @@ export class CommandEventHandler {
           prevVersion: event.commandRecord.version,
         })
       } catch (e) {
-        this.logger.warn(
-          `[${event.commandKey.pk}] Could not resume command v${nextCommand.version} (sk: ${nextCommand.sk}): ` +
-            `${e instanceof Error ? e.message : 'Unknown error'}`,
-        )
+        await this.handleResumeExecutionError(event, e, {
+          benignNames: new Set(['TaskDoesNotExist']),
+          logContext: `[${event.commandKey.pk}] Resume for v${nextCommand.version} (sk: ${nextCommand.sk})`,
+          alarmPayload: {
+            push_resume_failed: true,
+            nextVersion: nextCommand.version,
+            nextSk: nextCommand.sk,
+          },
+        })
       }
     } else {
       this.logger.warn(
@@ -367,6 +360,33 @@ export class CommandEventHandler {
     }
 
     return null
+  }
+
+  protected async handleResumeExecutionError(
+    event: DataSyncCommandSfnEvent,
+    e: unknown,
+    options: {
+      benignNames: ReadonlySet<string>
+      logContext: string
+      alarmPayload: Record<string, unknown>
+    },
+  ): Promise<void> {
+    const name = e instanceof Error ? e.name : undefined
+    if (name && options.benignNames.has(name)) {
+      this.logger.warn(`${options.logContext} already consumed (${name})`)
+      return
+    }
+
+    this.logger.error(
+      `${options.logContext} failed unexpectedly (${name ?? 'unknown'}): ` +
+        `${e instanceof Error ? e.message : 'Unknown error'}`,
+      e instanceof Error ? e.stack : undefined,
+    )
+    await this.publishAlarm(event, {
+      ...options.alarmPayload,
+      errorName: name ?? 'unknown',
+      cause: e instanceof Error ? e.message : String(e),
+    })
   }
 
   protected async publishAlarm(
