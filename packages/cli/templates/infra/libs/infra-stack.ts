@@ -812,7 +812,9 @@ export class InfraStack extends cdk.Stack {
       )
       // addCatch must run on the State before .next() turns it into a Chain.
       const configuredTask = configureTask
-        ? (configureTask(lambdaTask) as cdk.aws_stepfunctions_tasks.LambdaInvoke)
+        ? (configureTask(
+            lambdaTask,
+          ) as cdk.aws_stepfunctions_tasks.LambdaInvoke)
         : lambdaTask
       if (nextState) {
         return configuredTask.next(nextState)
@@ -937,6 +939,32 @@ export class InfraStack extends cdk.Stack {
           level: cdk.aws_stepfunctions.LogLevel.ALL, // Log level (ALL, ERROR, or FATAL)
         },
       },
+    )
+
+    // Pages when any command-handler execution fails — including wait_prev_command
+    // States.Timeout, which never invokes Lambda so publishAlarm cannot run.
+    const commandSfnFailedAlarm = new cdk.aws_cloudwatch.Alarm(
+      this,
+      'command-handler-sfn-failed-alarm',
+      {
+        alarmName: prefix + 'command-handler-sfn-failed',
+        alarmDescription:
+          'Command handler Step Functions execution failed (includes wait_prev_command 24h timeout)',
+        metric: stateMachine.metricFailed({
+          period: cdk.Duration.minutes(1),
+          statistic: 'Sum',
+        }),
+        threshold: 1,
+        evaluationPeriods: 1,
+        datapointsToAlarm: 1,
+        treatMissingData: cdk.aws_cloudwatch.TreatMissingData.NOT_BREACHING,
+        comparisonOperator:
+          cdk.aws_cloudwatch.ComparisonOperator
+            .GREATER_THAN_OR_EQUAL_TO_THRESHOLD,
+      },
+    )
+    commandSfnFailedAlarm.addAlarmAction(
+      new cdk.aws_cloudwatch_actions.SnsAction(alarmSns),
     )
 
     // Output the State Machine's ARN

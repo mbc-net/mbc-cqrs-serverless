@@ -210,6 +210,45 @@ exports[`snapshot test for InfraStack 1`] = `
       },
       "Type": "AWS::Cognito::UserPoolClient",
     },
+    "commandhandlersfnfailedalarmB54C35EC": {
+      "Properties": {
+        "AlarmActions": [
+          {
+            "Ref": "alarmsnsFB7BBC3B",
+          },
+        ],
+        "AlarmDescription": "Command handler Step Functions execution failed (includes wait_prev_command 24h timeout)",
+        "AlarmName": "dev--command-handler-sfn-failed",
+        "ComparisonOperator": "GreaterThanOrEqualToThreshold",
+        "DatapointsToAlarm": 1,
+        "Dimensions": [
+          {
+            "Name": "StateMachineArn",
+            "Value": {
+              "Ref": "commandhandlerstatemachine937D91FB",
+            },
+          },
+        ],
+        "EvaluationPeriods": 1,
+        "MetricName": "ExecutionsFailed",
+        "Namespace": "AWS/States",
+        "Period": 60,
+        "Statistic": "Sum",
+        "Tags": [
+          {
+            "Key": "env",
+            "Value": "dev",
+          },
+          {
+            "Key": "name",
+            "Value": "",
+          },
+        ],
+        "Threshold": 1,
+        "TreatMissingData": "notBreaching",
+      },
+      "Type": "AWS::CloudWatch::Alarm",
+    },
     "commandhandlersfnlog9072E963": {
       "DeletionPolicy": "Delete",
       "Properties": {
