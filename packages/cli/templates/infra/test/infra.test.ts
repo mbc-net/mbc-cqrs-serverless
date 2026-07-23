@@ -115,7 +115,7 @@ test('lambda-api SendTaskSuccess is scoped to command-handler state machine', ()
         Match.objectLike({
           Action: 'states:SendTaskSuccess',
           Effect: 'Allow',
-          Resource: Match.not('*'),
+          Resource: { Ref: 'commandhandlerstatemachine937D91FB' },
         }),
       ]),
     },
