@@ -96,7 +96,7 @@ test('snapshot test for InfraStack', () => {
   expect(template).toMatchSnapshot()
 })
 
-test('lambda-api has SendTaskSuccess with Resource * for task tokens', () => {
+test('lambda-api SendTaskSuccess is scoped to command-handler state machine', () => {
   const cdkEnv: cdk.Environment = {
     account: '101010101010',
     region: 'ap-northeast-1',
@@ -115,7 +115,7 @@ test('lambda-api has SendTaskSuccess with Resource * for task tokens', () => {
         Match.objectLike({
           Action: 'states:SendTaskSuccess',
           Effect: 'Allow',
-          Resource: '*',
+          Resource: Match.not('*'),
         }),
       ]),
     },

@@ -1839,7 +1839,9 @@ exports[`snapshot test for InfraStack 1`] = `
             {
               "Action": "states:SendTaskSuccess",
               "Effect": "Allow",
-              "Resource": "*",
+              "Resource": {
+                "Ref": "commandhandlerstatemachine937D91FB",
+              },
             },
           ],
           "Version": "2012-10-17",
