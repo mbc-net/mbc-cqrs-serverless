@@ -624,6 +624,59 @@ describe('DataSyncCommandSfnEventHandler', () => {
       })
     })
 
+    it('should rethrow original error when publishAlarm SNS rejects after step failure', async () => {
+      dynamoDBMock.on(UpdateItemCommand).resolves({} as any)
+      dynamoDBMock.on(GetItemCommand).resolves({ Item: {} })
+      snsMock.on(PublishCommand).callsFake(async (input) => {
+        const message = JSON.parse(String(input.Message))
+        if (message.action === 'sfn-alarm') {
+          throw new Error('SNS unavailable')
+        }
+        return {}
+      })
+
+      await expect(
+        commandEventHandler.execute(
+          createEvent(DataSyncCommandSfnName.SYNC_DATA, {
+            prevStateName: 'transform_data',
+          }),
+        ),
+      ).rejects.toThrow('SyncDataHandler not found!')
+
+      expect(dynamoDBMock).toHaveReceivedCommandWith(UpdateItemCommand, {
+        ExpressionAttributeValues: expect.objectContaining({
+          ':status': { S: 'sync_data:FAILED' },
+        }),
+      })
+    })
+
+    it('should return version-mismatch errorDetails when publishAlarm SNS rejects', async () => {
+      dynamoDBMock.on(UpdateItemCommand).resolves({} as any)
+      dynamoDBMock.on(GetItemCommand).resolves({
+        Item: {
+          version: {
+            N: '1',
+          },
+        },
+      })
+      snsMock.on(PublishCommand).callsFake(async (input) => {
+        const message = JSON.parse(String(input.Message))
+        if (message.action === 'sfn-alarm') {
+          throw new Error('SNS unavailable')
+        }
+        return {}
+      })
+
+      await expect(
+        commandEventHandler.execute(sfnCheckVersionEvent),
+      ).resolves.toEqual(
+        expect.objectContaining({
+          result: -1,
+          error: 'version is not match',
+        }),
+      )
+    })
+
     it('should call handler up when executing the correct sync data event', async () => {
       // Arrange
       dynamoDBMock.on(UpdateItemCommand).resolves({} as any)

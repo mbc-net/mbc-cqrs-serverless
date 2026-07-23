@@ -68,7 +68,7 @@ export class CommandEventHandler {
         getCommandStatus(event.stepStateName, CommandStatus.STATUS_FAILED),
         event.commandRecord.requestId,
       )
-      await this.publishAlarm(event, (error as Error).stack)
+      await this.publishAlarmSafely(event, (error as Error).stack)
       throw error
     }
   }
@@ -144,11 +144,12 @@ export class CommandEventHandler {
         })
       }
 
-      // Limitation: if the predecessor's wait_prev_command hit the 24h SFN
-      // taskTimeout, DynamoDB is not updated (Catch → Pass → Fail never
-      // invokes Lambda). status can remain wait_prev_command:FINISHED with a
-      // stale taskToken, so this check will not self-resume and this version
-      // may wait out its own 24h timeout (cascade).
+      // Limitation: self-resume only when predecessor status is finish:STARTED
+      // or finish:FINISHED. Any predecessor exit before FINISH (wait_prev_command
+      // 24h timeout Pass→Fail with no Lambda/DDB update, version-mismatch fail,
+      // or *:FAILED mid-pipeline) leaves a non-finish status (often with a stale
+      // taskToken), so this check will not self-resume and this version may wait
+      // out its own 24h timeout (cascade).
       const finishStarted = getCommandStatus(
         DataSyncCommandSfnName.FINISH,
         CommandStatus.STATUS_STARTED,
@@ -255,7 +256,7 @@ export class CommandEventHandler {
         'next version must be ' + nextVersion + ' but got ' + commandVersion,
     }
 
-    await this.publishAlarm(event, errorDetails)
+    await this.publishAlarmSafely(event, errorDetails)
     return errorDetails
   }
 
