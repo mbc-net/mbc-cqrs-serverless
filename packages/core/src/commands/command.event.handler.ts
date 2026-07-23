@@ -138,12 +138,17 @@ export class CommandEventHandler {
             `${e instanceof Error ? e.message : 'Unknown error'}`,
           e instanceof Error ? e.stack : undefined,
         )
-        await this.publishAlarm(event, {
+        await this.publishAlarmSafely(event, {
           self_resume_predecessor_read_failed: true,
           cause: e instanceof Error ? e.message : String(e),
         })
       }
 
+      // Limitation: if the predecessor's wait_prev_command hit the 24h SFN
+      // taskTimeout, DynamoDB is not updated (Catch → Pass → Fail never
+      // invokes Lambda). status can remain wait_prev_command:FINISHED with a
+      // stale taskToken, so this check will not self-resume and this version
+      // may wait out its own 24h timeout (cascade).
       const finishStarted = getCommandStatus(
         DataSyncCommandSfnName.FINISH,
         CommandStatus.STATUS_STARTED,
@@ -382,11 +387,30 @@ export class CommandEventHandler {
         `${e instanceof Error ? e.message : 'Unknown error'}`,
       e instanceof Error ? e.stack : undefined,
     )
-    await this.publishAlarm(event, {
+    await this.publishAlarmSafely(event, {
       ...options.alarmPayload,
       errorName: name ?? 'unknown',
       cause: e instanceof Error ? e.message : String(e),
     })
+  }
+
+  /**
+   * Best-effort alarm publish — SNS failure must not fail the SFN step
+   * (e.g. after updateTaskToken already succeeded).
+   */
+  protected async publishAlarmSafely(
+    event: DataSyncCommandSfnEvent,
+    errorDetails: any,
+  ): Promise<void> {
+    try {
+      await this.publishAlarm(event, errorDetails)
+    } catch (alarmError) {
+      this.logger.error(
+        `[${event.commandKey.pk}] publishAlarm failed: ` +
+          `${alarmError instanceof Error ? alarmError.message : 'Unknown error'}`,
+        alarmError instanceof Error ? alarmError.stack : undefined,
+      )
+    }
   }
 
   protected async publishAlarm(

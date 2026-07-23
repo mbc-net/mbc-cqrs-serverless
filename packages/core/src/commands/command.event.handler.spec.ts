@@ -1412,5 +1412,59 @@ describe('DataSyncCommandSfnEventHandler', () => {
         'alarm_topic_arn',
       )
     })
+
+    it('should not fail the step when publishAlarm rejects after getItem failure', async () => {
+      jest.useFakeTimers()
+      const taskToken = 'alarm-fail-token'
+      const mockCommandService = {
+        updateTaskToken: jest.fn().mockResolvedValue(undefined),
+        getItem: jest.fn().mockRejectedValue(new Error('ThrottlingException')),
+      }
+      const mockSfnService = { resumeExecution: jest.fn() }
+
+      const { h, publishSpy } = makeWaitConfirmTokenHandler(
+        mockCommandService,
+        mockSfnService,
+      )
+      publishSpy.mockRejectedValue(new Error('SNS unavailable'))
+      const event = createWaitConfirmEvent(2, taskToken)
+
+      const pending = h['waitConfirmToken'](event)
+      await jest.runAllTimersAsync()
+      await expect(pending).resolves.toEqual({
+        result: { token: taskToken },
+      })
+
+      jest.useRealTimers()
+    })
+
+    it('should not fail the step when publishAlarm rejects after unexpected resume error', async () => {
+      const taskToken = 'alarm-on-resume-fail-token'
+      const mockCommandService = {
+        updateTaskToken: jest.fn().mockResolvedValue(undefined),
+        getItem: jest.fn().mockResolvedValue({
+          version: 1,
+          status: finishStartedStatus,
+          sk: '1726027976@1',
+        }),
+      }
+      const accessDenied = Object.assign(new Error('AccessDeniedException'), {
+        name: 'AccessDeniedException',
+      })
+      const mockSfnService = {
+        resumeExecution: jest.fn().mockRejectedValue(accessDenied),
+      }
+
+      const { h, publishSpy } = makeWaitConfirmTokenHandler(
+        mockCommandService,
+        mockSfnService,
+      )
+      publishSpy.mockRejectedValue(new Error('SNS unavailable'))
+      const event = createWaitConfirmEvent(2, taskToken)
+
+      await expect(h['waitConfirmToken'](event)).resolves.toEqual({
+        result: { token: taskToken },
+      })
+    })
   })
 })

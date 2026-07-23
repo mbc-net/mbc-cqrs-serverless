@@ -865,6 +865,11 @@ export class InfraStack extends cdk.Stack {
       cdk.aws_stepfunctions.IntegrationPattern.REQUEST_RESPONSE,
     )
 
+    // States.Timeout never invokes the wait_prev_command Lambda, so the
+    // command row is not updated: status/taskToken stay at post-
+    // waitConfirmToken values (typically wait_prev_command:FINISHED +
+    // stale token). Later versions may each wait another 24h. Execution
+    // still fails here (CW ExecutionsFailed alarm may fire).
     const waitPrevCommandTimeoutHandler = new cdk.aws_stepfunctions.Pass(
       this,
       'wait_prev_command_timeout',
@@ -1280,6 +1285,11 @@ export class InfraStack extends cdk.Stack {
       resources: [commandSfnArn],
     })
 
+    const sfnTaskTokenPolicy = new cdk.aws_iam.PolicyStatement({
+      actions: ['states:SendTaskSuccess'],
+      resources: ['*'],
+    })
+
     const taskSfnPolicy = new cdk.aws_iam.PolicyStatement({
       actions: ['states:*'],
       resources: [taskSfnArn], // Access to all resources
@@ -1293,7 +1303,7 @@ export class InfraStack extends cdk.Stack {
     // Attach the policy to the Lambda function's execution role
     lambdaApi.role?.attachInlinePolicy(
       new cdk.aws_iam.Policy(this, 'lambda-event-sfn-policy', {
-        statements: [sfnPolicy],
+        statements: [sfnPolicy, sfnTaskTokenPolicy],
       }),
     )
 

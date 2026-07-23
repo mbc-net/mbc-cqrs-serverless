@@ -1836,6 +1836,11 @@ exports[`snapshot test for InfraStack 1`] = `
               "Effect": "Allow",
               "Resource": "arn:aws:states:ap-northeast-1:101010101010:stateMachine:dev--command-handler",
             },
+            {
+              "Action": "states:SendTaskSuccess",
+              "Effect": "Allow",
+              "Resource": "*",
+            },
           ],
           "Version": "2012-10-17",
         },

@@ -3,7 +3,7 @@
  */
 
 import * as cdk from 'aws-cdk-lib'
-import { Template } from 'aws-cdk-lib/assertions'
+import { Match, Template } from 'aws-cdk-lib/assertions'
 import { getConfig } from '../config'
 import { InfraStack } from '../libs/infra-stack'
 
@@ -94,4 +94,30 @@ test('snapshot test for InfraStack', () => {
   )
 
   expect(template).toMatchSnapshot()
+})
+
+test('lambda-api has SendTaskSuccess with Resource * for task tokens', () => {
+  const cdkEnv: cdk.Environment = {
+    account: '101010101010',
+    region: 'ap-northeast-1',
+  }
+  const config = getConfig('dev')
+  const app = new cdk.App()
+  const stack = new InfraStack(app, 'TestInfraStackIam', {
+    env: cdkEnv,
+    config,
+  })
+  const template = Template.fromStack(stack)
+
+  template.hasResourceProperties('AWS::IAM::Policy', {
+    PolicyDocument: {
+      Statement: Match.arrayWith([
+        Match.objectLike({
+          Action: 'states:SendTaskSuccess',
+          Effect: 'Allow',
+          Resource: '*',
+        }),
+      ]),
+    },
+  })
 })
