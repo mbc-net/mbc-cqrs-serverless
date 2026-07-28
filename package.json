@@ -144,16 +144,7 @@
     "lodash": "^4.18.0",
     "js-yaml": "4.3.0",
     "fast-uri": "3.1.4",
-    "glob@10": {
-      "minimatch": {
-        "brace-expansion": "2.1.2"
-      }
-    },
-    "readdir-glob": {
-      "minimatch": {
-        "brace-expansion": "2.1.2"
-      }
-    },
+    "brace-expansion@2": "5.0.8",
     "tmp": "^0.2.6",
     "webpack": "^5.105.0",
     "qs": "^6.14.2",
