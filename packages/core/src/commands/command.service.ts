@@ -486,11 +486,14 @@ export class CommandService implements OnModuleInit, ICommandService {
     })
   }
 
-  async getItem(key: DetailKey): Promise<CommandModel> {
+  async getItem(
+    key: DetailKey,
+    options?: { consistentRead?: boolean },
+  ): Promise<CommandModel> {
     if (!key.sk.includes(VER_SEPARATOR)) {
       return this.getLatestItem(key)
     }
-    return await this.dynamoDbService.getItem(this.tableName, key)
+    return await this.dynamoDbService.getItem(this.tableName, key, options)
   }
 
   async getLatestItem(key: DetailKey): Promise<CommandModel> {
@@ -594,6 +597,8 @@ export class CommandService implements OnModuleInit, ICommandService {
         getSortKeyVersion(currentKey.sk) + 1,
       ),
     }
-    return await this.dynamoDbService.getItem(this.tableName, nextKey)
+    return await this.dynamoDbService.getItem(this.tableName, nextKey, {
+      consistentRead: true,
+    })
   }
 }

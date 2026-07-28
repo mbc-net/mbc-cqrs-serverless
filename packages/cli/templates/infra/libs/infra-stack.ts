@@ -785,6 +785,10 @@ export class InfraStack extends cdk.Stack {
       stateName: string,
       nextState: cdk.aws_stepfunctions.IChainable | null,
       integrationPattern: cdk.aws_stepfunctions.IntegrationPattern,
+      taskTimeout?: cdk.aws_stepfunctions.Timeout,
+      configureTask?: (
+        task: cdk.aws_stepfunctions_tasks.LambdaInvoke,
+      ) => cdk.aws_stepfunctions.IChainable,
     ) => {
       const payloadObject: {
         [key: string]: any
@@ -796,7 +800,7 @@ export class InfraStack extends cdk.Stack {
         integrationPattern ===
         cdk.aws_stepfunctions.IntegrationPattern.WAIT_FOR_TASK_TOKEN
       ) {
-        payloadObject['taskToken'] = cdk.aws_stepfunctions.JsonPath.taskToken // '$$.Task.Token'
+        payloadObject['taskToken'] = cdk.aws_stepfunctions.JsonPath.taskToken
       }
       const lambdaTask = new cdk.aws_stepfunctions_tasks.LambdaInvoke(
         this,
@@ -808,12 +812,19 @@ export class InfraStack extends cdk.Stack {
           stateName,
           outputPath: '$.Payload[0][0]',
           integrationPattern,
+          ...(taskTimeout ? { taskTimeout } : {}),
         },
       )
+      // addCatch must run on the State before .next() turns it into a Chain.
+      const configuredTask = configureTask
+        ? (configureTask(
+            lambdaTask,
+          ) as cdk.aws_stepfunctions_tasks.LambdaInvoke)
+        : lambdaTask
       if (nextState) {
-        return lambdaTask.next(nextState)
+        return configuredTask.next(nextState)
       }
-      return lambdaTask
+      return configuredTask
     }
 
     // Define states
@@ -859,10 +870,34 @@ export class InfraStack extends cdk.Stack {
       cdk.aws_stepfunctions.IntegrationPattern.REQUEST_RESPONSE,
     )
 
+    // States.Timeout never invokes the wait_prev_command Lambda, so the
+    // command row is not updated (status/taskToken stay post-waitConfirmToken,
+    // typically wait_prev_command:FINISHED + stale token). That is one case of
+    // the broader cascade: any predecessor exit before FINISH leaves a
+    // non-finish status, so later versions will not self-resume and may each
+    // wait another 24h. Execution still fails here (CW ExecutionsFailed may fire).
+    const waitPrevCommandTimeoutHandler = new cdk.aws_stepfunctions.Pass(
+      this,
+      'wait_prev_command_timeout',
+      {
+        stateName: 'wait_prev_command_timeout',
+        parameters: {
+          error: 'States.Timeout',
+          cause: 'wait_prev_command exceeded taskTimeout (24h)',
+        },
+      },
+    ).next(fail)
+
     const waitPrevCommand = lambdaInvoke(
       'wait_prev_command',
       setTtlCommand,
       cdk.aws_stepfunctions.IntegrationPattern.WAIT_FOR_TASK_TOKEN,
+      cdk.aws_stepfunctions.Timeout.duration(cdk.Duration.hours(24)),
+      (task) =>
+        task.addCatch(waitPrevCommandTimeoutHandler, {
+          errors: ['States.Timeout'],
+          resultPath: '$.timeoutError',
+        }),
     )
 
     // Define Choice state
@@ -915,6 +950,32 @@ export class InfraStack extends cdk.Stack {
           level: cdk.aws_stepfunctions.LogLevel.ALL, // Log level (ALL, ERROR, or FATAL)
         },
       },
+    )
+
+    // Pages when any command-handler execution fails — including wait_prev_command
+    // States.Timeout, which never invokes Lambda so publishAlarm cannot run.
+    const commandSfnFailedAlarm = new cdk.aws_cloudwatch.Alarm(
+      this,
+      'command-handler-sfn-failed-alarm',
+      {
+        alarmName: prefix + 'command-handler-sfn-failed',
+        alarmDescription:
+          'Command handler Step Functions execution failed (includes wait_prev_command 24h timeout)',
+        metric: stateMachine.metricFailed({
+          period: cdk.Duration.minutes(1),
+          statistic: 'Sum',
+        }),
+        threshold: 1,
+        evaluationPeriods: 1,
+        datapointsToAlarm: 1,
+        treatMissingData: cdk.aws_cloudwatch.TreatMissingData.NOT_BREACHING,
+        comparisonOperator:
+          cdk.aws_cloudwatch.ComparisonOperator
+            .GREATER_THAN_OR_EQUAL_TO_THRESHOLD,
+      },
+    )
+    commandSfnFailedAlarm.addAlarmAction(
+      new cdk.aws_cloudwatch_actions.SnsAction(alarmSns),
     )
 
     // Output the State Machine's ARN
@@ -1050,7 +1111,7 @@ export class InfraStack extends cdk.Stack {
         },
       })
       .itemProcessor(csvRowsHandlerState, {
-        executionType: aws_stepfunctions.ProcessorType.STANDARD,
+        executionType: cdk.aws_stepfunctions.ProcessorType.STANDARD,
       })
 
     // Catch ALL Map state errors and route them to finalizeParentJobState
@@ -1230,6 +1291,14 @@ export class InfraStack extends cdk.Stack {
       resources: [commandSfnArn],
     })
 
+    // SendTaskSuccess is scoped to this command state machine (same pattern as
+    // CDK stateMachine.grantTaskResponse). Task tokens are still required at
+    // call time; Resource '*' is unnecessary and over-broad for the template.
+    const sfnTaskTokenPolicy = new cdk.aws_iam.PolicyStatement({
+      actions: ['states:SendTaskSuccess'],
+      resources: [stateMachine.stateMachineArn],
+    })
+
     const taskSfnPolicy = new cdk.aws_iam.PolicyStatement({
       actions: ['states:*'],
       resources: [taskSfnArn], // Access to all resources
@@ -1243,7 +1312,7 @@ export class InfraStack extends cdk.Stack {
     // Attach the policy to the Lambda function's execution role
     lambdaApi.role?.attachInlinePolicy(
       new cdk.aws_iam.Policy(this, 'lambda-event-sfn-policy', {
-        statements: [sfnPolicy],
+        statements: [sfnPolicy, sfnTaskTokenPolicy],
       }),
     )
 

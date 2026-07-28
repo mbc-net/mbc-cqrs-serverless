@@ -8,7 +8,12 @@ import {
 import { DataSyncCommandSfnName } from '../command-events/sfn-name.enum'
 import { S3Service } from '../data-store'
 import { addSortKeyVersion, removeSortKeyVersion } from '../helpers/key'
-import { CommandModuleOptions, INotification } from '../interfaces'
+import {
+  CommandModel,
+  CommandModuleOptions,
+  DetailKey,
+  INotification,
+} from '../interfaces'
 import { SnsService } from '../queue'
 import { StepFunctionService } from '../step-func/step-function.service'
 import { MODULE_OPTIONS_TOKEN } from './command.module-definition'
@@ -63,7 +68,7 @@ export class CommandEventHandler {
         getCommandStatus(event.stepStateName, CommandStatus.STATUS_FAILED),
         event.commandRecord.requestId,
       )
-      await this.publishAlarm(event, (error as Error).stack)
+      await this.publishAlarmSafely(event, (error as Error).stack)
       throw error
     }
   }
@@ -102,12 +107,142 @@ export class CommandEventHandler {
     event: DataSyncCommandSfnEvent,
   ): Promise<StepFunctionStateInput> {
     this.logger.debug('waitConfirmToken::', event)
+
     await this.commandService.updateTaskToken(event.commandKey, event.taskToken)
+
+    if (event.commandRecord.version > 1) {
+      const prevSk = addSortKeyVersion(
+        removeSortKeyVersion(event.commandRecord.sk),
+        event.commandRecord.version - 1,
+      )
+
+      let prevCommand: CommandModel | undefined
+      let prevReadFailed = false
+      try {
+        // consistentRead: true — predecessor status across independent SFN
+        // executions must not be a stale eventually-consistent read.
+        //
+        // Bounded retry (3 attempts, exponential backoff baseDelayMs * 2^(n-1)):
+        // best-effort check — updateTaskToken already succeeded; checkNextToken
+        // on the predecessor remains the primary resume path.
+        prevCommand = await this.getItemWithRetry(
+          { pk: event.commandRecord.pk, sk: prevSk },
+          { consistentRead: true },
+          3,
+          100,
+        )
+      } catch (e) {
+        // After app + SDK retries, treat as persistent degradation of the
+        // self-resume backstop — do not fail the step (token already stored).
+        prevReadFailed = true
+        this.logger.error(
+          `[${event.commandKey.pk}] Could not read predecessor status for command v${event.commandRecord.version} after retries, self-resume backstop degraded: ` +
+            `${e instanceof Error ? e.message : 'Unknown error'}`,
+          e instanceof Error ? e.stack : undefined,
+        )
+        await this.publishAlarmSafely(event, {
+          self_resume_predecessor_read_failed: true,
+          cause: e instanceof Error ? e.message : String(e),
+        })
+      }
+
+      // A successful read that returns no row is not the same as "predecessor
+      // has not reached finish yet" — the command chain is append-only, so for
+      // version > 1 the predecessor row must exist. Surface it instead of
+      // letting it fall through the same silent path as normal waiting.
+      if (!prevReadFailed && !prevCommand) {
+        this.logger.warn(
+          `[${event.commandKey.pk}] Predecessor command v${event.commandRecord.version - 1} not found (sk: ${prevSk}) — ` +
+            `self-resume backstop cannot evaluate predecessor status`,
+        )
+      }
+
+      // Limitation: self-resume only when predecessor status is finish:STARTED
+      // or finish:FINISHED. Any predecessor exit before FINISH (wait_prev_command
+      // 24h timeout Pass→Fail with no Lambda/DDB update, version-mismatch fail,
+      // or *:FAILED mid-pipeline) leaves a non-finish status (often with a stale
+      // taskToken), so this check will not self-resume and this version may wait
+      // out its own 24h timeout (cascade).
+      const finishStarted = getCommandStatus(
+        DataSyncCommandSfnName.FINISH,
+        CommandStatus.STATUS_STARTED,
+      )
+      const finishFinished = getCommandStatus(
+        DataSyncCommandSfnName.FINISH,
+        CommandStatus.STATUS_FINISHED,
+      )
+      const prevEnteredFinish =
+        prevCommand?.status === finishStarted ||
+        prevCommand?.status === finishFinished
+
+      if (prevEnteredFinish) {
+        this.logger.log(
+          `[${event.commandKey.pk}] Prev command already in finish step — self-resuming v${event.commandRecord.version}`,
+        )
+        try {
+          await this.sfnService.resumeExecution(event.taskToken, {
+            result: 'resumed_by_prev_version',
+            prevVersion: event.commandRecord.version - 1,
+          })
+        } catch (e) {
+          await this.handleResumeExecutionError(event, e, {
+            benignNames: new Set(['TaskDoesNotExist', 'TaskTimedOut']),
+            logContext: `[${event.commandKey.pk}] Self-resume for v${event.commandRecord.version}`,
+            alarmPayload: { self_resume_failed: true },
+          })
+        }
+      }
+    }
+
     return {
       result: {
         token: event.taskToken,
       },
     }
+  }
+
+  /**
+   * Retry wrapper around commandService.getItem for the cross-execution
+   * predecessor-status check in waitConfirmToken. Bounded and short —
+   * smooths a single transient DDB failure; does not wait out an outage.
+   */
+  protected async getItemWithRetry(
+    key: DetailKey,
+    options: { consistentRead: boolean },
+    maxAttempts: number,
+    baseDelayMs: number,
+  ): Promise<CommandModel> {
+    return await this.withRetry(
+      () => this.commandService.getItem(key, options),
+      maxAttempts,
+      baseDelayMs,
+    )
+  }
+
+  /**
+   * Bounded retry with exponential backoff (baseDelayMs * 2^(attempt - 1)),
+   * rethrowing the last error once every attempt is exhausted. Shared by both
+   * sides of the version handshake so the pull path (waitConfirmToken) and the
+   * push path (checkNextToken) tolerate transient DynamoDB failures equally.
+   */
+  protected async withRetry<T>(
+    fn: () => Promise<T>,
+    maxAttempts: number,
+    baseDelayMs: number,
+  ): Promise<T> {
+    let lastError: unknown
+    for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+      try {
+        return await fn()
+      } catch (e) {
+        lastError = e
+        if (attempt < maxAttempts) {
+          const delayMs = baseDelayMs * Math.pow(2, attempt - 1)
+          await new Promise((resolve) => setTimeout(resolve, delayMs))
+        }
+      }
+    }
+    throw lastError
   }
 
   protected async checkVersion(
@@ -122,10 +257,19 @@ export class CommandEventHandler {
     this.logger.debug('Checking version for data::', data)
     const commandVersion = event.commandRecord.version
     const nextVersion = 1 + (data?.version || 0)
-    const oldCommand = await this.commandService.getItem({
-      pk: event.commandRecord.pk,
-      sk: addSortKeyVersion(sk, commandVersion - 1),
-    })
+    // consistentRead: true — the predecessor row is written by an independent
+    // SFN execution. A stale eventually-consistent miss makes oldCommand look
+    // absent, which returns result: 0 and routes straight to set_ttl_command,
+    // skipping wait_prev_command and letting a later version's sync_data land
+    // out of order. Matches the predecessor reads in waitConfirmToken and
+    // getNextCommand.
+    const oldCommand = await this.commandService.getItem(
+      {
+        pk: event.commandRecord.pk,
+        sk: addSortKeyVersion(sk, commandVersion - 1),
+      },
+      { consistentRead: true },
+    )
 
     if (nextVersion === commandVersion) {
       return {
@@ -152,7 +296,7 @@ export class CommandEventHandler {
         'next version must be ' + nextVersion + ' but got ' + commandVersion,
     }
 
-    await this.publishAlarm(event, errorDetails)
+    await this.publishAlarmSafely(event, errorDetails)
     return errorDetails
   }
 
@@ -226,9 +370,38 @@ export class CommandEventHandler {
   ): Promise<StepFunctionStateInput> {
     this.logger.debug('checkNextToken:: ', event.commandRecord)
 
-    const nextCommand = await this.commandService.getNextCommand(
-      event.commandKey,
-    )
+    let nextCommand: CommandModel | undefined
+    try {
+      // Same bounded retry as the pull-side predecessor read in
+      // waitConfirmToken — without it a transient DDB failure here takes out
+      // both halves of the handshake at once.
+      nextCommand = await this.withRetry(
+        () => this.commandService.getNextCommand(event.commandKey),
+        3,
+        100,
+      )
+    } catch (e) {
+      // Deliberately does not rethrow. Failing this step makes execute() write
+      // finish:FAILED, and the successor's self-resume backstop only reacts to
+      // finish:STARTED|FINISHED — so the push path and the pull path would
+      // collapse together and the chain would stall until the 24h timeout.
+      // Returning normally lets execute() write finish:FINISHED, keeping the
+      // successor's self-resume armed for its own token-store pass. The step is
+      // reported as finished even though the push resume never ran; the alarm
+      // below is what records that, and the successor is the recovery path.
+      this.logger.error(
+        `[${event.commandKey.pk}] Could not read next command after retries, ` +
+          `push resume skipped (successor self-resume remains armed): ` +
+          `${e instanceof Error ? e.message : 'Unknown error'}`,
+        e instanceof Error ? e.stack : undefined,
+      )
+      await this.publishAlarmSafely(event, {
+        next_command_read_failed: true,
+        cause: e instanceof Error ? e.message : String(e),
+      })
+      return null
+    }
+
     if (!nextCommand) {
       this.logger.debug('No next command version found. Chain ends.')
       return null
@@ -245,10 +418,15 @@ export class CommandEventHandler {
           prevVersion: event.commandRecord.version,
         })
       } catch (e) {
-        this.logger.warn(
-          `[${event.commandKey.pk}] Could not resume command v${nextCommand.version} (sk: ${nextCommand.sk}): ` +
-            `${e instanceof Error ? e.message : 'Unknown error'}`,
-        )
+        await this.handleResumeExecutionError(event, e, {
+          benignNames: new Set(['TaskDoesNotExist']),
+          logContext: `[${event.commandKey.pk}] Resume for v${nextCommand.version} (sk: ${nextCommand.sk})`,
+          alarmPayload: {
+            push_resume_failed: true,
+            nextVersion: nextCommand.version,
+            nextSk: nextCommand.sk,
+          },
+        })
       }
     } else {
       this.logger.warn(
@@ -257,6 +435,52 @@ export class CommandEventHandler {
     }
 
     return null
+  }
+
+  protected async handleResumeExecutionError(
+    event: DataSyncCommandSfnEvent,
+    e: unknown,
+    options: {
+      benignNames: ReadonlySet<string>
+      logContext: string
+      alarmPayload: Record<string, unknown>
+    },
+  ): Promise<void> {
+    const name = e instanceof Error ? e.name : undefined
+    if (name && options.benignNames.has(name)) {
+      this.logger.warn(`${options.logContext} already consumed (${name})`)
+      return
+    }
+
+    this.logger.error(
+      `${options.logContext} failed unexpectedly (${name ?? 'unknown'}): ` +
+        `${e instanceof Error ? e.message : 'Unknown error'}`,
+      e instanceof Error ? e.stack : undefined,
+    )
+    await this.publishAlarmSafely(event, {
+      ...options.alarmPayload,
+      errorName: name ?? 'unknown',
+      cause: e instanceof Error ? e.message : String(e),
+    })
+  }
+
+  /**
+   * Best-effort alarm publish — SNS failure must not fail the SFN step
+   * (e.g. after updateTaskToken already succeeded).
+   */
+  protected async publishAlarmSafely(
+    event: DataSyncCommandSfnEvent,
+    errorDetails: any,
+  ): Promise<void> {
+    try {
+      await this.publishAlarm(event, errorDetails)
+    } catch (alarmError) {
+      this.logger.error(
+        `[${event.commandKey.pk}] publishAlarm failed: ` +
+          `${alarmError instanceof Error ? alarmError.message : 'Unknown error'}`,
+        alarmError instanceof Error ? alarmError.stack : undefined,
+      )
+    }
   }
 
   protected async publishAlarm(
