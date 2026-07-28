@@ -1034,6 +1034,168 @@ describe('DataSyncCommandSfnEventHandler', () => {
     })
   })
 
+  describe('checkVersion - predecessor consistent read', () => {
+    function makeCheckVersionHandler(
+      commandGetItem: jest.Mock,
+      dataGetItem: jest.Mock,
+    ) {
+      const h = new (CommandEventHandler as any)(
+        { tableName: 'table_name' },
+        { getItem: commandGetItem },
+        { getItem: dataGetItem },
+        null,
+        null,
+        { publish: jest.fn().mockResolvedValue(undefined) },
+        { get: jest.fn().mockReturnValue('alarm_topic_arn') },
+        null,
+      )
+      h.logger = {
+        debug: jest.fn(),
+        log: jest.fn(),
+        warn: jest.fn(),
+        error: jest.fn(),
+      }
+      return h
+    }
+
+    it('should read the predecessor command with consistentRead', async () => {
+      const commandGetItem = jest
+        .fn()
+        .mockResolvedValue({ version: 1, sk: '1726027976@1' })
+      const dataGetItem = jest.fn().mockResolvedValue({ version: 1 })
+      const h = makeCheckVersionHandler(commandGetItem, dataGetItem)
+
+      await h['checkVersion'](createWaitConfirmEvent(2))
+
+      expect(commandGetItem).toHaveBeenCalledWith(
+        { pk: 'tenantCode#test', sk: '1726027976@1' },
+        { consistentRead: true },
+      )
+    })
+
+    it('should route to wait_prev_command when the predecessor exists and data lags', async () => {
+      // A stale eventually-consistent miss here would return result: 0, which
+      // skips wait_prev_command and lets a later version's sync_data land out
+      // of order. With a consistent read the predecessor is seen and the
+      // execution waits (result: 1).
+      const commandGetItem = jest
+        .fn()
+        .mockResolvedValue({ version: 2, sk: '1726027976@2' })
+      const dataGetItem = jest.fn().mockResolvedValue({ version: 1 })
+      const h = makeCheckVersionHandler(commandGetItem, dataGetItem)
+
+      const result = await h['checkVersion'](createWaitConfirmEvent(3))
+
+      expect(commandGetItem).toHaveBeenCalledWith(
+        { pk: 'tenantCode#test', sk: '1726027976@2' },
+        { consistentRead: true },
+      )
+      expect(result).toEqual({ result: 1 })
+    })
+  })
+
+  describe('checkNextToken - push-side read retry', () => {
+    const COMMAND_TABLE = 'env-app-table_name-command'
+
+    function makeCheckNextTokenHandler() {
+      const dynamoGetItem = jest.fn()
+      const dynamoDbService = {
+        getItem: dynamoGetItem,
+        getTableName: jest.fn().mockReturnValue(COMMAND_TABLE),
+      }
+      const commandService = new (CommandService as any)(
+        { tableName: 'table_name' },
+        dynamoDbService,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+      )
+      const resumeExecution = jest.fn().mockResolvedValue(undefined)
+      const publishSpy = jest.fn().mockResolvedValue(undefined)
+      const h = new (CommandEventHandler as any)(
+        { tableName: 'table_name' },
+        commandService,
+        null,
+        null,
+        null,
+        { publish: publishSpy },
+        { get: jest.fn().mockReturnValue('alarm_topic_arn') },
+        { resumeExecution },
+      )
+      const errorSpy = jest.fn()
+      h.logger = {
+        debug: jest.fn(),
+        log: jest.fn(),
+        warn: jest.fn(),
+        error: errorSpy,
+      }
+      return { h, dynamoGetItem, resumeExecution, publishSpy, errorSpy }
+    }
+
+    it('should retry getNextCommand and resume when a later attempt succeeds', async () => {
+      const { h, dynamoGetItem, resumeExecution } = makeCheckNextTokenHandler()
+      dynamoGetItem
+        .mockRejectedValueOnce(
+          new Error('ProvisionedThroughputExceededException'),
+        )
+        .mockResolvedValueOnce({
+          version: 2,
+          taskToken: 'next-token',
+          sk: '1726027976@2',
+        })
+
+      const event = createEvent(DataSyncCommandSfnName.FINISH)
+      await h['checkNextToken'](event)
+
+      expect(dynamoGetItem).toHaveBeenCalledTimes(2)
+      expect(resumeExecution).toHaveBeenCalledWith('next-token', {
+        result: 'resumed_by_prev_version',
+        prevVersion: 1,
+      })
+    })
+
+    it('should alarm and resolve without throwing when getNextCommand keeps failing', async () => {
+      // Must not rethrow: execute() would write finish:FAILED, which the
+      // successor's self-resume backstop does not react to — collapsing the
+      // push and pull paths at the same time.
+      jest.useFakeTimers()
+      const { h, dynamoGetItem, resumeExecution, publishSpy, errorSpy } =
+        makeCheckNextTokenHandler()
+      dynamoGetItem.mockRejectedValue(
+        new Error('ProvisionedThroughputExceededException'),
+      )
+
+      const event = createEvent(DataSyncCommandSfnName.FINISH)
+      const pending = h['checkNextToken'](event)
+      await jest.runAllTimersAsync()
+      await expect(pending).resolves.toBeNull()
+
+      expect(dynamoGetItem).toHaveBeenCalledTimes(3)
+      expect(resumeExecution).not.toHaveBeenCalled()
+      expect(errorSpy).toHaveBeenCalled()
+      expect(errorSpy.mock.calls[0][0]).toContain('Could not read next command')
+      expect(publishSpy).toHaveBeenCalledWith(
+        expect.objectContaining({
+          action: 'sfn-alarm',
+          content: expect.objectContaining({
+            errorMessage: expect.objectContaining({
+              next_command_read_failed: true,
+              cause: 'ProvisionedThroughputExceededException',
+            }),
+          }),
+        }),
+        'alarm_topic_arn',
+      )
+
+      jest.useRealTimers()
+    })
+  })
+
   describe('waitConfirmToken - pull-side self-resume', () => {
     const finishStartedStatus = getCommandStatus(
       DataSyncCommandSfnName.FINISH,
@@ -1174,6 +1336,63 @@ describe('DataSyncCommandSfnEventHandler', () => {
 
       expect(mockCommandService.updateTaskToken).toHaveBeenCalled()
       expect(mockSfnService.resumeExecution).not.toHaveBeenCalled()
+    })
+
+    it('should warn when the predecessor row does not exist', async () => {
+      // A successful read that returns no row is not the same as "predecessor
+      // has not reached finish yet" — the chain is append-only, so a missing
+      // predecessor for version > 1 must not fall through the silent path.
+      const mockCommandService = {
+        updateTaskToken: jest.fn().mockResolvedValue(undefined),
+        getItem: jest.fn().mockResolvedValue(undefined),
+      }
+      const mockSfnService = {
+        resumeExecution: jest.fn(),
+      }
+
+      const { h, warnSpy, errorSpy } = makeWaitConfirmTokenHandler(
+        mockCommandService,
+        mockSfnService,
+      )
+      const event = createWaitConfirmEvent(2, 'missing-prev-token')
+
+      await expect(h['waitConfirmToken'](event)).resolves.toEqual({
+        result: { token: 'missing-prev-token' },
+      })
+
+      expect(mockCommandService.getItem).toHaveBeenCalledTimes(1)
+      expect(warnSpy).toHaveBeenCalledWith(
+        expect.stringContaining('Predecessor command v1 not found'),
+      )
+      expect(errorSpy).not.toHaveBeenCalled()
+      expect(mockSfnService.resumeExecution).not.toHaveBeenCalled()
+    })
+
+    it('should not warn about a missing predecessor when the read itself failed', async () => {
+      jest.useFakeTimers()
+      const mockCommandService = {
+        updateTaskToken: jest.fn().mockResolvedValue(undefined),
+        getItem: jest.fn().mockRejectedValue(new Error('ThrottlingException')),
+      }
+      const mockSfnService = {
+        resumeExecution: jest.fn(),
+      }
+
+      const { h, warnSpy } = makeWaitConfirmTokenHandler(
+        mockCommandService,
+        mockSfnService,
+      )
+      const event = createWaitConfirmEvent(2, 'read-failed-token')
+
+      const pending = h['waitConfirmToken'](event)
+      await jest.runAllTimersAsync()
+      await pending
+
+      expect(warnSpy).not.toHaveBeenCalledWith(
+        expect.stringContaining('not found'),
+      )
+
+      jest.useRealTimers()
     })
 
     it('should not lookup predecessor when version is 1', async () => {

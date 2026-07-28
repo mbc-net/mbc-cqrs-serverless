@@ -117,6 +117,7 @@ export class CommandEventHandler {
       )
 
       let prevCommand: CommandModel | undefined
+      let prevReadFailed = false
       try {
         // consistentRead: true — predecessor status across independent SFN
         // executions must not be a stale eventually-consistent read.
@@ -133,6 +134,7 @@ export class CommandEventHandler {
       } catch (e) {
         // After app + SDK retries, treat as persistent degradation of the
         // self-resume backstop — do not fail the step (token already stored).
+        prevReadFailed = true
         this.logger.error(
           `[${event.commandKey.pk}] Could not read predecessor status for command v${event.commandRecord.version} after retries, self-resume backstop degraded: ` +
             `${e instanceof Error ? e.message : 'Unknown error'}`,
@@ -142,6 +144,17 @@ export class CommandEventHandler {
           self_resume_predecessor_read_failed: true,
           cause: e instanceof Error ? e.message : String(e),
         })
+      }
+
+      // A successful read that returns no row is not the same as "predecessor
+      // has not reached finish yet" — the command chain is append-only, so for
+      // version > 1 the predecessor row must exist. Surface it instead of
+      // letting it fall through the same silent path as normal waiting.
+      if (!prevReadFailed && !prevCommand) {
+        this.logger.warn(
+          `[${event.commandKey.pk}] Predecessor command v${event.commandRecord.version - 1} not found (sk: ${prevSk}) — ` +
+            `self-resume backstop cannot evaluate predecessor status`,
+        )
       }
 
       // Limitation: self-resume only when predecessor status is finish:STARTED
@@ -199,10 +212,28 @@ export class CommandEventHandler {
     maxAttempts: number,
     baseDelayMs: number,
   ): Promise<CommandModel> {
+    return await this.withRetry(
+      () => this.commandService.getItem(key, options),
+      maxAttempts,
+      baseDelayMs,
+    )
+  }
+
+  /**
+   * Bounded retry with exponential backoff (baseDelayMs * 2^(attempt - 1)),
+   * rethrowing the last error once every attempt is exhausted. Shared by both
+   * sides of the version handshake so the pull path (waitConfirmToken) and the
+   * push path (checkNextToken) tolerate transient DynamoDB failures equally.
+   */
+  protected async withRetry<T>(
+    fn: () => Promise<T>,
+    maxAttempts: number,
+    baseDelayMs: number,
+  ): Promise<T> {
     let lastError: unknown
     for (let attempt = 1; attempt <= maxAttempts; attempt++) {
       try {
-        return await this.commandService.getItem(key, options)
+        return await fn()
       } catch (e) {
         lastError = e
         if (attempt < maxAttempts) {
@@ -226,10 +257,19 @@ export class CommandEventHandler {
     this.logger.debug('Checking version for data::', data)
     const commandVersion = event.commandRecord.version
     const nextVersion = 1 + (data?.version || 0)
-    const oldCommand = await this.commandService.getItem({
-      pk: event.commandRecord.pk,
-      sk: addSortKeyVersion(sk, commandVersion - 1),
-    })
+    // consistentRead: true — the predecessor row is written by an independent
+    // SFN execution. A stale eventually-consistent miss makes oldCommand look
+    // absent, which returns result: 0 and routes straight to set_ttl_command,
+    // skipping wait_prev_command and letting a later version's sync_data land
+    // out of order. Matches the predecessor reads in waitConfirmToken and
+    // getNextCommand.
+    const oldCommand = await this.commandService.getItem(
+      {
+        pk: event.commandRecord.pk,
+        sk: addSortKeyVersion(sk, commandVersion - 1),
+      },
+      { consistentRead: true },
+    )
 
     if (nextVersion === commandVersion) {
       return {
@@ -330,9 +370,38 @@ export class CommandEventHandler {
   ): Promise<StepFunctionStateInput> {
     this.logger.debug('checkNextToken:: ', event.commandRecord)
 
-    const nextCommand = await this.commandService.getNextCommand(
-      event.commandKey,
-    )
+    let nextCommand: CommandModel | undefined
+    try {
+      // Same bounded retry as the pull-side predecessor read in
+      // waitConfirmToken — without it a transient DDB failure here takes out
+      // both halves of the handshake at once.
+      nextCommand = await this.withRetry(
+        () => this.commandService.getNextCommand(event.commandKey),
+        3,
+        100,
+      )
+    } catch (e) {
+      // Deliberately does not rethrow. Failing this step makes execute() write
+      // finish:FAILED, and the successor's self-resume backstop only reacts to
+      // finish:STARTED|FINISHED — so the push path and the pull path would
+      // collapse together and the chain would stall until the 24h timeout.
+      // Returning normally lets execute() write finish:FINISHED, keeping the
+      // successor's self-resume armed for its own token-store pass. The step is
+      // reported as finished even though the push resume never ran; the alarm
+      // below is what records that, and the successor is the recovery path.
+      this.logger.error(
+        `[${event.commandKey.pk}] Could not read next command after retries, ` +
+          `push resume skipped (successor self-resume remains armed): ` +
+          `${e instanceof Error ? e.message : 'Unknown error'}`,
+        e instanceof Error ? e.stack : undefined,
+      )
+      await this.publishAlarmSafely(event, {
+        next_command_read_failed: true,
+        cause: e instanceof Error ? e.message : String(e),
+      })
+      return null
+    }
+
     if (!nextCommand) {
       this.logger.debug('No next command version found. Chain ends.')
       return null
