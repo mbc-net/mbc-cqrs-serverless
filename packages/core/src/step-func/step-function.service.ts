@@ -52,9 +52,13 @@ export class StepFunctionService {
         }),
       )
     } catch (error) {
-      this.logger.error(
+      // Log at debug and rethrow — the caller owns the level. On the
+      // bidirectional version handshake a duplicate resume (TaskDoesNotExist /
+      // TaskTimedOut) is by design, so an unconditional ERROR here would page
+      // on an expected outcome and cancel out the benign classification the
+      // caller applies (see CommandEventHandler.handleResumeExecutionError).
+      this.logger.debug(
         `Failed to resume execution: ${error instanceof Error ? error.message : 'Unknown error'}`,
-        error instanceof Error ? error.stack : undefined,
       )
       throw error
     }
