@@ -3,6 +3,48 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.3.5](https://github.com/mbc-net/mbc-cqrs-serverless/releases/tag/v1.3.5) (2026-07-29)
+
+### Bug Fixes
+
+- **core:** Harden command-handler resume against read-after-write races — `waitConfirmToken` now self-resumes when the predecessor command has already finished, closes the residual TOCTOU window via `STARTED|FINISHED` status checks, retries the predecessor `getItem` with exponential backoff, and classifies `checkNextToken` resume failures so a stuck resume raises an alarm instead of failing silently ([#465](https://github.com/mbc-net/mbc-cqrs-serverless/pull/465))
+- **core:** Add `ConsistentRead` support to `DynamoDbService.getItem` and thread it through `CommandService.getItem` / `getNextCommand`, so resume decisions read the latest committed state instead of a possibly stale replica ([#465](https://github.com/mbc-net/mbc-cqrs-serverless/pull/465))
+
+### Features
+
+- **infra:** Add CloudWatch alarms on the command-handler Step Functions state machine (`ExecutionsFailed` and degraded self-resume paths), add a 24h timeout and catch on `wait_prev_command`, and scope the `SendTaskSuccess` IAM permission to the command state machine ARN ([#465](https://github.com/mbc-net/mbc-cqrs-serverless/pull/465))
+
+### Security
+
+- Restore the blocking `npm audit --omit=dev --audit-level=high` CI gate that was temporarily disabled, and patch `brace-expansion` (top-level `brace-expansion@2` → `5.0.8`); root production audit: 0 critical/high ([#482](https://github.com/mbc-net/mbc-cqrs-serverless/pull/482))
+
+## [1.3.4](https://github.com/mbc-net/mbc-cqrs-serverless/releases/tag/v1.3.4) (2026-07-17)
+
+### Bug Fixes
+
+- **core, cli:** Lower the default `ATTRIBUTE_LIMIT_SIZE` from `389120` (380 KB) to `102400` (100 KB) in CDK infra templates and env examples — the previous default was sized for DynamoDB's 400 KB item limit, but Step Functions enforces a 256 KB payload limit per state, and the command state machine passes the DynamoDB stream event twice (`input.$` + `context.$`), so inline attributes above ~110 KB could trigger `States.DataLimitExceeded` ([#466](https://github.com/mbc-net/mbc-cqrs-serverless/pull/466))
+- **mcp-server:** Update skills with guidance on the new `ATTRIBUTE_LIMIT_SIZE` default ([#470](https://github.com/mbc-net/mbc-cqrs-serverless/pull/470))
+
+## [1.3.2](https://github.com/mbc-net/mbc-cqrs-serverless/releases/tag/v1.3.2) (2026-06-27)
+
+### Features
+
+- **mcp-server:** Add AP028, AP029, AP030 anti-pattern detectors ([#460](https://github.com/mbc-net/mbc-cqrs-serverless/pull/460), [#461](https://github.com/mbc-net/mbc-cqrs-serverless/pull/461))
+  - AP028: Duplicate `DataSyncHandler` registration across NestJS modules — detected and deduplicated with a warning log
+  - AP029: Reserved `'dynamodb'` type on `@DataSyncHandler` causes the handler to be silently excluded from dispatch
+  - AP030: Fully-qualified table name (ending in `'-command'`) in `@DataSyncHandler` causes silent handler skip
+
+### Bug Fixes
+
+- **core:** Fix `DataSyncHandler` duplicate registration — `ExplorerService` now deduplicates handlers via `Set`; `CommandService` deduplicates via `Map<constructor.name, instance>` and emits a `warn` log for each removed duplicate ([#459](https://github.com/mbc-net/mbc-cqrs-serverless/pull/459))
+- **core:** Fix `publishSync` — versioned `sk` is now assigned to `command.sk` before handler dispatch so `IDataSyncHandler.up()` receives the correct key; `updateStatus` errors are no longer silently masked; `pk`/`sk` are now included in `checkNextToken` warn logs ([#460](https://github.com/mbc-net/mbc-cqrs-serverless/pull/460))
+
+### Security
+
+- Harden npm dependencies — resolve high/moderate vulnerabilities via `overrides` (`lodash`, `tmp`, `multer`, `ajv`, `picomatch`, `fast-xml-parser`) and targeted upgrades (`@nestjs/config` ^4.0.4, `@typescript-eslint` v8); root production audit: 0 critical/high ([#445](https://github.com/mbc-net/mbc-cqrs-serverless/pull/445)–[#453](https://github.com/mbc-net/mbc-cqrs-serverless/pull/453))
+- **cli:** Upgrade `multer` to v2.2.0 in scaffolded templates to fix CVE-2026-5079 (DoS via deeply nested multipart field names) ([#463](https://github.com/mbc-net/mbc-cqrs-serverless/pull/463))
+- Add blocking CI gates: `npm audit --omit=dev --audit-level=high` and ESLint startup check run on every PR, failing the build on any production vulnerability ([#448](https://github.com/mbc-net/mbc-cqrs-serverless/pull/448))
+
 ## [1.3.1](https://github.com/mbc-net/mbc-cqrs-serverless/releases/tag/v1.3.1) (2026-06-02)
 
 ### Features
