@@ -116,11 +116,16 @@ export class DynamoDbService {
     return this.ddbItemToObj(res.Attributes)
   }
 
-  async getItem(tableName: string, key: DetailKey) {
+  async getItem(
+    tableName: string,
+    key: DetailKey,
+    options?: { consistentRead?: boolean },
+  ) {
     const { Item } = await this.client.send(
       new GetItemCommand({
         TableName: tableName,
         Key: this.toDdbKey(key),
+        ...(options?.consistentRead ? { ConsistentRead: true } : {}),
       }),
     )
 
