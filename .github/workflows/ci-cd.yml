@@ -92,6 +92,39 @@ jobs:
       - name: Run Unit Tests with Coverage
         run: npm run test:cov
 
+      # Blocking: the scaffolded infra template (packages/cli/templates/infra)
+      # is not an npm workspace member and its tests use a *.test.ts suffix, so
+      # the root jest run (testRegex '.*\.spec\.ts$') never covers them. Run the
+      # template's own type-check and tests here so the CDK snapshot and IAM
+      # guards (e.g. states:SendTaskSuccess scoping) are actually enforced —
+      # this is the gate that would have caught the `aws_stepfunctions`
+      # (undefined identifier) synth break shipped in v1.3.4.
+      # --ignore-scripts matches the root job's install hardening and blocks
+      # third-party postinstall scripts from running in this write-scoped job.
+      # A committed lockfile + `npm ci` would be preferable for reproducibility,
+      # but @aws/pdk's dependency tree does not resolve into an `npm ci`-clean
+      # lockfile and rewrites it on every `npm install`; determinism here is
+      # blocked on removing @aws/pdk (tracked in #486). The type-check and tests
+      # do not import @aws/pdk, so its floating subtree does not affect them.
+      - name: Infra template type-check & tests (blocking)
+        if: matrix.node-version == '20.x'
+        working-directory: packages/cli/templates/infra
+        run: |
+          npm install --ignore-scripts --no-audit --no-fund
+          npx tsc --noEmit
+          npx jest --ci
+
+      # Visibility only (non-blocking): the infra template ships @aws/pdk
+      # (build-time cdk-graph diagram tooling) in production dependencies, whose
+      # transitive tree carries high advisories. It is not an npm workspace
+      # member, so the root production audit above does not cover it. Surface it
+      # here without blocking; the @aws/pdk chain is tracked separately.
+      - name: Infra template audit (non-blocking, visibility)
+        if: matrix.node-version == '20.x'
+        working-directory: packages/cli/templates/infra
+        run: npm audit --omit=dev --audit-level=high
+        continue-on-error: true
+
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v4
         if: matrix.node-version == '20.x'
