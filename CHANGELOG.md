@@ -9,6 +9,7 @@ See [Conventional Commits](https://conventionalcommits.org) for commit guideline
 
 - **core:** Harden command-handler resume against read-after-write races — `waitConfirmToken` now self-resumes when the predecessor command has already finished, closes the residual TOCTOU window via `STARTED|FINISHED` status checks, retries the predecessor `getItem` with exponential backoff, and classifies `checkNextToken` resume failures so a stuck resume raises an alarm instead of failing silently ([#465](https://github.com/mbc-net/mbc-cqrs-serverless/pull/465))
 - **core:** Add `ConsistentRead` support to `DynamoDbService.getItem` and thread it through `CommandService.getItem` / `getNextCommand`, so resume decisions read the latest committed state instead of a possibly stale replica ([#465](https://github.com/mbc-net/mbc-cqrs-serverless/pull/465))
+- **cli:** Fix the scaffolded infra template failing `cdk synth`/`deploy` — the import-CSV Step Functions definition referenced an undefined `aws_stepfunctions` identifier (corrected to `cdk.aws_stepfunctions`), which broke every project scaffolded with `mbc new` on v1.3.4. Upgrade to v1.3.5 to restore deployability ([#465](https://github.com/mbc-net/mbc-cqrs-serverless/pull/465))
 
 ### Features
 
@@ -16,7 +17,8 @@ See [Conventional Commits](https://conventionalcommits.org) for commit guideline
 
 ### Security
 
-- Restore the blocking `npm audit --omit=dev --audit-level=high` CI gate that was temporarily disabled, and patch `brace-expansion` (top-level `brace-expansion@2` → `5.0.8`); root production audit: 0 critical/high ([#482](https://github.com/mbc-net/mbc-cqrs-serverless/pull/482))
+- Restore the blocking `npm audit --omit=dev --audit-level=high` CI gate that was temporarily disabled, and patch `brace-expansion` (top-level `brace-expansion@2` → `5.0.8`); **root workspace** production audit: 0 critical/high ([#482](https://github.com/mbc-net/mbc-cqrs-serverless/pull/482))
+  - Scope note: the scaffolded infra template (`packages/cli/templates/infra`) is not an npm workspace member and ships `@aws/pdk` (build-time cdk-graph diagram tooling) whose transitive tree still carries high advisories. It is now audited in CI (non-blocking, for visibility) and tracked separately in [#486](https://github.com/mbc-net/mbc-cqrs-serverless/issues/486); the "0 critical/high" figure above applies to the root workspace only.
 
 ## [1.3.4](https://github.com/mbc-net/mbc-cqrs-serverless/releases/tag/v1.3.4) (2026-07-17)
 
