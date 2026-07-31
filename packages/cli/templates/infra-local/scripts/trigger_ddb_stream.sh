@@ -73,12 +73,13 @@ while true; do
 	fi
 done
 
-# Wait serverless start
+# Wait serverless start (cold start compiles TS and initializes many plugins,
+# so allow a generous timeout to avoid failing the local startup flow)
 start=$(date +%s)
 while true; do
 
 	elapsed=$(($(date +%s) - ${start}))
-	if [[ ${elapsed} -gt 10 ]]; then
+	if [[ ${elapsed} -gt 100 ]]; then
 		echo "Timeout"
 		exit 1
 	fi
