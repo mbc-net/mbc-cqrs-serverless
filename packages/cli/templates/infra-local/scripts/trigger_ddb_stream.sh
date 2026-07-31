@@ -122,8 +122,10 @@ done
 
 echo "Registering Step Functions state machines..."
 
-# Extract state machine names and definitions from serverless.yml using Node.js
-node -e "
+# Extract state machine names and definitions from serverless.yml using Node.js.
+# Fail fast if extraction fails (e.g. js-yaml missing) so registration is not
+# silently skipped and later surfaced only as repeated runtime warnings.
+sm_data=$(node -e "
 const fs = require('fs');
 const yaml = require('js-yaml');
 let content = fs.readFileSync('./infra-local/serverless.yml', 'utf8');
@@ -136,7 +138,16 @@ for (const [key, sm] of Object.entries(sms)) {
   const definition = JSON.stringify(sm.definition);
   console.log(name + '\t' + definition);
 }
-" | while IFS=$'\t' read -r sm_name sm_definition; do
+")
+if [ $? -ne 0 ]; then
+	echo "Failed to extract state machines from serverless.yml (is js-yaml installed?)"
+	exit 1
+fi
+
+# A here-string (not a pipe) keeps the loop in the current shell so an "exit"
+# on a failed create actually aborts the script before triggering streams.
+while IFS=$'\t' read -r sm_name sm_definition; do
+	[ -z "${sm_name}" ] && continue
 	echo "Checking state machine: ${sm_name}"
 	# stderr is discarded (not captured) so a connection error is not mistaken
 	# for an existing state machine; readiness is already ensured above.
@@ -147,17 +158,21 @@ for (const [key, sm] of Object.entries(sms)) {
 		--output text 2>/dev/null)
 	if [ -z "${existing}" ]; then
 		echo "Creating state machine: ${sm_name}"
-		aws stepfunctions create-state-machine \
+		if aws stepfunctions create-state-machine \
 			--endpoint-url ${SFN_ENDPOINT} \
 			--region ap-northeast-1 \
 			--name "${sm_name}" \
 			--role-arn "arn:aws:iam::101010101010:role/DummyRole" \
-			--definition "${sm_definition}" \
-			2>&1 && echo "Created ${sm_name}" || echo "Failed to create ${sm_name}"
+			--definition "${sm_definition}" 2>&1; then
+			echo "Created ${sm_name}"
+		else
+			echo "Failed to create ${sm_name}"
+			exit 1
+		fi
 	else
 		echo "State machine ${sm_name} already exists"
 	fi
-done
+done <<< "${sm_data}"
 
 # Trigger command stream
 timestamp=$(date +%s)

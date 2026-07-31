@@ -158,7 +158,14 @@ for (const [key, sm] of Object.entries(sms)) {
 console.log(JSON.stringify(result));
 "@
 
-$stateMachines = node -e $nodeScript | ConvertFrom-Json
+# Fail fast if extraction fails (e.g. js-yaml missing) so registration is not
+# silently skipped and later surfaced only as repeated runtime warnings.
+$nodeOutput = node -e $nodeScript
+if ($LASTEXITCODE -ne 0) {
+    Write-Host "Failed to extract state machines from serverless.yml (is js-yaml installed?)"
+    exit 1
+}
+$stateMachines = $nodeOutput | ConvertFrom-Json
 
 foreach ($sm in $stateMachines) {
     $smName = $sm.name
@@ -189,6 +196,7 @@ foreach ($sm in $stateMachines) {
             Write-Host "Created $smName"
         } else {
             Write-Host "Failed to create $smName"
+            exit 1
         }
     } else {
         Write-Host "State machine $smName already exists"

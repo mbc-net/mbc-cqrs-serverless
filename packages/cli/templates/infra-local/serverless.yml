@@ -90,6 +90,9 @@ custom:
     region: ap-northeast-1
     # lambdaEndpoint: http://0.0.0.0:3002
     externalInstance: true
+    # Honor LOCAL_SFN_PORT so a non-default port reaches Step Functions Local
+    # (Docker mapping, the SDK and the registration script all use this port).
+    stepFunctionsEndpoint: http://localhost:${env:LOCAL_SFN_PORT, 8083}
   serverless-dynamodb:
     stages:
       # set for create tables on dev enviroment
