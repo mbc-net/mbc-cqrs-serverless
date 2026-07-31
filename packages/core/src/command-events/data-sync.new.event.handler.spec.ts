@@ -50,9 +50,14 @@ const sfnArn = 'arn:aws:states:ap-northeast-1:101010101010:stateMachine:command'
 describe('DataSyncNewCommandEventHandler', () => {
   let handler: DataSyncNewCommandEventHandler
   let stepFunctionService: StepFunctionService
+  let sfnEndpoint: string | undefined
   const sfnMock = mockClient(SFNClient)
 
   beforeEach(async () => {
+    // Default to a production-like environment (no local Step Functions
+    // endpoint) so the StateMachineDoesNotExist swallow is NOT applied unless a
+    // test explicitly opts into local by setting SFN_ENDPOINT.
+    sfnEndpoint = undefined
     const moduleRef = await Test.createTestingModule({
       providers: [
         DataSyncNewCommandEventHandler,
@@ -60,7 +65,8 @@ describe('DataSyncNewCommandEventHandler', () => {
         {
           provide: ConfigService,
           useValue: {
-            get: () => sfnArn,
+            get: (key: string) =>
+              key === 'SFN_ENDPOINT' ? sfnEndpoint : sfnArn,
           },
         },
         {
@@ -109,8 +115,9 @@ describe('DataSyncNewCommandEventHandler', () => {
     })
   })
 
-  it('should warn and return undefined when state machine does not exist', async () => {
+  it('should warn and return undefined when state machine does not exist in local environment', async () => {
     // Arrange
+    sfnEndpoint = 'http://localhost:8083'
     const error = new Error('State Machine Does Not Exist')
     error.name = 'StateMachineDoesNotExist'
     sfnMock.on(StartExecutionCommand).rejects(error)
@@ -124,6 +131,21 @@ describe('DataSyncNewCommandEventHandler', () => {
     expect(result).toBeUndefined()
     expect(warnSpy).toHaveBeenCalledWith(
       expect.stringContaining('State machine not found'),
+    )
+  })
+
+  it('should rethrow StateMachineDoesNotExist in a non-local environment (no silent skip in production)', async () => {
+    // Arrange: no SFN_ENDPOINT => production (real AWS Step Functions)
+    sfnEndpoint = undefined
+    const error = new Error('State Machine Does Not Exist')
+    error.name = 'StateMachineDoesNotExist'
+    sfnMock.on(StartExecutionCommand).rejects(error)
+
+    // Action & Assert: outside local dev a missing state machine is a real
+    // misconfiguration and must surface (Lambda error / stream retry / alarm),
+    // not be swallowed into a silent data-sync skip.
+    await expect(handler.execute(dynamoInsertEvent)).rejects.toThrow(
+      'State Machine Does Not Exist',
     )
   })
 

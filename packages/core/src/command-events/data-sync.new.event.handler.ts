@@ -42,7 +42,17 @@ export class DataSyncNewCommandEventHandler
         sfnExecName,
       )
     } catch (error: any) {
-      if (error?.name === 'StateMachineDoesNotExist') {
+      // Only tolerate a missing state machine when running against Step
+      // Functions Local, where DynamoDB Streams can fire before the state
+      // machine has been registered. SFN_ENDPOINT is configured only for local
+      // development (never in the production infra), so its presence is a
+      // reliable signal. In any other environment a missing state machine is a
+      // real misconfiguration (wrong ARN, undeployed/deleted state machine,
+      // deploy race) and must surface as a failure — otherwise the command is
+      // silently written without its data-sync ever running, with no Lambda
+      // error metric / stream retry / alarm to detect it.
+      const isLocalStepFunctions = !!this.config.get<string>('SFN_ENDPOINT')
+      if (error?.name === 'StateMachineDoesNotExist' && isLocalStepFunctions) {
         this.logger.warn(
           `State machine not found (ARN: ${this.sfnArn}). ` +
             'This may happen during local development if the state machine is not yet registered. ' +
