@@ -99,6 +99,27 @@ done
 SFN_PORT="${LOCAL_SFN_PORT:-8083}"
 SFN_ENDPOINT="http://localhost:${SFN_PORT}"
 
+# Wait for Step Functions Local to accept connections before registering, so a
+# not-yet-ready endpoint (the exact race this block fixes) does not cause silent
+# registration failures.
+start=$(date +%s)
+while true; do
+	elapsed=$(($(date +%s) - ${start}))
+	if [[ ${elapsed} -gt 30 ]]; then
+		echo "Timeout waiting for Step Functions Local at ${SFN_ENDPOINT}"
+		exit 1
+	fi
+	echo "Check health Step Functions Local"
+	if aws stepfunctions list-state-machines \
+		--endpoint-url ${SFN_ENDPOINT} \
+		--region ap-northeast-1 >/dev/null 2>&1; then
+		echo "Step Functions Local is ACTIVE"
+		break
+	fi
+	echo "Step Functions Local is not ACTIVE"
+	sleep 1
+done
+
 echo "Registering Step Functions state machines..."
 
 # Extract state machine names and definitions from serverless.yml using Node.js
@@ -117,12 +138,14 @@ for (const [key, sm] of Object.entries(sms)) {
 }
 " | while IFS=$'\t' read -r sm_name sm_definition; do
 	echo "Checking state machine: ${sm_name}"
+	# stderr is discarded (not captured) so a connection error is not mistaken
+	# for an existing state machine; readiness is already ensured above.
 	existing=$(aws stepfunctions list-state-machines \
 		--endpoint-url ${SFN_ENDPOINT} \
 		--region ap-northeast-1 \
 		--query "stateMachines[?name=='${sm_name}'].name" \
-		--output text 2>&1)
-	if [ -z "${existing}" ] || echo "${existing}" | grep -q "error\|Error"; then
+		--output text 2>/dev/null)
+	if [ -z "${existing}" ]; then
 		echo "Creating state machine: ${sm_name}"
 		aws stepfunctions create-state-machine \
 			--endpoint-url ${SFN_ENDPOINT} \

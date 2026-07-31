@@ -121,6 +121,26 @@ while ($true) {
 $sfnPort = if ($env:LOCAL_SFN_PORT) { $env:LOCAL_SFN_PORT } else { "8083" }
 $sfnEndpoint = "http://localhost:$sfnPort"
 
+# Wait for Step Functions Local to accept connections before registering, so a
+# not-yet-ready endpoint (the exact race this block fixes) does not cause silent
+# registration failures.
+$sfnStart = Get-Date
+while ($true) {
+    $sfnElapsed = ((Get-Date) - $sfnStart).TotalSeconds
+    if ($sfnElapsed -gt 30) {
+        Write-Host "Timeout waiting for Step Functions Local at $sfnEndpoint"
+        exit 1
+    }
+    Write-Host "Check health Step Functions Local"
+    aws stepfunctions list-state-machines --endpoint-url $sfnEndpoint --region ap-northeast-1 *> $null
+    if ($LASTEXITCODE -eq 0) {
+        Write-Host "Step Functions Local is ACTIVE"
+        break
+    }
+    Write-Host "Step Functions Local is not ACTIVE"
+    Start-Sleep -Seconds 1
+}
+
 Write-Host "Registering Step Functions state machines..."
 
 # Extract state machine names and definitions from serverless.yml using Node.js
@@ -144,28 +164,30 @@ foreach ($sm in $stateMachines) {
     $smName = $sm.name
     $smDefinition = $sm.definition
     Write-Host "Checking state machine: $smName"
-    $existing = $null
-    try {
-        $existing = aws stepfunctions list-state-machines `
+    # stderr discarded and success decided by $LASTEXITCODE (not string-matching
+    # the output) so a CLI error is not mistaken for an existing state machine.
+    $existing = aws stepfunctions list-state-machines `
+        --endpoint-url $sfnEndpoint `
+        --region ap-northeast-1 `
+        --query "stateMachines[?name=='$smName'].name" `
+        --output text 2>$null
+
+    if ($LASTEXITCODE -ne 0 -or [string]::IsNullOrWhiteSpace($existing)) {
+        Write-Host "Creating state machine: $smName"
+        # Escape embedded double quotes before passing the JSON definition to
+        # aws.exe (same pattern as the put-item call below); native-command
+        # failures are detected via $LASTEXITCODE, not try/catch, which does not
+        # trigger on non-zero exit of external executables.
+        $escapedDefinition = $smDefinition -replace '"', '\"'
+        aws stepfunctions create-state-machine `
             --endpoint-url $sfnEndpoint `
             --region ap-northeast-1 `
-            --query "stateMachines[?name=='$smName'].name" `
-            --output text 2>&1
-    } catch {
-        $existing = $null
-    }
-
-    if (-not $existing -or $existing -match "error|Error") {
-        Write-Host "Creating state machine: $smName"
-        try {
-            aws stepfunctions create-state-machine `
-                --endpoint-url $sfnEndpoint `
-                --region ap-northeast-1 `
-                --name $smName `
-                --role-arn "arn:aws:iam::101010101010:role/DummyRole" `
-                --definition $smDefinition 2>&1
+            --name $smName `
+            --role-arn "arn:aws:iam::101010101010:role/DummyRole" `
+            --definition $escapedDefinition 2>&1 | Out-Host
+        if ($LASTEXITCODE -eq 0) {
             Write-Host "Created $smName"
-        } catch {
+        } else {
             Write-Host "Failed to create $smName"
         }
     } else {
