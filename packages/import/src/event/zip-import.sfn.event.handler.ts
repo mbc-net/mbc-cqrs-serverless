@@ -12,6 +12,7 @@ import { ImportService } from '../import.service'
 import {
   IZipFinalizationHook,
   ZipFinalizationContext,
+  ZipFinalizationResults,
 } from '../interface/zip-finalization-hook.interface'
 import { ZipImportSfnEvent } from './zip-import.sfn.event'
 
@@ -30,7 +31,7 @@ export class ZipImportSfnEventHandler
 
   async execute(event: ZipImportSfnEvent): Promise<any> {
     const stateName = event.context.State.Name
-    this.logger.log(`Executing state: ${stateName} for Zip SFN`)
+    this.logger.debug(`Executing state: ${stateName} for Zip SFN`)
 
     if (stateName === 'trigger_single_csv_and_wait') {
       return this.triggerSingleCsvJob(event)
@@ -55,7 +56,7 @@ export class ZipImportSfnEventHandler
     const { taskToken } = event
     const { masterJobKey, parameters } = event.context.Execution.Input
 
-    this.logger.log(`Triggering CSV job for file: ${s3Key}`)
+    this.logger.debug(`Triggering CSV job for file: ${s3Key}`)
 
     let tableName = parameters.tableName
     if (!tableName) {
@@ -84,7 +85,7 @@ export class ZipImportSfnEventHandler
       masterJobKey,
     )
 
-    this.logger.log(
+    this.logger.debug(
       `Successfully created CSV job for ${tableName} with task token.`,
     )
   }
@@ -100,23 +101,34 @@ export class ZipImportSfnEventHandler
       (event.input as any[]) // This will be an array of results
     const { masterJobKey } = event.context.Execution.Input
 
-    this.logger.log(
+    this.logger.debug(
       `Finalizing ZIP master job: ${masterJobKey.pk}#${masterJobKey.sk}`,
     )
     this.logger.debug('Aggregated results:', resultsFromMapState)
 
     // Aggregate the results from each CSV file's processing.
-    const finalSummary = resultsFromMapState.reduce(
+    const finalSummary = resultsFromMapState.reduce<ZipFinalizationResults>(
       (acc, result) => {
         const res = result?.result || result || {}
+        if (res.importJobStatus === ImportStatusEnum.FAILED) {
+          acc.csvTaskFailureCount += 1
+        }
         acc.totalRows += res.total || res.totalRows || 0
         acc.processedRows += res.succeeded || res.processedRows || 0
         acc.failedRows += res.failed || res.failedRows || 0
         return acc
       },
-      { totalRows: 0, processedRows: 0, failedRows: 0 },
+      {
+        totalRows: 0,
+        processedRows: 0,
+        failedRows: 0,
+        csvTaskFailureCount: 0,
+      },
     )
-    const finalStatus = ImportStatusEnum.COMPLETED
+    const finalStatus =
+      finalSummary.csvTaskFailureCount > 0
+        ? ImportStatusEnum.FAILED
+        : ImportStatusEnum.COMPLETED
 
     // Execute finalization hooks in parallel
     await this.executeFinalizationHooks(
@@ -130,8 +142,8 @@ export class ZipImportSfnEventHandler
       result: finalSummary,
     })
 
-    this.logger.log(
-      `Successfully finalized ZIP master job ${masterJobKey.pk}#${masterJobKey.sk} with status ${finalStatus}`,
+    this.logger.debug(
+      `Finalized ZIP master job ${masterJobKey.pk}#${masterJobKey.sk} with status ${finalStatus}`,
     )
   }
 
@@ -142,7 +154,7 @@ export class ZipImportSfnEventHandler
   private async executeFinalizationHooks(
     event: ZipImportSfnEvent,
     masterJobKey: DetailKey,
-    results: { totalRows: number; processedRows: number; failedRows: number },
+    results: ZipFinalizationResults,
     status: ImportStatusEnum,
   ): Promise<void> {
     if (!this.finalizationHooks || this.finalizationHooks.length === 0) {
@@ -150,7 +162,7 @@ export class ZipImportSfnEventHandler
       return
     }
 
-    this.logger.log(
+    this.logger.debug(
       `Executing ${this.finalizationHooks.length} ZIP finalization hook(s)`,
     )
 
@@ -165,11 +177,11 @@ export class ZipImportSfnEventHandler
     // Execute all hooks in parallel with error isolation
     const hookPromises = this.finalizationHooks.map(async (hook, index) => {
       try {
-        this.logger.log(
+        this.logger.debug(
           `Executing ZIP finalization hook ${index + 1}/${this.finalizationHooks.length}`,
         )
         await hook.execute(context)
-        this.logger.log(
+        this.logger.debug(
           `ZIP finalization hook ${index + 1} completed successfully`,
         )
       } catch (error) {
@@ -185,6 +197,6 @@ export class ZipImportSfnEventHandler
     })
 
     await Promise.allSettled(hookPromises)
-    this.logger.log(`All ZIP finalization hooks completed`)
+    this.logger.debug(`All ZIP finalization hooks completed`)
   }
 }

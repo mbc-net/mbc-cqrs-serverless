@@ -3,6 +3,8 @@ import * as fs from 'fs'
 import * as path from 'path'
 import { z } from 'zod'
 
+import { findFiles, readFileSafe } from '../utils/fs.js'
+
 /**
  * Analysis result interface.
  */
@@ -215,7 +217,16 @@ async function analyzeProject(projectPath: string): Promise<AnalysisResult> {
   // Check package.json
   const packageJsonPath = path.join(projectPath, 'package.json')
   if (fs.existsSync(packageJsonPath)) {
-    const packageJson = JSON.parse(fs.readFileSync(packageJsonPath, 'utf-8'))
+    let packageJson: {
+      name?: string
+      dependencies?: Record<string, string>
+      devDependencies?: Record<string, string>
+    }
+    try {
+      packageJson = JSON.parse(readFileSafe(packageJsonPath))
+    } catch {
+      packageJson = {}
+    }
     result.projectName = packageJson.name || result.projectName
     const deps = { ...packageJson.dependencies, ...packageJson.devDependencies }
 
@@ -238,7 +249,7 @@ async function analyzeProject(projectPath: string): Promise<AnalysisResult> {
   // Analyze modules
   const moduleFiles = await findFiles(srcPath, '.module.ts')
   for (const file of moduleFiles) {
-    const content = fs.readFileSync(file, 'utf-8')
+    const content = readFileSafe(file)
     const classMatch = content.match(/export\s+class\s+(\w+Module)/)
     if (classMatch) {
       const imports: string[] = []
@@ -261,7 +272,7 @@ async function analyzeProject(projectPath: string): Promise<AnalysisResult> {
   // Analyze entities
   const entityFiles = await findFiles(srcPath, '.entity.ts')
   for (const file of entityFiles) {
-    const content = fs.readFileSync(file, 'utf-8')
+    const content = readFileSafe(file)
     const classMatch = content.match(/export\s+class\s+(\w+)/)
     if (classMatch) {
       const type: 'command' | 'data' | 'unknown' = content.includes(
@@ -308,7 +319,7 @@ async function analyzeProject(projectPath: string): Promise<AnalysisResult> {
   // Analyze CQRS patterns
   const allTsFiles = await findFiles(srcPath, '.ts')
   for (const file of allTsFiles) {
-    const content = fs.readFileSync(file, 'utf-8')
+    const content = readFileSafe(file)
     if (content.includes('@CommandHandler'))
       result.cqrsPatterns.commandHandlers++
     if (content.includes('@QueryHandler')) result.cqrsPatterns.queryHandlers++
@@ -317,30 +328,6 @@ async function analyzeProject(projectPath: string): Promise<AnalysisResult> {
   }
 
   return result
-}
-
-async function findFiles(dir: string, suffix: string): Promise<string[]> {
-  const files: string[] = []
-
-  if (!fs.existsSync(dir)) {
-    return files
-  }
-
-  const entries = fs.readdirSync(dir, { withFileTypes: true })
-  for (const entry of entries) {
-    const fullPath = path.join(dir, entry.name)
-    if (
-      entry.isDirectory() &&
-      entry.name !== 'node_modules' &&
-      entry.name !== 'dist'
-    ) {
-      files.push(...(await findFiles(fullPath, suffix)))
-    } else if (entry.isFile() && entry.name.endsWith(suffix)) {
-      files.push(fullPath)
-    }
-  }
-
-  return files
 }
 
 async function lookupError(
@@ -358,7 +345,7 @@ async function lookupError(
     }
   }
 
-  const catalog = fs.readFileSync(errorCatalogPath, 'utf-8')
+  const catalog = readFileSafe(errorCatalogPath)
   const lowerError = errorMessage.toLowerCase()
 
   // Find matching sections
@@ -473,7 +460,21 @@ interface AntiPatternMatch {
 
 /**
  * Anti-patterns to check for.
- * Codes are sequential from AP001 to AP010.
+ *
+ * Codes are sequential from AP001 to AP028 in detector-implementation order.
+ *
+ * IMPORTANT: These detector codes are a SEPARATE numbering system from the AP codes
+ * used in `skills/mbc-review/SKILL.md`. Only AP016, AP017, AP018, AP019, and AP021
+ * happen to refer to the same concept in both systems. See the cross-reference
+ * table at the top of `skills/mbc-review/SKILL.md` to map a detector code to its
+ * corresponding skill-doc section.
+ *
+ * When adding a new detector, append at the end (do not renumber) and update the
+ * cross-reference table in `skills/mbc-review/SKILL.md`.
+ *
+ * AP028 is a cross-file check implemented separately in
+ * checkDuplicateDataSyncHandlerRegistrations() and merged into the results
+ * inside checkAntiPatterns().
  */
 const ANTI_PATTERNS = [
   {
@@ -514,7 +515,7 @@ const ANTI_PATTERNS = [
     severity: 'critical' as const,
     pattern: /['"`]TENANT#\w+['"`]/,
     recommendation:
-      'Use getUserContext(context).tenantCode to get tenant dynamically.',
+      'Use getUserContext(invokeContext).tenantCode to get the tenant code from the authenticated context.',
   },
   {
     code: 'AP006',
@@ -557,7 +558,325 @@ const ANTI_PATTERNS = [
       /^import\s+\*\s+as\s+\w+\s+from\s+['"`](?:aws-sdk|lodash|moment)['"`]/m,
     recommendation: 'Import only what you need to reduce cold start time.',
   },
+  {
+    code: 'AP011',
+    name: 'Deprecated Method Usage',
+    severity: 'high' as const,
+    // Match .publish( and .publishPartialUpdate( but not the Async/Sync variants
+    pattern:
+      /\.publish(?!Async|Sync|PartialUpdateAsync|PartialUpdateSync)\s*\(|\.publishPartialUpdate(?!Async|Sync)\s*\(/,
+    recommendation:
+      'publish() and publishPartialUpdate() were removed in v1.1.0. Use publishAsync() or publishPartialUpdateAsync() instead.',
+  },
+  {
+    code: 'AP012',
+    name: 'Uppercase COMMON Tenant Key',
+    severity: 'critical' as const,
+    // Detect hardcoded uppercase COMMON in DynamoDB partition keys (pre-v1.1.0 format)
+    pattern: /['"`](?:MASTER_SETTING|MASTER_DATA|TENANT)#COMMON['"`#]/,
+    recommendation:
+      'TENANT_COMMON changed from "COMMON" to "common" (lowercase) in v1.1.0. Update partition keys and migrate existing DynamoDB data.',
+  },
+  {
+    code: 'AP013',
+    name: 'publishSync Null Return Unchecked',
+    severity: 'high' as const,
+    // Detect direct property access on publishSync/publishPartialUpdateSync result without null check
+    pattern:
+      /(?:publishSync|publishPartialUpdateSync)\s*\([^)]*\)[^;{]*\.\s*(?:pk|sk|id|version|code|name|tenantCode|type|attributes)/,
+    recommendation:
+      'publishSync() and publishPartialUpdateSync() return null when the command is not dirty (no-op) since v1.2.0. Always null-check the result before accessing properties.',
+  },
+  {
+    code: 'AP014',
+    name: 'Deprecated genNewSequence',
+    severity: 'high' as const,
+    // Detect usage of removed SequenceService.genNewSequence() method
+    pattern: /\.genNewSequence\s*\(/,
+    recommendation:
+      'SequenceService.genNewSequence() was removed in v1.2.0. Use generateSequenceItem() or generateSequenceItemWithProvideSetting() instead.',
+  },
+  {
+    code: 'AP015',
+    name: 'Duplicate TaskModule Registration',
+    severity: 'high' as const,
+    // Detect TaskModule.register() calls inside @Module imports — multiple registrations
+    // conflict because TASK_QUEUE_EVENT_FACTORY is a global singleton since v1.2.4.
+    pattern: /TaskModule\.register\s*\(/,
+    recommendation:
+      'TaskModule.register() is global since v1.2.4 and must be called exactly once in the host AppModule. Multiple calls cause conflicting TASK_QUEUE_EVENT_FACTORY bindings and result in "transformTask is not a function" at runtime. Remove all TaskModule.register() calls from feature modules and keep only the one in the host AppModule.',
+  },
+  {
+    code: 'AP016',
+    name: 'Missing Error Logging Before Rethrow',
+    severity: 'high' as const,
+    // Detect catch blocks that rethrow without logging (throw error; or throw new XxxException without logger.error)
+    pattern:
+      /catch\s*\(\s*(?:error|err|e)\s*\)\s*\{(?:(?!logger\.(error|warn)).)*throw\s+(?:error|err|e|new\s+\w+Exception)/s,
+    recommendation:
+      'Always log errors with context before rethrowing. Use this.logger.error() with the error message and stack trace for debugging.',
+  },
+  {
+    code: 'AP017',
+    name: 'Incorrect Attribute Merging on Partial Update',
+    severity: 'high' as const,
+    // Detect publishPartialUpdateAsync/Sync where attributes: dto.attributes (not spread merged)
+    pattern:
+      /publishPartialUpdate(?:Async|Sync)\s*\(\s*\{[^}]*attributes\s*:\s*(?:dto|input|body|data)\s*\.\s*attributes(?!\s*}?\s*,?\s*\.\.\.)(?![^}]*\.\.\.[^}]*attributes)/,
+    recommendation:
+      'When updating attributes, merge existing attributes with new ones: { ...existingItem.attributes, ...dto.attributes }. Passing dto.attributes directly overwrites all existing attributes.',
+  },
+  {
+    code: 'AP018',
+    name: 'Missing Swagger Documentation',
+    severity: 'low' as const,
+    // Detect @Controller classes that have no @ApiTags decorator
+    pattern: /@Controller\s*\([^)]*\)(?:(?!@ApiTags).){0,200}export\s+class/,
+    recommendation:
+      'Add @ApiTags() to controllers and @ApiOperation({ summary: ... }) / @ApiResponse() to endpoint methods for API documentation.',
+  },
+  {
+    code: 'AP019',
+    name: 'Missing Pagination in List Queries',
+    severity: 'high' as const,
+    // Detect listByPk/listItemsByPk/listItems calls without limit parameter
+    pattern:
+      /\.(?:listByPk|listItemsByPk|listItems)\s*\(\s*\{(?:(?!limit).)*\}\s*\)/,
+    recommendation:
+      'Always include limit and cursor parameters in list queries to avoid returning unbounded result sets and causing performance issues.',
+  },
+  {
+    code: 'AP020',
+    name: 'Missing getCommandSource for Tracing',
+    severity: 'low' as const,
+    // Detect publishAsync/publishSync called with options object that has invokeContext but no source
+    pattern:
+      /commandService\.publish(?:Async|Sync|PartialUpdateAsync|PartialUpdateSync)\s*\([^)]*invokeContext[^)]*\)/,
+    recommendation:
+      'Include source in publish options using getCommandSource(basename(__dirname), this.constructor.name, methodName) for debugging and audit trails.',
+  },
+  {
+    code: 'AP021',
+    name: 'Event Emit Directly After publishAsync in CommandService',
+    severity: 'high' as const,
+    // Detect eventEmitter.emit() called close after commandService.publishAsync/publishSync.
+    // 200-char window reduces cross-method false positives while catching same-method violations.
+    pattern:
+      /commandService\.publish(?:Async|Sync|PartialUpdateAsync|PartialUpdateSync)\b[\s\S]{0,200}?this\.eventEmitter\.emit\s*\(/,
+    recommendation:
+      'Do not call eventEmitter.emit() directly after publishAsync(). At that point only the command table has been written; the data table is populated asynchronously via DynamoDB Streams. Any @OnEvent handler that calls DataService.getItem() will find no data. Instead, implement IDataSyncHandler and emit events inside up()/down(), which are called after the data table write completes. Register the handler in CommandModule.register({ dataSyncHandlers: [...] }). If change-detection is needed (e.g. statusChanged), embed previous values as attributes._prev in publishAsync and read them in the handler; strip _prev in RDS sync handlers to prevent it leaking into the database.',
+  },
+  {
+    code: 'AP022',
+    name: 'Use of eval() or Function() Constructor',
+    severity: 'critical' as const,
+    // Detect the eval and Function-constructor sinks at actual call sites,
+    // not mentions in strings or comments. Requires preceding context that
+    // indicates an expression position (=, (, ;, {, comma, or an
+    // await/return/throw keyword).
+    pattern:
+      /(?:[=({,;]|\b(?:await|return|throw|void)\s)\s*(?:eval\s*\(|new\s+Function\s*\()/,
+    recommendation:
+      'eval() and new Function() execute arbitrary code and are common XSS/RCE sinks (CWE-95). Use JSON.parse() for parsing data, structured serialization (Zod, class-validator) for input, or a sandboxed expression evaluator (e.g. expr-eval, mathjs) for user-defined formulas. There is almost never a legitimate need for these in framework code.',
+  },
+  {
+    code: 'AP023',
+    name: 'Shell Command Built from String Concatenation',
+    severity: 'critical' as const,
+    // Detect child_process.exec/execSync calls whose first argument is built
+    // by interpolation or concatenation. Requires the call to be at an
+    // expression position (preceded by =, (, ;, {, comma, or await/return)
+    // to avoid matching the substring "exec(" inside comments or strings.
+    pattern:
+      /(?:[=({,;]|\b(?:await|return|throw)\s)\s*(?:child_process\.|cp\.)?(?:exec|execSync)\s*\(\s*(?:`[^`]*\$\{[^}]+\}[^`]*`|['"][^'"]*['"]\s*\+\s*\w)/,
+    recommendation:
+      "exec/execSync interpret the first argument as a shell command string. Concatenating user-controlled values into it is a command-injection sink (CWE-78). Use execFile/execFileSync with an args array instead, which bypasses the shell. Example: execFile('git', ['log', userBranch]) is safe; building the same command via string interpolation is not.",
+  },
+  {
+    code: 'AP024',
+    name: 'HTTP Request Without Timeout',
+    severity: 'medium' as const,
+    // Detect axios/fetch/http.get calls where no timeout option is set.
+    // Limits to short window after the call to reduce false positives from later .timeout() chaining.
+    pattern:
+      /(?:axios|http|https)\.(?:get|post|put|patch|delete|request)\s*\([^)]*\)(?![^;{]*\.timeout)/,
+    recommendation:
+      'HTTP requests without an explicit timeout can hang indefinitely if the remote host stalls — a DoS vector against your own service (CWE-400). Set { timeout: 5000 } (or appropriate ms) on every outbound request. For Lambda functions, the timeout must be lower than the function timeout to avoid wasted billed duration.',
+  },
+  {
+    code: 'AP025',
+    name: 'Logging process.env or full request object',
+    severity: 'high' as const,
+    // Detect console/logger calls that pass process.env or *.headers/body wholesale.
+    // CodeQL js/clear-text-logging — sensitive data exposure (CWE-532).
+    pattern:
+      /(?:console\.(?:log|info|warn|error|debug)|logger\.\w+)\s*\([^)]*\b(?:process\.env\b(?!\.[A-Z_]+)|\bheaders\s*[,)\]}]|\bauthorization\b|\bcookie\b)/i,
+    recommendation:
+      'Logging process.env (without picking specific keys), the full headers object, or fields like authorization/cookie leaks credentials, JWT tokens, and API keys into log aggregation systems where they may be retained or replicated to less-trusted observers (CWE-312, CWE-532). Log only the specific non-secret fields you actually need (e.g. process.env.NODE_ENV, request id, user id from JWT claims).',
+  },
+  {
+    code: 'AP026',
+    name: 'Notification service class using @Injectable instead of @NotificationTransport',
+    severity: 'high' as const,
+    // Detect classes that implement INotificationTransport but use @Injectable() instead of @NotificationTransport()
+    pattern: /@Injectable\(\)[\s\S]{0,200}implements\s+INotificationTransport/,
+    recommendation:
+      "Classes that implement INotificationTransport must use @NotificationTransport('transport-name') instead of @Injectable(). The decorator registers the transport name as metadata so NotificationEventHandler can discover and activate it via NOTIFICATION_TRANSPORTS env var. With @Injectable() alone, the transport will never be invoked.",
+  },
+  {
+    code: 'AP027',
+    name: 'GroupRoleResolver class also annotated with @Injectable (v1.3.1+)',
+    severity: 'high' as const,
+    // Detect classes decorated with @GroupRoleResolver() that ALSO carry @Injectable().
+    // @GroupRoleResolver() already applies @Injectable() with the default (singleton)
+    // scope; a second @Injectable() overrides that scope and breaks bootstrap, which
+    // resolves a single instance once at startup. The two decorators must be ADJACENT
+    // (only whitespace or other decorators between them) so we don't match
+    // @GroupRoleResolver on one class and @Injectable on a different class below it.
+    // Decorator arguments are allowed. Matches either order.
+    pattern:
+      /@GroupRoleResolver\([^)]*\)(?:\s|@[A-Za-z]+\([^)]*\))*@Injectable\(|@Injectable\([^)]*\)(?:\s|@[A-Za-z]+\([^)]*\))*@GroupRoleResolver\(/,
+    recommendation:
+      'Do not annotate a @GroupRoleResolver() class with @Injectable(). @GroupRoleResolver() already registers the class as a singleton provider; adding @Injectable() (particularly with REQUEST/TRANSIENT scope) overrides the scope and breaks bootstrap, which resolves the resolver exactly once at application startup. Remove the extra @Injectable().',
+  },
+  {
+    code: 'AP029',
+    name: 'Reserved DataSyncHandler Type',
+    severity: 'high' as const,
+    // Detect a @DataSyncHandler-decorated class that sets readonly type = 'dynamodb'.
+    // 'dynamodb' is reserved for the internal DataSyncDdsHandler. Any user-defined
+    // handler with this type is silently excluded from publishSync's handler pipeline
+    // (which filters out type === 'dynamodb'), causing data loss with no error or warning.
+    pattern:
+      /@DataSyncHandler[\s\S]{0,500}readonly\s+type\s*=\s*['"`]dynamodb['"`]/,
+    recommendation:
+      "Remove or rename the 'dynamodb' type value. This string is reserved for the internal DataSyncDdsHandler. Setting readonly type = 'dynamodb' on a custom handler causes publishSync to silently exclude it from the synchronous pipeline (CommandService filters handler.type !== 'dynamodb'), resulting in data loss with no error or warning. Use any other string (e.g. 'rds', 'opensearch') or omit the type property entirely.",
+  },
+  {
+    code: 'AP030',
+    name: 'Fully-Qualified Table Name in @DataSyncHandler',
+    severity: 'high' as const,
+    // Detect @DataSyncHandler called with a table name ending in '-command'.
+    // The decorator expects the RAW table name as passed to CommandModule.register({ tableName }).
+    // Passing the DynamoDB-level name (e.g. 'dev-my-table-command') causes silent handler
+    // discovery failure: ExplorerService matches by this metadata key and finds nothing.
+    pattern: /@DataSyncHandler\s*\(\s*['"`][^'"`]+-command['"`]/,
+    recommendation:
+      "Pass the raw table name to @DataSyncHandler(), not the fully-qualified DynamoDB table name. Example: if CommandModule.register({ tableName: 'my-table' }), then use @DataSyncHandler('my-table'). Passing 'dev-my-table-command' (with environment prefix and -command suffix) causes the ExplorerService to find no matching metadata, so the handler is silently never called — no error is raised. Remove the environment prefix and the '-command' suffix.",
+  },
 ]
+
+/**
+ * Maps a detector AP code (this file) to the corresponding skill-doc AP code in
+ * `skills/mbc-review/SKILL.md`. Used to annotate detector output so users can
+ * navigate from a detector hit to the human-readable explanation.
+ *
+ * Codes not present in the map are detector-only (no skill-doc counterpart).
+ * Keep this table in sync with the cross-reference table in SKILL.md.
+ */
+const DETECTOR_TO_SKILL_AP: Record<string, string> = {
+  AP001: 'AP012', // Direct DynamoDB Write → Direct DynamoDB Access Instead of DataService
+  AP002: 'AP005', // Ignored Version Mismatch → Not Handling ConditionalCheckFailedException
+  AP005: 'AP002', // Hardcoded Tenant → Missing tenantCode in Multi-Tenant Operations
+  AP006: 'AP002', // Missing Tenant Validation → Missing tenantCode in Multi-Tenant Operations
+  AP011: 'AP010', // Deprecated Method Usage → Deprecated Method Usage
+  AP013: 'AP001', // publishSync Null Return Unchecked → Using publishSync Instead of publishAsync (related)
+  AP014: 'AP010', // Deprecated genNewSequence → Deprecated Method Usage (related)
+  AP016: 'AP016', // Missing Error Logging Before Rethrow ✅
+  AP017: 'AP017', // Incorrect Attribute Merging ✅
+  AP018: 'AP018', // Missing Swagger Documentation ✅
+  AP019: 'AP019', // Missing Pagination in List Queries ✅
+  AP020: 'AP011', // Missing getCommandSource for Tracing → Missing getCommandSource for Tracing
+  AP021: 'AP021', // Event Emit After publishAsync ✅
+  // AP026: detector-only (no skill-doc AP counterpart)
+  AP027: 'AP022', // GroupRoleResolver + @Injectable → Incorrect Group-Based Role Resolver Implementation
+  AP028: 'AP023', // Duplicate DataSyncHandler Registration → Duplicate DataSyncHandler Registration Across Modules
+  AP029: 'AP024', // Reserved DataSyncHandler Type → Reserved DataSyncHandler Type
+  AP030: 'AP025', // Fully-Qualified Table Name in @DataSyncHandler → Fully-Qualified Table Name
+}
+
+/**
+ * AP028: Detect @DataSyncHandler classes registered as providers in more than one module.
+ *
+ * ExplorerService.flatMap() collects providers from every NestJS module without
+ * class-level deduplication. If the same @DataSyncHandler class appears in the
+ * providers array (or dataSyncHandlers option) of N modules, handler.up()/down()
+ * is called N times per command event — causing duplicate DB writes and P2002 errors.
+ */
+async function checkDuplicateDataSyncHandlerRegistrations(
+  targetPath: string,
+  projectPath: string,
+): Promise<AntiPatternMatch[]> {
+  const allTsFiles = await findFiles(targetPath, '.ts')
+  const nonTestFiles = allTsFiles.filter(
+    (f) =>
+      !f.includes('.spec.') && !f.includes('.test.') && !f.endsWith('.d.ts'),
+  )
+
+  // Phase 1: find all @DataSyncHandler-decorated class names and their source files.
+  const handlerSourceFile = new Map<string, string>() // className → relative path
+  const handlerClassPattern =
+    /@DataSyncHandler\([^)]*\)[\s\S]{0,100}class\s+(\w+)/g
+
+  for (const file of nonTestFiles) {
+    const content = readFileSafe(file)
+    for (const m of content.matchAll(handlerClassPattern)) {
+      handlerSourceFile.set(m[1], path.relative(projectPath, file))
+    }
+  }
+
+  if (handlerSourceFile.size === 0) return []
+
+  // Phase 2: for each module file, check which handler classes are registered.
+  // A class is considered "registered" if it appears in a providers: [...] block
+  // or inside a dataSyncHandlers: [...] option of CommandModule.register().
+  const moduleFiles = nonTestFiles.filter((f) => f.endsWith('.module.ts'))
+  const registeredInModules = new Map<string, string[]>()
+
+  for (const modFile of moduleFiles) {
+    const content = readFileSafe(modFile)
+    if (!content.includes('@Module(')) continue
+
+    for (const className of handlerSourceFile.keys()) {
+      const inProviders = new RegExp(
+        `\\bproviders\\s*:\\s*\\[[^\\]]{0,2000}\\b${className}\\b`,
+      ).test(content)
+      const inDataSyncHandlersOption = new RegExp(
+        `\\bdataSyncHandlers\\s*:\\s*\\[[^\\]]{0,500}\\b${className}\\b`,
+      ).test(content)
+
+      if (inProviders || inDataSyncHandlersOption) {
+        if (!registeredInModules.has(className)) {
+          registeredInModules.set(className, [])
+        }
+        registeredInModules
+          .get(className)!
+          .push(path.relative(projectPath, modFile))
+      }
+    }
+  }
+
+  // Phase 3: report classes registered in more than one module.
+  const results: AntiPatternMatch[] = []
+  for (const [className, modules] of registeredInModules) {
+    if (modules.length <= 1) continue
+    results.push({
+      code: 'AP028',
+      name: 'Duplicate DataSyncHandler Registration',
+      severity: 'high' as const,
+      file: handlerSourceFile.get(className)!,
+      line: 1,
+      snippet: `class ${className}`,
+      recommendation:
+        `${className} is registered in ${modules.length} module(s): ${modules.join(', ')}. ` +
+        `ExplorerService scans all modules without class-level deduplication, so ` +
+        `handler.up()/down() is called ${modules.length} times per command event — ` +
+        `causing duplicate DB writes and potential P2002 unique-constraint errors. ` +
+        `Register the handler as a provider in exactly one module (the module that owns this concern).`,
+    })
+  }
+  return results
+}
 
 /**
  * Check for anti-patterns in code.
@@ -586,11 +905,8 @@ async function checkAntiPatterns(
       continue
     }
 
-    let content: string
-    try {
-      content = fs.readFileSync(file, 'utf-8')
-    } catch (err) {
-      // Skip files that cannot be read (permission issues, etc.)
+    const content = readFileSafe(file)
+    if (content.startsWith('Error reading file:')) {
       skippedFiles.push(path.relative(projectPath, file))
       continue
     }
@@ -617,6 +933,11 @@ async function checkAntiPatterns(
     }
   }
 
+  // Cross-file check: AP028 Duplicate DataSyncHandler Registration
+  const duplicateHandlerMatches =
+    await checkDuplicateDataSyncHandlerRegistrations(targetPath, projectPath)
+  matches.push(...duplicateHandlerMatches)
+
   if (matches.length === 0) {
     let text =
       '## Anti-Pattern Check Results\n\n✅ No anti-patterns detected! Your code follows best practices.'
@@ -641,6 +962,8 @@ async function checkAntiPatterns(
   text += `| 🟠 High | ${high.length} |\n`
   text += `| 🟡 Medium | ${medium.length} |\n`
   text += `| 🟢 Low | ${low.length} |\n\n`
+  text +=
+    '> **Note:** AP codes below are *detector codes* (from `analyze.ts`). They are a separate numbering system from the AP codes in `mbc-review` skill documentation. See the cross-reference table at the top of `skills/mbc-review/SKILL.md` to map a detector code to its corresponding skill-doc section.\n\n'
 
   for (const m of matches) {
     const icon =
@@ -651,7 +974,9 @@ async function checkAntiPatterns(
           : m.severity === 'medium'
             ? '🟡'
             : '🟢'
-    text += `### ${icon} ${m.code}: ${m.name}\n\n`
+    const skillRef = DETECTOR_TO_SKILL_AP[m.code]
+    const skillRefSuffix = skillRef ? ` _(skill-doc: ${skillRef})_` : ''
+    text += `### ${icon} ${m.code}: ${m.name}${skillRefSuffix}\n\n`
     text += `**File:** \`${m.file}:${m.line}\`\n`
     text += `**Snippet:** \`${m.snippet}\`\n\n`
     text += `**Recommendation:** ${m.recommendation}\n\n`
@@ -696,8 +1021,8 @@ async function healthCheck(
       devDependencies?: Record<string, string>
     }
     try {
-      pkg = JSON.parse(fs.readFileSync(packageJsonPath, 'utf-8'))
-    } catch (err) {
+      pkg = JSON.parse(readFileSafe(packageJsonPath))
+    } catch {
       result.checks.push({
         name: 'package.json',
         status: 'fail',
@@ -874,7 +1199,7 @@ async function explainCode(
     }
   }
 
-  const content = fs.readFileSync(filePath, 'utf-8')
+  const content = readFileSafe(filePath)
   const lines = content.split('\n')
   const fileName = path.basename(filePath)
 
@@ -980,10 +1305,21 @@ async function explainCode(
     explanations.push(
       'Uses publishSync() for synchronous command execution (waits for Step Functions).',
     )
+    explanations.push(
+      'Note: publishSync() returns null when the command is not dirty (no-op) since v1.2.0. Always null-check the result before accessing properties.',
+    )
   }
   if (content.includes('getUserContext(')) {
     explanations.push(
-      'Extracts user context (tenantCode, userId, role) from the invocation context.',
+      'Extracts user context (userId, tenantCode, tenantRole, tenantRoles, tenantGroupIds) from the invocation context. Since v1.3.1, tenantRoles is the array of direct roles from custom:roles and tenantGroupIds holds the group IDs from custom:groups; tenantRole (singular) is kept for backward compatibility. A malformed custom:groups claim is tolerated (fail-closed to no group roles), but a malformed custom:roles claim still throws — guard accordingly when the claim source is untrusted.',
+    )
+  }
+
+  // TaskModule global pattern
+  if (content.includes('TaskModule.register(')) {
+    patterns.push('TaskModule Registration')
+    explanations.push(
+      'TaskModule.register() is global since v1.2.4 — call it exactly once in the host AppModule. Multiple registrations conflict and cause "transformTask is not a function" at runtime.',
     )
   }
 

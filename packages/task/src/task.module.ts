@@ -45,6 +45,7 @@ export class TaskModule extends ConfigurableModuleClass {
 
     return {
       ...module,
+      global: true,
     }
   }
 }

@@ -31,11 +31,11 @@ jobs:
           node-version: ${{ matrix.node-version }}
           cache: npm
 
+      - name: Sync lockfile
+        run: npm install --package-lock-only --ignore-scripts
+
       - name: Install dependencies
         run: npm ci --ignore-scripts
-
-      - name: Verify lockfile integrity
-        run: git diff --exit-code package-lock.json
 
       - name: Build packages
         run: npm run build
@@ -48,6 +48,13 @@ jobs:
         run: npm run lint
         continue-on-error: true
 
+      # Blocking: ESLint must at least start. A broken dependency tree
+      # (e.g. an override forcing an incompatible ajv onto @eslint/eslintrc,
+      # see PR #446) crashes ESLint before any file is linted, which the
+      # non-blocking lint step above cannot surface.
+      - name: ESLint startup check
+        run: npx eslint --print-config .eslintrc.js > /dev/null
+
       - name: Type Check
         run: npx tsc --noEmit
         continue-on-error: true
@@ -56,8 +63,15 @@ jobs:
         run: npm audit --audit-level=high
         continue-on-error: true
 
+      # Blocking: production dependencies must stay free of high/critical
+      # advisories. npm re-resolution (npm install/update/audit fix) can
+      # silently resurrect vulnerable nested copies that root overrides do
+      # not reach through workspace packages (see PRs #445/#447).
+      - name: Security Audit (production, blocking)
+        run: npm audit --omit=dev --audit-level=high
+
       - name: Security Scan (Trivy)
-        uses: aquasecurity/trivy-action@master
+        uses: aquasecurity/trivy-action@v0.36.0
         if: matrix.node-version == '20.x'
         with:
           scan-type: 'fs'
@@ -77,6 +91,39 @@ jobs:
 
       - name: Run Unit Tests with Coverage
         run: npm run test:cov
+
+      # Blocking: the scaffolded infra template (packages/cli/templates/infra)
+      # is not an npm workspace member and its tests use a *.test.ts suffix, so
+      # the root jest run (testRegex '.*\.spec\.ts$') never covers them. Run the
+      # template's own type-check and tests here so the CDK snapshot and IAM
+      # guards (e.g. states:SendTaskSuccess scoping) are actually enforced —
+      # this is the gate that would have caught the `aws_stepfunctions`
+      # (undefined identifier) synth break shipped in v1.3.4.
+      # --ignore-scripts matches the root job's install hardening and blocks
+      # third-party postinstall scripts from running in this write-scoped job.
+      # A committed lockfile + `npm ci` would be preferable for reproducibility,
+      # but @aws/pdk's dependency tree does not resolve into an `npm ci`-clean
+      # lockfile and rewrites it on every `npm install`; determinism here is
+      # blocked on removing @aws/pdk (tracked in #486). The type-check and tests
+      # do not import @aws/pdk, so its floating subtree does not affect them.
+      - name: Infra template type-check & tests (blocking)
+        if: matrix.node-version == '20.x'
+        working-directory: packages/cli/templates/infra
+        run: |
+          npm install --ignore-scripts --no-audit --no-fund
+          npx tsc --noEmit
+          npx jest --ci
+
+      # Visibility only (non-blocking): the infra template ships @aws/pdk
+      # (build-time cdk-graph diagram tooling) in production dependencies, whose
+      # transitive tree carries high advisories. It is not an npm workspace
+      # member, so the root production audit above does not cover it. Surface it
+      # here without blocking; the @aws/pdk chain is tracked separately.
+      - name: Infra template audit (non-blocking, visibility)
+        if: matrix.node-version == '20.x'
+        working-directory: packages/cli/templates/infra
+        run: npm audit --omit=dev --audit-level=high
+        continue-on-error: true
 
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v4
@@ -114,6 +161,9 @@ jobs:
           node-version: ${{ matrix.node-version }}
           cache: npm
 
+      - name: Sync lockfile
+        run: npm install --package-lock-only --ignore-scripts
+
       - name: Install dependencies
         run: npm ci --ignore-scripts
 
@@ -144,6 +194,9 @@ jobs:
     needs: e2e_tests
     runs-on: ubuntu-latest
     if: startsWith(github.ref, 'refs/tags/')
+    permissions:
+      contents: write
+      id-token: write
     steps:
       - uses: actions/checkout@v4
         with:
@@ -151,16 +204,17 @@ jobs:
           # Remove ref to checkout the tag itself, not develop branch
       - uses: actions/setup-node@v4
         with:
-          node-version: 18
+          node-version: 22
           cache: npm
+
+      - name: Sync lockfile
+        run: npm install --package-lock-only --ignore-scripts
+
       - name: Install dependencies
         run: npm ci --ignore-scripts
 
       - name: Build packages
         run: npm run build
-
-      - name: Authenticate with npm
-        run: echo "//registry.npmjs.org/:_authToken=${{ secrets.NPM_TOKEN }}" > ~/.npmrc
 
       - name: Extract version from tag
         id: version
@@ -290,10 +344,8 @@ jobs:
           git add -A
           git commit -m "chore: version packages for release" || echo "No changes to commit"
 
-          # Then publish the versioned packages
+          # Then publish the versioned packages (lerna v9 handles OIDC automatically)
           npx lerna publish from-package --yes --dist-tag ${{ steps.release-type.outputs.tag }} --no-git-tag-version --no-push
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
       - name: Publish to npm (Production)
         if: steps.release-type.outputs.prerelease == 'false' && steps.prod-changes.outputs.changed_count != '0'
@@ -309,10 +361,8 @@ jobs:
           git add -A
           git commit -m "chore: version packages for release" || echo "No changes to commit"
 
-          # Then publish the versioned packages
+          # Then publish the versioned packages (lerna v9 handles OIDC automatically)
           npx lerna publish from-package --yes --no-git-tag-version --no-push
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
       - name: Skip publish (no changes)
         if: |

@@ -1,5 +1,6 @@
 import {
   AttributeValue,
+  DeleteItemCommand,
   DynamoDBClient,
   GetItemCommand,
   PutItemCommand,
@@ -115,15 +116,31 @@ export class DynamoDbService {
     return this.ddbItemToObj(res.Attributes)
   }
 
-  async getItem(tableName: string, key: DetailKey) {
+  async getItem(
+    tableName: string,
+    key: DetailKey,
+    options?: { consistentRead?: boolean },
+  ) {
     const { Item } = await this.client.send(
       new GetItemCommand({
         TableName: tableName,
         Key: this.toDdbKey(key),
+        ...(options?.consistentRead ? { ConsistentRead: true } : {}),
       }),
     )
 
     return await this.ddbItemToObj(Item)
+  }
+
+  async deleteItem(tableName: string, key: DetailKey, conditions?: string) {
+    const res = await this.client.send(
+      new DeleteItemCommand({
+        TableName: tableName,
+        Key: this.toDdbKey(key),
+        ConditionExpression: conditions,
+      }),
+    )
+    return res
   }
 
   async listItemsByPk(

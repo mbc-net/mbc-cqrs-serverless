@@ -440,6 +440,55 @@ export class [Entity]EventHandler {
 }
 ```
 
+### Custom Notification Transport (`notifications/[name].transport.ts`)
+
+For adding a custom pub/sub transport alongside or instead of the built-in AppSync transports:
+
+```typescript
+import { Logger } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
+import { NotificationTransport } from '@mbc-cqrs-serverless/core';
+import { INotification, INotificationTransport } from '@mbc-cqrs-serverless/core';
+
+@NotificationTransport('[name]')  // must match NOTIFICATION_TRANSPORTS value
+export class [Name]NotificationTransport implements INotificationTransport {
+  private readonly logger = new Logger([Name]NotificationTransport.name);
+
+  constructor(private readonly config: ConfigService) {}
+
+  async sendMessage(notification: INotification): Promise<void> {
+    this.logger.debug(`sendMessage:: ${notification.action} for ${notification.tenantCode}`);
+    // Add your transport logic here (e.g., WebSocket push, Pusher, SNS, etc.)
+  }
+}
+```
+
+Register in `NotificationModule` (or your app module):
+
+```typescript
+import { NotificationModule } from '@mbc-cqrs-serverless/core';
+
+@Module({
+  imports: [NotificationModule],
+  providers: [[Name]NotificationTransport],
+})
+export class AppModule {}
+```
+
+Activate via environment variable (comma-separated, order does not matter):
+
+```bash
+# Use only the custom transport
+NOTIFICATION_TRANSPORTS=[name]
+
+# Use alongside the built-in AppSync GraphQL transport
+NOTIFICATION_TRANSPORTS=appsync-graphql,[name]
+```
+
+> **Note:** The decorator name `'[name]'` must exactly match the value in `NOTIFICATION_TRANSPORTS`. If it does not match, the transport is silently ignored (AP026).
+
+---
+
 ### Query Handler for Complex Searches (`[entity].query.ts`)
 
 For advanced query operations:
@@ -611,6 +660,40 @@ export class [Entity]Resolver {
   }
 }
 ```
+
+### Group Role Resolver (`auth/app-group-role.resolver.ts`) — since v1.3.1
+
+Generate this only when the app uses **group-based roles**. `RolesGuard` checks direct roles from the JWT `custom:roles` first, then roles derived from the user's groups in `custom:groups`. The group → role mapping is **not** in the JWT — you implement it here. Exactly **one** resolver is allowed per application.
+
+```typescript
+import {
+  GroupRoleResolver,
+  IGroupRoleResolver,
+  ResolveGroupRolesInput,
+} from '@mbc-cqrs-serverless/core';
+
+// Do NOT add @Injectable() — @GroupRoleResolver() already registers this as a
+// singleton provider. A second @Injectable() can override the scope and break bootstrap.
+@GroupRoleResolver()
+export class AppGroupRoleResolver implements IGroupRoleResolver {
+  async resolveRoles({
+    tenantCode,
+    groupIds,
+    claims,
+  }: ResolveGroupRolesInput): Promise<string[]> {
+    // Map the user's group IDs to roles for this tenant.
+    // Load from DynamoDB, RDS, config, etc. Return an array of role strings.
+    // Keep this resolver stateless and resilient — failures propagate as 5xx.
+    return [];
+  }
+}
+```
+
+**Rules:**
+- Register the class in your NestJS module `providers`. `AuthModule` is imported automatically via `AppModule.forRoot()`.
+- The resolver must be a **singleton** (resolved once at bootstrap). Do not use `REQUEST`/`TRANSIENT` scope.
+- A resolver throw propagates as a **5xx** (not a silent 403), so a backend outage is distinguishable from a real access denial.
+- Role-name matching is case-sensitive — keep the casing consistent with `@Roles(...)`.
 
 ## Customization Questions
 

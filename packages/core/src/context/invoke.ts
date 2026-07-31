@@ -1,5 +1,5 @@
 import { getCurrentInvoke } from '@codegenie/serverless-express'
-import { ExecutionContext } from '@nestjs/common'
+import { ExecutionContext, UnauthorizedException } from '@nestjs/common'
 import { Request } from 'express'
 import { jwtDecode } from 'jwt-decode'
 
@@ -21,6 +21,7 @@ export interface JwtClaims {
   name: string
   'custom:tenant'?: string // tenant code
   'custom:roles'?: string
+  'custom:groups'?: string
   exp: number
   email: string
   email_verified?: boolean
@@ -91,12 +92,19 @@ export function extractInvokeContext(ctx?: ExecutionContext): IInvoke {
   let authorizer: object | undefined = undefined
   const authToken = request.get('authorization')
   if (authToken) {
-    const claims = jwtDecode<JwtClaims>(authToken)
-    authorizer = {
-      jwt: {
-        claims,
-        scopes: claims?.scope?.split(','),
-      },
+    try {
+      const token = authToken.replace(/^Bearer\s/i, '').trim()
+      const claims = jwtDecode<JwtClaims>(token)
+      authorizer = {
+        jwt: {
+          claims,
+          scopes: claims?.scope?.split(','),
+        },
+      }
+    } catch {
+      throw new UnauthorizedException(
+        'Invalid or malformed authorization token',
+      )
     }
   }
   return {

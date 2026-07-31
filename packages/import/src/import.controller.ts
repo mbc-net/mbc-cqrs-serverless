@@ -92,16 +92,25 @@ export class ImportController {
   @Post('zip')
   @ApiOperation({
     summary: 'Initiate a ZIP file import',
-    description:
-      'Accepts the S3 location of a ZIP file containing multiple CSVs. This will trigger a sequential, orchestrated import process.',
+    description: `
+    Synchronously initializes a ZIP import job and triggers the Step Function orchestrator.
+    
+    ⚠️ **Performance & Size Limits (API Gateway 29s Timeout):**
+    * **Small Files:** Send the ZIP S3 key. The backend will synchronously download, extract, and upload the individual CSVs to S3.
+    * **Large Files:** To prevent 504 Gateway Timeouts, the client application *must* extract the ZIP on the frontend, upload the CSVs directly to S3, and provide the \`sortedFileKeys\` array in this payload. If \`sortedFileKeys\` is provided, the backend safely bypasses in-memory extraction.
+  `,
   })
   @ApiBody({ type: CreateZipImportDto })
   @ApiResponse({
-    status: 202,
+    status: 201,
     description:
-      'The zip import task has been accepted and queued for processing.',
+      'The ZIP import job was successfully created and the orchestrator started.',
   })
-  @HttpCode(HttpStatus.ACCEPTED)
+  @ApiResponse({
+    status: 400,
+    description: 'Bad Request - ZIP file is empty, corrupt, or invalid.',
+  })
+  @HttpCode(HttpStatus.CREATED)
   @UsePipes(new ValidationPipe({ transform: true, whitelist: true }))
   async createZipImport(
     @INVOKE_CONTEXT() invokeContext: IInvoke,

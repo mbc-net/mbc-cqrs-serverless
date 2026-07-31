@@ -4,6 +4,7 @@ export * from './key'
 export * from './object'
 export * from './serializer'
 export * from './source'
+export * from './transform'
 
 // Re-export serialization helpers for convenience
 export { deserializeToInternal, serializeToExternal } from './serializer'

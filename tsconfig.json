@@ -26,5 +26,14 @@
     }
   },
   "include": ["./packages/**/*", "./examples/**/*"],
-  "exclude": ["node_modules", "**/test/**", "**/dist", "**/schematics/**", "**/templates/**", "examples/**", "**/*.spec.ts", "**/*.test.ts"]
+  "exclude": [
+    "node_modules",
+    "**/test/**",
+    "**/dist",
+    "**/schematics/**",
+    "**/templates/**",
+    "examples/**",
+    "**/*.spec.ts",
+    "**/*.test.ts"
+  ]
 }

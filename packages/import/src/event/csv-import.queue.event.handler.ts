@@ -34,19 +34,29 @@ export class CsvImportQueueEventHandler
   }
 
   async execute(event: ImportQueueEvent): Promise<any> {
-    const importEntity = event.importEvent.importEntity
+    if (event.isCsvBatch) {
+      this.logger.debug(
+        'Skipping batch processing payload in CsvImportQueueEventHandler',
+      )
+      return
+    }
 
-    // This handler ONLY acts on master csv jobs and ignores all other event types.
+    const importEntity = event.importEvent?.importEntity
+    if (!importEntity) return
+
     if (
       !importEntity.id.startsWith(`${CSV_IMPORT_PK_PREFIX}${KEY_SEPARATOR}`)
     ) {
+      this.logger.debug(
+        `Skipping other type import job in csv queue handler: ${importEntity.id}`,
+      )
       return
     }
 
     const importKey = event.importEvent.importKey
     const { key, tableName, tenantCode } =
       importEntity.attributes as CreateCsvImportDto
-    this.logger.log(
+    this.logger.debug(
       `Received master CSV job from queue: ${importEntity.id} for file ${key}`,
     )
 
@@ -71,7 +81,7 @@ export class CsvImportQueueEventHandler
         `${tenantCode}-${tableName}-${Date.now()}`,
       )
 
-      this.logger.log(
+      this.logger.debug(
         `Started Step Function execution for master job ${importEntity.id}`,
       )
       // The master job's status will now be updated by the Step Function itself upon completion/failure.

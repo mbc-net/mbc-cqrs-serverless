@@ -12,6 +12,7 @@ import { isDeepStrictEqual } from 'util'
 import { VER_SEPARATOR, VERSION_FIRST, VERSION_LATEST } from '../constants'
 import { getUserContext } from '../context/user'
 import { DynamoDbService } from '../data-store/dynamodb.service'
+import { SessionService } from '../data-store/session.service'
 import { DATA_SYNC_HANDLER_METADATA } from '../decorators'
 import { mergeDeep, pickKeys } from '../helpers'
 import {
@@ -36,7 +37,10 @@ import { ExplorerService } from '../services'
 import { MODULE_OPTIONS_TOKEN } from './command.module-definition'
 import { DataService } from './data.service'
 import { TableType } from './enums'
+import { CommandSyncMode } from './enums/command-sync-mode.enum'
+import { CommandStatus, getCommandStatus } from './enums/status.enum'
 import { DataSyncDdsHandler } from './handlers/data-sync-dds.handler'
+import { HistoryService } from './history.service'
 import { TtlService } from './ttl.service'
 
 const TABLE_NAME = Symbol('command')
@@ -60,6 +64,8 @@ export class CommandService implements OnModuleInit, ICommandService {
     private readonly dataSyncDdsHandler: DataSyncDdsHandler,
     private readonly dataService: DataService,
     private readonly ttlService: TtlService,
+    private readonly historyService: HistoryService,
+    private readonly sessionService: SessionService,
   ) {
     this.tableName = this.dynamoDbService.getTableName(
       this.options.tableName,
@@ -77,11 +83,12 @@ export class CommandService implements OnModuleInit, ICommandService {
       this[DATA_SYNC_HANDLER] = [this.dataSyncDdsHandler]
     }
     if (this.options.dataSyncHandlers?.length) {
-      // this.logger.debug('init data sync handlers')
       this[DATA_SYNC_HANDLER].push(
-        ...this.options.dataSyncHandlers.map((HandlerClass) =>
-          this.moduleRef.get(HandlerClass, { strict: false }),
-        ),
+        ...this.options.dataSyncHandlers
+          .map((HandlerClass) =>
+            this.moduleRef.get(HandlerClass, { strict: false }),
+          )
+          .filter((handler) => !!handler),
       )
     }
     this.logger.debug('find data sync handlers from decorator')
@@ -94,9 +101,27 @@ export class CommandService implements OnModuleInit, ICommandService {
         .map((handler) => this.moduleRef.get(handler, { strict: false }))
         .filter((handler) => !!handler),
     )
-    // this.logger.debug(
-    //   'data sync handlers length: ' + this[DATA_SYNC_HANDLER].length,
-    // )
+
+    const allHandlers = this[DATA_SYNC_HANDLER]
+    const seen = new Map<string, IDataSyncHandler>()
+    const dupNames: string[] = []
+    for (const h of allHandlers) {
+      const name = h.constructor.name
+      if (seen.has(name)) {
+        dupNames.push(name)
+      } else {
+        seen.set(name, h)
+      }
+    }
+    if (dupNames.length > 0) {
+      this.logger.warn(
+        `[${this.options.tableName}] Duplicate DataSyncHandler instances detected ` +
+          `(${allHandlers.length} registered, ${seen.size} unique, ` +
+          `duplicates: ${[...new Set(dupNames)].join(', ')}). ` +
+          `Each @DataSyncHandler class must be registered as a provider in exactly one module.`,
+      )
+    }
+    this[DATA_SYNC_HANDLER] = [...seen.values()]
   }
 
   set tableName(name: string) {
@@ -123,7 +148,7 @@ export class CommandService implements OnModuleInit, ICommandService {
   async publishPartialUpdateSync(
     input: CommandPartialInputModel,
     options: ICommandOptions,
-  ): Promise<CommandModel> {
+  ): Promise<CommandModel | null> {
     const item: CommandModel = await this.dataService.getItem({
       pk: input.pk,
       sk: input.sk,
@@ -146,7 +171,7 @@ export class CommandService implements OnModuleInit, ICommandService {
   async publishPartialUpdateAsync(
     input: CommandPartialInputModel,
     options: ICommandOptions,
-  ): Promise<CommandModel> {
+  ): Promise<CommandModel | null> {
     let item: CommandModel
     if (input.version > VERSION_FIRST) {
       item = await this.getItem({
@@ -167,6 +192,8 @@ export class CommandService implements OnModuleInit, ICommandService {
     }
     const fullInput = mergeDeep({}, item, input, { version: item.version })
 
+    delete fullInput['syncMode']
+
     this.logger.debug('publishPartialUpdate::', fullInput)
     return await this.publishAsync(fullInput, options)
   }
@@ -174,7 +201,7 @@ export class CommandService implements OnModuleInit, ICommandService {
   async publishSync(
     input: CommandInputModel,
     options: ICommandOptions,
-  ): Promise<CommandModel> {
+  ): Promise<CommandModel | null> {
     const item = await this.dataService.getItem({ pk: input.pk, sk: input.sk })
 
     let inputVersion = input.version ?? VERSION_FIRST
@@ -187,12 +214,19 @@ export class CommandService implements OnModuleInit, ICommandService {
       )
     }
 
+    if (item && this.isNotCommandDirty(item, input)) {
+      this.logger.debug('publishSync:: command is not dirty, skipping update')
+      return null
+    }
+
     const userContext = getUserContext(options.invokeContext)
     const requestId =
       options?.requestId || options.invokeContext?.context?.awsRequestId
     const sourceIp =
       options.invokeContext?.event?.requestContext?.http?.sourceIp
     const version = (item?.version ?? inputVersion) + 1
+
+    const versionedSk = addSortKeyVersion(input.sk, version)
 
     const command: CommandModel = {
       ttl: await this.ttlService.calculateTtl(
@@ -201,6 +235,8 @@ export class CommandService implements OnModuleInit, ICommandService {
       ),
       ...input,
       version,
+      status: getCommandStatus('publish_sync', CommandStatus.STATUS_STARTED),
+      syncMode: CommandSyncMode.SYNC,
       source: options?.source,
       requestId,
       createdAt: new Date(),
@@ -212,15 +248,65 @@ export class CommandService implements OnModuleInit, ICommandService {
     }
     this.logger.debug('publishSync::', command)
 
-    await this.dataService.publish(command)
-
-    const targetSyncHandlers = this.dataSyncHandlers?.filter(
-      (handler) => handler.type !== 'dynamodb',
+    // 1. Write to Command table first (Immutable Audit Log)
+    await this.dynamoDbService.putItem(
+      this.tableName,
+      { ...command, sk: versionedSk },
+      'attribute_not_exists(pk) AND attribute_not_exists(sk)',
     )
 
-    await Promise.all(targetSyncHandlers.map((handler) => handler.up(command)))
+    try {
+      // 2. SET_TTL_COMMAND: set TTL on the previous command version (matches SFN)
+      await this.updateTtl({ pk: command.pk, sk: versionedSk })
 
-    return command
+      // 3. Write to History table before Data (matches SFN: HISTORY_COPY → SYNC_DATA).
+      //    historyService.publish reads the current data row; it must run before
+      //    dataService.publish so the snapshot is the pre-transition state.
+      await this.historyService.publish({
+        pk: command.pk,
+        sk: removeSortKeyVersion(input.sk),
+      })
+
+      // 4. Write to Data table (same role as DataSyncDdsHandler in SYNC_DATA)
+      await this.dataService.publish(command)
+
+      // 5. Execute custom data sync handlers.
+      //    Set versioned sk on command before calling handlers so they receive
+      //    the same sk that the SFN path provides (sk@version, not raw sk).
+      command.sk = versionedSk
+      const targetSyncHandlers = this.dataSyncHandlers?.filter(
+        (handler) => handler.type !== 'dynamodb',
+      )
+      await Promise.all(
+        targetSyncHandlers.map((handler) => handler.up(command)),
+      )
+
+      // 6. Update Status to FINISHED and broadcast SNS notification
+      await this.updateStatus(
+        { pk: command.pk, sk: versionedSk },
+        getCommandStatus('finish', CommandStatus.STATUS_FINISHED),
+        requestId,
+      )
+
+      command.status = getCommandStatus('finish', CommandStatus.STATUS_FINISHED)
+      return command
+    } catch (error) {
+      // Mark as failed if the synchronous pipeline breaks.
+      // Wrap updateStatus so its own failure cannot mask the original error.
+      try {
+        await this.updateStatus(
+          { pk: command.pk, sk: versionedSk },
+          getCommandStatus('publish_sync', CommandStatus.STATUS_FAILED),
+          requestId,
+        )
+      } catch (statusErr) {
+        this.logger.warn(
+          `[publishSync] Failed to mark command as FAILED (pk=${command.pk}, sk=${versionedSk}): ` +
+            `${statusErr instanceof Error ? statusErr.message : statusErr}`,
+        )
+      }
+      throw error
+    }
   }
 
   async publishAsync(
@@ -282,7 +368,45 @@ export class CommandService implements OnModuleInit, ICommandService {
       command,
       'attribute_not_exists(pk) AND attribute_not_exists(sk)',
     )
+    await this.writeRywSessionIfApplicable(command, options)
     return command
+  }
+
+  /**
+   * Records a short-lived session row so Repository can merge pending async
+   * commands before the data table catches up. Only used after publishAsync —
+   * publishSync writes data in the same request, so no session is needed.
+   */
+  private async writeRywSessionIfApplicable(
+    command: CommandModel,
+    options: ICommandOptions,
+  ): Promise<void> {
+    let userId: string | undefined
+    try {
+      userId = getUserContext(options.invokeContext)?.userId
+    } catch {
+      return
+    }
+    if (!userId) {
+      return
+    }
+
+    const tenantCode = getTenantCode(command.pk)
+    if (!tenantCode) {
+      return
+    }
+
+    try {
+      await this.sessionService.put(
+        userId,
+        tenantCode,
+        this.options.tableName,
+        command.id,
+        command.version,
+      )
+    } catch (err) {
+      this.logger.warn('RYW session write failed (non-fatal)', err)
+    }
   }
 
   async duplicate(key: DetailKey, options: ICommandOptions) {
@@ -362,11 +486,14 @@ export class CommandService implements OnModuleInit, ICommandService {
     })
   }
 
-  async getItem(key: DetailKey): Promise<CommandModel> {
+  async getItem(
+    key: DetailKey,
+    options?: { consistentRead?: boolean },
+  ): Promise<CommandModel> {
     if (!key.sk.includes(VER_SEPARATOR)) {
       return this.getLatestItem(key)
     }
-    return await this.dynamoDbService.getItem(this.tableName, key)
+    return await this.dynamoDbService.getItem(this.tableName, key, options)
   }
 
   async getLatestItem(key: DetailKey): Promise<CommandModel> {
@@ -470,6 +597,8 @@ export class CommandService implements OnModuleInit, ICommandService {
         getSortKeyVersion(currentKey.sk) + 1,
       ),
     }
-    return await this.dynamoDbService.getItem(this.tableName, nextKey)
+    return await this.dynamoDbService.getItem(this.tableName, nextKey, {
+      consistentRead: true,
+    })
   }
 }

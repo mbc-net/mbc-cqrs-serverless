@@ -8,8 +8,8 @@ describe('analyze tools', () => {
     it('should return all analyze tools', () => {
       const tools = getAnalyzeTools()
       expect(tools).toHaveLength(5)
-      
-      const toolNames = tools.map(t => t.name)
+
+      const toolNames = tools.map((t) => t.name)
       expect(toolNames).toContain('mbc_analyze_project')
       expect(toolNames).toContain('mbc_lookup_error')
       expect(toolNames).toContain('mbc_check_anti_patterns')
@@ -32,14 +32,17 @@ describe('analyze tools', () => {
 
     it('should detect direct DynamoDB write (AP001)', async () => {
       const testFile = path.join(testDir, 'src', 'test.ts')
-      fs.writeFileSync(testFile, `
+      fs.writeFileSync(
+        testFile,
+        `
         const command = new PutItemCommand({ TableName: 'test' })
-      `)
+      `,
+      )
 
       const result = await handleAnalyzeTool(
         'mbc_check_anti_patterns',
         { path: 'src' },
-        testDir
+        testDir,
       )
 
       expect(result.content[0].text).toContain('AP001')
@@ -48,14 +51,17 @@ describe('analyze tools', () => {
 
     it('should detect hardcoded tenant (AP005)', async () => {
       const testFile = path.join(testDir, 'src', 'test.ts')
-      fs.writeFileSync(testFile, `
+      fs.writeFileSync(
+        testFile,
+        `
         const pk = "TENANT#hardcoded"
-      `)
+      `,
+      )
 
       const result = await handleAnalyzeTool(
         'mbc_check_anti_patterns',
         { path: 'src' },
-        testDir
+        testDir,
       )
 
       expect(result.content[0].text).toContain('AP005')
@@ -64,14 +70,17 @@ describe('analyze tools', () => {
 
     it('should detect hardcoded secret (AP008)', async () => {
       const testFile = path.join(testDir, 'src', 'test.ts')
-      fs.writeFileSync(testFile, `
+      fs.writeFileSync(
+        testFile,
+        `
         const password = "supersecretpassword123"
-      `)
+      `,
+      )
 
       const result = await handleAnalyzeTool(
         'mbc_check_anti_patterns',
         { path: 'src' },
-        testDir
+        testDir,
       )
 
       expect(result.content[0].text).toContain('AP008')
@@ -85,7 +94,7 @@ describe('analyze tools', () => {
       const result = await handleAnalyzeTool(
         'mbc_check_anti_patterns',
         { path: 'src' },
-        testDir
+        testDir,
       )
 
       expect(result.content[0].text).toContain('AP010')
@@ -94,18 +103,21 @@ describe('analyze tools', () => {
 
     it('should return success when no anti-patterns found', async () => {
       const testFile = path.join(testDir, 'src', 'test.ts')
-      fs.writeFileSync(testFile, `
+      fs.writeFileSync(
+        testFile,
+        `
         export class TestService {
           async doSomething() {
             return 'hello'
           }
         }
-      `)
+      `,
+      )
 
       const result = await handleAnalyzeTool(
         'mbc_check_anti_patterns',
         { path: 'src' },
-        testDir
+        testDir,
       )
 
       expect(result.content[0].text).toContain('No anti-patterns detected')
@@ -113,28 +125,355 @@ describe('analyze tools', () => {
 
     it('should skip test files', async () => {
       const testFile = path.join(testDir, 'src', 'test.spec.ts')
-      fs.writeFileSync(testFile, `
+      fs.writeFileSync(
+        testFile,
+        `
         const password = "supersecretpassword123"
-      `)
+      `,
+      )
 
       const result = await handleAnalyzeTool(
         'mbc_check_anti_patterns',
         { path: 'src' },
-        testDir
+        testDir,
       )
 
       expect(result.content[0].text).toContain('No anti-patterns detected')
+    })
+
+    it('should detect event emit after publishAsync in CommandService (AP021)', async () => {
+      const testFile = path.join(testDir, 'src', 'test.ts')
+      fs.writeFileSync(
+        testFile,
+        `
+        @Injectable()
+        export class OrderCommandService {
+          async createOrder(params: CreateOrderParams): Promise<string> {
+            await this.commandService.publishAsync({ pk, sk, version: VERSION_FIRST }, { invokeContext });
+            this.eventEmitter.emit('order.created', { orderId });
+            return orderId;
+          }
+        }
+      `,
+      )
+
+      const result = await handleAnalyzeTool(
+        'mbc_check_anti_patterns',
+        { path: 'src' },
+        testDir,
+      )
+
+      expect(result.content[0].text).toContain('AP021')
+      expect(result.content[0].text).toContain(
+        'Event Emit Directly After publishAsync',
+      )
+    })
+
+    it('should detect @Injectable instead of @NotificationTransport (AP026)', async () => {
+      const testFile = path.join(testDir, 'src', 'test.ts')
+      fs.writeFileSync(
+        testFile,
+        `
+        import { Injectable } from '@nestjs/common';
+        import { INotificationTransport } from '@mbc-cqrs-serverless/core';
+
+        @Injectable()
+        export class MyCustomTransport implements INotificationTransport {
+          async sendMessage(notification: INotification): Promise<void> {
+            // custom logic
+          }
+        }
+      `,
+      )
+
+      const result = await handleAnalyzeTool(
+        'mbc_check_anti_patterns',
+        { path: 'src' },
+        testDir,
+      )
+
+      expect(result.content[0].text).toContain('AP026')
+      expect(result.content[0].text).toContain(
+        'Notification service class using @Injectable instead of @NotificationTransport',
+      )
+    })
+
+    it('should detect @GroupRoleResolver also annotated with @Injectable (AP027)', async () => {
+      const testFile = path.join(testDir, 'src', 'test.ts')
+      fs.writeFileSync(
+        testFile,
+        `
+        import { Injectable } from '@nestjs/common';
+        import { GroupRoleResolver, IGroupRoleResolver } from '@mbc-cqrs-serverless/core';
+
+        @GroupRoleResolver()
+        @Injectable()
+        export class AppGroupRoleResolver implements IGroupRoleResolver {
+          async resolveRoles() {
+            return [];
+          }
+        }
+      `,
+      )
+
+      const result = await handleAnalyzeTool(
+        'mbc_check_anti_patterns',
+        { path: 'src' },
+        testDir,
+      )
+
+      expect(result.content[0].text).toContain('AP027')
+      expect(result.content[0].text).toContain(
+        'GroupRoleResolver class also annotated with @Injectable',
+      )
+    })
+
+    it('should NOT flag a correctly-decorated GroupRoleResolver (AP027 negative)', async () => {
+      const testFile = path.join(testDir, 'src', 'test.ts')
+      fs.writeFileSync(
+        testFile,
+        `
+        import { GroupRoleResolver, IGroupRoleResolver } from '@mbc-cqrs-serverless/core';
+
+        @GroupRoleResolver()
+        export class AppGroupRoleResolver implements IGroupRoleResolver {
+          async resolveRoles() {
+            return [];
+          }
+        }
+      `,
+      )
+
+      const result = await handleAnalyzeTool(
+        'mbc_check_anti_patterns',
+        { path: 'src' },
+        testDir,
+      )
+
+      expect(result.content[0].text).not.toContain('AP027')
+    })
+
+    it('should NOT flag a GroupRoleResolver class followed by a separate @Injectable class (AP027 negative)', async () => {
+      const testFile = path.join(testDir, 'src', 'test.ts')
+      fs.writeFileSync(
+        testFile,
+        `
+        import { Injectable } from '@nestjs/common';
+        import { GroupRoleResolver, IGroupRoleResolver } from '@mbc-cqrs-serverless/core';
+
+        @GroupRoleResolver()
+        export class AppGroupRoleResolver implements IGroupRoleResolver {
+          async resolveRoles() {
+            return [];
+          }
+        }
+
+        @Injectable()
+        export class SomeOtherService {}
+      `,
+      )
+
+      const result = await handleAnalyzeTool(
+        'mbc_check_anti_patterns',
+        { path: 'src' },
+        testDir,
+      )
+
+      expect(result.content[0].text).not.toContain('AP027')
+    })
+
+    it('should detect duplicate DataSyncHandler registration across modules (AP028)', async () => {
+      // Handler defined in its own file
+      fs.writeFileSync(
+        path.join(testDir, 'src', 'tenant-config-rds.handler.ts'),
+        `
+        import { DataSyncHandler } from '@mbc-cqrs-serverless/core';
+
+        @DataSyncHandler('tenant-table')
+        export class TenantConfigRdsHandler implements IDataSyncHandler {
+          async up(cmd) {}
+          async down(cmd) {}
+        }
+      `,
+      )
+
+      // Correctly registered in the owning module
+      fs.writeFileSync(
+        path.join(testDir, 'src', 'tenant.module.ts'),
+        `
+        @Module({
+          providers: [TenantConfigRdsHandler],
+        })
+        export class TenantModule {}
+      `,
+      )
+
+      // Incorrectly also registered in a second module
+      fs.writeFileSync(
+        path.join(testDir, 'src', 'agent.module.ts'),
+        `
+        @Module({
+          providers: [TenantConfigRdsHandler],
+        })
+        export class AgentModule {}
+      `,
+      )
+
+      const result = await handleAnalyzeTool(
+        'mbc_check_anti_patterns',
+        { path: 'src' },
+        testDir,
+      )
+
+      expect(result.content[0].text).toContain('AP028')
+      expect(result.content[0].text).toContain(
+        'Duplicate DataSyncHandler Registration',
+      )
+      expect(result.content[0].text).toContain('TenantConfigRdsHandler')
+    })
+
+    it('should NOT flag a DataSyncHandler registered in only one module (AP028 negative)', async () => {
+      fs.writeFileSync(
+        path.join(testDir, 'src', 'order-rds.handler.ts'),
+        `
+        import { DataSyncHandler } from '@mbc-cqrs-serverless/core';
+
+        @DataSyncHandler('order-table')
+        export class OrderRdsHandler implements IDataSyncHandler {
+          async up(cmd) {}
+          async down(cmd) {}
+        }
+      `,
+      )
+
+      fs.writeFileSync(
+        path.join(testDir, 'src', 'order.module.ts'),
+        `
+        @Module({
+          providers: [OrderRdsHandler],
+        })
+        export class OrderModule {}
+      `,
+      )
+
+      const result = await handleAnalyzeTool(
+        'mbc_check_anti_patterns',
+        { path: 'src' },
+        testDir,
+      )
+
+      expect(result.content[0].text).not.toContain('AP028')
     })
 
     it('should return error for non-existent path', async () => {
       const result = await handleAnalyzeTool(
         'mbc_check_anti_patterns',
         { path: 'nonexistent' },
-        testDir
+        testDir,
       )
 
       expect(result.isError).toBe(true)
       expect(result.content[0].text).toContain('Path not found')
+    })
+
+    /** AP029: custom DataSyncHandler using reserved type = 'dynamodb' */
+    it('should detect reserved type dynamodb in custom DataSyncHandler (AP029)', async () => {
+      fs.writeFileSync(
+        path.join(testDir, 'src', 'bad-handler.ts'),
+        `
+        import { DataSyncHandler, IDataSyncHandler } from '@mbc-cqrs-serverless/core';
+
+        @DataSyncHandler('my-table')
+        export class BadHandler implements IDataSyncHandler {
+          readonly type = 'dynamodb'
+          async up(cmd) {}
+          async down(cmd) {}
+        }
+      `,
+      )
+
+      const result = await handleAnalyzeTool(
+        'mbc_check_anti_patterns',
+        { path: 'src' },
+        testDir,
+      )
+
+      expect(result.content[0].text).toContain('AP029')
+      expect(result.content[0].text).toContain('Reserved DataSyncHandler Type')
+    })
+
+    it('should NOT flag DataSyncHandler with a non-reserved type (AP029 negative)', async () => {
+      fs.writeFileSync(
+        path.join(testDir, 'src', 'ok-handler.ts'),
+        `
+        import { DataSyncHandler, IDataSyncHandler } from '@mbc-cqrs-serverless/core';
+
+        @DataSyncHandler('my-table')
+        export class OkHandler implements IDataSyncHandler {
+          readonly type = 'rds'
+          async up(cmd) {}
+          async down(cmd) {}
+        }
+      `,
+      )
+
+      const result = await handleAnalyzeTool(
+        'mbc_check_anti_patterns',
+        { path: 'src' },
+        testDir,
+      )
+
+      expect(result.content[0].text).not.toContain('AP029')
+    })
+
+    /** AP030: @DataSyncHandler with fully-qualified table name ending in -command */
+    it('should detect fully-qualified table name with -command suffix (AP030)', async () => {
+      fs.writeFileSync(
+        path.join(testDir, 'src', 'bad-table-name.ts'),
+        `
+        import { DataSyncHandler, IDataSyncHandler } from '@mbc-cqrs-serverless/core';
+
+        @DataSyncHandler('dev-my-table-command')
+        export class MyHandler implements IDataSyncHandler {
+          async up(cmd) {}
+          async down(cmd) {}
+        }
+      `,
+      )
+
+      const result = await handleAnalyzeTool(
+        'mbc_check_anti_patterns',
+        { path: 'src' },
+        testDir,
+      )
+
+      expect(result.content[0].text).toContain('AP030')
+      expect(result.content[0].text).toContain(
+        'Fully-Qualified Table Name in @DataSyncHandler',
+      )
+    })
+
+    it('should NOT flag DataSyncHandler with raw table name (AP030 negative)', async () => {
+      fs.writeFileSync(
+        path.join(testDir, 'src', 'ok-table-name.ts'),
+        `
+        import { DataSyncHandler, IDataSyncHandler } from '@mbc-cqrs-serverless/core';
+
+        @DataSyncHandler('my-table')
+        export class MyHandler implements IDataSyncHandler {
+          async up(cmd) {}
+          async down(cmd) {}
+        }
+      `,
+      )
+
+      const result = await handleAnalyzeTool(
+        'mbc_check_anti_patterns',
+        { path: 'src' },
+        testDir,
+      )
+
+      expect(result.content[0].text).not.toContain('AP030')
     })
   })
 
@@ -150,70 +489,62 @@ describe('analyze tools', () => {
     })
 
     it('should detect healthy project with MBC packages', async () => {
-      fs.writeFileSync(path.join(testDir, 'package.json'), JSON.stringify({
-        name: 'test-project',
-        dependencies: {
-          '@mbc-cqrs-serverless/core': '^1.0.0',
-          '@nestjs/common': '^10.0.0',
-        },
-        devDependencies: {
-          typescript: '^5.0.0',
-        },
-      }))
+      fs.writeFileSync(
+        path.join(testDir, 'package.json'),
+        JSON.stringify({
+          name: 'test-project',
+          dependencies: {
+            '@mbc-cqrs-serverless/core': '^1.0.0',
+            '@nestjs/common': '^10.0.0',
+          },
+          devDependencies: {
+            typescript: '^5.0.0',
+          },
+        }),
+      )
       fs.mkdirSync(path.join(testDir, 'src'), { recursive: true })
       fs.writeFileSync(path.join(testDir, 'src', 'app.module.ts'), '')
       fs.writeFileSync(path.join(testDir, '.env'), '')
       fs.writeFileSync(path.join(testDir, 'serverless.yml'), '')
 
-      const result = await handleAnalyzeTool(
-        'mbc_health_check',
-        {},
-        testDir
-      )
+      const result = await handleAnalyzeTool('mbc_health_check', {}, testDir)
 
       expect(result.content[0].text).toContain('HEALTHY')
       expect(result.content[0].text).toContain('MBC Framework')
     })
 
     it('should detect missing MBC packages', async () => {
-      fs.writeFileSync(path.join(testDir, 'package.json'), JSON.stringify({
-        name: 'test-project',
-        dependencies: {
-          '@nestjs/common': '^10.0.0',
-        },
-      }))
+      fs.writeFileSync(
+        path.join(testDir, 'package.json'),
+        JSON.stringify({
+          name: 'test-project',
+          dependencies: {
+            '@nestjs/common': '^10.0.0',
+          },
+        }),
+      )
       fs.mkdirSync(path.join(testDir, 'src'), { recursive: true })
 
-      const result = await handleAnalyzeTool(
-        'mbc_health_check',
-        {},
-        testDir
-      )
+      const result = await handleAnalyzeTool('mbc_health_check', {}, testDir)
 
       expect(result.content[0].text).toContain('ERROR')
-      expect(result.content[0].text).toContain('No @mbc-cqrs-serverless packages found')
+      expect(result.content[0].text).toContain(
+        'No @mbc-cqrs-serverless packages found',
+      )
     })
 
     it('should handle invalid package.json', async () => {
       fs.writeFileSync(path.join(testDir, 'package.json'), 'invalid json')
       fs.mkdirSync(path.join(testDir, 'src'), { recursive: true })
 
-      const result = await handleAnalyzeTool(
-        'mbc_health_check',
-        {},
-        testDir
-      )
+      const result = await handleAnalyzeTool('mbc_health_check', {}, testDir)
 
       expect(result.content[0].text).toContain('ERROR')
       expect(result.content[0].text).toContain('could not be parsed')
     })
 
     it('should detect missing package.json', async () => {
-      const result = await handleAnalyzeTool(
-        'mbc_health_check',
-        {},
-        testDir
-      )
+      const result = await handleAnalyzeTool('mbc_health_check', {}, testDir)
 
       expect(result.content[0].text).toContain('ERROR')
       expect(result.content[0].text).toContain('package.json not found')
@@ -233,18 +564,21 @@ describe('analyze tools', () => {
 
     it('should detect NestJS module', async () => {
       const testFile = path.join(testDir, 'app.module.ts')
-      fs.writeFileSync(testFile, `
+      fs.writeFileSync(
+        testFile,
+        `
         @Module({
           imports: [CommandModule],
           providers: [AppService],
         })
         export class AppModule {}
-      `)
+      `,
+      )
 
       const result = await handleAnalyzeTool(
         'mbc_explain_code',
         { file_path: 'app.module.ts' },
-        testDir
+        testDir,
       )
 
       expect(result.content[0].text).toContain('NestJS Module')
@@ -253,7 +587,9 @@ describe('analyze tools', () => {
 
     it('should detect REST controller', async () => {
       const testFile = path.join(testDir, 'app.controller.ts')
-      fs.writeFileSync(testFile, `
+      fs.writeFileSync(
+        testFile,
+        `
         @Controller('api')
         export class AppController {
           @Get()
@@ -262,12 +598,13 @@ describe('analyze tools', () => {
           @Post()
           create() {}
         }
-      `)
+      `,
+      )
 
       const result = await handleAnalyzeTool(
         'mbc_explain_code',
         { file_path: 'app.controller.ts' },
-        testDir
+        testDir,
       )
 
       expect(result.content[0].text).toContain('REST Controller')
@@ -277,7 +614,9 @@ describe('analyze tools', () => {
 
     it('should detect service with CommandService', async () => {
       const testFile = path.join(testDir, 'app.service.ts')
-      fs.writeFileSync(testFile, `
+      fs.writeFileSync(
+        testFile,
+        `
         @Injectable()
         export class AppService {
           constructor(private commandService: CommandService) {}
@@ -286,12 +625,13 @@ describe('analyze tools', () => {
             await this.commandService.publishAsync(...)
           }
         }
-      `)
+      `,
+      )
 
       const result = await handleAnalyzeTool(
         'mbc_explain_code',
         { file_path: 'app.service.ts' },
-        testDir
+        testDir,
       )
 
       expect(result.content[0].text).toContain('Service')
@@ -301,18 +641,21 @@ describe('analyze tools', () => {
 
     it('should detect entity with DynamoDB keys', async () => {
       const testFile = path.join(testDir, 'item.entity.ts')
-      fs.writeFileSync(testFile, `
+      fs.writeFileSync(
+        testFile,
+        `
         export class ItemEntity extends CommandEntity {
           pk: string
           sk: string
           name: string
         }
-      `)
+      `,
+      )
 
       const result = await handleAnalyzeTool(
         'mbc_explain_code',
         { file_path: 'item.entity.ts' },
-        testDir
+        testDir,
       )
 
       expect(result.content[0].text).toContain('Entity')
@@ -324,7 +667,7 @@ describe('analyze tools', () => {
       const result = await handleAnalyzeTool(
         'mbc_explain_code',
         { file_path: 'nonexistent.ts' },
-        testDir
+        testDir,
       )
 
       expect(result.isError).toBe(true)
@@ -333,16 +676,19 @@ describe('analyze tools', () => {
 
     it('should explain specific line range', async () => {
       const testFile = path.join(testDir, 'test.ts')
-      fs.writeFileSync(testFile, `line1
+      fs.writeFileSync(
+        testFile,
+        `line1
 line2
 line3
 line4
-line5`)
+line5`,
+      )
 
       const result = await handleAnalyzeTool(
         'mbc_explain_code',
         { file_path: 'test.ts', start_line: 2, end_line: 4 },
-        testDir
+        testDir,
       )
 
       expect(result.content[0].text).toContain('lines 2-4')

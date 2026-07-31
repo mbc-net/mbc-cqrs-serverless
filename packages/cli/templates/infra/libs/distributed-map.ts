@@ -16,6 +16,17 @@ export type DistributedMapS3Parameter =
       readonly Key: JsonPath | string
     }
 
+/** ResultWriter uses Bucket + Prefix (not Key). See distributed Map ResultWriter. */
+export type DistributedMapResultWriterParameters =
+  | {
+      readonly 'Bucket.$': string
+      readonly 'Prefix.$': string
+    }
+  | {
+      readonly Bucket: JsonPath | string
+      readonly Prefix: JsonPath | string
+    }
+
 export interface DistributedMapItemReader {
   readonly Resource:
     | 'arn:aws:states:::s3:getObject'
@@ -31,7 +42,7 @@ export interface DistributedMapItemReader {
 
 export interface DistributedMapResultWriter {
   readonly Resource: 'arn:aws:states:::s3:putObject'
-  readonly Parameters: DistributedMapS3Parameter
+  readonly Parameters: DistributedMapResultWriterParameters
 }
 
 export interface DistributedMapItemBatcher {

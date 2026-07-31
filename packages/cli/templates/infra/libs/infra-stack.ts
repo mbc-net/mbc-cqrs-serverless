@@ -249,6 +249,76 @@ export class InfraStack extends cdk.Stack {
     this.graphqlApiKey = new cdk.CfnOutput(this, 'GraphQLAPIKey', {
       value: appSyncApi.apiKey || '',
     })
+
+    // AppSync Events API (HTTP pub/sub, schema-free)
+    // Uses L2 EventApi so that ChannelNamespace can set explicit publishAuthModeTypes
+    // and subscribeAuthModeTypes — without these the namespace has no effective
+    // authorization and Lambda publish calls receive 401.
+    let appSyncEventsApi: cdk.aws_appsync.EventApi | undefined
+    if (props.config.appsyncEvents?.enabled) {
+      const expireDays = props.config.appsyncEvents.apiKeyExpireDays ?? 365
+
+      appSyncEventsApi = new cdk.aws_appsync.EventApi(this, 'events-api', {
+        apiName: prefix + 'events',
+        authorizationConfig: {
+          authProviders: [
+            {
+              authorizationType: cdk.aws_appsync.AppSyncAuthorizationType.IAM,
+            },
+            {
+              authorizationType:
+                cdk.aws_appsync.AppSyncAuthorizationType.API_KEY,
+              apiKeyConfig: {
+                expires: cdk.Expiration.after(cdk.Duration.days(expireDays)),
+              },
+            },
+          ],
+          // API-level defaults — overridden per-namespace below
+          connectionAuthModeTypes: [
+            cdk.aws_appsync.AppSyncAuthorizationType.API_KEY,
+          ],
+          defaultPublishAuthModeTypes: [
+            cdk.aws_appsync.AppSyncAuthorizationType.IAM,
+          ],
+          defaultSubscribeAuthModeTypes: [
+            cdk.aws_appsync.AppSyncAuthorizationType.API_KEY,
+          ],
+        },
+      })
+
+      // Namespace — explicitly sets auth per operation so it is never left
+      // without authorization (which caused the 401).
+      //   publish  = AWS_IAM   → Lambda signs with its execution role
+      //   subscribe = API_KEY  → browser clients pass x-api-key header
+      new cdk.aws_appsync.ChannelNamespace(this, 'events-namespace', {
+        api: appSyncEventsApi,
+        channelNamespaceName: props.config.appsyncEvents.namespace ?? 'default',
+        authorizationConfig: {
+          publishAuthModeTypes: [cdk.aws_appsync.AppSyncAuthorizationType.IAM],
+          subscribeAuthModeTypes: [
+            cdk.aws_appsync.AppSyncAuthorizationType.API_KEY,
+          ],
+        },
+      })
+
+      // Outputs
+      new cdk.CfnOutput(this, 'AppSyncEventsHttpEndpoint', {
+        value: `https://${appSyncEventsApi.httpDns}/event`,
+        description:
+          'AppSync Events HTTP endpoint — APPSYNC_EVENTS_ENDPOINT env var',
+      })
+      new cdk.CfnOutput(this, 'AppSyncEventsRealtimeEndpoint', {
+        value: `wss://${appSyncEventsApi.realtimeDns}/event/realtime`,
+        description:
+          'AppSync Events WebSocket endpoint for client subscriptions',
+      })
+      new cdk.CfnOutput(this, 'AppSyncEventsNamespace', {
+        value: props.config.appsyncEvents.namespace ?? 'default',
+        description:
+          'AppSync Events namespace — APPSYNC_EVENTS_NAMESPACE env var',
+      })
+    }
+
     // S3
     const ddbBucket = new cdk.aws_s3.Bucket(this, 'ddb-attributes', {
       bucketName: prefix + 'ddb-attributes', // Globally unique bucket name
@@ -389,7 +459,12 @@ export class InfraStack extends cdk.Stack {
       APP_NAME: name,
       LOG_LEVEL: props.config.logLevel?.level || 'info',
       EVENT_SOURCE_DISABLED: 'false',
-      ATTRIBUTE_LIMIT_SIZE: '389120',
+      // Max size (bytes) for `attributes` before S3 offload.
+      // Must account for Step Functions 256 KB payload limit: the SFN state passes
+      // the DynamoDB event twice (input + context.Execution.Input), so the safe
+      // limit is ~(256 KB - overhead) / 2 ≈ 110 KB. Default: 100 KB.
+      // DynamoDB item limit is 400 KB — do NOT use that as the reference.
+      ATTRIBUTE_LIMIT_SIZE: '102400',
       S3_BUCKET_NAME: ddbBucket.bucketName,
       SFN_COMMAND_ARN: commandSfnArn,
       SFN_TASK_ARN: taskSfnArn,
@@ -398,10 +473,21 @@ export class InfraStack extends cdk.Stack {
       SNS_ALARM_TOPIC_ARN: alarmSns.topicArn,
       COGNITO_USER_POOL_ID: userPool.userPoolId,
       APPSYNC_ENDPOINT: appSyncApi.graphqlUrl,
+      // AppSync Events — only injected when feature is enabled
+      ...(props.config.appsyncEvents?.enabled && appSyncEventsApi
+        ? {
+            NOTIFICATION_TRANSPORTS:
+              props.config.notificationTransports ?? 'appsync-event',
+            APPSYNC_EVENTS_ENDPOINT: `https://${appSyncEventsApi.httpDns}/event`,
+            APPSYNC_EVENTS_NAMESPACE:
+              props.config.appsyncEvents.namespace ?? 'default',
+          }
+        : {}),
       SES_FROM_EMAIL: props.config.fromEmailAddress,
       DATABASE_URL: `postgresql://${props.config.rds.accountSsmKey}@${props.config.rds.endpoint}/${props.config.rds.dbName}?schema=public`,
       S3_PUBLIC_BUCKET_NAME: publicBucket.bucketName,
       FRONT_BASE_URL: props.config.frontBaseUrl,
+      IMPORT_QUEUE_URL: importActionSqs.queueUrl,
     }
     const lambdaApi = new cdk.aws_lambda.Function(this, 'lambda-api', {
       vpc,
@@ -644,6 +730,14 @@ export class InfraStack extends cdk.Stack {
       domainName: httpDistribution.distributionDomainName,
     })
 
+    if (props.config.domain.appsyncEvents && appSyncEventsApi) {
+      new cdk.aws_route53.CnameRecord(this, 'AppSyncEventsCnameRecord', {
+        zone: hostedZone,
+        recordName: props.config.domain.appsyncEvents,
+        domainName: appSyncEventsApi.httpDns,
+      })
+    }
+
     this.httpDistributionDomain = new cdk.CfnOutput(
       this,
       'http-distribution-domain',
@@ -691,6 +785,10 @@ export class InfraStack extends cdk.Stack {
       stateName: string,
       nextState: cdk.aws_stepfunctions.IChainable | null,
       integrationPattern: cdk.aws_stepfunctions.IntegrationPattern,
+      taskTimeout?: cdk.aws_stepfunctions.Timeout,
+      configureTask?: (
+        task: cdk.aws_stepfunctions_tasks.LambdaInvoke,
+      ) => cdk.aws_stepfunctions.IChainable,
     ) => {
       const payloadObject: {
         [key: string]: any
@@ -702,7 +800,7 @@ export class InfraStack extends cdk.Stack {
         integrationPattern ===
         cdk.aws_stepfunctions.IntegrationPattern.WAIT_FOR_TASK_TOKEN
       ) {
-        payloadObject['taskToken'] = cdk.aws_stepfunctions.JsonPath.taskToken // '$$.Task.Token'
+        payloadObject['taskToken'] = cdk.aws_stepfunctions.JsonPath.taskToken
       }
       const lambdaTask = new cdk.aws_stepfunctions_tasks.LambdaInvoke(
         this,
@@ -714,12 +812,19 @@ export class InfraStack extends cdk.Stack {
           stateName,
           outputPath: '$.Payload[0][0]',
           integrationPattern,
+          ...(taskTimeout ? { taskTimeout } : {}),
         },
       )
+      // addCatch must run on the State before .next() turns it into a Chain.
+      const configuredTask = configureTask
+        ? (configureTask(
+            lambdaTask,
+          ) as cdk.aws_stepfunctions_tasks.LambdaInvoke)
+        : lambdaTask
       if (nextState) {
-        return lambdaTask.next(nextState)
+        return configuredTask.next(nextState)
       }
-      return lambdaTask
+      return configuredTask
     }
 
     // Define states
@@ -765,10 +870,34 @@ export class InfraStack extends cdk.Stack {
       cdk.aws_stepfunctions.IntegrationPattern.REQUEST_RESPONSE,
     )
 
+    // States.Timeout never invokes the wait_prev_command Lambda, so the
+    // command row is not updated (status/taskToken stay post-waitConfirmToken,
+    // typically wait_prev_command:FINISHED + stale token). That is one case of
+    // the broader cascade: any predecessor exit before FINISH leaves a
+    // non-finish status, so later versions will not self-resume and may each
+    // wait another 24h. Execution still fails here (CW ExecutionsFailed may fire).
+    const waitPrevCommandTimeoutHandler = new cdk.aws_stepfunctions.Pass(
+      this,
+      'wait_prev_command_timeout',
+      {
+        stateName: 'wait_prev_command_timeout',
+        parameters: {
+          error: 'States.Timeout',
+          cause: 'wait_prev_command exceeded taskTimeout (24h)',
+        },
+      },
+    ).next(fail)
+
     const waitPrevCommand = lambdaInvoke(
       'wait_prev_command',
       setTtlCommand,
       cdk.aws_stepfunctions.IntegrationPattern.WAIT_FOR_TASK_TOKEN,
+      cdk.aws_stepfunctions.Timeout.duration(cdk.Duration.hours(24)),
+      (task) =>
+        task.addCatch(waitPrevCommandTimeoutHandler, {
+          errors: ['States.Timeout'],
+          resultPath: '$.timeoutError',
+        }),
     )
 
     // Define Choice state
@@ -821,6 +950,32 @@ export class InfraStack extends cdk.Stack {
           level: cdk.aws_stepfunctions.LogLevel.ALL, // Log level (ALL, ERROR, or FATAL)
         },
       },
+    )
+
+    // Pages when any command-handler execution fails — including wait_prev_command
+    // States.Timeout, which never invokes Lambda so publishAlarm cannot run.
+    const commandSfnFailedAlarm = new cdk.aws_cloudwatch.Alarm(
+      this,
+      'command-handler-sfn-failed-alarm',
+      {
+        alarmName: prefix + 'command-handler-sfn-failed',
+        alarmDescription:
+          'Command handler Step Functions execution failed (includes wait_prev_command 24h timeout)',
+        metric: stateMachine.metricFailed({
+          period: cdk.Duration.minutes(1),
+          statistic: 'Sum',
+        }),
+        threshold: 1,
+        evaluationPeriods: 1,
+        datapointsToAlarm: 1,
+        treatMissingData: cdk.aws_cloudwatch.TreatMissingData.NOT_BREACHING,
+        comparisonOperator:
+          cdk.aws_cloudwatch.ComparisonOperator
+            .GREATER_THAN_OR_EQUAL_TO_THRESHOLD,
+      },
+    )
+    commandSfnFailedAlarm.addAlarmAction(
+      new cdk.aws_cloudwatch_actions.SnsAction(alarmSns),
     )
 
     // Output the State Machine's ARN
@@ -887,8 +1042,47 @@ export class InfraStack extends cdk.Stack {
       cdk.aws_stepfunctions.IntegrationPattern.REQUEST_RESPONSE,
     )
 
+    const importCsvSuccess = new cdk.aws_stepfunctions.Succeed(
+      this,
+      'ImportCsvSuccess',
+      {
+        stateName: 'success',
+      },
+    )
+
+    const finalizeParentJobInvoke =
+      new cdk.aws_stepfunctions_tasks.LambdaInvoke(
+        this,
+        'finalize_parent_job',
+        {
+          lambdaFunction: lambdaApi,
+          payload: cdk.aws_stepfunctions.TaskInput.fromObject({
+            'input.$': '$',
+            'context.$': '$$',
+          }),
+          stateName: 'finalize_parent_job',
+          outputPath: '$.Payload[0][0]',
+          integrationPattern:
+            cdk.aws_stepfunctions.IntegrationPattern.REQUEST_RESPONSE,
+          retryOnServiceExceptions: false,
+        },
+      )
+    finalizeParentJobInvoke.addRetry({
+      errors: [
+        'Lambda.ServiceException',
+        'Lambda.AWSLambdaException',
+        'Lambda.SdkClientException',
+      ],
+      interval: cdk.Duration.seconds(2),
+      maxAttempts: 5,
+      backoffRate: 2,
+    })
+    const finalizeParentJobState =
+      finalizeParentJobInvoke.next(importCsvSuccess)
+
     const sfnImportCsvDefinition = new DistributedMap(this, 'import-csv', {
       maxConcurrency: 50,
+      resultPath: '$.mapOutput', // Captures the MapRunArn and ResultWriterDetails
     })
       .setLabel('import-csv')
       .setItemReader({
@@ -903,14 +1097,31 @@ export class InfraStack extends cdk.Stack {
         },
       })
       .setItemBatcher({
-        MaxInputBytesPerBatch: 10,
+        MaxItemsPerBatch: 100,
         BatchInput: {
           'Attributes.$': '$',
         },
       })
-      .itemProcessor(csvRowsHandlerState, {
-        executionType: cdk.aws_stepfunctions.ProcessorType.EXPRESS,
+      .setResultWriter({
+        Resource: 'arn:aws:states:::s3:putObject',
+        Parameters: {
+          // Replace this with your actual CDK bucket reference (e.g., props.bucket.bucketName)
+          Bucket: 'your-import-bucket-name',
+          Prefix: 'sfn-results/import-csv',
+        },
       })
+      .itemProcessor(csvRowsHandlerState, {
+        executionType: cdk.aws_stepfunctions.ProcessorType.STANDARD,
+      })
+
+    // Catch ALL Map state errors and route them to finalizeParentJobState
+    sfnImportCsvDefinition.addCatch(finalizeParentJobState, {
+      errors: ['States.ALL'],
+      resultPath: '$.errorOutput',
+    })
+
+    // Normal successful flow
+    sfnImportCsvDefinition.next(finalizeParentJobState)
 
     const sfnImportCsvLogGroup = new cdk.aws_logs.LogGroup(
       this,
@@ -999,6 +1210,11 @@ export class InfraStack extends cdk.Stack {
           filters: [
             cdk.aws_lambda.FilterCriteria.filter({
               eventName: cdk.aws_lambda.FilterRule.isEqual('INSERT'),
+              dynamodb: {
+                NewImage: {
+                  syncMode: cdk.aws_lambda.FilterRule.notExists(),
+                },
+              },
             }),
           ],
         }),
@@ -1036,6 +1252,9 @@ export class InfraStack extends cdk.Stack {
     taskSqs.grantSendMessages(lambdaApi)
     notifySqs.grantSendMessages(lambdaApi)
     appSyncApi.grantMutation(lambdaApi)
+    importActionSqs.grantSendMessages(lambdaApi)
+
+    appSyncEventsApi?.grantPublish(lambdaApi)
 
     // Define an IAM policy for full DynamoDB access
     const dynamoDbTablePrefixArn = cdk.Arn.format({
@@ -1072,6 +1291,14 @@ export class InfraStack extends cdk.Stack {
       resources: [commandSfnArn],
     })
 
+    // SendTaskSuccess is scoped to this command state machine (same pattern as
+    // CDK stateMachine.grantTaskResponse). Task tokens are still required at
+    // call time; Resource '*' is unnecessary and over-broad for the template.
+    const sfnTaskTokenPolicy = new cdk.aws_iam.PolicyStatement({
+      actions: ['states:SendTaskSuccess'],
+      resources: [stateMachine.stateMachineArn],
+    })
+
     const taskSfnPolicy = new cdk.aws_iam.PolicyStatement({
       actions: ['states:*'],
       resources: [taskSfnArn], // Access to all resources
@@ -1085,7 +1312,7 @@ export class InfraStack extends cdk.Stack {
     // Attach the policy to the Lambda function's execution role
     lambdaApi.role?.attachInlinePolicy(
       new cdk.aws_iam.Policy(this, 'lambda-event-sfn-policy', {
-        statements: [sfnPolicy],
+        statements: [sfnPolicy, sfnTaskTokenPolicy],
       }),
     )
 
@@ -1168,6 +1395,7 @@ export class InfraStack extends cdk.Stack {
           statements: [ssmPolicy],
         }),
       )
+      appSyncEventsApi?.grantPublish(taskRole)
     }
   }
 }

@@ -1,6 +1,7 @@
 import { Resource } from '@modelcontextprotocol/sdk/types.js'
-import * as fs from 'fs'
 import * as path from 'path'
+
+import { readFileSafe } from '../utils/fs.js'
 
 /**
  * Documentation resources for MBC CQRS Serverless framework.
@@ -50,41 +51,52 @@ export function getDocumentationResources(): Resource[] {
   ]
 }
 
+/**
+ * Resolve the framework root directory.
+ * Uses MBC_FRAMEWORK_ROOT env var when set (e.g. in production installs),
+ * otherwise falls back to two directories above this package (monorepo layout).
+ */
+function getFrameworkRoot(): string {
+  if (process.env.MBC_FRAMEWORK_ROOT) {
+    return process.env.MBC_FRAMEWORK_ROOT
+  }
+  // dist/resources/ → dist/ → packages/mcp-server/ → packages/ → monorepo root
+  return path.resolve(__dirname, '..', '..', '..', '..')
+}
+
 export async function readDocumentation(
   uri: string,
 ): Promise<{ contents: { uri: string; mimeType: string; text: string }[] }> {
-  const frameworkRoot = path.resolve(__dirname, '../../../../..')
+  const frameworkRoot = getFrameworkRoot()
 
   let content: string
   let mimeType = 'text/plain'
 
   switch (uri) {
     case 'mbc://docs/overview':
-      content = await readFileContent(path.join(frameworkRoot, 'llms-full.txt'))
+      content = readFileSafe(path.join(frameworkRoot, 'llms-full.txt'))
       break
     case 'mbc://docs/llms-short':
-      content = await readFileContent(path.join(frameworkRoot, 'llms.txt'))
+      content = readFileSafe(path.join(frameworkRoot, 'llms.txt'))
       break
     case 'mbc://docs/architecture':
-      content = await readFileContent(
+      content = readFileSafe(
         path.join(frameworkRoot, 'docs', 'ARCHITECTURE.md'),
       )
       mimeType = 'text/markdown'
       break
     case 'mbc://docs/faq':
-      content = await readFileContent(
-        path.join(frameworkRoot, 'docs', 'FAQ.md'),
-      )
+      content = readFileSafe(path.join(frameworkRoot, 'docs', 'FAQ.md'))
       mimeType = 'text/markdown'
       break
     case 'mbc://docs/troubleshooting':
-      content = await readFileContent(
+      content = readFileSafe(
         path.join(frameworkRoot, 'docs', 'TROUBLESHOOTING.md'),
       )
       mimeType = 'text/markdown'
       break
     case 'mbc://docs/security':
-      content = await readFileContent(path.join(frameworkRoot, 'SECURITY.md'))
+      content = readFileSafe(path.join(frameworkRoot, 'SECURITY.md'))
       mimeType = 'text/markdown'
       break
     default:
@@ -92,20 +104,6 @@ export async function readDocumentation(
   }
 
   return {
-    contents: [
-      {
-        uri,
-        mimeType,
-        text: content,
-      },
-    ],
-  }
-}
-
-async function readFileContent(filePath: string): Promise<string> {
-  try {
-    return fs.readFileSync(filePath, 'utf-8')
-  } catch (error) {
-    return `Error reading file: ${filePath}. File may not exist.`
+    contents: [{ uri, mimeType, text: content }],
   }
 }

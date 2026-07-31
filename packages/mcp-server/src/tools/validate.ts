@@ -3,6 +3,8 @@ import * as fs from 'fs'
 import * as path from 'path'
 import { z } from 'zod'
 
+import { findFiles, readFileSafe } from '../utils/fs.js'
+
 /**
  * Validation result interface.
  */
@@ -96,7 +98,7 @@ async function validateCqrsPatterns(
   // Check for package.json with @mbc-cqrs-serverless/core dependency
   const packageJsonPath = path.join(projectPath, 'package.json')
   if (fs.existsSync(packageJsonPath)) {
-    const packageJson = JSON.parse(fs.readFileSync(packageJsonPath, 'utf-8'))
+    const packageJson = JSON.parse(readFileSafe(packageJsonPath))
     const deps = { ...packageJson.dependencies, ...packageJson.devDependencies }
     if (!deps['@mbc-cqrs-serverless/core']) {
       issues.push({
@@ -113,7 +115,7 @@ async function validateCqrsPatterns(
   // Check for entities extending proper base classes
   const entityFiles = await findFiles(srcPath, '.entity.ts')
   for (const file of entityFiles) {
-    const content = fs.readFileSync(file, 'utf-8')
+    const content = readFileSafe(file)
     if (!content.includes('CommandEntity') && !content.includes('DataEntity')) {
       issues.push({
         severity: 'warning',
@@ -129,7 +131,7 @@ async function validateCqrsPatterns(
   // Check for modules with proper command module registration
   const moduleFiles = await findFiles(srcPath, '.module.ts')
   for (const file of moduleFiles) {
-    const content = fs.readFileSync(file, 'utf-8')
+    const content = readFileSafe(file)
     if (
       content.includes('@Module') &&
       !content.includes('CommandModule') &&
@@ -148,7 +150,7 @@ async function validateCqrsPatterns(
   // Check for services using proper patterns
   const serviceFiles = await findFiles(srcPath, '.service.ts')
   for (const file of serviceFiles) {
-    const content = fs.readFileSync(file, 'utf-8')
+    const content = readFileSafe(file)
     if (content.includes('CommandService') || content.includes('DataService')) {
       // Good - using CQRS services
     } else if (
@@ -184,30 +186,6 @@ async function validateCqrsPatterns(
     issues,
     suggestions,
   }
-}
-
-async function findFiles(dir: string, suffix: string): Promise<string[]> {
-  const files: string[] = []
-
-  if (!fs.existsSync(dir)) {
-    return files
-  }
-
-  const entries = fs.readdirSync(dir, { withFileTypes: true })
-  for (const entry of entries) {
-    const fullPath = path.join(dir, entry.name)
-    if (
-      entry.isDirectory() &&
-      entry.name !== 'node_modules' &&
-      entry.name !== 'dist'
-    ) {
-      files.push(...(await findFiles(fullPath, suffix)))
-    } else if (entry.isFile() && entry.name.endsWith(suffix)) {
-      files.push(fullPath)
-    }
-  }
-
-  return files
 }
 
 function formatValidationResult(result: ValidationResult): {

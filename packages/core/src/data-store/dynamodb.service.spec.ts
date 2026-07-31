@@ -1,4 +1,5 @@
 import {
+  DeleteItemCommand,
   DynamoDBClient,
   GetItemCommand,
   PutItemCommand,
@@ -16,7 +17,6 @@ import { GetObjectCommand, S3Client } from '@aws-sdk/client-s3'
 import { sdkStreamMixin } from '@smithy/util-stream'
 import { Readable } from 'stream'
 import { ulid } from 'ulid'
-import { toISOStringWithTimezone } from '../helpers'
 
 const keys = {
   NODE_ENV: 'env',
@@ -51,6 +51,26 @@ describe('DynamoDbService', () => {
     jest.clearAllMocks()
     dynamoDBMock.reset()
     s3Mock.reset()
+  })
+
+  describe('deleteItem', () => {
+    it('should send DeleteItemCommand with the correct parameters', async () => {
+      // Arrange
+      dynamoDBMock.on(DeleteItemCommand).resolves({})
+      const key = { pk: 'master', sk: 'test' }
+
+      // Action
+      await dynamoDbService.deleteItem('table_name', key)
+
+      // Assert
+      expect(dynamoDBMock).toHaveReceivedCommandWith(DeleteItemCommand, {
+        TableName: 'table_name',
+        Key: {
+          pk: { S: 'master' },
+          sk: { S: 'test' },
+        },
+      })
+    })
   })
 
   describe('get', () => {
@@ -165,6 +185,39 @@ describe('DynamoDbService', () => {
         pk: 'master',
         sk: 'test',
       })
+    })
+
+    it('should set ConsistentRead when options.consistentRead is true', async () => {
+      // Arrange
+      dynamoDBMock.on(GetItemCommand).resolves({ Item: {} })
+      const key = { pk: 'master', sk: 'test' }
+
+      // Action
+      await dynamoDbService.getItem('table_name', key, { consistentRead: true })
+
+      // Assert
+      expect(dynamoDBMock).toHaveReceivedCommandWith(GetItemCommand, {
+        TableName: 'table_name',
+        Key: {
+          pk: { S: 'master' },
+          sk: { S: 'test' },
+        },
+        ConsistentRead: true,
+      })
+    })
+
+    it('should omit ConsistentRead when options are not provided', async () => {
+      // Arrange
+      dynamoDBMock.on(GetItemCommand).resolves({ Item: {} })
+      const key = { pk: 'master', sk: 'test' }
+
+      // Action
+      await dynamoDbService.getItem('table_name', key)
+
+      // Assert
+      const calls = dynamoDBMock.commandCalls(GetItemCommand)
+      expect(calls).toHaveLength(1)
+      expect(calls[0].args[0].input.ConsistentRead).toBeUndefined()
     })
   })
 

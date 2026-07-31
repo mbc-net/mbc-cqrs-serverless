@@ -4,6 +4,7 @@ import { createMock } from '@golevelup/ts-jest'
 import { ExplorerService } from './explorer.service'
 import { MockEventHandler } from './mocks/event-handler.mock'
 import { MockEventFactory } from './mocks/event-factory.mock'
+import { MockGroupRoleResolver } from './mocks/group-role-resolver.mock'
 import { DataSyncHandlerMock } from './mocks/sync-data.handler.mock'
 
 describe('ExplorerService', () => {
@@ -85,6 +86,81 @@ describe('ExplorerService', () => {
       // Assert
       expect(dataSyncHandlers).toBeDefined()
       expect(dataSyncHandlers.length).toEqual(0)
+    })
+  })
+
+  describe('exploreDataSyncHandlers deduplication', () => {
+    it('should return deduplicated results when the same handler class is in multiple modules', () => {
+      const instance = new DataSyncHandlerMock()
+      const wrapper = { instance }
+      const moduleA = { providers: new Map([['a', wrapper]]) }
+      const moduleB = { providers: new Map([['b', wrapper]]) }
+
+      const fakeContainer = {
+        values: () => [moduleA, moduleB][Symbol.iterator](),
+      } as any
+      const service = new (ExplorerService as any)(fakeContainer)
+
+      const { dataSyncHandlers } = service.exploreDataSyncHandlers('table_name')
+
+      expect(dataSyncHandlers).toHaveLength(1)
+      expect(dataSyncHandlers[0]).toBe(DataSyncHandlerMock)
+    })
+  })
+
+  describe('flatMap - does NOT deduplicate (preserves raw results for callers)', () => {
+    it('should return duplicate entries when the same constructor appears in multiple modules', () => {
+      const instance = new DataSyncHandlerMock()
+      const wrapper = { instance }
+      const moduleA = { providers: new Map([['a', wrapper]]) }
+      const moduleB = { providers: new Map([['b', wrapper]]) }
+
+      const fakeContainer = { values: () => [][Symbol.iterator]() } as any
+      const service = new (ExplorerService as any)(fakeContainer)
+
+      const callback = () => DataSyncHandlerMock as any
+      const result = service.flatMap([moduleA, moduleB] as any, callback)
+
+      // flatMap does NOT dedup — callers decide dedup policy
+      expect(result).toHaveLength(2)
+    })
+  })
+
+  describe('exploreGroupRoleResolvers - same class in multiple modules still detected as duplicate', () => {
+    it('should return multiple entries when the same GroupRoleResolver class appears in two modules', () => {
+      const instance = new MockGroupRoleResolver()
+      const wrapper = { instance }
+      const moduleA = { providers: new Map([['a', wrapper]]) }
+      const moduleB = { providers: new Map([['b', wrapper]]) }
+
+      const fakeContainer = {
+        values: () => [moduleA, moduleB][Symbol.iterator](),
+      } as any
+      const service = new (ExplorerService as any)(fakeContainer)
+
+      const result = service.exploreGroupRoleResolvers()
+
+      // Must return 2 entries so AuthzBootstrapService can detect the misconfiguration
+      expect(result).toHaveLength(2)
+    })
+  })
+
+  describe('exploreGroupRoleResolvers', () => {
+    let explorerService: ExplorerService
+
+    beforeEach(async () => {
+      const module: TestingModule = await Test.createTestingModule({
+        providers: [ExplorerService, MockGroupRoleResolver],
+      }).compile()
+
+      explorerService = module.get<ExplorerService>(ExplorerService)
+    })
+
+    it('should discover @GroupRoleResolver provider', () => {
+      const types = explorerService.exploreGroupRoleResolvers()
+
+      expect(types.length).toBe(1)
+      expect(new types[0]()).toBeInstanceOf(MockGroupRoleResolver)
     })
   })
 

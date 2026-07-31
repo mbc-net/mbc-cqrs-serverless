@@ -186,7 +186,8 @@ export class ${featureName}DataEntity extends DataEntity implements DataModel {
 ## Using CommandService
 
 \`\`\`typescript
-import { CommandService } from '@mbc-cqrs-serverless/core'
+import { CommandService, getUserContext, IInvoke } from '@mbc-cqrs-serverless/core'
+import { ulid } from 'ulid'
 
 @Injectable()
 export class ${featureName}Service {
@@ -194,20 +195,25 @@ export class ${featureName}Service {
 
   // Create (Async - returns immediately, processes in background)
   async createAsync(dto: Create${featureName}Dto, options: IInvoke) {
+    const { tenantCode } = getUserContext(options)
     const entity = new ${featureName}CommandEntity()
-    entity.pk = \`${featureName.toUpperCase()}#\${options.tenantCode}\`
+    entity.pk = \`${featureName.toUpperCase()}#\${tenantCode}\`
     entity.sk = \`${featureName.toUpperCase()}#\${ulid()}\`
     // ... set other fields
 
     return this.commandService.publishAsync(entity, options)
   }
 
-  // Create (Sync - waits for completion)
+  // Create (Sync - waits for completion, writes full audit trail since v1.1.4)
+  // Note: returns null when command is not dirty (no-op) since v1.2.0
   async createSync(dto: Create${featureName}Dto, options: IInvoke) {
+    const { tenantCode } = getUserContext(options)
     const entity = new ${featureName}CommandEntity()
     // ... same setup
 
-    return this.commandService.publishSync(entity, options)
+    const result = await this.commandService.publishSync(entity, options)
+    if (!result) return null // no-op (not dirty)
+    return result
   }
 
   // Update with optimistic locking
@@ -415,9 +421,9 @@ await commandService.publishPartialUpdateAsync({
   name: 'Updated',
 }, options)
 
-// Or fetch and use latest (sync mode)
+// Or fetch and use latest version before updating
 const latest = await dataService.getItem({ pk, sk })
-await commandService.publishPartialUpdateSync({
+await commandService.publishPartialUpdateAsync({
   pk, sk,
   version: latest.version,
   name: 'Updated',
@@ -457,25 +463,29 @@ function getMigrationGuideMessages(
    npm update @mbc-cqrs-serverless/core @mbc-cqrs-serverless/cli
    \`\`\`
 
-2. **Check for breaking changes** in the CHANGELOG.md
+2. **Review breaking changes** for every version between ${fromVersion} and ${toVersion} (see the version-specific notes below).
 
-3. **Update imports** if API has changed
+3. **Update imports / call sites** if any API changed.
 
-4. **Run tests** to verify everything works
+4. **Run \`npm run build\` and \`npm test\`** to verify everything still compiles and passes.
 
-## Common Migration Issues
+## Where to find version-specific breaking changes
 
-### Interface Changes
-- Check if CommandEntity/DataEntity interfaces have new required fields
-- Update your entities accordingly
+Detailed, per-version migration notes (v1.0.x → v1.3.1, including data migrations,
+removed APIs, and step-by-step upgrade instructions) live in the **\`mbc-migrate\` skill**
+(\`skills/mbc-migrate/SKILL.md\`) and in the framework **CHANGELOG.md**. These are the
+single source of truth and are kept current with each release — consult them for the
+exact changes between ${fromVersion} and ${toVersion}.
 
-### Configuration Changes
-- Review CommandModuleOptions for new options
-- Check environment variables
+**High-impact versions to check when crossing them:**
+- **v1.1.0** — *Breaking*: \`TENANT_COMMON\` keys lowercased (DynamoDB data migration); \`publish()\` / \`publishPartialUpdate()\` removed (use the \`*Async\` variants).
+- **v1.1.5** — CSV Import v2 batch architecture (Step Functions \`finalize_parent_job\` now required).
+- **v1.2.0** — *Breaking*: \`publishSync\` / \`publishPartialUpdateSync\` now return \`null\` on a no-op (add null checks); \`SequenceService.genNewSequence()\` removed.
+- **v1.2.4** — *Breaking for \`@mbc-cqrs-serverless/master\` users*: \`TaskModule.register()\` must be called exactly once in the host \`AppModule\`.
+- **v1.3.0** — AppSync Events API support (opt-in, no breaking changes).
+- **v1.3.1** — Group-based roles (\`@GroupRoleResolver\`, \`custom:groups\`); \`UserContext\` gains \`tenantRoles\` / \`tenantGroupIds\` (opt-in, no breaking changes).
 
-### Deprecated Features
-- Look for deprecation warnings in build output
-- Replace deprecated APIs with recommended alternatives
+For the full instructions on any of the above, open the \`mbc-migrate\` skill and read the matching \`### <version>\` section.
 
 ## Verification
 
@@ -494,7 +504,7 @@ function getMigrationGuideMessages(
    npm run offline
    \`\`\`
 
-For specific version migration details, check the CHANGELOG.md in the framework repository.`,
+For specific version migration details, check the \`mbc-migrate\` skill and CHANGELOG.md in the framework repository.`,
         },
       },
     ],

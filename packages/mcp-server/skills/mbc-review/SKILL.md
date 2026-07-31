@@ -21,6 +21,52 @@ Before executing this skill, check for updates:
 
 This skill reviews code for MBC CQRS Serverless best practices and identifies anti-patterns.
 
+## ⚠️ Important: Two Anti-Pattern Code Systems
+
+This codebase currently has **two independent `AP00X` numbering systems** that are NOT interchangeable:
+
+1. **Skill `AP` codes** (this document) — used in human-facing reviews and documentation. Stable identifiers for discussion.
+2. **Detector `AP` codes** (output of the `mbc_check_anti_patterns` tool, defined in `src/tools/analyze.ts`) — used by the static analysis tool. Numbered in detector implementation order.
+
+**Only AP016, AP017, AP018, AP019, and AP021 happen to refer to the same concept in both systems.** All other AP numbers diverge — for example, the detector's `AP005: Hardcoded Tenant` corresponds to this document's `AP002: Missing tenantCode`. Do not assume the codes match.
+
+**Cross-reference table** (detector → skill doc):
+
+| Detector code (analyze.ts)                              | Skill doc code (this file) | Topic                                            |
+| ------------------------------------------------------- | -------------------------- | ------------------------------------------------ |
+| AP001 Direct DynamoDB Write                             | AP012                      | Bypassing CommandService / DataService           |
+| AP002 Ignored Version Mismatch                          | AP005                      | ConditionalCheckFailedException handling         |
+| AP003 N+1 Query Pattern                                 | — (detector only)          | Query in a loop                                  |
+| AP004 Full Table Scan                                   | — (detector only)          | `.scan()` usage                                  |
+| AP005 Hardcoded Tenant                                  | AP002                      | Multi-tenant code/key handling                   |
+| AP006 Missing Tenant Validation                         | AP002                      | Trusting client-provided `tenantCode`            |
+| AP007 Throwing in Sync Handler                          | — (detector only)          | DataSyncHandler error escape                     |
+| AP008 Hardcoded Secret                                  | — (detector only)          | Secrets in code                                  |
+| AP009 Manual JWT Parsing                                | — (detector only)          | Bypassing Cognito authorizer                     |
+| AP010 Heavy Module Import                               | — (detector only)          | Cold-start optimization                          |
+| AP011 Deprecated Method Usage                           | AP010                      | `publish()` / `publishPartialUpdate()` removal   |
+| AP012 Uppercase COMMON Tenant Key                       | — (detector only)          | v1.1.0 tenant key migration                      |
+| AP013 publishSync Null Return Unchecked                 | AP001 (related)            | `publishSync` v1.2.0+ return                     |
+| AP014 Deprecated genNewSequence                         | AP010 (related)            | v1.2.0 sequence API change                       |
+| AP015 Duplicate TaskModule Registration                 | — (detector only)          | v1.2.4 global TaskModule                         |
+| AP016 Missing Error Logging Before Rethrow              | AP016                      | ✅ same code                                     |
+| AP017 Incorrect Attribute Merging                       | AP017                      | ✅ same code                                     |
+| AP018 Missing Swagger Documentation                     | AP018                      | ✅ same code                                     |
+| AP019 Missing Pagination in List Queries                | AP019                      | ✅ same code                                     |
+| AP020 Missing getCommandSource for Tracing              | AP011                      | Tracing/audit                                    |
+| AP021 Event Emit After publishAsync                     | AP021                      | ✅ same code                                     |
+| AP022 Use of eval() or Function() Constructor           | — (detector only)          | RCE/XSS sink (CWE-95)                            |
+| AP023 Shell Command Built from String Concatenation     | — (detector only)          | Command injection (CWE-78)                       |
+| AP024 HTTP Request Without Timeout                      | — (detector only)          | Local DoS via stalled upstream (CWE-400)         |
+| AP025 Logging process.env or full request object        | — (detector only)          | Sensitive data exposure (CWE-312, CWE-532)       |
+| AP026 @Injectable instead of @NotificationTransport     | — (detector only)          | INotificationTransport implementor never invoked |
+| AP027 GroupRoleResolver also annotated with @Injectable | AP022                      | Incorrect group-based role resolver (v1.3.1+)    |
+| AP028 Duplicate DataSyncHandler Registration            | AP023                      | ✅ same code                                     |
+| AP029 Reserved DataSyncHandler Type                     | AP024                      | ✅ same code                                     |
+| AP030 Fully-Qualified Table Name in @DataSyncHandler    | AP025                      | ✅ same code                                     |
+
+When you receive `mbc_check_anti_patterns` output, look up the detector code in this table to find the corresponding skill-doc section for full context and recommended fixes. Future versions of this framework should consolidate the two systems; until then, treat them as separate identifier spaces.
+
 ## Anti-Patterns to Detect
 
 ### AP001: Using publishSync Instead of publishAsync
@@ -28,12 +74,13 @@ This skill reviews code for MBC CQRS Serverless best practices and identifies an
 **Severity:** Warning
 
 **Pattern:**
+
 ```typescript
 // Bad
-await this.commandService.publishSync(command, options);
+await this.commandService.publishSync(command, options)
 
 // Good
-await this.commandService.publishAsync(command, options);
+await this.commandService.publishAsync(command, options)
 ```
 
 **Explanation:** `publishAsync` is the recommended default. Only use `publishSync` when immediate consistency is absolutely required, as it blocks until processing completes.
@@ -45,13 +92,14 @@ await this.commandService.publishAsync(command, options);
 **Severity:** Error
 
 **Pattern:**
+
 ```typescript
 // Bad
-const pk = `ORDER#${code}`;
+const pk = `ORDER#${code}`
 
 // Good
-const { tenantCode } = getUserContext(invokeContext);
-const pk = `ORDER#${tenantCode}`;
+const { tenantCode } = getUserContext(invokeContext)
+const pk = `ORDER#${tenantCode}`
 ```
 
 **Explanation:** All operations must include `tenantCode` for proper tenant isolation.
@@ -63,6 +111,7 @@ const pk = `ORDER#${tenantCode}`;
 **Severity:** Error
 
 **Pattern:**
+
 ```typescript
 // Bad
 version: 1,
@@ -82,6 +131,7 @@ version: existingItem.version,  // For updates
 **Severity:** Error
 
 **Pattern:**
+
 ```typescript
 // Bad
 CommandModule.register({
@@ -105,19 +155,20 @@ CommandModule.register({
 **Severity:** Warning
 
 **Pattern:**
+
 ```typescript
 // Bad
-await this.commandService.publishAsync(command, options);
+await this.commandService.publishAsync(command, options)
 
 // Good
 try {
-  await this.commandService.publishAsync(command, options);
+  await this.commandService.publishAsync(command, options)
 } catch (error) {
   if (error.name === 'ConditionalCheckFailedException') {
     // Handle version conflict - retry or inform user
-    throw new ConflictException('Data was modified by another user');
+    throw new ConflictException('Data was modified by another user')
   }
-  throw error;
+  throw error
 }
 ```
 
@@ -130,14 +181,15 @@ try {
 **Severity:** Error
 
 **Pattern:**
+
 ```typescript
 // Bad - inconsistent format
-const pk = `order-${tenantCode}`;
-const sk = `order_${code}`;
+const pk = `order-${tenantCode}`
+const sk = `order_${code}`
 
 // Good - consistent ENTITY#value format
-const pk = `ORDER#${tenantCode}`;
-const sk = `ORDER#${code}`;
+const pk = `ORDER#${tenantCode}`
+const sk = `ORDER#${code}`
 ```
 
 **Explanation:** Follow the `ENTITY#value` convention for partition and sort keys.
@@ -149,6 +201,7 @@ const sk = `ORDER#${code}`;
 **Severity:** Error
 
 **Pattern:**
+
 ```typescript
 // Bad
 async create(dto: CreateOrderDto) {
@@ -170,6 +223,7 @@ async create(dto: CreateOrderDto, invokeContext: IInvoke) {
 **Severity:** Warning
 
 **Pattern:**
+
 ```typescript
 // Bad
 id: uuid(),
@@ -188,22 +242,23 @@ id: generateId(pk, sk),
 **Severity:** Warning
 
 **Pattern:**
+
 ```typescript
 // Bad
 export class CreateOrderDto {
-  code: string;
-  name: string;
+  code: string
+  name: string
 }
 
 // Good
 export class CreateOrderDto {
   @IsString()
   @IsNotEmpty()
-  code: string;
+  code: string
 
   @IsString()
   @IsNotEmpty()
-  name: string;
+  name: string
 }
 ```
 
@@ -216,14 +271,15 @@ export class CreateOrderDto {
 **Severity:** Warning
 
 **Pattern:**
+
 ```typescript
 // Bad - deprecated
-await this.commandService.publish(command, options);
-await this.commandService.publishPartialUpdate(command, options);
+await this.commandService.publish(command, options)
+await this.commandService.publishPartialUpdate(command, options)
 
 // Good - use Async variants
-await this.commandService.publishAsync(command, options);
-await this.commandService.publishPartialUpdateAsync(command, options);
+await this.commandService.publishAsync(command, options)
+await this.commandService.publishPartialUpdateAsync(command, options)
 ```
 
 **Explanation:** The non-Async methods are deprecated. Use `publishAsync` and `publishPartialUpdateAsync`.
@@ -235,23 +291,24 @@ await this.commandService.publishPartialUpdateAsync(command, options);
 **Severity:** Warning
 
 **Pattern:**
+
 ```typescript
 // Bad - no source tracking
 await this.commandService.publishAsync(command, {
   invokeContext,
-});
+})
 
 // Good - with source tracking
 const commandSource = getCommandSource(
   basename(__dirname),
   this.constructor.name,
   'create',
-);
+)
 
 await this.commandService.publishAsync(command, {
   source: commandSource,
   invokeContext,
-});
+})
 ```
 
 **Explanation:** Always include `source` in publish options for debugging and audit trails.
@@ -263,18 +320,21 @@ await this.commandService.publishAsync(command, {
 **Severity:** Warning
 
 **Pattern:**
+
 ```typescript
 // Bad - direct DynamoDB access
-import { DynamoDBClient, GetItemCommand } from '@aws-sdk/client-dynamodb';
+import { DynamoDBClient, GetItemCommand } from '@aws-sdk/client-dynamodb'
 
-const client = new DynamoDBClient({});
-const result = await client.send(new GetItemCommand({
-  TableName: 'my-table',
-  Key: { pk: { S: 'ORDER#tenant' }, sk: { S: 'ORDER#123' } },
-}));
+const client = new DynamoDBClient({})
+const result = await client.send(
+  new GetItemCommand({
+    TableName: 'my-table',
+    Key: { pk: { S: 'ORDER#tenant' }, sk: { S: 'ORDER#123' } },
+  }),
+)
 
 // Good - use DataService
-const result = await this.dataService.getItem({ pk, sk });
+const result = await this.dataService.getItem({ pk, sk })
 ```
 
 **Explanation:** Use `DataService` for read operations. It provides caching, consistent interfaces, and proper error handling.
@@ -286,6 +346,7 @@ const result = await this.dataService.getItem({ pk, sk });
 **Severity:** Error
 
 **Pattern:**
+
 ```typescript
 // Bad - missing type
 @DataSyncHandler({})
@@ -309,6 +370,7 @@ export class OrderDataSyncRdsHandler implements IDataSyncHandler {
 **Severity:** Info
 
 **Pattern:**
+
 ```typescript
 // Bad - inline key definition
 async findOne(pk: string, sk: string) {
@@ -332,6 +394,7 @@ async findOne(key: DetailKey) {
 **Severity:** Warning
 
 **Pattern:**
+
 ```typescript
 // Bad - hardcoded table name
 CommandModule.register({
@@ -355,6 +418,7 @@ CommandModule.register({
 **Severity:** Warning
 
 **Pattern:**
+
 ```typescript
 // Bad - silently catching errors
 try {
@@ -386,22 +450,29 @@ try {
 **Severity:** Error
 
 **Pattern:**
+
 ```typescript
 // Bad - overwrites all attributes
-await this.commandService.publishPartialUpdateAsync({
-  pk: key.pk,
-  sk: key.sk,
-  version: existingItem.version,
-  attributes: dto.attributes, // Overwrites existing attributes!
-}, options);
+await this.commandService.publishPartialUpdateAsync(
+  {
+    pk: key.pk,
+    sk: key.sk,
+    version: existingItem.version,
+    attributes: dto.attributes, // Overwrites existing attributes!
+  },
+  options,
+)
 
 // Good - merge attributes properly
-await this.commandService.publishPartialUpdateAsync({
-  pk: key.pk,
-  sk: key.sk,
-  version: existingItem.version,
-  attributes: { ...existingItem.attributes, ...dto.attributes },
-}, options);
+await this.commandService.publishPartialUpdateAsync(
+  {
+    pk: key.pk,
+    sk: key.sk,
+    version: existingItem.version,
+    attributes: { ...existingItem.attributes, ...dto.attributes },
+  },
+  options,
+)
 ```
 
 **Explanation:** When updating, merge new attributes with existing ones to avoid data loss.
@@ -413,6 +484,7 @@ await this.commandService.publishPartialUpdateAsync({
 **Severity:** Info
 
 **Pattern:**
+
 ```typescript
 // Bad - no documentation
 @Controller('orders')
@@ -442,6 +514,7 @@ export class OrderController {
 **Severity:** Warning
 
 **Pattern:**
+
 ```typescript
 // Bad - no pagination support
 async search(dto: SearchOrderDto, invokeContext: IInvoke) {
@@ -471,6 +544,7 @@ async search(dto: SearchOrderDto, invokeContext: IInvoke) {
 **Severity:** Error
 
 **Pattern:**
+
 ```typescript
 // Bad - circular dependency
 // order.module.ts
@@ -503,16 +577,256 @@ export class OrderModule {}
 
 ---
 
+### AP021: Emitting Events Directly in XxxCommandService After publishAsync
+
+**Severity:** Error
+
+**Pattern:**
+
+```typescript
+// Bad - emit immediately after publishAsync (data table not yet written)
+async createOrder(params: CreateOrderParams, context: UserContext): Promise<string> {
+  await this.commandService.publishAsync({ pk, sk, ... }, { invokeContext });
+
+  // WRONG: at this point, DataService.getItem() returns null
+  // because the data table is populated asynchronously via DynamoDB Streams
+  this.eventEmitter.emit('order.created', { orderId, tenantCode, ... });
+  return orderId;
+}
+
+// Bad - @OnEvent handler tries to read from DataService but finds nothing
+@OnEvent('order.created')
+async handleOrderCreated(event: OrderCreatedEvent) {
+  const order = await this.dataService.getItem({ pk, sk }); // Returns null!
+}
+
+// Good - emit inside IDataSyncHandler.up() AFTER data table write
+@Injectable()
+export class OrderDataSyncHandler implements IDataSyncHandler {
+  constructor(private readonly eventEmitter: EventEmitter2) {}
+
+  async up(cmd: CommandModel): Promise<void> {
+    if (!cmd.pk.startsWith('ORDER#')) return;
+    if (cmd.isDeleted) return;
+
+    if (cmd.version === VERSION_FIRST + 1) {
+      // Data table is already written at this point — DataService.getItem() works
+      this.eventEmitter.emit('order.created', {
+        orderId: cmd.id,
+        tenantCode: cmd.tenantCode,
+        // ... other fields from cmd.attributes
+      });
+    }
+  }
+
+  async down(cmd: CommandModel): Promise<void> {
+    this.eventEmitter.emit('order.deleted', { orderId: cmd.id, tenantCode: cmd.tenantCode });
+  }
+}
+```
+
+**Explanation:** `publishAsync` writes only to the DynamoDB **command** table. The **data** table (read by `DataService.getItem()`) is populated asynchronously via DynamoDB Streams → Step Functions → `IDataSyncHandler.up()`. Emitting events in `XxxCommandService` immediately after `publishAsync` means any `@OnEvent` handler that calls `DataService.getItem()` will find no data, causing "entity not found" errors.
+
+The correct pattern is to implement a custom `IDataSyncHandler` and emit events in `up()` / `down()`. By the time these methods run, the data table write has already completed. Register the handler in `CommandModule.register({ dataSyncHandlers: [...] })`.
+
+If you need to include previous field values for change-detection (e.g., `statusChanged`), embed them as `attributes._prev` in the `publishAsync` call and read them in the handler. Strip `_prev` from RDS sync handlers to prevent internal metadata from leaking into the database.
+
+**Related (v1.2.6+):** If you only need read-your-writes consistency for the **same user within the same request flow** (e.g. POST → immediate GET in the API client), the Repository's RYW session mechanism (when `RYW_SESSION_TTL_MINUTES` is enabled) is sufficient — it merges the pending command-table write into the next read by the originating user, no event handler required.
+
+The `IDataSyncHandler.up()` pattern above is still required when other users, background jobs, or cross-module event subscribers need to react to the change — RYW only covers the writer's own subsequent reads.
+
+---
+
+### AP022: Incorrect Group-Based Role Resolver Implementation (v1.3.1+)
+
+> Detector counterpart: **AP027** (`mbc_check_anti_patterns`). Note this skill-doc `AP022` is unrelated to the detector's `AP022` (eval/Function) — see the cross-reference table above.
+
+**Problem:** Group-based roles (`@GroupRoleResolver`, `custom:groups`) are implemented in ways that break bootstrap or leak across requests.
+
+**❌ Incorrect — adding `@Injectable()` alongside `@GroupRoleResolver()`:**
+
+```typescript
+@GroupRoleResolver()
+@Injectable({ scope: Scope.REQUEST }) // ❌ overrides the singleton scope; breaks bootstrap
+export class AppGroupRoleResolver implements IGroupRoleResolver {
+  /* ... */
+}
+```
+
+**❌ Incorrect — swallowing resolver errors to "fail open":**
+
+```typescript
+async resolveRoles(input) {
+  try {
+    return await this.lookup(input); // ❌ catching and returning roles on error
+  } catch {
+    return ['admin']; // ❌ grants access on backend failure
+  }
+}
+```
+
+**❌ Incorrect — more than one resolver, or stateful instance shared across requests:**
+
+```typescript
+@GroupRoleResolver() class ResolverA ... // ❌ only one @GroupRoleResolver() per app
+@GroupRoleResolver() class ResolverB ... //    (bootstrap throws)
+```
+
+**✅ Correct:**
+
+```typescript
+import {
+  GroupRoleResolver,
+  IGroupRoleResolver,
+  ResolveGroupRolesInput,
+} from '@mbc-cqrs-serverless/core'
+
+// No @Injectable() — @GroupRoleResolver() already registers a singleton provider.
+@GroupRoleResolver()
+export class AppGroupRoleResolver implements IGroupRoleResolver {
+  async resolveRoles({
+    tenantCode,
+    groupIds,
+    claims,
+  }: ResolveGroupRolesInput): Promise<string[]> {
+    return this.mapGroupsToRoles(tenantCode, groupIds) // stateless; let failures throw
+  }
+}
+```
+
+**Explanation:** `@GroupRoleResolver()` already applies `@Injectable()` with the default (singleton) scope. Adding another `@Injectable()` — especially with `REQUEST`/`TRANSIENT` scope — overrides it and breaks bootstrap, which resolves a single instance once at startup. Exactly one resolver is allowed per app. The default `RolesGuard` deliberately **rethrows** resolver failures so a backend outage surfaces as a 5xx instead of a silent 403; do not catch-and-grant inside the resolver. Use `tenantRoles` / `tenantGroupIds` from `getUserContext()` for direct/group context; do not rely on the deprecated `RolesGuard.getUserRole()`.
+
+---
+
+### AP023: Duplicate DataSyncHandler Registration Across Modules
+
+> Detector counterpart: **AP028** (`mbc_check_anti_patterns`).
+
+**Severity:** High
+
+**Pattern:**
+
+```typescript
+// Bad — same handler class listed as a provider in multiple modules
+
+// tenant.module.ts  ← correct owner
+@Module({
+  providers: [TenantConfigRdsHandler],
+})
+export class TenantModule {}
+
+// agent.module.ts  ← WRONG: registered here too
+@Module({
+  providers: [TenantConfigRdsHandler],
+})
+export class AgentModule {}
+
+// Good — register the handler in exactly one module
+// tenant.module.ts
+@Module({
+  providers: [TenantConfigRdsHandler],
+})
+export class TenantModule {}
+// AgentModule must NOT list TenantConfigRdsHandler in its providers.
+```
+
+**Explanation:** `ExplorerService.exploreDataSyncHandlers()` scans the entire NestJS `ModulesContainer` and collects every provider whose class carries the `@DataSyncHandler(tableName)` decorator — **without deduplication by class reference**. If the same handler class appears as a provider in N modules, it is collected N times. `CommandService.onModuleInit()` then resolves each entry via `moduleRef.get(handler, { strict: false })` (which always returns the same singleton instance) and pushes it to the internal handler list N times. When a command event arrives, `handler.up()` is executed N times in parallel inside `Promise.all()` — causing N concurrent DB writes that produce duplicate rows or P2002 unique-constraint errors.
+
+This is a copy-paste mistake driven by the misconception that "each module must register the handler to pick it up." In reality, `ExplorerService` scans globally, so a single registration in any one module is sufficient.
+
+**Common symptoms:**
+
+- RDS records created in duplicate after a single command
+- P2002 / unique constraint violations in Step Functions logs
+- Alert/notification handlers firing multiple times per event
+
+**Fix:** Register each `@DataSyncHandler` class as a `provider` in exactly **one** NestJS module — the module that logically owns that handler's concern. No other module should list it in its `providers` array or in the `dataSyncHandlers` option of `CommandModule.register()`.
+
+---
+
+### AP024: Reserved DataSyncHandler Type (`'dynamodb'`)
+
+> Detector counterpart: **AP029** (`mbc_check_anti_patterns`).
+
+**Severity:** High
+
+**Pattern:**
+
+```typescript
+// Bad — 'dynamodb' is reserved for the internal DataSyncDdsHandler
+@DataSyncHandler('my-table')
+export class TenantConfigRdsHandler implements IDataSyncHandler {
+  readonly type = 'dynamodb'  // ← silently excluded from publishSync pipeline
+  async up(cmd: CommandModel) { ... }
+  async down(cmd: CommandModel) { ... }
+}
+
+// Good — use any other string, or omit the type property entirely
+@DataSyncHandler('my-table')
+export class TenantConfigRdsHandler implements IDataSyncHandler {
+  readonly type = 'rds'  // ← included in publishSync pipeline
+  async up(cmd: CommandModel) { ... }
+  async down(cmd: CommandModel) { ... }
+}
+```
+
+**Explanation:** `CommandService.publishSync()` filters out handlers whose `type` is `'dynamodb'` before executing the sync pipeline (`this.dataSyncHandlers?.filter(h => h.type !== 'dynamodb')`). The string `'dynamodb'` is the type used exclusively by the internal `DataSyncDdsHandler` (the handler that writes the Data table). If a custom handler accidentally sets `readonly type = 'dynamodb'`, it is silently excluded — `handler.up()` is never called, data is never written, and no error or warning is produced.
+
+**Common symptoms:**
+
+- Custom RDS / OpenSearch sync appears to work (no errors) but data is never written
+- Integration tests pass (mock handlers are not filtered) but production sync is missing
+- The symptom first appears in `publishSync` paths; async Step Functions path is unaffected (the async path calls all handlers by name, not by `type`)
+
+**Fix:** Remove `readonly type = 'dynamodb'` from custom handlers and use a different value (e.g., `'rds'`, `'opensearch'`, `'custom'`). If no `type` is needed, omit the property — a missing `type` evaluates to `undefined`, which satisfies `!== 'dynamodb'` and is included in the pipeline.
+
+---
+
+### AP025: Fully-Qualified Table Name in `@DataSyncHandler`
+
+> Detector counterpart: **AP030** (`mbc_check_anti_patterns`).
+
+**Severity:** High
+
+**Pattern:**
+
+```typescript
+// Bad — fully-qualified DynamoDB table name (with env prefix + -command suffix)
+@DataSyncHandler('dev-my-table-command')  // ← wrong: this is the DynamoDB table name
+export class MyRdsHandler implements IDataSyncHandler { ... }
+
+// Good — raw table name as passed to CommandModule.register()
+@DataSyncHandler('my-table')  // ← correct: matches tableName in CommandModule.register
+export class MyRdsHandler implements IDataSyncHandler { ... }
+
+// In the module:
+CommandModule.register({ tableName: 'my-table', dataSyncHandlers: [] })
+```
+
+**Explanation:** `@DataSyncHandler(commandTableName)` stores `commandTableName` as Reflect metadata on the class. `ExplorerService` matches handlers to `CommandService` instances by comparing this metadata value to the `tableName` option passed to `CommandModule.register()`. `tableName` is the raw logical name (e.g., `'my-table'`), not the DynamoDB table name (e.g., `'dev-my-table-command'` which the framework builds internally with environment prefix and `-command` suffix). A mismatch causes `ExplorerService` to find no match and silently skip the handler — no error, no warning, no data sync.
+
+**Common symptoms:**
+
+- Custom DataSyncHandler is correctly defined and registered as a provider, but `handler.up()` is never called
+- Data appears to sync correctly for the DynamoDB (Data table) path but the RDS / secondary sync is missing
+- No errors in CloudWatch; Step Functions shows `SYNC_DATA` state with an empty handler list
+
+**Fix:** Pass the same raw `tableName` string to `@DataSyncHandler` that you pass to `CommandModule.register({ tableName: '...' })`. Do not include environment prefixes (`dev-`, `stg-`, `prod-`) or the `-command` suffix — those are added internally by the framework when constructing the actual DynamoDB table name.
+
+---
+
 ## Review Checklist
 
 When reviewing MBC CQRS Serverless code, check:
 
 ### Module Structure
+
 - [ ] Module properly imports `CommandModule.register()`
 - [ ] DataSyncHandlers are registered
 - [ ] Services and controllers are properly provided
 
 ### Service Layer
+
 - [ ] All methods receive `invokeContext: IInvoke`
 - [ ] `getUserContext()` is used to extract tenant info
 - [ ] `publishAsync` is used (not `publishSync`)
@@ -520,33 +834,54 @@ When reviewing MBC CQRS Serverless code, check:
 - [ ] Existing version is fetched for updates
 - [ ] `generateId()` is used for ID generation
 - [ ] `getCommandSource()` is used for tracing
+- [ ] `eventEmitter.emit()` is NOT called directly after `publishAsync` (use IDataSyncHandler instead)
 
 ### DTOs
+
 - [ ] class-validator decorators are present
 - [ ] Swagger decorators for API documentation
 - [ ] CommandDto extends the base class
 
 ### Controller
+
 - [ ] `@INVOKE_CONTEXT()` decorator is used
 - [ ] Proper HTTP methods (POST for create, PUT for update, etc.)
 - [ ] API tags and documentation
 
 ### Error Handling
+
 - [ ] ConditionalCheckFailedException is handled
 - [ ] Proper HTTP exceptions are thrown
 - [ ] Errors are logged appropriately
 
 ### Data Sync Handler
-- [ ] `@DataSyncHandler({ type: 'ENTITY' })` decorator is present
+
+- [ ] `@DataSyncHandler({ type: 'ENTITY' })` decorator is present (for RDS sync handlers)
 - [ ] Implements `IDataSyncHandler`
 - [ ] Handles both create/update and delete cases
-- [ ] Registered in module
+- [ ] Registered as a provider in **exactly one** module — not duplicated across multiple modules (AP023)
+- [ ] Event-emitting handlers implement `IDataSyncHandler` and emit in `up()` / `down()`
+- [ ] `_prev` metadata is stripped before RDS upsert if used for change-detection
+
+### Notification Transport (when implementing INotificationTransport)
+
+- [ ] Uses `@NotificationTransport('transport-name')` decorator instead of `@Injectable()` (AP026)
+- [ ] Transport name is registered in `NOTIFICATION_TRANSPORTS` env var to be active
+
+### Group Role Resolver (when implementing IGroupRoleResolver, v1.3.1+) (AP022)
+
+- [ ] Uses `@GroupRoleResolver()` only — no extra `@Injectable()` on the same class
+- [ ] Resolver is singleton-scoped (no `REQUEST`/`TRANSIENT` scope)
+- [ ] Exactly one `@GroupRoleResolver()` per application
+- [ ] Resolver is stateless and does NOT catch-and-grant on failure (let errors propagate as 5xx)
+- [ ] Registered in the module `providers`
+- [ ] Uses `tenantRoles` / `tenantGroupIds` from `getUserContext()`, not the deprecated `RolesGuard.getUserRole()`
 
 ## Output Format
 
 When reviewing, provide output in this format:
 
-```
+````
 ## Code Review: [File Name]
 
 ### Issues Found
@@ -557,7 +892,8 @@ When reviewing, provide output in this format:
 - **Current Code:**
   ```typescript
   // problematic code
-  ```
+````
+
 - **Suggested Fix:**
   ```typescript
   // corrected code
@@ -567,12 +903,16 @@ When reviewing, provide output in this format:
 ### Summary
 
 | Severity | Count |
-|----------|-------|
+| -------- | ----- |
 | Error    | X     |
 | Warning  | X     |
 | Info     | X     |
 
 ### Recommendations
+
 1. Priority fixes...
 2. Suggested improvements...
+
+```
+
 ```
