@@ -187,16 +187,22 @@ foreach ($sm in $stateMachines) {
         # failures are detected via $LASTEXITCODE, not try/catch, which does not
         # trigger on non-zero exit of external executables.
         $escapedDefinition = $smDefinition -replace '"', '\"'
-        aws stepfunctions create-state-machine `
+        # The serverless-step-functions-local plugin also auto-registers state
+        # machines on offline:start:init; this block is a fallback for the race
+        # where Step Functions Local starts after that hook runs. A benign
+        # "already exists" is treated as success; only a real failure aborts.
+        $createOut = aws stepfunctions create-state-machine `
             --endpoint-url $sfnEndpoint `
             --region ap-northeast-1 `
             --name $smName `
             --role-arn "arn:aws:iam::101010101010:role/DummyRole" `
-            --definition $escapedDefinition 2>&1 | Out-Host
+            --definition $escapedDefinition 2>&1 | Out-String
         if ($LASTEXITCODE -eq 0) {
             Write-Host "Created $smName"
+        } elseif ($createOut -match "already exists|StateMachineAlreadyExists") {
+            Write-Host "State machine $smName already exists"
         } else {
-            Write-Host "Failed to create $smName"
+            Write-Host "Failed to create ${smName}: $createOut"
             exit 1
         }
     } else {

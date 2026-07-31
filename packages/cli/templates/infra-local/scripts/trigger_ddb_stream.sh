@@ -159,15 +159,21 @@ while IFS=$'\t' read -r sm_name sm_definition; do
 		--output text 2>/dev/null)
 	if [ -z "${existing}" ]; then
 		echo "Creating state machine: ${sm_name}"
-		if aws stepfunctions create-state-machine \
+		# The serverless-step-functions-local plugin also auto-registers state
+		# machines on offline:start:init; this block is a fallback for the race
+		# where Step Functions Local starts after that hook runs. A benign
+		# "already exists" is treated as success; only a real failure aborts.
+		if create_out=$(aws stepfunctions create-state-machine \
 			--endpoint-url ${SFN_ENDPOINT} \
 			--region ap-northeast-1 \
 			--name "${sm_name}" \
 			--role-arn "arn:aws:iam::101010101010:role/DummyRole" \
-			--definition "${sm_definition}" 2>&1; then
+			--definition "${sm_definition}" 2>&1); then
 			echo "Created ${sm_name}"
+		elif echo "${create_out}" | grep -qi "already exists\|StateMachineAlreadyExists"; then
+			echo "State machine ${sm_name} already exists"
 		else
-			echo "Failed to create ${sm_name}"
+			echo "Failed to create ${sm_name}: ${create_out}"
 			exit 1
 		fi
 	else
