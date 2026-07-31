@@ -50,14 +50,13 @@ const sfnArn = 'arn:aws:states:ap-northeast-1:101010101010:stateMachine:command'
 describe('DataSyncNewCommandEventHandler', () => {
   let handler: DataSyncNewCommandEventHandler
   let stepFunctionService: StepFunctionService
-  let sfnEndpoint: string | undefined
   const sfnMock = mockClient(SFNClient)
 
   beforeEach(async () => {
-    // Default to a production-like environment (no local Step Functions
-    // endpoint) so the StateMachineDoesNotExist swallow is NOT applied unless a
-    // test explicitly opts into local by setting SFN_ENDPOINT.
-    sfnEndpoint = undefined
+    // Default to a production-like environment (not running under
+    // serverless-offline) so the StateMachineDoesNotExist swallow is NOT
+    // applied unless a test explicitly opts into local by setting IS_OFFLINE.
+    delete process.env.IS_OFFLINE
     const moduleRef = await Test.createTestingModule({
       providers: [
         DataSyncNewCommandEventHandler,
@@ -65,8 +64,7 @@ describe('DataSyncNewCommandEventHandler', () => {
         {
           provide: ConfigService,
           useValue: {
-            get: (key: string) =>
-              key === 'SFN_ENDPOINT' ? sfnEndpoint : sfnArn,
+            get: () => sfnArn,
           },
         },
         {
@@ -89,6 +87,7 @@ describe('DataSyncNewCommandEventHandler', () => {
   })
 
   afterEach(() => {
+    delete process.env.IS_OFFLINE
     jest.clearAllMocks()
     sfnMock.reset()
   })
@@ -117,7 +116,7 @@ describe('DataSyncNewCommandEventHandler', () => {
 
   it('should warn and return undefined when state machine does not exist in local environment', async () => {
     // Arrange
-    sfnEndpoint = 'http://localhost:8083'
+    process.env.IS_OFFLINE = 'true'
     const error = new Error('State Machine Does Not Exist')
     error.name = 'StateMachineDoesNotExist'
     sfnMock.on(StartExecutionCommand).rejects(error)
@@ -135,8 +134,8 @@ describe('DataSyncNewCommandEventHandler', () => {
   })
 
   it('should rethrow StateMachineDoesNotExist in a non-local environment (no silent skip in production)', async () => {
-    // Arrange: no SFN_ENDPOINT => production (real AWS Step Functions)
-    sfnEndpoint = undefined
+    // Arrange: not running under serverless-offline => production
+    delete process.env.IS_OFFLINE
     const error = new Error('State Machine Does Not Exist')
     error.name = 'StateMachineDoesNotExist'
     sfnMock.on(StartExecutionCommand).rejects(error)
