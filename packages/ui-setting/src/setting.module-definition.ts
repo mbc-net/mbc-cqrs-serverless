@@ -5,6 +5,11 @@ import { ConfigurableModuleBuilder, ModuleMetadata, Type } from '@nestjs/common'
  * ui-setting stores its data on the master table by default, so `tableName`
  * defaults to 'master'. When combined with MasterModule, both modules MUST use
  * the same `tableName` value.
+ *
+ * NOTE: this value must stay in sync with `TABLE_NAME` in
+ * `@mbc-cqrs-serverless/master` (packages/master/src/constants/index.ts). It is
+ * duplicated here to avoid a package dependency; if the master default table
+ * name ever changes, update this constant too.
  */
 export const DEFAULT_UI_SETTING_TABLE_NAME = 'master'
 

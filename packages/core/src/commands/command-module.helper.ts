@@ -40,8 +40,14 @@ export function buildDomainCommandModule(
   defaultTableName: string,
   options: DomainCommandModuleOptions,
 ): DynamicModule {
+  const tableName = options.tableName ?? defaultTableName
+  if (!tableName) {
+    throw new Error(
+      `tableName must be a non-empty string (received '${tableName}').`,
+    )
+  }
   return CommandModule.register({
-    tableName: options.tableName ?? defaultTableName,
+    tableName,
     dataSyncHandlers: options.dataSyncHandlers,
     registerHandlerProviders: false,
     registerEventHandlerAlias: options.registerEventHandlerAlias ?? true,

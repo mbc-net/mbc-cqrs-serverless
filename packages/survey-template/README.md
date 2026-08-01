@@ -58,6 +58,13 @@ SurveyTemplateModule.registerAsync({
 > **Provisioning:** Add **only the raw base name** (e.g. `"questionnaire"`) to
 > `prisma/dynamodbs/cqrs.json`; the CLI creates the `-command` / `-data` /
 > `-history` physical tables, and your IaC must define the same three.
+>
+> **Unique table name:** give `SurveyTemplateModule` its own `tableName`. Sharing
+> one physical table across modules is only wired for `MasterModule` + ui-setting's
+> `SettingModule`. Because survey registers default data-sync handlers, sharing its
+> table with another module registers a duplicate
+> `<tableName>_CommandEventHandler` alias (the app warns and handler ownership
+> becomes import-order dependent).
 
 ## Documentation
 

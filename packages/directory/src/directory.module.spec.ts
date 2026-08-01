@@ -50,6 +50,15 @@ describe('DirectoryStorageModule', () => {
         /prismaService/,
       )
     })
+
+    it('throws fast on an empty tableName', () => {
+      expect(() =>
+        DirectoryStorageModule.register({
+          prismaService: MockPrismaService,
+          tableName: '',
+        }),
+      ).toThrow(/non-empty/)
+    })
   })
 
   describe('registerAsync', () => {

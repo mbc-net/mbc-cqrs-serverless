@@ -70,6 +70,13 @@ DirectoryStorageModule.registerAsync({
 > into `<name>-command`, `<name>-data`, and `<name>-history` — do **not** add
 > those suffixes yourself. Mirror the same three physical tables in your IaC.
 > Migrating existing data to a renamed table is the application's responsibility.
+>
+> **Unique table name:** give each domain module its own `tableName`. Sharing one
+> physical table across modules is only wired for `MasterModule` + ui-setting's
+> `SettingModule` (via `registerEventHandlerAlias`). Pointing another module at a
+> table already owned by a different module registers a second
+> `<tableName>_CommandEventHandler` alias — the app logs a warning and which
+> module's data-sync handlers run becomes import-order dependent.
 
 ## Documentation
 
