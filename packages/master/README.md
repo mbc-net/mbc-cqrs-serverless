@@ -322,7 +322,10 @@ MasterModule.registerAsync({
 >
 > **Shared table:** If you also use `@mbc-cqrs-serverless/ui-setting`
 > (`SettingModule`), both modules must use the **same** `tableName`, because they
-> share the same physical table.
+> share the same physical table. `MasterModule` should own the data-sync
+> pipeline — register `SettingModule` with `registerEventHandlerAlias: false`.
+> If both modules own the `<tableName>_CommandEventHandler` alias, the framework
+> fails fast at startup.
 
 ## License
 

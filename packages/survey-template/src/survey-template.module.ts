@@ -44,6 +44,11 @@ export class SurveyTemplateModule extends ConfigurableModuleClass {
       buildPrismaProviderSync(options.prismaService, PRISMA_SERVICE),
     )
 
+    // Data-sync handlers are registered here (not inside CommandModule) so they
+    // can resolve PRISMA_SERVICE from this module's scope.
+    const handlers = options.dataSyncHandlers ?? DEFAULT_HANDLERS
+    providers.push(...handlers)
+
     if (options.enableController) {
       controllers.push(SurveyTemplateController, SurveyAnswerController)
     }
@@ -51,7 +56,7 @@ export class SurveyTemplateModule extends ConfigurableModuleClass {
     imports.push(
       buildDomainCommandModule(DEFAULT_SURVEY_TABLE_NAME, {
         tableName: options.tableName,
-        dataSyncHandlers: options.dataSyncHandlers ?? DEFAULT_HANDLERS,
+        dataSyncHandlers: handlers,
       }),
     )
 
@@ -83,6 +88,9 @@ export class SurveyTemplateModule extends ConfigurableModuleClass {
       buildPrismaProviderAsync(MODULE_OPTIONS_TOKEN, PRISMA_SERVICE),
     )
 
+    const handlers = options.dataSyncHandlers ?? DEFAULT_HANDLERS
+    providers.push(...handlers)
+
     if (options.enableController) {
       controllers.push(SurveyTemplateController, SurveyAnswerController)
     }
@@ -90,7 +98,7 @@ export class SurveyTemplateModule extends ConfigurableModuleClass {
     imports.push(
       buildDomainCommandModule(DEFAULT_SURVEY_TABLE_NAME, {
         tableName: options.tableName,
-        dataSyncHandlers: options.dataSyncHandlers ?? DEFAULT_HANDLERS,
+        dataSyncHandlers: handlers,
       }),
     )
 

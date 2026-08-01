@@ -3,17 +3,17 @@ import { Global, Module } from '@nestjs/common'
 import { ConfigModule } from '@nestjs/config'
 import { Test } from '@nestjs/testing'
 
-import { PRISMA_SERVICE } from './survey-template.module-definition'
 import { SurveyTemplateModule } from './survey-template.module'
 import { SurveyTemplateService } from './survey-template.service'
 
 class MockPrismaService {}
 
 /**
- * Provides globally-scoped dependencies a real app supplies. PRISMA_SERVICE is
- * exposed globally because the default data-sync handlers are registered inside
- * the (child) CommandModule and inject the token across the module boundary —
- * this mirrors how a real app provides PrismaService globally.
+ * Provides only globally-scoped app dependencies (ConfigService,
+ * StepFunctionService) and the concrete PrismaService class. PRISMA_SERVICE is
+ * intentionally NOT provided globally: the default data-sync handlers now resolve
+ * it from SurveyTemplateModule's own scope, proving the module boots without the
+ * app having to expose the token globally.
  */
 @Global()
 @Module({
@@ -24,12 +24,8 @@ class MockPrismaService {}
       load: [() => ({ NODE_ENV: 'local', APP_NAME: 'app' })],
     }),
   ],
-  providers: [
-    StepFunctionService,
-    MockPrismaService,
-    { provide: PRISMA_SERVICE, useClass: MockPrismaService },
-  ],
-  exports: [StepFunctionService, MockPrismaService, PRISMA_SERVICE],
+  providers: [StepFunctionService, MockPrismaService],
+  exports: [StepFunctionService, MockPrismaService],
 })
 class SupportModule {}
 

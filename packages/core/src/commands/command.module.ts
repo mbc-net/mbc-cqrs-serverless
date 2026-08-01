@@ -38,15 +38,27 @@ export class CommandModule extends ConfigurableModuleClass {
   static register(options: typeof OPTIONS_TYPE): DynamicModule {
     const module = super.register(options)
 
-    const { tableName, dataSyncHandlers = [] } = options
-    module.providers.push(
-      {
+    const {
+      tableName,
+      dataSyncHandlers = [],
+      registerHandlerProviders = true,
+      registerEventHandlerAlias = true,
+    } = options
+
+    if (registerEventHandlerAlias) {
+      module.providers.push({
         // data-sync-handler uses dynamic command event handler to handle step function events of command execution
         provide: tableName + '_CommandEventHandler',
         useExisting: CommandEventHandler,
-      },
-      ...dataSyncHandlers,
-    )
+      })
+    }
+
+    // When false, the handlers are provided by the importing (domain) module so
+    // they can resolve domain-scoped tokens; CommandService still resolves them
+    // globally via ModuleRef.get(HandlerClass, { strict: false }).
+    if (registerHandlerProviders) {
+      module.providers.push(...dataSyncHandlers)
+    }
 
     return {
       ...module,

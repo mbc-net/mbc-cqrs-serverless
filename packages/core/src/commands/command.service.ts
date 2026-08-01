@@ -79,6 +79,23 @@ export class CommandService implements OnModuleInit, ICommandService {
   }
 
   onModuleInit() {
+    // Fail fast when two CommandModule instances own the same table's
+    // `<tableName>_CommandEventHandler` alias. The Step Functions data-sync
+    // pipeline resolves the alias non-strictly, so a duplicate would silently
+    // shadow one module's data-sync handlers depending on import order.
+    const aliasCount = this.explorerService.countCommandEventHandlerAliases?.(
+      this.options.tableName,
+    )
+    if (typeof aliasCount === 'number' && aliasCount > 1) {
+      throw new Error(
+        `[${this.options.tableName}] ${aliasCount} CommandModule registrations own the ` +
+          `'${this.options.tableName}_CommandEventHandler' alias. A DynamoDB table must be ` +
+          `owned by exactly one CommandModule data-sync pipeline. When MasterModule and ` +
+          `ui-setting's SettingModule share this table, set 'registerEventHandlerAlias: false' ` +
+          `on SettingModule so MasterModule owns the alias.`,
+      )
+    }
+
     if (!this.options.disableDefaultHandler) {
       this[DATA_SYNC_HANDLER] = [this.dataSyncDdsHandler]
     }

@@ -327,11 +327,24 @@ SettingModule.register({
 })
 
 SettingModule.registerAsync({ tableName: 'master', inject: [] })
+
+// When combined with MasterModule on the same table, let MasterModule own the
+// data-sync pipeline and defer the alias:
+SettingModule.register({
+  enableSettingController: true,
+  registerEventHandlerAlias: false,
+})
 ```
 
 > **Shared table:** `SettingModule` and `MasterModule` share the same physical
-> table. When you use both, they **must** be registered with the **same**
-> `tableName` value, otherwise their data is silently split across two tables.
+> table. When you use both:
+> 1. Register them with the **same** `tableName`, otherwise their data is split
+>    across two tables.
+> 2. Set `registerEventHandlerAlias: false` on `SettingModule` so `MasterModule`
+>    owns the `<tableName>_CommandEventHandler` alias. If both modules own the
+>    alias, the framework **fails fast at startup** with a clear error (rather
+>    than silently dropping `MasterModule`'s data-sync handlers depending on
+>    module import order).
 >
 > **Provisioning:** A custom `tableName` must exist as physical tables
 > (`-command` / `-data` / `-history`). Add the raw base name to

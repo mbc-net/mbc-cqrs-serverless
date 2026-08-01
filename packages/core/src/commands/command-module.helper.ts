@@ -14,6 +14,12 @@ export interface DomainCommandModuleOptions {
   /** Raw DynamoDB base table name (physical name = `${NODE_ENV}-${APP_NAME}-${tableName}`). */
   tableName?: string
   dataSyncHandlers?: Type<IDataSyncHandler>[]
+  /**
+   * Whether this module owns the `<tableName>_CommandEventHandler` alias.
+   * Defaults to `true`. Set to `false` when sharing a table already owned by
+   * another module (avoids a duplicate-alias collision).
+   */
+  registerEventHandlerAlias?: boolean
 }
 
 /**
@@ -24,6 +30,12 @@ export interface DomainCommandModuleOptions {
  * `<tableName>_CommandEventHandler` alias is always generated from a
  * build-time-known table name (dynamic provider tokens cannot be produced from
  * an async factory result).
+ *
+ * The `dataSyncHandlers` are NOT registered as CommandModule providers here
+ * (`registerHandlerProviders: false`) — the domain module registers them as its
+ * own providers so they can resolve domain-scoped tokens (e.g. PRISMA_SERVICE).
+ * CommandService still resolves them globally via
+ * `ModuleRef.get(HandlerClass, { strict: false })`.
  */
 export function buildDomainCommandModule(
   defaultTableName: string,
@@ -32,6 +44,8 @@ export function buildDomainCommandModule(
   return CommandModule.register({
     tableName: options.tableName ?? defaultTableName,
     dataSyncHandlers: options.dataSyncHandlers,
+    registerHandlerProviders: false,
+    registerEventHandlerAlias: options.registerEventHandlerAlias ?? true,
   })
 }
 

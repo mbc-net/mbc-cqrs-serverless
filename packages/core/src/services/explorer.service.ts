@@ -62,6 +62,23 @@ export class ExplorerService {
     )
   }
 
+  /**
+   * Count how many modules register the `<tableName>_CommandEventHandler` alias
+   * provider. More than one indicates two CommandModule instances competing for
+   * the same physical table's data-sync pipeline (the alias is resolved
+   * non-strictly, so only one — import-order dependent — would win).
+   */
+  countCommandEventHandlerAliases(tableName: string): number {
+    const token = `${tableName}_CommandEventHandler`
+    let count = 0
+    for (const module of this.modulesContainer.values()) {
+      if (module.providers.has(token)) {
+        count++
+      }
+    }
+    return count
+  }
+
   flatMap<T>(
     modules: Module[],
     callback: (instance: InstanceWrapper) => Type<any> | undefined,

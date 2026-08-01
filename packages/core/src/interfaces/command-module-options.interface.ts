@@ -31,4 +31,23 @@ export interface CommandModuleOptions {
   dataSyncHandlers?: Type<IDataSyncHandler>[]
   /** If true, disables the default data sync handler */
   disableDefaultHandler?: boolean
+  /**
+   * Whether `dataSyncHandlers` are registered as providers of CommandModule
+   * itself. Defaults to `true` (backward compatible).
+   *
+   * Set to `false` when the handlers are provided by the importing (domain)
+   * module instead — e.g. when they inject a token such as `PRISMA_SERVICE`
+   * that only exists in the domain module's scope. CommandService still resolves
+   * them globally via `ModuleRef.get(HandlerClass, { strict: false })`.
+   */
+  registerHandlerProviders?: boolean
+  /**
+   * Whether to register the `<tableName>_CommandEventHandler` alias provider
+   * that the Step Functions data-sync pipeline resolves. Defaults to `true`.
+   *
+   * Set to `false` on a module that shares a physical table already owned by
+   * another module (which registers the alias), to avoid a duplicate-alias
+   * collision. Exactly one module per table must register the alias.
+   */
+  registerEventHandlerAlias?: boolean
 }

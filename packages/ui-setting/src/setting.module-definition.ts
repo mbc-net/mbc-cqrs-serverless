@@ -14,6 +14,13 @@ export interface SettingModuleOptions {
   /** DynamoDB base table name. Default: 'master' (shared with MasterModule). */
   tableName?: string
   dataSyncHandlers?: Type<IDataSyncHandler>[]
+  /**
+   * Whether SettingModule owns the `<tableName>_CommandEventHandler` alias.
+   * Defaults to `true`. When combined with MasterModule on the same (default
+   * 'master') table, set this to `false` so MasterModule owns the alias and the
+   * duplicate-alias guard does not trip.
+   */
+  registerEventHandlerAlias?: boolean
 }
 
 export interface SettingModuleAsyncOptions
@@ -22,6 +29,7 @@ export interface SettingModuleAsyncOptions
   enableDataController?: boolean
   tableName?: string
   dataSyncHandlers?: Type<IDataSyncHandler>[]
+  registerEventHandlerAlias?: boolean
   inject?: any[]
   /** ui-setting needs no runtime-resolved options; provided for API symmetry. */
   useFactory?: (...args: any[]) => Promise<unknown> | unknown

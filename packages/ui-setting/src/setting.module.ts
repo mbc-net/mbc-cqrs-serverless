@@ -27,6 +27,10 @@ export class SettingModule extends ConfigurableModuleClass {
     const controllers = [...(base.controllers ?? [])]
     const imports = [...(base.imports ?? [])]
 
+    const providers = [...(base.providers ?? [])]
+    const handlers = options.dataSyncHandlers ?? []
+    providers.push(...handlers)
+
     if (options.enableDataController) {
       controllers.push(DataSettingController)
     }
@@ -37,11 +41,12 @@ export class SettingModule extends ConfigurableModuleClass {
     imports.push(
       buildDomainCommandModule(DEFAULT_UI_SETTING_TABLE_NAME, {
         tableName: options.tableName,
-        dataSyncHandlers: options.dataSyncHandlers,
+        dataSyncHandlers: handlers,
+        registerEventHandlerAlias: options.registerEventHandlerAlias,
       }),
     )
 
-    return { ...base, controllers, imports }
+    return { ...base, providers, controllers, imports }
   }
 
   static registerAsync(options: SettingModuleAsyncOptions): DynamicModule {
@@ -60,6 +65,9 @@ export class SettingModule extends ConfigurableModuleClass {
     })
     const controllers = [...(base.controllers ?? [])]
     const imports = [...(base.imports ?? [])]
+    const providers = [...(base.providers ?? [])]
+    const handlers = options.dataSyncHandlers ?? []
+    providers.push(...handlers)
 
     if (options.enableDataController) {
       controllers.push(DataSettingController)
@@ -71,10 +79,11 @@ export class SettingModule extends ConfigurableModuleClass {
     imports.push(
       buildDomainCommandModule(DEFAULT_UI_SETTING_TABLE_NAME, {
         tableName: options.tableName,
-        dataSyncHandlers: options.dataSyncHandlers,
+        dataSyncHandlers: handlers,
+        registerEventHandlerAlias: options.registerEventHandlerAlias,
       }),
     )
 
-    return { ...base, controllers, imports }
+    return { ...base, providers, controllers, imports }
   }
 }
