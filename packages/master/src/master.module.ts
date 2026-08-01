@@ -1,5 +1,7 @@
 import {
-  CommandModule,
+  buildDomainCommandModule,
+  buildPrismaProviderAsync,
+  buildPrismaProviderSync,
   DataStoreModule,
   QueueModule,
 } from '@mbc-cqrs-serverless/core'
@@ -16,6 +18,8 @@ import { CustomTaskModule } from './custom-task/custom-task.module'
 import { MasterSfnTaskEventHandler } from './handler/master-sfn-task.handler'
 import {
   ConfigurableModuleClass,
+  MasterModuleAsyncOptions,
+  MODULE_OPTIONS_TOKEN,
   OPTIONS_TYPE,
   PRISMA_SERVICE,
 } from './master.module-definition'
@@ -28,49 +32,70 @@ import { MasterDataService, MasterSettingService } from './services'
 })
 export class MasterModule extends ConfigurableModuleClass {
   static register(options: typeof OPTIONS_TYPE): DynamicModule {
-    const module = super.register(options)
+    const base = super.register(options)
+    const providers = [...(base.providers ?? [])]
+    const controllers = [...(base.controllers ?? [])]
+    const imports = [...(base.imports ?? [])]
+
+    // The master services inject PRISMA_SERVICE unconditionally.
+    providers.push(
+      buildPrismaProviderSync(options.prismaService, PRISMA_SERVICE),
+    )
 
     if (options.enableController) {
-      if (!options.prismaService) {
-        throw new Error(
-          'PrismaService must be provided when enableController is true.',
-        )
-      }
-      if (!module.controllers) {
-        module.controllers = []
-      }
-      module.controllers.push(MasterBulkController)
-      module.controllers.push(MasterDataController)
-      module.controllers.push(MasterSettingController)
-
-      if (!module.providers) {
-        module.providers = []
-      }
-
-      module.providers.push({
-        provide: PRISMA_SERVICE,
-        useExisting: options.prismaService,
-      })
-      module.providers.push(MasterSfnTaskEventHandler)
-
-      if (!module.imports) {
-        module.imports = []
-      }
-      module.imports.push(CustomTaskModule)
-      module.imports.push(SequencesModule)
+      controllers.push(
+        MasterBulkController,
+        MasterDataController,
+        MasterSettingController,
+      )
+      providers.push(MasterSfnTaskEventHandler)
+      imports.push(CustomTaskModule, SequencesModule)
     }
-    const imports = [...(module.imports ?? [])]
+
+    imports.push(buildDomainCommandModule(TABLE_NAME, options))
+
+    return { ...base, providers, controllers, imports }
+  }
+
+  static registerAsync(options: MasterModuleAsyncOptions): DynamicModule {
+    const base = super.registerAsync({
+      imports: options.imports,
+      inject: options.inject ?? [],
+      useFactory: async (...args: any[]) => {
+        const resolved = (await options.useFactory?.(...args)) ?? {}
+        return {
+          ...resolved,
+          enableController: options.enableController,
+          dataSyncHandlers: options.dataSyncHandlers,
+          tableName: options.tableName ?? TABLE_NAME,
+        }
+      },
+    })
+    const providers = [...(base.providers ?? [])]
+    const controllers = [...(base.controllers ?? [])]
+    const imports = [...(base.imports ?? [])]
+
+    providers.push(
+      buildPrismaProviderAsync(MODULE_OPTIONS_TOKEN, PRISMA_SERVICE),
+    )
+
+    if (options.enableController) {
+      controllers.push(
+        MasterBulkController,
+        MasterDataController,
+        MasterSettingController,
+      )
+      providers.push(MasterSfnTaskEventHandler)
+      imports.push(CustomTaskModule, SequencesModule)
+    }
 
     imports.push(
-      CommandModule.register({
-        tableName: TABLE_NAME,
-        dataSyncHandlers: options?.dataSyncHandlers,
+      buildDomainCommandModule(TABLE_NAME, {
+        tableName: options.tableName,
+        dataSyncHandlers: options.dataSyncHandlers,
       }),
     )
 
-    return {
-      ...module,
-      imports,
-    }
+    return { ...base, providers, controllers, imports }
   }
 }

@@ -34,6 +34,30 @@ npm install @mbc-cqrs-serverless/survey-template
 - `PUT /api/survey-template/:id` - Update a survey template
 - `DELETE /api/survey-template/:id` - Delete a survey template
 
+## Configurable table name
+
+`SurveyTemplateModule` uses the `survey` DynamoDB table by default. Pass
+`tableName` to override it (backward compatible). Both `register` and
+`registerAsync` accept it:
+
+```ts
+SurveyTemplateModule.register({
+  enableController: true,
+  prismaService: PrismaService,
+  tableName: 'questionnaire', // default: 'survey'
+})
+
+SurveyTemplateModule.registerAsync({
+  tableName: 'questionnaire',
+  inject: [],
+  useFactory: () => ({ prismaService: PrismaService }),
+})
+```
+
+> **Provisioning:** Add **only the raw base name** (e.g. `"questionnaire"`) to
+> `prisma/dynamodbs/cqrs.json`; the CLI creates the `-command` / `-data` /
+> `-history` physical tables, and your IaC must define the same three.
+
 ## Documentation
 
 Visit https://mbc-cqrs-serverless.mbc-net.com/ to view the full documentation.

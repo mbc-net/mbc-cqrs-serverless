@@ -314,6 +314,29 @@ await dataSettingService.create(tenantCode, {
 
 Full documentation available at [https://mbc-cqrs-serverless.mbc-net.com/](https://mbc-cqrs-serverless.mbc-net.com/)
 
+## Configurable table name
+
+`SettingModule` stores its data on the `master` DynamoDB table by default
+(shared with `MasterModule`). Pass `tableName` to override it (backward
+compatible). Both `register` and `registerAsync` accept it:
+
+```ts
+SettingModule.register({
+  enableSettingController: true,
+  tableName: 'master', // default: 'master'
+})
+
+SettingModule.registerAsync({ tableName: 'master', inject: [] })
+```
+
+> **Shared table:** `SettingModule` and `MasterModule` share the same physical
+> table. When you use both, they **must** be registered with the **same**
+> `tableName` value, otherwise their data is silently split across two tables.
+>
+> **Provisioning:** A custom `tableName` must exist as physical tables
+> (`-command` / `-data` / `-history`). Add the raw base name to
+> `prisma/dynamodbs/cqrs.json` and define the tables in your IaC.
+
 ## License
 
 Copyright © 2024-2025, Murakami Business Consulting, Inc. [https://www.mbc-net.com/](https://www.mbc-net.com/)

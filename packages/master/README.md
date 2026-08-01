@@ -294,6 +294,36 @@ Full documentation available at [https://mbc-cqrs-serverless.mbc-net.com/](https
 
 - [Master Service Guide](https://mbc-cqrs-serverless.mbc-net.com/docs/master-service)
 
+## Configurable table name
+
+`MasterModule` uses the `master` DynamoDB table by default. Pass `tableName` to
+override it (backward compatible — omitting it keeps `master`). Both
+`register` and `registerAsync` accept it:
+
+```ts
+MasterModule.register({
+  enableController: true,
+  prismaService: PrismaService,
+  tableName: 'catalog', // default: 'master'
+})
+
+MasterModule.registerAsync({
+  tableName: 'catalog',
+  inject: [],
+  useFactory: () => ({ prismaService: PrismaService }),
+})
+```
+
+> **Provisioning:** Add **only the raw base name** (e.g. `"catalog"`) to
+> `prisma/dynamodbs/cqrs.json`; the CLI creates the `-command` / `-data` /
+> `-history` physical tables, and your IaC must define the same three. Note that
+> `@mbc-cqrs-serverless/master`'s postinstall auto-adds only the default `master`
+> name — a custom name must be added manually.
+>
+> **Shared table:** If you also use `@mbc-cqrs-serverless/ui-setting`
+> (`SettingModule`), both modules must use the **same** `tableName`, because they
+> share the same physical table.
+
 ## License
 
 Copyright © 2024-2025, Murakami Business Consulting, Inc. [https://www.mbc-net.com/](https://www.mbc-net.com/)

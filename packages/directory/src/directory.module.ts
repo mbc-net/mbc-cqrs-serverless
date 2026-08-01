@@ -1,5 +1,7 @@
 import {
-  CommandModule,
+  buildDomainCommandModule,
+  buildPrismaProviderAsync,
+  buildPrismaProviderSync,
   DataStoreModule,
   QueueModule,
 } from '@mbc-cqrs-serverless/core'
@@ -8,6 +10,9 @@ import { DynamicModule, Module } from '@nestjs/common'
 import { DirectoryController } from './directory.controller'
 import {
   ConfigurableModuleClass,
+  DEFAULT_DIRECTORY_TABLE_NAME,
+  DirectoryStorageModuleAsyncOptions,
+  MODULE_OPTIONS_TOKEN,
   OPTIONS_TYPE,
   PRISMA_SERVICE,
 } from './directory.module-definition'
@@ -22,41 +27,70 @@ import { DynamoService } from './dynamodb.service'
 })
 export class DirectoryStorageModule extends ConfigurableModuleClass {
   static register(options: typeof OPTIONS_TYPE): DynamicModule {
-    const module = super.register(options)
+    const base = super.register(options)
+    const providers = [...(base.providers ?? [])]
+    const controllers = [...(base.controllers ?? [])]
+    const imports = [...(base.imports ?? [])]
+
+    // The domain services inject PRISMA_SERVICE unconditionally, so it must be
+    // registered regardless of whether controllers are enabled.
+    providers.push(
+      buildPrismaProviderSync(options.prismaService, PRISMA_SERVICE),
+    )
 
     if (options.enableController) {
-      if (!options.prismaService) {
-        throw new Error(
-          'PrismaService must be provided when enableController is true.',
-        )
-      }
-      if (!module.controllers) {
-        module.controllers = []
-      }
-      module.controllers.push(DirectoryController)
-
-      if (!module.providers) {
-        module.providers = []
-      }
-
-      module.providers.push({
-        provide: PRISMA_SERVICE,
-        useExisting: options.prismaService,
-      })
-
-      if (!module.imports) {
-        module.imports = []
-      }
+      controllers.push(DirectoryController)
     }
-    const imports = [...(module.imports ?? [])]
 
     imports.push(
-      CommandModule.register({
-        tableName: 'directory',
-        dataSyncHandlers: options?.dataSyncHandlers,
+      buildDomainCommandModule(DEFAULT_DIRECTORY_TABLE_NAME, options),
+    )
+
+    return { ...base, providers, controllers, imports }
+  }
+
+  static registerAsync(
+    options: DirectoryStorageModuleAsyncOptions,
+  ): DynamicModule {
+    const base = super.registerAsync({
+      imports: options.imports,
+      inject: options.inject ?? [],
+      // Merge the build-time structural fields into the options token so
+      // DirectoryService can read tableName/pkPrefix/prismaModelName. The async
+      // factory only needs to resolve `prismaService`.
+      useFactory: async (...args: any[]) => {
+        const resolved = (await options.useFactory?.(...args)) ?? {}
+        return {
+          ...resolved,
+          enableController: options.enableController,
+          dataSyncHandlers: options.dataSyncHandlers,
+          tableName: options.tableName ?? DEFAULT_DIRECTORY_TABLE_NAME,
+          pkPrefix: options.pkPrefix,
+          prismaModelName: options.prismaModelName,
+        }
+      },
+    })
+    const providers = [...(base.providers ?? [])]
+    const controllers = [...(base.controllers ?? [])]
+    const imports = [...(base.imports ?? [])]
+
+    providers.push(
+      buildPrismaProviderAsync(MODULE_OPTIONS_TOKEN, PRISMA_SERVICE),
+    )
+
+    if (options.enableController) {
+      controllers.push(DirectoryController)
+    }
+
+    // tableName is a build-time constant, so CommandModule.register() (which
+    // eagerly creates the `<tableName>_CommandEventHandler` alias) is correct.
+    imports.push(
+      buildDomainCommandModule(DEFAULT_DIRECTORY_TABLE_NAME, {
+        tableName: options.tableName,
+        dataSyncHandlers: options.dataSyncHandlers,
       }),
     )
 
-    return { ...module, imports }
+    return { ...base, providers, controllers, imports }
   }
 }

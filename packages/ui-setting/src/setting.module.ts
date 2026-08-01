@@ -1,5 +1,5 @@
 import {
-  CommandModule,
+  buildDomainCommandModule,
   DataStoreModule,
   QueueModule,
 } from '@mbc-cqrs-serverless/core'
@@ -11,39 +11,70 @@ import { DataSettingService } from './services/data-setting.service'
 import { SettingService } from './services/setting.service'
 import {
   ConfigurableModuleClass,
+  DEFAULT_UI_SETTING_TABLE_NAME,
   OPTIONS_TYPE,
+  SettingModuleAsyncOptions,
 } from './setting.module-definition'
+
 @Module({
-  imports: [
-    CommandModule.register({
-      tableName: 'master',
-    }),
-    DataStoreModule,
-    QueueModule,
-  ],
+  imports: [DataStoreModule, QueueModule],
   providers: [SettingService, DataSettingService],
   exports: [SettingService, DataSettingService],
 })
 export class SettingModule extends ConfigurableModuleClass {
   static register(options: typeof OPTIONS_TYPE): DynamicModule {
-    const module = super.register(options)
+    const base = super.register(options)
+    const controllers = [...(base.controllers ?? [])]
+    const imports = [...(base.imports ?? [])]
 
-    const { enableDataController, enableSettingController } = options
-
-    if (enableDataController || enableSettingController) {
-      if (!module.controllers) {
-        module.controllers = []
-      }
-      if (enableDataController) {
-        module.controllers.push(DataSettingController)
-      }
-      if (enableSettingController) {
-        module.controllers.push(SettingController)
-      }
+    if (options.enableDataController) {
+      controllers.push(DataSettingController)
+    }
+    if (options.enableSettingController) {
+      controllers.push(SettingController)
     }
 
-    return {
-      ...module,
+    imports.push(
+      buildDomainCommandModule(DEFAULT_UI_SETTING_TABLE_NAME, {
+        tableName: options.tableName,
+        dataSyncHandlers: options.dataSyncHandlers,
+      }),
+    )
+
+    return { ...base, controllers, imports }
+  }
+
+  static registerAsync(options: SettingModuleAsyncOptions): DynamicModule {
+    const base = super.registerAsync({
+      imports: options.imports,
+      inject: options.inject ?? [],
+      useFactory: async (...args: any[]) => {
+        await options.useFactory?.(...args)
+        return {
+          enableDataController: options.enableDataController,
+          enableSettingController: options.enableSettingController,
+          tableName: options.tableName ?? DEFAULT_UI_SETTING_TABLE_NAME,
+          dataSyncHandlers: options.dataSyncHandlers,
+        }
+      },
+    })
+    const controllers = [...(base.controllers ?? [])]
+    const imports = [...(base.imports ?? [])]
+
+    if (options.enableDataController) {
+      controllers.push(DataSettingController)
     }
+    if (options.enableSettingController) {
+      controllers.push(SettingController)
+    }
+
+    imports.push(
+      buildDomainCommandModule(DEFAULT_UI_SETTING_TABLE_NAME, {
+        tableName: options.tableName,
+        dataSyncHandlers: options.dataSyncHandlers,
+      }),
+    )
+
+    return { ...base, controllers, imports }
   }
 }
