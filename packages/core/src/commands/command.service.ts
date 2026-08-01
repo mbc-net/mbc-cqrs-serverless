@@ -86,14 +86,30 @@ export class CommandService implements OnModuleInit, ICommandService {
     const aliasCount = this.explorerService.countCommandEventHandlerAliases?.(
       this.options.tableName,
     )
-    if (typeof aliasCount === 'number' && aliasCount > 1) {
-      throw new Error(
-        `[${this.options.tableName}] ${aliasCount} CommandModule registrations own the ` +
-          `'${this.options.tableName}_CommandEventHandler' alias. A DynamoDB table must be ` +
-          `owned by exactly one CommandModule data-sync pipeline. When MasterModule and ` +
-          `ui-setting's SettingModule share this table, set 'registerEventHandlerAlias: false' ` +
-          `on SettingModule so MasterModule owns the alias.`,
-      )
+    if (typeof aliasCount === 'number') {
+      if (aliasCount > 1) {
+        throw new Error(
+          `[${this.options.tableName}] ${aliasCount} CommandModule registrations own the ` +
+            `'${this.options.tableName}_CommandEventHandler' alias. A DynamoDB table must be ` +
+            `owned by exactly one CommandModule data-sync pipeline. When MasterModule and ` +
+            `ui-setting's SettingModule share this table, set 'registerEventHandlerAlias: false' ` +
+            `on SettingModule so MasterModule owns the alias.`,
+        )
+      }
+      // This module deferred the alias but no other module owns it — the Step
+      // Functions data-sync pipeline would fail at runtime on the first async
+      // command. Fail fast at startup instead.
+      if (
+        aliasCount === 0 &&
+        this.options.registerEventHandlerAlias === false
+      ) {
+        throw new Error(
+          `[${this.options.tableName}] registerEventHandlerAlias:false was set, but no other ` +
+            `CommandModule owns the '${this.options.tableName}_CommandEventHandler' alias for ` +
+            `this table. Import the owning module (e.g. MasterModule) with a matching tableName, ` +
+            `or remove registerEventHandlerAlias:false so this module owns the alias.`,
+        )
+      }
     }
 
     if (!this.options.disableDefaultHandler) {

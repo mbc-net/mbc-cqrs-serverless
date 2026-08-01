@@ -120,5 +120,27 @@ describe('SettingModule', () => {
       expect(moduleRef.get(SettingService)).toBeDefined()
       await moduleRef.close()
     })
+
+    it('rejects dataSyncHandlers combined with registerEventHandlerAlias:false', () => {
+      expect(() =>
+        SettingModule.register({
+          registerEventHandlerAlias: false,
+          dataSyncHandlers: [MasterRdsHandler as any],
+        }),
+      ).toThrow(/would not run on the asynchronous/)
+    })
+
+    it('fails fast when the alias is deferred but no module owns it', async () => {
+      const testingModule = await Test.createTestingModule({
+        imports: [
+          SupportModule,
+          SettingModule.register({ registerEventHandlerAlias: false }),
+        ],
+      }).compile()
+
+      await expect(testingModule.init()).rejects.toThrow(
+        /no other CommandModule owns/,
+      )
+    })
   })
 })

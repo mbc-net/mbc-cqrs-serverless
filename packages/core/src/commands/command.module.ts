@@ -45,6 +45,20 @@ export class CommandModule extends ConfigurableModuleClass {
       registerEventHandlerAlias = true,
     } = options
 
+    // A module that defers the alias to another owner cannot run its own
+    // data-sync handlers on the asynchronous (Step Functions) pipeline — that
+    // pipeline only invokes the alias owner's CommandService. Fail fast rather
+    // than dropping them silently for async commands.
+    if (!registerEventHandlerAlias && dataSyncHandlers.length > 0) {
+      throw new Error(
+        `[${tableName}] dataSyncHandlers were provided together with ` +
+          `registerEventHandlerAlias:false. These handlers would not run on the ` +
+          `asynchronous (Step Functions) data-sync pipeline, which only invokes the ` +
+          `owner of the '${tableName}_CommandEventHandler' alias. Register them on ` +
+          `the alias-owning module instead.`,
+      )
+    }
+
     if (registerEventHandlerAlias) {
       module.providers.push({
         // data-sync-handler uses dynamic command event handler to handle step function events of command execution
