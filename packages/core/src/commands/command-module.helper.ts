@@ -96,6 +96,13 @@ export function buildPrismaProviderAsync(
             `return the PrismaService instance under 'prismaService'.`,
         )
       }
+      if (typeof options.prismaService === 'function') {
+        throw new Error(
+          `${String(prismaToken)}: registerAsync's useFactory returned the ` +
+            `PrismaService CLASS, not an instance. Inject and return the instance: ` +
+            `{ inject: [PrismaService], useFactory: (p) => ({ prismaService: p }) }.`,
+        )
+      }
       return options.prismaService
     },
   }

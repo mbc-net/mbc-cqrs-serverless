@@ -104,5 +104,28 @@ describe('MasterModule', () => {
         expect.objectContaining({ tableName: 'custom-master' }),
       )
     })
+
+    it('rejects a useFactory that returns the PrismaService class instead of an instance', async () => {
+      await expect(
+        Test.createTestingModule({
+          imports: [
+            SupportModule,
+            MasterModule.registerAsync({
+              inject: [],
+              // wrong: returns the class, not an instance
+              useFactory: () => ({ prismaService: MockPrismaService }),
+            }),
+          ],
+        }).compile(),
+      ).rejects.toThrow(/CLASS, not an instance/)
+    })
+  })
+
+  describe('CommandModule.registerAsync guard', () => {
+    it('throws a clear error (not supported)', () => {
+      expect(() => (CommandModule as any).registerAsync({})).toThrow(
+        /not supported/,
+      )
+    })
   })
 })

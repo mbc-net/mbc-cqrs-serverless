@@ -78,4 +78,21 @@ export class CommandModule extends ConfigurableModuleClass {
       ...module,
     }
   }
+
+  /**
+   * Not supported. The `<tableName>_CommandEventHandler` alias and
+   * dataSyncHandlers wiring must be composed at build time (the table name is a
+   * deploy-time constant), which the inherited async builder cannot do — it
+   * would silently produce a module with no alias, failing the Step Functions
+   * data-sync pipeline at runtime. Use {@link CommandModule.register} (domain
+   * modules compose it via `buildDomainCommandModule`).
+   */
+  static registerAsync(): DynamicModule {
+    throw new Error(
+      'CommandModule.registerAsync() is not supported: the table name must be ' +
+        'known at build time to register the `<tableName>_CommandEventHandler` ' +
+        'alias. Use CommandModule.register(), or a domain module that composes it ' +
+        'via buildDomainCommandModule.',
+    )
+  }
 }
