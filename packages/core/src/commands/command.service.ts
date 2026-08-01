@@ -79,21 +79,26 @@ export class CommandService implements OnModuleInit, ICommandService {
   }
 
   onModuleInit() {
-    // Fail fast when two CommandModule instances own the same table's
+    // Detect how many CommandModule instances own this table's
     // `<tableName>_CommandEventHandler` alias. The Step Functions data-sync
-    // pipeline resolves the alias non-strictly, so a duplicate would silently
-    // shadow one module's data-sync handlers depending on import order.
+    // pipeline resolves the alias non-strictly, so a duplicate can shadow one
+    // module's data-sync handlers depending on import order.
     const aliasCount = this.explorerService.countCommandEventHandlerAliases?.(
       this.options.tableName,
     )
     if (typeof aliasCount === 'number') {
       if (aliasCount > 1) {
-        throw new Error(
+        // Warn (not throw) to preserve backward compatibility for existing
+        // MasterModule + SettingModule deployments that already share a table.
+        // Set `registerEventHandlerAlias: false` on the non-owning module for
+        // deterministic single-owner behavior.
+        this.logger.warn(
           `[${this.options.tableName}] ${aliasCount} CommandModule registrations own the ` +
-            `'${this.options.tableName}_CommandEventHandler' alias. A DynamoDB table must be ` +
-            `owned by exactly one CommandModule data-sync pipeline. When MasterModule and ` +
-            `ui-setting's SettingModule share this table, set 'registerEventHandlerAlias: false' ` +
-            `on SettingModule so MasterModule owns the alias.`,
+            `'${this.options.tableName}_CommandEventHandler' alias. The Step Functions data-sync ` +
+            `pipeline resolves it non-strictly, so which module's data-sync handlers run is ` +
+            `import-order dependent. When MasterModule and ui-setting's SettingModule share this ` +
+            `table, set 'registerEventHandlerAlias: false' on SettingModule so MasterModule owns ` +
+            `the alias.`,
         )
       }
       // This module deferred the alias but no other module owns it — the Step

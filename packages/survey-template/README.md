@@ -49,8 +49,9 @@ SurveyTemplateModule.register({
 
 SurveyTemplateModule.registerAsync({
   tableName: 'questionnaire',
-  inject: [],
-  useFactory: () => ({ prismaService: PrismaService }),
+  imports: [PrismaModule],
+  inject: [PrismaService], // resolve and return the PrismaService INSTANCE
+  useFactory: (prisma) => ({ prismaService: prisma }),
 })
 ```
 

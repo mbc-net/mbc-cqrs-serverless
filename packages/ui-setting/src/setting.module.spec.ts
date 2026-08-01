@@ -1,7 +1,7 @@
 import { CommandModule, StepFunctionService } from '@mbc-cqrs-serverless/core'
 import { MasterModule } from '@mbc-cqrs-serverless/master'
 import { TaskService } from '@mbc-cqrs-serverless/task'
-import { Global, Module } from '@nestjs/common'
+import { Global, Logger, Module } from '@nestjs/common'
 import { ConfigModule } from '@nestjs/config'
 import { Test } from '@nestjs/testing'
 
@@ -85,9 +85,11 @@ describe('SettingModule', () => {
       expect(tableNames.filter((name) => name === 'shared').length).toBe(2)
     })
 
-    it('fails fast when both modules own the same event-handler alias', async () => {
-      // The duplicate-alias guard runs in CommandService.onModuleInit, which is
-      // triggered by init() (not compile()).
+    it('warns but still boots when both modules own the same alias (backward compatible)', async () => {
+      // The duplicate-alias guard warns (does not throw) so existing
+      // MasterModule + SettingModule deployments keep booting. It runs in
+      // CommandService.onModuleInit, triggered by init() (not compile()).
+      const warnSpy = jest.spyOn(Logger.prototype, 'warn')
       const testingModule = await Test.createTestingModule({
         imports: [
           SupportModule,
@@ -99,9 +101,11 @@ describe('SettingModule', () => {
         ],
       }).compile()
 
-      await expect(testingModule.init()).rejects.toThrow(
-        /CommandModule registrations own/,
+      await expect(testingModule.init()).resolves.toBeDefined()
+      expect(warnSpy).toHaveBeenCalledWith(
+        expect.stringMatching(/CommandModule registrations own/),
       )
+      await testingModule.close()
     })
 
     it('compiles when SettingModule defers the alias to MasterModule', async () => {

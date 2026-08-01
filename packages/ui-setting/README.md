@@ -342,9 +342,9 @@ SettingModule.register({
 >    across two tables.
 > 2. Set `registerEventHandlerAlias: false` on `SettingModule` so `MasterModule`
 >    owns the `<tableName>_CommandEventHandler` alias. If both modules own the
->    alias, the framework **fails fast at startup** with a clear error (rather
->    than silently dropping `MasterModule`'s data-sync handlers depending on
->    module import order).
+>    alias, the app still boots but logs a **warning** — which module's data-sync
+>    handlers run is then import-order dependent, so setting the flag is required
+>    for deterministic behavior.
 >
 > **Provisioning:** A custom `tableName` must exist as physical tables
 > (`-command` / `-data` / `-history`). Add the raw base name to

@@ -309,8 +309,9 @@ MasterModule.register({
 
 MasterModule.registerAsync({
   tableName: 'catalog',
-  inject: [],
-  useFactory: () => ({ prismaService: PrismaService }),
+  imports: [PrismaModule],
+  inject: [PrismaService], // resolve and return the PrismaService INSTANCE
+  useFactory: (prisma) => ({ prismaService: prisma }),
 })
 ```
 
@@ -324,8 +325,8 @@ MasterModule.registerAsync({
 > (`SettingModule`), both modules must use the **same** `tableName`, because they
 > share the same physical table. `MasterModule` should own the data-sync
 > pipeline — register `SettingModule` with `registerEventHandlerAlias: false`.
-> If both modules own the `<tableName>_CommandEventHandler` alias, the framework
-> fails fast at startup.
+> If both modules own the `<tableName>_CommandEventHandler` alias, the app boots
+> but logs a warning and the effective owner becomes import-order dependent.
 
 ## License
 

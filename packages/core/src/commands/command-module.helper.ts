@@ -1,5 +1,4 @@
 import { DynamicModule, Provider, Type } from '@nestjs/common'
-import { ModuleRef } from '@nestjs/core'
 
 import { IDataSyncHandler } from '../interfaces/data-sync-handler.interface'
 import { CommandModule } from './command.module'
@@ -67,9 +66,21 @@ export function buildPrismaProviderSync(
 }
 
 /**
- * Build the `PRISMA_SERVICE` provider for the `registerAsync()` path. The
- * concrete PrismaService class is resolved at runtime from the module options
- * token (populated by the caller's async factory) via {@link ModuleRef}.
+ * Build the `PRISMA_SERVICE` provider for the `registerAsync()` path.
+ *
+ * The async factory must return the **resolved PrismaService instance** (not the
+ * class) under `prismaService` — typically by injecting it:
+ *
+ * ```ts
+ * registerAsync({ imports: [PrismaModule], inject: [PrismaService],
+ *   useFactory: (prisma) => ({ prismaService: prisma }) })
+ * ```
+ *
+ * The instance is aliased to the token directly, so Nest's own dependency graph
+ * guarantees PrismaService is constructed first (even when it is provided
+ * asynchronously via `forRootAsync`). Resolving the class via `ModuleRef.get`
+ * here would NOT be ordered against an async PrismaService and could inject
+ * `null`.
  */
 export function buildPrismaProviderAsync(
   optionsToken: string | symbol,
@@ -77,17 +88,15 @@ export function buildPrismaProviderAsync(
 ): Provider {
   return {
     provide: prismaToken,
-    inject: [ModuleRef, optionsToken],
-    useFactory: (
-      moduleRef: ModuleRef,
-      options: { prismaService?: Type<any> },
-    ) => {
+    inject: [optionsToken],
+    useFactory: (options: { prismaService?: any }) => {
       if (!options?.prismaService) {
         throw new Error(
-          `${String(prismaToken)}: 'prismaService' is required (registerAsync factory must return it).`,
+          `${String(prismaToken)}: registerAsync's useFactory must resolve and ` +
+            `return the PrismaService instance under 'prismaService'.`,
         )
       }
-      return moduleRef.get(options.prismaService, { strict: false })
+      return options.prismaService
     },
   }
 }

@@ -58,13 +58,18 @@ describe('DirectoryStorageModule', () => {
         imports: [
           SupportModule,
           DirectoryStorageModule.registerAsync({
-            inject: [],
-            useFactory: () => ({ prismaService: MockPrismaService }),
+            inject: [MockPrismaService],
+            useFactory: (prisma: MockPrismaService) => ({
+              prismaService: prisma,
+            }),
           }),
         ],
       }).compile()
+      await moduleRef.init()
 
-      expect(moduleRef.get(DirectoryService)).toBeDefined()
+      const svc = moduleRef.get(DirectoryService)
+      expect(svc).toBeDefined()
+      expect((svc as any).prismaService).toBeInstanceOf(MockPrismaService)
       await moduleRef.close()
     })
   })

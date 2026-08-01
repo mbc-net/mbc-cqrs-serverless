@@ -54,12 +54,14 @@ DirectoryStorageModule.register({
 })
 
 // Async configuration is also supported. The table name is a build-time
-// constant, so it is passed as a plain field; the factory only resolves
-// runtime dependencies such as prismaService.
+// constant, so it is passed as a plain field; the factory must resolve and
+// return the PrismaService INSTANCE (inject it so Nest orders it correctly,
+// even when Prisma is provided via forRootAsync).
 DirectoryStorageModule.registerAsync({
   tableName: 'document',
-  inject: [],
-  useFactory: () => ({ prismaService: PrismaService }),
+  imports: [PrismaModule],
+  inject: [PrismaService],
+  useFactory: (prisma) => ({ prismaService: prisma }),
 })
 ```
 

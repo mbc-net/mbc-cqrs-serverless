@@ -18,16 +18,15 @@ export interface MasterModuleAsyncOptions
   tableName?: string
   inject?: any[]
   /**
-   * Resolves the runtime module options. Must return at least `{ prismaService }`
-   * so the master services (which inject PRISMA_SERVICE) can be constructed.
-   * Optional only to stay assignment-compatible with the inherited
-   * `registerAsync` signature; omitting it makes PRISMA_SERVICE fail fast.
+   * Resolves the runtime module options. Must return the resolved PrismaService
+   * **instance** under `prismaService` (typically by injecting it), so the master
+   * services (which inject PRISMA_SERVICE) can be constructed. Optional only to
+   * stay assignment-compatible with the inherited `registerAsync` signature;
+   * omitting it makes PRISMA_SERVICE fail fast.
    */
   useFactory?: (
     ...args: any[]
-  ) =>
-    | Promise<Pick<MasterModuleOptions, 'prismaService'>>
-    | Pick<MasterModuleOptions, 'prismaService'>
+  ) => Promise<{ prismaService?: any }> | { prismaService?: any }
 }
 
 export const { ConfigurableModuleClass, MODULE_OPTIONS_TOKEN, OPTIONS_TYPE } =

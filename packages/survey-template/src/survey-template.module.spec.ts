@@ -68,13 +68,18 @@ describe('SurveyTemplateModule', () => {
         imports: [
           SupportModule,
           SurveyTemplateModule.registerAsync({
-            inject: [],
-            useFactory: () => ({ prismaService: MockPrismaService }),
+            inject: [MockPrismaService],
+            useFactory: (prisma: MockPrismaService) => ({
+              prismaService: prisma,
+            }),
           }),
         ],
       }).compile()
+      await moduleRef.init()
 
-      expect(moduleRef.get(SurveyTemplateService)).toBeDefined()
+      const svc = moduleRef.get(SurveyTemplateService)
+      expect(svc).toBeDefined()
+      expect((svc as any).prismaService).toBeInstanceOf(MockPrismaService)
       await moduleRef.close()
     })
   })

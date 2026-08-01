@@ -1,18 +1,21 @@
 import { CommandModule, StepFunctionService } from '@mbc-cqrs-serverless/core'
 import { TaskService } from '@mbc-cqrs-serverless/task'
-import { ConfigModule } from '@nestjs/config'
 import { Global, Module } from '@nestjs/common'
+import { ConfigModule } from '@nestjs/config'
 import { Test } from '@nestjs/testing'
 
 import { MasterModule } from './master.module'
 import { MasterDataService } from './services'
 
-class MockPrismaService {}
+class MockPrismaService {
+  readonly kind = 'instance'
+}
 
 /**
- * Provides the globally-scoped dependencies a real app supplies
- * (ConfigService, StepFunctionService, TaskService, PrismaService) so the
- * module composed by registerAsync can be compiled in isolation.
+ * Provides the globally-scoped dependencies a real app supplies. PrismaService
+ * is provided via an ASYNC factory (mirroring PrismaModule.forRootAsync) so the
+ * registerAsync path is exercised against the realistic ordering where the
+ * Prisma instance is not available synchronously.
  */
 @Global()
 @Module({
@@ -25,10 +28,16 @@ class MockPrismaService {}
   ],
   providers: [
     StepFunctionService,
-    MockPrismaService,
     { provide: TaskService, useValue: {} },
+    {
+      provide: MockPrismaService,
+      useFactory: async () => {
+        await new Promise((r) => setTimeout(r, 5))
+        return new MockPrismaService()
+      },
+    },
   ],
-  exports: [StepFunctionService, MockPrismaService, TaskService],
+  exports: [StepFunctionService, TaskService, MockPrismaService],
 })
 class SupportModule {}
 
@@ -61,18 +70,26 @@ describe('MasterModule', () => {
   })
 
   describe('registerAsync', () => {
-    it('compiles and resolves the public service (default table)', async () => {
+    it('resolves an async-provided PrismaService instance (not null)', async () => {
       const moduleRef = await Test.createTestingModule({
         imports: [
           SupportModule,
           MasterModule.registerAsync({
-            inject: [],
-            useFactory: () => ({ prismaService: MockPrismaService }),
+            inject: [MockPrismaService],
+            useFactory: (prisma: MockPrismaService) => ({
+              prismaService: prisma,
+            }),
           }),
         ],
       }).compile()
+      await moduleRef.init()
 
-      expect(moduleRef.get(MasterDataService)).toBeDefined()
+      const svc = moduleRef.get(MasterDataService)
+      expect(svc).toBeDefined()
+      // Regression: the injected PRISMA_SERVICE must be the resolved instance,
+      // not null (async Prisma) and not the class reference.
+      expect((svc as any).prismaService).toBeInstanceOf(MockPrismaService)
+      expect((svc as any).prismaService.kind).toBe('instance')
       await moduleRef.close()
     })
 
@@ -80,7 +97,7 @@ describe('MasterModule', () => {
       const spy = jest.spyOn(CommandModule, 'register')
       MasterModule.registerAsync({
         inject: [],
-        useFactory: () => ({ prismaService: MockPrismaService }),
+        useFactory: () => ({ prismaService: new MockPrismaService() }),
         tableName: 'custom-master',
       })
       expect(spy).toHaveBeenCalledWith(
