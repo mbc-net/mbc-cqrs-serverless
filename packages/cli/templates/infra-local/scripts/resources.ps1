@@ -11,15 +11,18 @@ Get-Content .env | ForEach-Object {
     }
 }
 
+# Get S3 port from environment variable with default
+$s3Port = if ($env:LOCAL_S3_PORT) { $env:LOCAL_S3_PORT } else { "4566" }
+
 Write-Host "======= check if S3 bucket exists ======="
-$bucketExists = aws --endpoint-url=http://localhost:4566 s3 ls | Select-String $env:S3_BUCKET_NAME
+$bucketExists = aws --endpoint-url=http://localhost:$s3Port s3 ls | Select-String $env:S3_BUCKET_NAME
 
 if (-not $bucketExists) {
     Write-Host "Bucket $env:S3_BUCKET_NAME does not exist. Creating it..."
-    aws --endpoint-url=http://localhost:4566 s3 mb "s3://$env:S3_BUCKET_NAME"
+    aws --endpoint-url=http://localhost:$s3Port s3 mb "s3://$env:S3_BUCKET_NAME"
 } else {
     Write-Host "Bucket $env:S3_BUCKET_NAME already exists."
 }
 
 Write-Host "======= list S3 buckets ======="
-aws --endpoint-url=http://localhost:4566 s3 ls
+aws --endpoint-url=http://localhost:$s3Port s3 ls

@@ -69,8 +69,17 @@ jobs:
           # Get the list of changed dependencies
           git diff origin/main...HEAD -- package-lock.json > /tmp/lockfile-diff.txt || true
 
-          # Count changed packages
-          CHANGED_COUNT=$(grep -c '"version":' /tmp/lockfile-diff.txt || echo "0")
+          # Count changed packages.
+          # `grep -c` already prints "0" when there is no match (and exits
+          # non-zero), so the old `|| echo "0"` appended a SECOND "0", producing
+          # a two-line value ("0\n0"). Writing that to $GITHUB_OUTPUT fails with
+          # "Invalid format '0'". This triggers whenever the PR changes a
+          # package.json (workflow trigger) but the root package-lock.json has no
+          # diff vs the current main (e.g. a PR to develop after main already
+          # carries develop's lockfile). Use `|| true` (grep's own "0" stays) and
+          # a default so the value is always a single line.
+          CHANGED_COUNT=$(grep -c '"version":' /tmp/lockfile-diff.txt || true)
+          CHANGED_COUNT=${CHANGED_COUNT:-0}
           echo "changed_packages=$CHANGED_COUNT" >> $GITHUB_OUTPUT
 
           # Check for major version updates

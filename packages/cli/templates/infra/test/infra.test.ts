@@ -54,6 +54,17 @@ jest.mock('aws-cdk-lib', () => ({
   },
 }))
 
+// buildApp() shells out to a real `npm ci && npm run build:prod` of the parent
+// application (via execSync). That cannot run in the isolated template / CI
+// context, so it is mocked to return placeholder asset directories, keeping the
+// CDK synthesis hermetic and the snapshot deterministic.
+jest.mock('../libs/build-app', () => ({
+  buildApp: jest.fn(() => ({
+    layerPath: require('path').resolve(__dirname, 'fixtures/layer'),
+    appPath: require('path').resolve(__dirname, 'fixtures/app'),
+  })),
+}))
+
 function replaceKeyValue(obj: any, desKey: string, desVal: string): any {
   if (typeof obj !== 'object' || obj === null) {
     return obj
