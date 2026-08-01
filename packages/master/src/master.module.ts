@@ -6,7 +6,7 @@ import {
   QueueModule,
 } from '@mbc-cqrs-serverless/core'
 import { SequencesModule } from '@mbc-cqrs-serverless/sequence'
-import { DynamicModule, Module } from '@nestjs/common'
+import { DynamicModule, Logger, Module } from '@nestjs/common'
 
 import { TABLE_NAME } from './constants'
 import {
@@ -31,7 +31,27 @@ import { MasterDataService, MasterSettingService } from './services'
   exports: [MasterDataService, MasterSettingService],
 })
 export class MasterModule extends ConfigurableModuleClass {
+  private static readonly logger = new Logger(MasterModule.name)
+
+  /**
+   * The `master` table is a framework-wide central config store: `TtlService`
+   * (TTL config) and the sequence package (numbering formats) read the fixed
+   * `master-data` table. Renaming it silently breaks those readers, so warn.
+   */
+  private static warnIfCustomTable(tableName?: string): void {
+    if (tableName && tableName !== TABLE_NAME) {
+      MasterModule.logger.warn(
+        `tableName '${tableName}' overrides the 'master' table, which is also read ` +
+          `at a fixed 'master-data' name by TtlService (TTL config) and the sequence ` +
+          `package (numbering formats). Renaming the master table is not fully ` +
+          `supported — TTL and sequence formats will silently fall back. Keep the ` +
+          `default 'master' unless you have addressed those readers.`,
+      )
+    }
+  }
+
   static register(options: typeof OPTIONS_TYPE): DynamicModule {
+    MasterModule.warnIfCustomTable(options.tableName)
     const base = super.register(options)
     const providers = [...(base.providers ?? [])]
     const controllers = [...(base.controllers ?? [])]
@@ -68,6 +88,7 @@ export class MasterModule extends ConfigurableModuleClass {
   }
 
   static registerAsync(options: MasterModuleAsyncOptions): DynamicModule {
+    MasterModule.warnIfCustomTable(options.tableName)
     const base = super.registerAsync({
       imports: options.imports,
       inject: options.inject ?? [],

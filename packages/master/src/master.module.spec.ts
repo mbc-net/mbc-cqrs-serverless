@@ -1,6 +1,6 @@
 import { CommandModule, StepFunctionService } from '@mbc-cqrs-serverless/core'
 import { TaskService } from '@mbc-cqrs-serverless/task'
-import { Global, Module } from '@nestjs/common'
+import { Global, Logger, Module } from '@nestjs/common'
 import { ConfigModule } from '@nestjs/config'
 import { Test } from '@nestjs/testing'
 
@@ -66,6 +66,25 @@ describe('MasterModule', () => {
 
     it('throws fast when prismaService is missing', () => {
       expect(() => MasterModule.register({} as any)).toThrow(/prismaService/)
+    })
+
+    it('warns that renaming the central master table breaks TTL/sequence config', () => {
+      const warnSpy = jest.spyOn(Logger.prototype, 'warn')
+      MasterModule.register({
+        prismaService: MockPrismaService,
+        tableName: 'catalog',
+      })
+      expect(warnSpy).toHaveBeenCalledWith(
+        expect.stringMatching(/central config|master-data|not fully supported/),
+      )
+    })
+
+    it('does not warn for the default master table', () => {
+      const warnSpy = jest.spyOn(Logger.prototype, 'warn')
+      MasterModule.register({ prismaService: MockPrismaService })
+      expect(warnSpy).not.toHaveBeenCalledWith(
+        expect.stringMatching(/not fully supported/),
+      )
     })
   })
 

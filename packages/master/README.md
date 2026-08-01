@@ -300,11 +300,21 @@ Full documentation available at [https://mbc-cqrs-serverless.mbc-net.com/](https
 override it (backward compatible — omitting it keeps `master`). Both
 `register` and `registerAsync` accept it:
 
+> **⚠️ Renaming the master table is not fully supported.** The `master` table is a
+> framework-wide **central config store** — `TtlService` (TTL config) and the
+> `@mbc-cqrs-serverless/sequence` package (numbering formats) read a fixed
+> `master-data` table name. If you override the master `tableName`, those readers
+> keep looking at `master-data`, so TTLs are not applied and sequence formats
+> silently fall back to defaults. `MasterModule.register`/`registerAsync` logs a
+> warning when a custom `tableName` is set. Prefer keeping the default `master`;
+> only override it if you have separately addressed those readers. (Customizing
+> the directory / survey-template / ui-setting table names has no such caveat.)
+
 ```ts
 MasterModule.register({
   enableController: true,
   prismaService: PrismaService,
-  tableName: 'catalog', // default: 'master'
+  tableName: 'catalog', // default: 'master' — see the caveat above
 })
 
 MasterModule.registerAsync({
