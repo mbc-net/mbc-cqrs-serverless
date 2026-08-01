@@ -60,7 +60,6 @@ services:
     image: localstack/localstack
     ports:
       - '${LOCAL_S3_PORT:-4566}:4566'
-      - '4510-4559:4510-4559'
     environment:
       - SERVICES=s3
       - AWS_DEFAULT_REGION=ap-northeast-1
@@ -85,7 +84,12 @@ services:
     build:
       context: ./cognito-local
       dockerfile: Dockerfile
+    environment:
+      # cognito-local listens on $PORT and emits JWT `iss` as http://localhost:$PORT
+      # (see cognito-local/start.sh). Host and container use the same port so the
+      # `iss` claim stays reachable from the serverless-offline authorizer.
+      - PORT=${LOCAL_COGNITO_PORT:-9229}
     ports:
-      - ${LOCAL_COGNITO_PORT:-9229}:9229
+      - ${LOCAL_COGNITO_PORT:-9229}:${LOCAL_COGNITO_PORT:-9229}
     volumes:
       - ./docker-data/.cognito:/app/.cognito

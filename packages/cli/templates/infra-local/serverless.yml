@@ -24,6 +24,11 @@ custom:
   sesPort: ${env:LOCAL_SES_PORT, 8005}
   cognitoPort: ${env:LOCAL_COGNITO_PORT, 9229}
 
+  # serverless-offline-lambda plugin (external Lambda invoke, separate from serverless-offline lambdaPort)
+  lambda:
+    port: ${env:LOCAL_OFFLINE_LAMBDA_PORT, 4000}
+    host: 0.0.0.0
+
   serverless-offline:
     corsAllowOrigin: '*'
     corsAllowHeaders: '*'
@@ -85,6 +90,9 @@ custom:
     region: ap-northeast-1
     # lambdaEndpoint: http://0.0.0.0:3002
     externalInstance: true
+    # Honor LOCAL_SFN_PORT so a non-default port reaches Step Functions Local
+    # (Docker mapping, the SDK and the registration script all use this port).
+    stepFunctionsEndpoint: http://localhost:${env:LOCAL_SFN_PORT, 8083}
   serverless-dynamodb:
     stages:
       # set for create tables on dev enviroment
@@ -125,6 +133,9 @@ provider:
       localAuthorizer:
         type: jwt
         identitySource: $request.header.Authorization
+        # cognito-local emits the JWT `iss` claim as http://localhost:${LOCAL_COGNITO_PORT}
+        # (its listen port; see infra-local/cognito-local/start.sh, which writes a matching
+        # TokenConfig.IssuerDomain). Keep issuerUrl in sync with that configurable port.
         issuerUrl: http://localhost:${self:custom.cognitoPort}/local_2G7noHgW
         audience:
           - dnk8y7ii3wled35p3lw0l2cd7
