@@ -59,6 +59,8 @@ DirectoryStorageModule.register({
 // even when Prisma is provided via forRootAsync).
 DirectoryStorageModule.registerAsync({
   tableName: 'document',
+  pkPrefix: 'DOCUMENT',
+  prismaModelName: 'document',
   imports: [PrismaModule],
   inject: [PrismaService],
   useFactory: (prisma) => ({ prismaService: prisma }),
