@@ -110,18 +110,18 @@ describe('Cross-Package Integration', () => {
     })
 
     describe('Directory package key patterns', () => {
-      const DIRECTORY_PREFIX = 'DOCUMENT'
+      const DIRECTORY_PREFIX = 'DIRECTORY'
 
       it('should generate directory PK with tenant code', () => {
         const pk = generatePk(DIRECTORY_PREFIX, 'COMPANY_X')
-        expect(pk).toBe('DOCUMENT#COMPANY_X')
+        expect(pk).toBe('DIRECTORY#COMPANY_X')
       })
 
       it('should generate complete ID from PK and SK', () => {
         const pk = generatePk(DIRECTORY_PREFIX, 'COMPANY_X')
         const sk = 'folder-ulid-123'
         const id = generateId(pk, sk)
-        expect(id).toBe('DOCUMENT#COMPANY_X#folder-ulid-123')
+        expect(id).toBe('DIRECTORY#COMPANY_X#folder-ulid-123')
       })
     })
   })
@@ -162,7 +162,7 @@ describe('Cross-Package Integration', () => {
      */
     function extractTenantFromPk(pk: string): string | null {
       const match = pk.match(
-        /^(TENANT|SETTING|MASTER|SEQUENCE|TASK|DOCUMENT)#([^#]+)/,
+        /^(TENANT|SETTING|MASTER|SEQUENCE|TASK|DIRECTORY)#([^#]+)/,
       )
       return match ? match[2] : null
     }
@@ -219,8 +219,8 @@ describe('Cross-Package Integration', () => {
         expect(extractTenantFromPk('TASK#CLIENT_1')).toBe('CLIENT_1')
       })
 
-      it('should extract tenant from DOCUMENT PK', () => {
-        expect(extractTenantFromPk('DOCUMENT#CORP_ABC')).toBe('CORP_ABC')
+      it('should extract tenant from DIRECTORY PK', () => {
+        expect(extractTenantFromPk('DIRECTORY#CORP_ABC')).toBe('CORP_ABC')
       })
 
       it('should return null for invalid PK', () => {
@@ -326,9 +326,9 @@ describe('Cross-Package Integration', () => {
       })
 
       it('should support VERSION_FIRST constant', () => {
-        const baseSk = 'DOCUMENT#DOC001'
+        const baseSk = 'DIRECTORY#DOC001'
         const historySk = generateHistorySk(baseSk, VERSION_FIRST)
-        expect(historySk).toBe('DOCUMENT#DOC001@0')
+        expect(historySk).toBe('DIRECTORY#DOC001@0')
       })
     })
 
@@ -545,7 +545,7 @@ describe('Cross-Package Integration', () => {
         data: Partial<DirectoryItem>,
       ): DirectoryItem {
         return {
-          pk: `DOCUMENT${KEY_SEPARATOR}${tenantCode}`,
+          pk: `DIRECTORY${KEY_SEPARATOR}${tenantCode}`,
           sk: itemId,
           tenantCode,
           name: data.name || 'Untitled',
@@ -561,7 +561,7 @@ describe('Cross-Package Integration', () => {
           type: 'folder',
         })
 
-        expect(folder.pk).toBe('DOCUMENT#ORG_123')
+        expect(folder.pk).toBe('DIRECTORY#ORG_123')
         expect(folder.sk).toBe('ulid-folder-001')
         expect(folder.tenantCode).toBe('ORG_123')
       })
