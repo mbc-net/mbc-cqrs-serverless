@@ -63,7 +63,7 @@ export class DirectoryService {
     opts: { invokeContext: IInvoke },
   ) {
     const { tenantCode } = getUserContext(opts.invokeContext)
-    const pk = `DIRECTORY${KEY_SEPARATOR}${tenantCode}`
+    const pk = `DOCUMENT${KEY_SEPARATOR}${tenantCode}`
     const sk = ulid()
 
     const attrs = createDto.attributes as DirectoryAttributes
@@ -117,7 +117,7 @@ export class DirectoryService {
   }
 
   async getTenantFileSizeSummary() {
-    const fileSizeSummary = await this.prismaService.directory.groupBy({
+    const fileSizeSummary = await this.prismaService.document.groupBy({
       by: ['tenantCode'],
 
       _sum: {
@@ -155,7 +155,7 @@ export class DirectoryService {
       throw new NotFoundException('Directory not found!')
     }
 
-    const pk = `DIRECTORY${KEY_SEPARATOR}${tenantCode}`
+    const pk = `DOCUMENT${KEY_SEPARATOR}${tenantCode}`
     const sk = ulid()
     const attrs = data.attributes as DirectoryAttributes
     let newAncestors = []
@@ -235,7 +235,7 @@ export class DirectoryService {
       )
     }
 
-    const pk = `DIRECTORY${KEY_SEPARATOR}${tenantCode}`
+    const pk = `DOCUMENT${KEY_SEPARATOR}${tenantCode}`
     const sk = ulid()
     const attrs = data.attributes as DirectoryAttributes
     let newAncestors = []
@@ -452,7 +452,7 @@ export class DirectoryService {
       skAttributeValues: { ':typeCode': `${item.code}${VER_SEPARATOR}` },
     }
 
-    const table = `${process.env.NODE_ENV}-${process.env.APP_NAME}-directory-history`
+    const table = `${process.env.NODE_ENV}-${process.env.APP_NAME}-document-history`
     const directoryHistories = await this.customDynamoService.listItemsByPk(
       table,
       item.pk,
