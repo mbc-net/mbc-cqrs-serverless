@@ -10,12 +10,17 @@ import {
   CommandService,
   DataService,
   DetailDto,
+  DynamoDbService,
   IInvoke,
   S3Service,
+  TableType,
   getUserContext,
 } from '@mbc-cqrs-serverless/core'
 import { DynamoService } from './dynamodb.service'
-import { PRISMA_SERVICE } from './directory.module-definition'
+import {
+  MODULE_OPTIONS_TOKEN,
+  PRISMA_SERVICE,
+} from './directory.module-definition'
 import {
   DirectoryAttributes,
   FilePermission,
@@ -127,6 +132,19 @@ describe('DirectoryService', () => {
               groupBy: jest.fn(),
             },
           },
+        },
+        {
+          provide: MODULE_OPTIONS_TOKEN,
+          useValue: {},
+        },
+        {
+          provide: DynamoDbService,
+          useValue: createMock<DynamoDbService>({
+            getTableName: jest.fn(
+              (name: string, type?: TableType) =>
+                `local-app-${name}${type ? '-' + type : ''}`,
+            ),
+          }),
         },
       ],
     }).compile()
@@ -539,11 +557,10 @@ describe('DirectoryService', () => {
         role: FileRole.WRITE,
       }
 
-      const result = service.checkPermissionObject(
-        permission,
-        'TEST_TENANT',
-        { email: 'anyone@example.com', tenant: 'TEST_TENANT' },
-      )
+      const result = service.checkPermissionObject(permission, 'TEST_TENANT', {
+        email: 'anyone@example.com',
+        tenant: 'TEST_TENANT',
+      })
 
       expect(result).toBe(FileRole.WRITE)
     })
@@ -555,11 +572,10 @@ describe('DirectoryService', () => {
         users: [],
       }
 
-      const result = service.checkPermissionObject(
-        permission,
-        'TEST_TENANT',
-        { email: 'user@example.com', tenant: 'TEST_TENANT' },
-      )
+      const result = service.checkPermissionObject(permission, 'TEST_TENANT', {
+        email: 'user@example.com',
+        tenant: 'TEST_TENANT',
+      })
 
       expect(result).toBeNull()
     })
@@ -652,6 +668,12 @@ describe('DirectoryService', () => {
 
       expect(result.total).toBe(3) // current + 2 history items
       expect(result.items).toHaveLength(3)
+      // Default table name resolves the history table via getTableName.
+      expect(dynamoService.listItemsByPk).toHaveBeenCalledWith(
+        'local-app-directory-history',
+        expect.anything(),
+        expect.anything(),
+      )
     })
 
     it('should throw ForbiddenException when lacking read permission', async () => {
@@ -1353,6 +1375,108 @@ describe('DirectoryService', () => {
           _sum: { fileSize: true },
           _count: { _all: true },
         }),
+      )
+    })
+  })
+
+  // ============================================
+  // CONFIGURABLE TABLE NAME (opt-in overrides)
+  // ============================================
+  describe('configurable table name (custom options)', () => {
+    let customService: DirectoryService
+    let customCommandService: jest.Mocked<CommandService>
+    let customDynamoService: jest.Mocked<DynamoService>
+    let customDynamoDbService: jest.Mocked<DynamoDbService>
+    let customPrisma: any
+
+    beforeEach(async () => {
+      mockGetUserContext.mockReturnValue(mockUserContext as any)
+      customPrisma = { document: { groupBy: jest.fn().mockResolvedValue([]) } }
+
+      const module: TestingModule = await Test.createTestingModule({
+        providers: [
+          DirectoryService,
+          { provide: CommandService, useValue: createMock<CommandService>() },
+          { provide: DataService, useValue: createMock<DataService>() },
+          {
+            provide: S3Service,
+            useValue: { client: { send: jest.fn() }, privateBucket: 'b' },
+          },
+          { provide: DynamoService, useValue: createMock<DynamoService>() },
+          { provide: PRISMA_SERVICE, useValue: customPrisma },
+          {
+            provide: MODULE_OPTIONS_TOKEN,
+            useValue: {
+              tableName: 'document',
+              pkPrefix: 'DOCUMENT',
+              prismaModelName: 'document',
+            },
+          },
+          {
+            provide: DynamoDbService,
+            useValue: createMock<DynamoDbService>({
+              getTableName: jest.fn(
+                (name: string, type?: TableType) =>
+                  `local-app-${name}${type ? '-' + type : ''}`,
+              ),
+            }),
+          },
+        ],
+      }).compile()
+
+      customService = module.get(DirectoryService)
+      customCommandService = module.get(CommandService)
+      customDynamoService = module.get(DynamoService)
+      customDynamoDbService = module.get(DynamoDbService)
+    })
+
+    it('uses the custom pk prefix when creating a directory', async () => {
+      customCommandService.publishAsync.mockResolvedValue(
+        createMockDirectoryData() as any,
+      )
+
+      await customService.create(
+        {
+          name: 'Doc',
+          type: 'folder',
+          attributes: { parentId: null, ancestors: [] },
+        } as any,
+        { invokeContext: mockInvokeContext },
+      )
+
+      expect(customCommandService.publishAsync).toHaveBeenCalledWith(
+        expect.objectContaining({ pk: 'DOCUMENT#TEST_TENANT' }),
+        expect.any(Object),
+      )
+    })
+
+    it('reads the summary from the custom prisma model', async () => {
+      await customService.getTenantFileSizeSummary()
+      expect(customPrisma.document.groupBy).toHaveBeenCalled()
+    })
+
+    it('resolves the history table from the custom table name', async () => {
+      const mockData = createMockDirectoryData()
+      ;(customService as any).dataService?.getItem
+      customDynamoService.listItemsByPk.mockResolvedValue({ items: [] })
+      const dataService = (customService as any)
+        .dataService as jest.Mocked<DataService>
+      dataService.getItem.mockResolvedValue(mockData)
+
+      await customService.findHistory(
+        { pk: 'DOCUMENT#TEST_TENANT', sk: 'test-ulid' },
+        { invokeContext: mockInvokeContext },
+        { email: 'owner@example.com' },
+      )
+
+      expect(customDynamoDbService.getTableName).toHaveBeenCalledWith(
+        'document',
+        TableType.HISTORY,
+      )
+      expect(customDynamoService.listItemsByPk).toHaveBeenCalledWith(
+        'local-app-document-history',
+        expect.anything(),
+        expect.anything(),
       )
     })
   })

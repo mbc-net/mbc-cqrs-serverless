@@ -304,9 +304,10 @@ describe('Cross-Package Integration', () => {
     /**
      * Parses SK to extract base SK and version
      */
-    function parseVersionedSk(
-      sk: string,
-    ): { baseSk: string; version?: number } {
+    function parseVersionedSk(sk: string): {
+      baseSk: string
+      version?: number
+    } {
       const parts = sk.split(VER_SEPARATOR)
       if (parts.length === 2) {
         return {
@@ -325,9 +326,9 @@ describe('Cross-Package Integration', () => {
       })
 
       it('should support VERSION_FIRST constant', () => {
-        const baseSk = 'DOCUMENT#DOC001'
+        const baseSk = 'DIRECTORY#DOC001'
         const historySk = generateHistorySk(baseSk, VERSION_FIRST)
-        expect(historySk).toBe('DOCUMENT#DOC001@0')
+        expect(historySk).toBe('DIRECTORY#DOC001@0')
       })
     })
 
@@ -445,7 +446,9 @@ describe('Cross-Package Integration', () => {
       ): { pk: string; sk: string } {
         return {
           pk: `SEQUENCE${KEY_SEPARATOR}${tenantCode}`,
-          sk: [config.typeCode, rotateValue].filter(Boolean).join(KEY_SEPARATOR),
+          sk: [config.typeCode, rotateValue]
+            .filter(Boolean)
+            .join(KEY_SEPARATOR),
         }
       }
 
@@ -635,9 +638,10 @@ describe('Cross-Package Integration', () => {
       /**
        * Generates SK prefix for begins_with queries
        */
-      function skBeginsWithExpression(
-        prefix: string,
-      ): { expression: string; values: Record<string, string> } {
+      function skBeginsWithExpression(prefix: string): {
+        expression: string
+        values: Record<string, string>
+      } {
         return {
           expression: 'begins_with(sk, :prefix)',
           values: { ':prefix': `${prefix}${KEY_SEPARATOR}` },
@@ -782,7 +786,9 @@ describe('Cross-Package Integration', () => {
       }
     }
 
-    function projectDataFromEvents(events: CommandEvent[]): DataSnapshot | null {
+    function projectDataFromEvents(
+      events: CommandEvent[],
+    ): DataSnapshot | null {
       if (events.length === 0) return null
 
       const sorted = [...events].sort((a, b) => a.version - b.version)

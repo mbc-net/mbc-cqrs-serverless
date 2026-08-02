@@ -3,7 +3,22 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
-## [1.3.5](https://github.com/mbc-net/mbc-cqrs-serverless/releases/tag/v1.3.5) (2026-07-29)
+## [1.4.0](https://github.com/mbc-net/mbc-cqrs-serverless/releases/tag/v1.4.0) (2026-08-02)
+
+### Features
+
+- **core, master, directory, survey-template, ui-setting:** Make the DynamoDB table names of the domain modules configurable via a backward-compatible `tableName?` option, and add `registerAsync` support to all four modules. Defaults are unchanged (`master` / `directory` / `survey` / `master`), so existing apps upgrade with no code changes ([#493](https://github.com/mbc-net/mbc-cqrs-serverless/pull/493))
+  - **directory:** `DirectoryStorageModule` additionally accepts `pkPrefix?` (default `DIRECTORY`) and `prismaModelName?` (default `directory`). The `directory` → `document` rename ([#469](https://github.com/mbc-net/mbc-cqrs-serverless/pull/469)) is now expressed as opt-in configuration (`tableName: 'document'`, `pkPrefix: 'DOCUMENT'`, `prismaModelName: 'document'`) rather than a forced default
+- **mcp-server:** Add the v1.3.5 → v1.4.0 migration guide to the `mbc-migrate` skill (configurable table names, how to change a table name, and the central master-table caveat) ([#494](https://github.com/mbc-net/mbc-cqrs-serverless/pull/494))
+
+### Changes (behavior)
+
+- **master, directory, survey-template:** `prismaService` is now always required at registration (previously validated only when `enableController: true`). A missing value now fails fast at startup with a clear message instead of a cryptic dependency-resolution error. Pass `prismaService` explicitly if you registered with `enableController: false` and relied on a globally-provided token ([#493](https://github.com/mbc-net/mbc-cqrs-serverless/pull/493))
+- **master, ui-setting:** When `MasterModule` and `SettingModule` share the default `master` table, the framework logs a startup warning if both own the `master_CommandEventHandler` alias (data-sync ownership becomes import-order dependent). Set `registerEventHandlerAlias: false` on `SettingModule` so `MasterModule` owns the alias ([#493](https://github.com/mbc-net/mbc-cqrs-serverless/pull/493))
+- **master:** `MasterModule` logs a warning if its `tableName` is overridden — the `master` table is a framework-wide config store read at a fixed `master-data` name by `TtlService` and the sequence package, so renaming it is not fully supported ([#493](https://github.com/mbc-net/mbc-cqrs-serverless/pull/493))
+- **core:** `CommandModule.registerAsync()` now throws a clear error (it cannot build the `<tableName>_CommandEventHandler` alias asynchronously); compose CommandModule via `register()` or a domain module ([#493](https://github.com/mbc-net/mbc-cqrs-serverless/pull/493))
+
+## [1.3.5](https://github.com/mbc-net/mbc-cqrs-serverless/releases/tag/v1.3.5) (2026-08-01)
 
 ### Bug Fixes
 

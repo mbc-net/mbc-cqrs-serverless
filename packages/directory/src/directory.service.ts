@@ -4,10 +4,12 @@ import {
   CommandService,
   DataService,
   DetailDto,
+  DynamoDbService,
   generateId,
   getUserContext,
   IInvoke,
   S3Service,
+  TableType,
   VER_SEPARATOR,
   VERSION_FIRST,
 } from '@mbc-cqrs-serverless/core'
@@ -22,7 +24,14 @@ import {
 } from '@nestjs/common'
 import { ulid } from 'ulid'
 
-import { PRISMA_SERVICE } from './directory.module-definition'
+import {
+  DEFAULT_DIRECTORY_PK_PREFIX,
+  DEFAULT_DIRECTORY_PRISMA_MODEL,
+  DEFAULT_DIRECTORY_TABLE_NAME,
+  DirectoryStorageModuleOptions,
+  MODULE_OPTIONS_TOKEN,
+  PRISMA_SERVICE,
+} from './directory.module-definition'
 import {
   DirectoryAttributes,
   FilePermission,
@@ -48,22 +57,33 @@ import { parsePk } from './helpers'
 @Injectable()
 export class DirectoryService {
   private readonly logger = new Logger(DirectoryService.name)
+  private readonly tableName: string
+  private readonly pkPrefix: string
+  private readonly prismaModelName: string
 
   constructor(
+    @Inject(MODULE_OPTIONS_TOKEN)
+    private readonly moduleOptions: DirectoryStorageModuleOptions,
     @Inject(PRISMA_SERVICE)
     private readonly prismaService: any,
     private readonly commandService: CommandService,
     private readonly dataService: DataService,
     private readonly s3Service: S3Service,
     private readonly customDynamoService: DynamoService,
-  ) {}
+    private readonly dynamoDbService: DynamoDbService,
+  ) {
+    this.tableName = moduleOptions.tableName ?? DEFAULT_DIRECTORY_TABLE_NAME
+    this.pkPrefix = moduleOptions.pkPrefix ?? DEFAULT_DIRECTORY_PK_PREFIX
+    this.prismaModelName =
+      moduleOptions.prismaModelName ?? DEFAULT_DIRECTORY_PRISMA_MODEL
+  }
 
   async create(
     createDto: DirectoryCreateDto,
     opts: { invokeContext: IInvoke },
   ) {
     const { tenantCode } = getUserContext(opts.invokeContext)
-    const pk = `DIRECTORY${KEY_SEPARATOR}${tenantCode}`
+    const pk = `${this.pkPrefix}${KEY_SEPARATOR}${tenantCode}`
     const sk = ulid()
 
     const attrs = createDto.attributes as DirectoryAttributes
@@ -117,7 +137,9 @@ export class DirectoryService {
   }
 
   async getTenantFileSizeSummary() {
-    const fileSizeSummary = await this.prismaService.directory.groupBy({
+    const fileSizeSummary = await this.prismaService[
+      this.prismaModelName
+    ].groupBy({
       by: ['tenantCode'],
 
       _sum: {
@@ -155,7 +177,7 @@ export class DirectoryService {
       throw new NotFoundException('Directory not found!')
     }
 
-    const pk = `DIRECTORY${KEY_SEPARATOR}${tenantCode}`
+    const pk = `${this.pkPrefix}${KEY_SEPARATOR}${tenantCode}`
     const sk = ulid()
     const attrs = data.attributes as DirectoryAttributes
     let newAncestors = []
@@ -235,7 +257,7 @@ export class DirectoryService {
       )
     }
 
-    const pk = `DIRECTORY${KEY_SEPARATOR}${tenantCode}`
+    const pk = `${this.pkPrefix}${KEY_SEPARATOR}${tenantCode}`
     const sk = ulid()
     const attrs = data.attributes as DirectoryAttributes
     let newAncestors = []
@@ -311,7 +333,7 @@ export class DirectoryService {
     try {
       item = await this.getItem(itemId)
       attributes = item.attributes as DirectoryAttributes
-    } catch (e) {
+    } catch {
       return null
     }
 
@@ -452,7 +474,10 @@ export class DirectoryService {
       skAttributeValues: { ':typeCode': `${item.code}${VER_SEPARATOR}` },
     }
 
-    const table = `${process.env.NODE_ENV}-${process.env.APP_NAME}-directory-history`
+    const table = this.dynamoDbService.getTableName(
+      this.tableName,
+      TableType.HISTORY,
+    )
     const directoryHistories = await this.customDynamoService.listItemsByPk(
       table,
       item.pk,

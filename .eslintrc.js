@@ -26,6 +26,9 @@ module.exports = {
     '**/*.spec.ts',
     '**/*.test.ts',
     'examples/**',
+    // Scaffolding templates are excluded from tsconfig and reference
+    // generated-app paths, so they cannot be type-aware linted.
+    '**/src/templates/**',
   ],
   rules: {
     '@typescript-eslint/interface-name-prefix': 'off',
