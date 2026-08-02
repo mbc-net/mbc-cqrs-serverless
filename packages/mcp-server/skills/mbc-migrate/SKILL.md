@@ -44,6 +44,7 @@ This skill helps migrate MBC CQRS Serverless projects between versions.
 | v1.2.7 | v1.3.0 | Low | AppSync Events API support (opt-in, no breaking changes) |
 | v1.3.0 | v1.3.1 | Low | Group-based roles (`@GroupRoleResolver`, `custom:groups`); `UserContext.tenantRoles`/`tenantGroupIds` added (opt-in, no breaking changes) |
 | v1.3.2 | v1.3.3 | Low | `ATTRIBUTE_LIMIT_SIZE` default lowered 389120 → 102400 for Step Functions payload limit (transparent unless overridden) |
+| v1.3.5 | v1.4.0 | Low | Configurable DynamoDB table names (opt-in) + `registerAsync` on domain modules; `prismaService` now always required; `MasterModule`+`SettingModule` shared-table alias warns |
 
 ## Migration Guides
 
@@ -688,10 +689,68 @@ Register the class in your module `providers`. `AuthModule` is imported automati
 
 ---
 
+### v1.3.5 → v1.4.0 (opt-in new features; no changes required if you keep defaults)
+
+v1.4.0 makes the DynamoDB table names of the domain modules (`master`, `directory`, `survey-template`, `ui-setting`) configurable and adds `registerAsync` support. **All new options default to the current names, so existing apps upgrade with no code changes.**
+
+**New capabilities (opt-in):**
+- `tableName?` on `MasterModule` / `DirectoryStorageModule` / `SurveyTemplateModule` / `SettingModule` (defaults: `master` / `directory` / `survey` / `master`).
+- `DirectoryStorageModule` also accepts `pkPrefix?` (default `DIRECTORY`) and `prismaModelName?` (default `directory`).
+- `registerAsync(...)` on all four modules.
+
+**Behavior changes to be aware of (not breaking for the common setup):**
+- `prismaService` is now **always required** when registering `MasterModule` / `DirectoryStorageModule` / `SurveyTemplateModule` (previously it was only validated when `enableController: true`). The domain services inject `PRISMA_SERVICE` unconditionally, so a missing `prismaService` now fails fast at startup with a clear message instead of a cryptic `UnknownDependenciesException`. **Action:** if you registered one of these modules with `enableController: false` and omitted `prismaService` (relying on a globally-provided token), pass `prismaService` explicitly.
+- If you use **`MasterModule` + `SettingModule` on the same (default `master`) table**, the framework now logs a **warning** at startup when both own the `master_CommandEventHandler` alias, and which module's data-sync handlers run is import-order dependent. Set `registerEventHandlerAlias: false` on `SettingModule` so `MasterModule` owns the alias (deterministic). This was a silent ambiguity before; nothing breaks, but the warning is new.
+
+#### How to change a table name
+
+Changing a table name is opt-in and backward compatible. Example: run the directory module as `document` (this is how the v1.3.x `directory` → `document` rename is now expressed — as configuration, not a forced default):
+
+```ts
+// Synchronous
+DirectoryStorageModule.register({
+  enableController: true,
+  prismaService: PrismaService,
+  tableName: 'document',        // physical tables: <env>-<app>-document-command/-data/-history
+  pkPrefix: 'DOCUMENT',         // partition key: DOCUMENT#<tenantCode>
+  prismaModelName: 'document',  // RDS reads via prismaService.document
+})
+
+// Async — the factory must resolve and return the PrismaService INSTANCE
+DirectoryStorageModule.registerAsync({
+  tableName: 'document',
+  pkPrefix: 'DOCUMENT',
+  prismaModelName: 'document',
+  imports: [PrismaModule],
+  inject: [PrismaService],
+  useFactory: (prisma) => ({ prismaService: prisma }),
+})
+```
+
+For `MasterModule` / `SurveyTemplateModule` / `SettingModule`, only `tableName` applies:
+
+```ts
+MasterModule.register({ enableController: true, prismaService: PrismaService, tableName: 'catalog' })
+```
+
+**Set all three (`tableName` + `pkPrefix` + `prismaModelName`) together for directory** — changing only `tableName` leaves the PK as `DIRECTORY#` and reads `prismaService.directory`, which is inconsistent.
+
+**Required provisioning and data migration (application responsibility):**
+1. **DynamoDB:** add the **raw base name** (e.g. `"document"`) — not the `-command`/`-data`/`-history` variants — to `prisma/dynamodbs/cqrs.json`, then run `npm run migrate:ddb` (`prisma/ddb.ts`). This creates `<name>-command/-data/-history`. Only `@mbc-cqrs-serverless/master`'s postinstall auto-adds its default `master`; every other module and every custom name must be added to `cqrs.json` by hand. Mirror the three physical tables in your IaC.
+2. **RDS:** add the corresponding Prisma model (e.g. `model Document { ... }` for `prismaModelName: 'document'`) to `schema.prisma`, then run `npm run migrate:rds` (`prisma migrate deploy`).
+3. **Data:** `migrate` only creates the (empty) tables. Copying existing rows from `directory-*` / `DIRECTORY#` / the `directory` model to the new `document-*` / `DOCUMENT#` / `document` targets is your responsibility (DynamoDB scan-and-rewrite + an RDS data migration). See [Data Migration Patterns](/docs/data-migration-patterns).
+
+> **Caveat — do NOT rename the `master` table.** The `master` table is a framework-wide central config store: `TtlService` (TTL config) and `@mbc-cqrs-serverless/sequence` (numbering formats) read a fixed `master-data` name. Overriding `MasterModule`'s `tableName` makes those readers miss their config (TTLs not applied, sequence formats fall back silently); `MasterModule.register`/`registerAsync` logs a warning in that case. Renaming `directory` / `survey-template` / `ui-setting` has no such caveat.
+
+**Action required:** none if you keep the defaults. To adopt a custom name, follow the steps above.
+
+---
+
 ## Version Compatibility Matrix
 
 | Core Version | CLI Version | NestJS | Node.js | TypeScript |
 |--------------|-------------|--------|---------|------------|
+| v1.4.0 | v1.4.0 | 10.x | 18+ | 5.x |
 | v1.3.0 | v1.3.0 | 10.x | 18+ | 5.x |
 | v1.0.23 | v1.0.23 | 10.x | 18+ | 5.x |
 | v1.0.22 | v1.0.22 | 10.x | 18+ | 5.x |
