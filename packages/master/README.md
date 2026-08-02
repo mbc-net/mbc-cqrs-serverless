@@ -44,7 +44,7 @@ import { AppTaskQueueEventFactory } from './task/app-task-queue-event.factory';
     }),
     MasterModule.register({
       enableController: true, // Optional: enable REST endpoints
-      prismaService: PrismaService, // Required when enableController is true
+      prismaService: PrismaService, // Required (MasterDataService/MasterSettingService inject it)
       dataSyncHandlers: [MasterDataSyncHandler], // Optional: custom sync handlers
     }),
   ],

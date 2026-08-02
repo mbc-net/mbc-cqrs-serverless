@@ -44,8 +44,10 @@ export class MasterModule extends ConfigurableModuleClass {
         `tableName '${tableName}' overrides the 'master' table, which is also read ` +
           `at a fixed 'master-data' name by TtlService (TTL config) and the sequence ` +
           `package (numbering formats). Renaming the master table is not fully ` +
-          `supported — TTL and sequence formats will silently fall back. Keep the ` +
-          `default 'master' unless you have addressed those readers.`,
+          `supported — TTL and sequence formats will silently fall back. Also, if you ` +
+          `use ui-setting's SettingModule, set its tableName to '${tableName}' too ` +
+          `(they share this table). Keep the default 'master' unless you have ` +
+          `addressed those readers.`,
       )
     }
   }
