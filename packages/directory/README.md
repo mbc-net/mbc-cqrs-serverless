@@ -32,6 +32,52 @@ npm install @mbc-cqrs-serverless/directory
 - `PUT /api/directory/:id` - Update a specific file or folder
 - `DELETE /api/directory/:id` - Delete a specific file or folder
 
+## Configurable table name
+
+`DirectoryStorageModule` stores its data on the `directory` DynamoDB table by
+default. You can override this (and related identifiers) with backward-compatible
+options — omitting them keeps the current behavior.
+
+| Option | Default | Description |
+|--------|---------|-------------|
+| `tableName` | `directory` | Raw DynamoDB base table name. Physical tables become `${NODE_ENV}-${APP_NAME}-${tableName}` (`-command` / `-data` / `-history`). |
+| `pkPrefix` | `DIRECTORY` | Partition-key prefix (before `#`). |
+| `prismaModelName` | `directory` | Prisma model accessor used for RDS reads. |
+
+```ts
+DirectoryStorageModule.register({
+  enableController: true,
+  prismaService: PrismaService,
+  tableName: 'document',
+  pkPrefix: 'DOCUMENT',
+  prismaModelName: 'document',
+})
+
+// Async configuration is also supported. The table name is a build-time
+// constant, so it is passed as a plain field; the factory must resolve and
+// return the PrismaService INSTANCE (inject it so Nest orders it correctly,
+// even when Prisma is provided via forRootAsync).
+DirectoryStorageModule.registerAsync({
+  tableName: 'document',
+  imports: [PrismaModule],
+  inject: [PrismaService],
+  useFactory: (prisma) => ({ prismaService: prisma }),
+})
+```
+
+> **Provisioning:** When you use a custom `tableName`, add **only the raw base
+> name** (e.g. `"document"`) to `prisma/dynamodbs/cqrs.json`. The CLI expands it
+> into `<name>-command`, `<name>-data`, and `<name>-history` — do **not** add
+> those suffixes yourself. Mirror the same three physical tables in your IaC.
+> Migrating existing data to a renamed table is the application's responsibility.
+>
+> **Unique table name:** give each domain module its own `tableName`. Sharing one
+> physical table across modules is only wired for `MasterModule` + ui-setting's
+> `SettingModule` (via `registerEventHandlerAlias`). Pointing another module at a
+> table already owned by a different module registers a second
+> `<tableName>_CommandEventHandler` alias — the app logs a warning and which
+> module's data-sync handlers run becomes import-order dependent.
+
 ## Documentation
 
 Visit https://mbc-cqrs-serverless.mbc-net.com/ to view the full documentation.

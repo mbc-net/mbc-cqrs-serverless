@@ -10,12 +10,17 @@ import {
   CommandService,
   DataService,
   DetailDto,
+  DynamoDbService,
   IInvoke,
   S3Service,
+  TableType,
   getUserContext,
 } from '@mbc-cqrs-serverless/core'
 import { DynamoService } from './dynamodb.service'
-import { PRISMA_SERVICE } from './directory.module-definition'
+import {
+  MODULE_OPTIONS_TOKEN,
+  PRISMA_SERVICE,
+} from './directory.module-definition'
 import {
   DirectoryAttributes,
   FilePermission,
@@ -65,9 +70,9 @@ describe('DirectoryService', () => {
     overrides?: Partial<DirectoryDataEntity>,
   ): DirectoryDataEntity => {
     return {
-      pk: 'DOCUMENT#TEST_TENANT',
+      pk: 'DIRECTORY#TEST_TENANT',
       sk: 'test-ulid-123',
-      id: 'DOCUMENT#TEST_TENANT#test-ulid-123',
+      id: 'DIRECTORY#TEST_TENANT#test-ulid-123',
       code: 'test-ulid-123',
       name: 'Test Directory',
       version: 1,
@@ -123,10 +128,23 @@ describe('DirectoryService', () => {
         {
           provide: PRISMA_SERVICE,
           useValue: {
-            document: {
+            directory: {
               groupBy: jest.fn(),
             },
           },
+        },
+        {
+          provide: MODULE_OPTIONS_TOKEN,
+          useValue: {},
+        },
+        {
+          provide: DynamoDbService,
+          useValue: createMock<DynamoDbService>({
+            getTableName: jest.fn(
+              (name: string, type?: TableType) =>
+                `local-app-${name}${type ? '-' + type : ''}`,
+            ),
+          }),
         },
       ],
     }).compile()
@@ -267,7 +285,7 @@ describe('DirectoryService', () => {
       dataService.getItem.mockResolvedValue(mockData)
 
       const result = await service.hasPermission(
-        { pk: 'DOCUMENT#TEST_TENANT', sk: 'test-ulid' },
+        { pk: 'DIRECTORY#TEST_TENANT', sk: 'test-ulid' },
         [FileRole.WRITE],
         { email: 'user@example.com', tenant: 'TEST_TENANT' },
       )
@@ -289,7 +307,7 @@ describe('DirectoryService', () => {
       dataService.getItem.mockResolvedValue(mockData)
 
       const result = await service.hasPermission(
-        { pk: 'DOCUMENT#TEST_TENANT', sk: 'test-ulid' },
+        { pk: 'DIRECTORY#TEST_TENANT', sk: 'test-ulid' },
         [FileRole.WRITE],
         { email: 'user@example.com', tenant: 'TEST_TENANT' },
       )
@@ -315,7 +333,7 @@ describe('DirectoryService', () => {
       dataService.getItem.mockResolvedValue(mockData)
 
       const result = await service.hasPermission(
-        { pk: 'DOCUMENT#TEST_TENANT', sk: 'test-ulid' },
+        { pk: 'DIRECTORY#TEST_TENANT', sk: 'test-ulid' },
         [FileRole.WRITE],
         { email: 'user@example.com', tenant: 'TEST_TENANT' },
       )
@@ -341,7 +359,7 @@ describe('DirectoryService', () => {
       dataService.getItem.mockResolvedValue(mockData)
 
       const result = await service.hasPermission(
-        { pk: 'DOCUMENT#TEST_TENANT', sk: 'test-ulid' },
+        { pk: 'DIRECTORY#TEST_TENANT', sk: 'test-ulid' },
         [FileRole.WRITE],
         { email: 'user@example.com', tenant: 'TEST_TENANT' },
       )
@@ -374,7 +392,7 @@ describe('DirectoryService', () => {
       dataService.getItem.mockResolvedValue(mockData)
 
       const result = await service.hasPermission(
-        { pk: 'DOCUMENT#TEST_TENANT', sk: 'test-ulid' },
+        { pk: 'DIRECTORY#TEST_TENANT', sk: 'test-ulid' },
         [FileRole.WRITE],
         { email: 'allowed@example.com', tenant: 'TEST_TENANT' },
       )
@@ -407,7 +425,7 @@ describe('DirectoryService', () => {
       dataService.getItem.mockResolvedValue(mockData)
 
       const result = await service.hasPermission(
-        { pk: 'DOCUMENT#TEST_TENANT', sk: 'test-ulid' },
+        { pk: 'DIRECTORY#TEST_TENANT', sk: 'test-ulid' },
         [FileRole.WRITE],
         { email: 'notallowed@example.com', tenant: 'TEST_TENANT' },
       )
@@ -429,7 +447,7 @@ describe('DirectoryService', () => {
       dataService.getItem.mockResolvedValue(mockData)
 
       const result = await service.hasPermission(
-        { pk: 'DOCUMENT#TEST_TENANT', sk: 'test-ulid' },
+        { pk: 'DIRECTORY#TEST_TENANT', sk: 'test-ulid' },
         [FileRole.WRITE],
         { email: 'user@example.com', tenant: 'TEST_TENANT' },
       )
@@ -451,7 +469,7 @@ describe('DirectoryService', () => {
       dataService.getItem.mockResolvedValue(mockData)
 
       const result = await service.hasPermission(
-        { pk: 'DOCUMENT#TEST_TENANT', sk: 'test-ulid' },
+        { pk: 'DIRECTORY#TEST_TENANT', sk: 'test-ulid' },
         [FileRole.WRITE],
         { email: 'user@example.com', tenant: 'OTHER_TENANT' },
       )
@@ -465,7 +483,7 @@ describe('DirectoryService', () => {
       dataService.getItem.mockResolvedValue(null)
 
       const result = await service.getEffectiveRole(
-        { pk: 'DOCUMENT#TEST_TENANT', sk: 'non-existent' },
+        { pk: 'DIRECTORY#TEST_TENANT', sk: 'non-existent' },
         { email: 'user@example.com', tenant: 'TEST_TENANT' },
       )
 
@@ -501,7 +519,7 @@ describe('DirectoryService', () => {
         .mockResolvedValueOnce(parentData)
 
       const result = await service.getEffectiveRole(
-        { pk: 'DOCUMENT#TEST_TENANT', sk: 'child-ulid' },
+        { pk: 'DIRECTORY#TEST_TENANT', sk: 'child-ulid' },
         { email: 'user@example.com', tenant: 'TEST_TENANT' },
       )
 
@@ -524,7 +542,7 @@ describe('DirectoryService', () => {
       dataService.getItem.mockResolvedValue(childData)
 
       const result = await service.getEffectiveRole(
-        { pk: 'DOCUMENT#TEST_TENANT', sk: 'child-ulid' },
+        { pk: 'DIRECTORY#TEST_TENANT', sk: 'child-ulid' },
         { email: 'user@example.com', tenant: 'TEST_TENANT' },
       )
 
@@ -572,7 +590,7 @@ describe('DirectoryService', () => {
       dataService.getItem.mockResolvedValue(mockData)
 
       const result = await service.findOne(
-        { pk: 'DOCUMENT#TEST_TENANT', sk: 'test-ulid' },
+        { pk: 'DIRECTORY#TEST_TENANT', sk: 'test-ulid' },
         { invokeContext: mockInvokeContext },
         { email: 'user@example.com' },
       )
@@ -607,7 +625,7 @@ describe('DirectoryService', () => {
 
       await expect(
         service.findOne(
-          { pk: 'DOCUMENT#TEST_TENANT', sk: 'test-ulid' },
+          { pk: 'DIRECTORY#TEST_TENANT', sk: 'test-ulid' },
           { invokeContext: mockInvokeContext },
           { email: 'unauthorized@example.com' },
         ),
@@ -623,7 +641,7 @@ describe('DirectoryService', () => {
 
       await expect(
         service.findOne(
-          { pk: 'DOCUMENT#TEST_TENANT', sk: 'non-existent' },
+          { pk: 'DIRECTORY#TEST_TENANT', sk: 'non-existent' },
           { invokeContext: mockInvokeContext },
           { email: 'user@example.com' },
         ),
@@ -643,13 +661,19 @@ describe('DirectoryService', () => {
       dynamoService.listItemsByPk.mockResolvedValue({ items: mockHistoryItems })
 
       const result = await service.findHistory(
-        { pk: 'DOCUMENT#TEST_TENANT', sk: 'test-ulid' },
+        { pk: 'DIRECTORY#TEST_TENANT', sk: 'test-ulid' },
         { invokeContext: mockInvokeContext },
         { email: 'user@example.com' },
       )
 
       expect(result.total).toBe(3) // current + 2 history items
       expect(result.items).toHaveLength(3)
+      // Default table name resolves the history table via getTableName.
+      expect(dynamoService.listItemsByPk).toHaveBeenCalledWith(
+        'local-app-directory-history',
+        expect.anything(),
+        expect.anything(),
+      )
     })
 
     it('should throw ForbiddenException when lacking read permission', async () => {
@@ -667,7 +691,7 @@ describe('DirectoryService', () => {
 
       await expect(
         service.findHistory(
-          { pk: 'DOCUMENT#TEST_TENANT', sk: 'test-ulid' },
+          { pk: 'DIRECTORY#TEST_TENANT', sk: 'test-ulid' },
           { invokeContext: mockInvokeContext },
           { email: 'user@example.com' },
         ),
@@ -693,7 +717,7 @@ describe('DirectoryService', () => {
       )
 
       const result = await service.update(
-        { pk: 'DOCUMENT#TEST_TENANT', sk: 'test-ulid' },
+        { pk: 'DIRECTORY#TEST_TENANT', sk: 'test-ulid' },
         updateDto,
         { invokeContext: mockInvokeContext },
       )
@@ -714,7 +738,7 @@ describe('DirectoryService', () => {
 
       await expect(
         service.update(
-          { pk: 'DOCUMENT#TEST_TENANT', sk: 'test-ulid' },
+          { pk: 'DIRECTORY#TEST_TENANT', sk: 'test-ulid' },
           updateDto,
           { invokeContext: mockInvokeContext },
         ),
@@ -731,7 +755,7 @@ describe('DirectoryService', () => {
 
       await expect(
         service.update(
-          { pk: 'DOCUMENT#TEST_TENANT', sk: 'non-existent' },
+          { pk: 'DIRECTORY#TEST_TENANT', sk: 'non-existent' },
           updateDto,
           { invokeContext: mockInvokeContext },
         ),
@@ -752,7 +776,7 @@ describe('DirectoryService', () => {
 
       await expect(
         service.update(
-          { pk: 'DOCUMENT#TEST_TENANT', sk: 'test-ulid' },
+          { pk: 'DIRECTORY#TEST_TENANT', sk: 'test-ulid' },
           updateDto,
           { invokeContext: mockInvokeContext },
         ),
@@ -779,7 +803,7 @@ describe('DirectoryService', () => {
 
       await expect(
         service.update(
-          { pk: 'DOCUMENT#TEST_TENANT', sk: 'test-ulid' },
+          { pk: 'DIRECTORY#TEST_TENANT', sk: 'test-ulid' },
           updateDto,
           { invokeContext: mockInvokeContext },
         ),
@@ -808,7 +832,7 @@ describe('DirectoryService', () => {
       )
 
       const result = await service.updatePermission(
-        { pk: 'DOCUMENT#TEST_TENANT', sk: 'test-ulid' },
+        { pk: 'DIRECTORY#TEST_TENANT', sk: 'test-ulid' },
         {
           email: 'user@example.com',
           attributes: {
@@ -839,7 +863,7 @@ describe('DirectoryService', () => {
       }
 
       const result = await service.rename(
-        { pk: 'DOCUMENT#TEST_TENANT', sk: 'test-ulid' },
+        { pk: 'DIRECTORY#TEST_TENANT', sk: 'test-ulid' },
         renameDto,
         { invokeContext: mockInvokeContext },
       )
@@ -852,7 +876,7 @@ describe('DirectoryService', () => {
 
       await expect(
         service.rename(
-          { pk: 'DOCUMENT#TEST_TENANT', sk: 'non-existent' },
+          { pk: 'DIRECTORY#TEST_TENANT', sk: 'non-existent' },
           { name: 'New Name', email: 'user@example.com' },
           { invokeContext: mockInvokeContext },
         ),
@@ -886,7 +910,7 @@ describe('DirectoryService', () => {
       }
 
       const result = await service.copy(
-        { pk: 'DOCUMENT#TEST_TENANT', sk: 'test-ulid' },
+        { pk: 'DIRECTORY#TEST_TENANT', sk: 'test-ulid' },
         copyDto,
         { invokeContext: mockInvokeContext },
       )
@@ -906,7 +930,7 @@ describe('DirectoryService', () => {
 
       await expect(
         service.copy(
-          { pk: 'DOCUMENT#TEST_TENANT', sk: 'non-existent' },
+          { pk: 'DIRECTORY#TEST_TENANT', sk: 'non-existent' },
           copyDto,
           { invokeContext: mockInvokeContext },
         ),
@@ -955,7 +979,7 @@ describe('DirectoryService', () => {
       }
 
       const result = await service.move(
-        { pk: 'DOCUMENT#TEST_TENANT', sk: 'test-ulid' },
+        { pk: 'DIRECTORY#TEST_TENANT', sk: 'test-ulid' },
         moveDto,
         { invokeContext: mockInvokeContext },
       )
@@ -1002,7 +1026,7 @@ describe('DirectoryService', () => {
 
       await expect(
         service.move(
-          { pk: 'DOCUMENT#TEST_TENANT', sk: 'folder-ulid' },
+          { pk: 'DIRECTORY#TEST_TENANT', sk: 'folder-ulid' },
           moveDto,
           { invokeContext: mockInvokeContext },
         ),
@@ -1028,9 +1052,11 @@ describe('DirectoryService', () => {
       }
 
       await expect(
-        service.move({ pk: 'DOCUMENT#TEST_TENANT', sk: 'test-ulid' }, moveDto, {
-          invokeContext: mockInvokeContext,
-        }),
+        service.move(
+          { pk: 'DIRECTORY#TEST_TENANT', sk: 'test-ulid' },
+          moveDto,
+          { invokeContext: mockInvokeContext },
+        ),
       ).rejects.toThrow(ForbiddenException)
     })
   })
@@ -1057,7 +1083,7 @@ describe('DirectoryService', () => {
       )
 
       const result = await service.remove(
-        { pk: 'DOCUMENT#TEST_TENANT', sk: 'test-ulid' },
+        { pk: 'DIRECTORY#TEST_TENANT', sk: 'test-ulid' },
         { invokeContext: mockInvokeContext },
         { email: 'user@example.com' },
       )
@@ -1073,7 +1099,7 @@ describe('DirectoryService', () => {
 
       await expect(
         service.remove(
-          { pk: 'DOCUMENT#TEST_TENANT', sk: 'test-ulid' },
+          { pk: 'DIRECTORY#TEST_TENANT', sk: 'test-ulid' },
           { invokeContext: mockInvokeContext },
           { email: 'user@example.com' },
         ),
@@ -1085,7 +1111,7 @@ describe('DirectoryService', () => {
 
       await expect(
         service.remove(
-          { pk: 'DOCUMENT#TEST_TENANT', sk: 'non-existent' },
+          { pk: 'DIRECTORY#TEST_TENANT', sk: 'non-existent' },
           { invokeContext: mockInvokeContext },
           { email: 'user@example.com' },
         ),
@@ -1118,7 +1144,7 @@ describe('DirectoryService', () => {
       )
 
       const result = await service.removeFile(
-        { pk: 'DOCUMENT#TEST_TENANT', sk: 'test-ulid' },
+        { pk: 'DIRECTORY#TEST_TENANT', sk: 'test-ulid' },
         { invokeContext: mockInvokeContext },
         { email: 'user@example.com' },
       )
@@ -1147,7 +1173,7 @@ describe('DirectoryService', () => {
       } as any)
 
       await service.removeFile(
-        { pk: 'DOCUMENT#TEST_TENANT', sk: 'test-ulid' },
+        { pk: 'DIRECTORY#TEST_TENANT', sk: 'test-ulid' },
         { invokeContext: mockInvokeContext },
         { email: 'user@example.com' },
       )
@@ -1169,7 +1195,7 @@ describe('DirectoryService', () => {
       commandService.publishAsync.mockResolvedValue(historyItem as any)
 
       const result = await service.restoreHistoryItem(
-        { pk: 'DOCUMENT#TEST_TENANT', sk: 'test-ulid' },
+        { pk: 'DIRECTORY#TEST_TENANT', sk: 'test-ulid' },
         '2',
         { email: 'user@example.com' },
         { invokeContext: mockInvokeContext },
@@ -1188,7 +1214,7 @@ describe('DirectoryService', () => {
 
       await expect(
         service.restoreHistoryItem(
-          { pk: 'DOCUMENT#TEST_TENANT', sk: 'test-ulid' },
+          { pk: 'DIRECTORY#TEST_TENANT', sk: 'test-ulid' },
           '999',
           { email: 'user@example.com' },
           { invokeContext: mockInvokeContext },
@@ -1214,7 +1240,7 @@ describe('DirectoryService', () => {
 
       await expect(
         service.restoreHistoryItem(
-          { pk: 'DOCUMENT#TEST_TENANT', sk: 'test-ulid' },
+          { pk: 'DIRECTORY#TEST_TENANT', sk: 'test-ulid' },
           '2',
           { email: 'user@example.com' },
           { invokeContext: mockInvokeContext },
@@ -1236,7 +1262,7 @@ describe('DirectoryService', () => {
       )
 
       const result = await service.restoreTemporary(
-        { pk: 'DOCUMENT#TEST_TENANT', sk: 'test-ulid' },
+        { pk: 'DIRECTORY#TEST_TENANT', sk: 'test-ulid' },
         { email: 'user@example.com' },
         { invokeContext: mockInvokeContext },
       )
@@ -1249,7 +1275,7 @@ describe('DirectoryService', () => {
 
       await expect(
         service.restoreTemporary(
-          { pk: 'DOCUMENT#TEST_TENANT', sk: 'non-existent' },
+          { pk: 'DIRECTORY#TEST_TENANT', sk: 'non-existent' },
           { email: 'user@example.com' },
           { invokeContext: mockInvokeContext },
         ),
@@ -1262,7 +1288,7 @@ describe('DirectoryService', () => {
 
       await expect(
         service.restoreTemporary(
-          { pk: 'DOCUMENT#TEST_TENANT', sk: 'test-ulid' },
+          { pk: 'DIRECTORY#TEST_TENANT', sk: 'test-ulid' },
           { email: 'user@example.com' },
           { invokeContext: mockInvokeContext },
         ),
@@ -1279,7 +1305,7 @@ describe('DirectoryService', () => {
       dataService.getItem.mockResolvedValue(mockData)
 
       const result = await service.getItemAttributes({
-        pk: 'DOCUMENT#TEST_TENANT',
+        pk: 'DIRECTORY#TEST_TENANT',
         sk: 'test-ulid',
       })
 
@@ -1291,7 +1317,7 @@ describe('DirectoryService', () => {
 
       await expect(
         service.getItemAttributes({
-          pk: 'DOCUMENT#TEST_TENANT',
+          pk: 'DIRECTORY#TEST_TENANT',
           sk: 'non-existent',
         }),
       ).rejects.toThrow(NotFoundException)
@@ -1304,7 +1330,7 @@ describe('DirectoryService', () => {
       dataService.getItem.mockResolvedValue(mockData)
 
       const result = await service.getItem({
-        pk: 'DOCUMENT#TEST_TENANT',
+        pk: 'DIRECTORY#TEST_TENANT',
         sk: 'test-ulid',
       })
 
@@ -1316,7 +1342,7 @@ describe('DirectoryService', () => {
 
       await expect(
         service.getItem({
-          pk: 'DOCUMENT#TEST_TENANT',
+          pk: 'DIRECTORY#TEST_TENANT',
           sk: 'non-existent',
         }),
       ).rejects.toThrow(NotFoundException)
@@ -1338,17 +1364,119 @@ describe('DirectoryService', () => {
         },
       ]
 
-      prismaService.document.groupBy.mockResolvedValue(mockSummary)
+      prismaService.directory.groupBy.mockResolvedValue(mockSummary)
 
       const result = await service.getTenantFileSizeSummary()
 
       expect(result).toHaveLength(2)
-      expect(prismaService.document.groupBy).toHaveBeenCalledWith(
+      expect(prismaService.directory.groupBy).toHaveBeenCalledWith(
         expect.objectContaining({
           by: ['tenantCode'],
           _sum: { fileSize: true },
           _count: { _all: true },
         }),
+      )
+    })
+  })
+
+  // ============================================
+  // CONFIGURABLE TABLE NAME (opt-in overrides)
+  // ============================================
+  describe('configurable table name (custom options)', () => {
+    let customService: DirectoryService
+    let customCommandService: jest.Mocked<CommandService>
+    let customDynamoService: jest.Mocked<DynamoService>
+    let customDynamoDbService: jest.Mocked<DynamoDbService>
+    let customPrisma: any
+
+    beforeEach(async () => {
+      mockGetUserContext.mockReturnValue(mockUserContext as any)
+      customPrisma = { document: { groupBy: jest.fn().mockResolvedValue([]) } }
+
+      const module: TestingModule = await Test.createTestingModule({
+        providers: [
+          DirectoryService,
+          { provide: CommandService, useValue: createMock<CommandService>() },
+          { provide: DataService, useValue: createMock<DataService>() },
+          {
+            provide: S3Service,
+            useValue: { client: { send: jest.fn() }, privateBucket: 'b' },
+          },
+          { provide: DynamoService, useValue: createMock<DynamoService>() },
+          { provide: PRISMA_SERVICE, useValue: customPrisma },
+          {
+            provide: MODULE_OPTIONS_TOKEN,
+            useValue: {
+              tableName: 'document',
+              pkPrefix: 'DOCUMENT',
+              prismaModelName: 'document',
+            },
+          },
+          {
+            provide: DynamoDbService,
+            useValue: createMock<DynamoDbService>({
+              getTableName: jest.fn(
+                (name: string, type?: TableType) =>
+                  `local-app-${name}${type ? '-' + type : ''}`,
+              ),
+            }),
+          },
+        ],
+      }).compile()
+
+      customService = module.get(DirectoryService)
+      customCommandService = module.get(CommandService)
+      customDynamoService = module.get(DynamoService)
+      customDynamoDbService = module.get(DynamoDbService)
+    })
+
+    it('uses the custom pk prefix when creating a directory', async () => {
+      customCommandService.publishAsync.mockResolvedValue(
+        createMockDirectoryData() as any,
+      )
+
+      await customService.create(
+        {
+          name: 'Doc',
+          type: 'folder',
+          attributes: { parentId: null, ancestors: [] },
+        } as any,
+        { invokeContext: mockInvokeContext },
+      )
+
+      expect(customCommandService.publishAsync).toHaveBeenCalledWith(
+        expect.objectContaining({ pk: 'DOCUMENT#TEST_TENANT' }),
+        expect.any(Object),
+      )
+    })
+
+    it('reads the summary from the custom prisma model', async () => {
+      await customService.getTenantFileSizeSummary()
+      expect(customPrisma.document.groupBy).toHaveBeenCalled()
+    })
+
+    it('resolves the history table from the custom table name', async () => {
+      const mockData = createMockDirectoryData()
+      ;(customService as any).dataService?.getItem
+      customDynamoService.listItemsByPk.mockResolvedValue({ items: [] })
+      const dataService = (customService as any)
+        .dataService as jest.Mocked<DataService>
+      dataService.getItem.mockResolvedValue(mockData)
+
+      await customService.findHistory(
+        { pk: 'DOCUMENT#TEST_TENANT', sk: 'test-ulid' },
+        { invokeContext: mockInvokeContext },
+        { email: 'owner@example.com' },
+      )
+
+      expect(customDynamoDbService.getTableName).toHaveBeenCalledWith(
+        'document',
+        TableType.HISTORY,
+      )
+      expect(customDynamoService.listItemsByPk).toHaveBeenCalledWith(
+        'local-app-document-history',
+        expect.anything(),
+        expect.anything(),
       )
     })
   })
