@@ -10,7 +10,7 @@ This guide covers common issues and their solutions when working with MBC CQRS S
 
 **Solutions**:
 1. Ensure Docker is running
-2. Check if ports are available (4566, 4571, etc.)
+2. Check if port 4566 is available
 3. Remove old containers: `docker rm -f floci`
 4. Restart Floci: `npm run offline:docker`
 
@@ -19,9 +19,9 @@ This guide covers common issues and their solutions when working with MBC CQRS S
 **Symptom**: "Table not found" errors when running locally.
 
 **Solutions**:
-1. Ensure Floci is running
+1. Ensure DynamoDB Local is running (`npm run offline:docker`)
 2. Run table creation: `npm run ddb:create`
-3. Verify tables exist: `aws --endpoint-url=http://localhost:4566 dynamodb list-tables`
+3. Verify tables exist: `aws --endpoint-url=http://localhost:8000 dynamodb list-tables`
 
 ### Cognito Authentication Fails Locally
 

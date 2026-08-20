@@ -62,6 +62,42 @@ See [Conventional Commits](https://conventionalcommits.org) for commit guideline
 - Harden npm dependencies — resolve high/moderate vulnerabilities via `overrides` (`lodash`, `tmp`, `multer`, `ajv`, `picomatch`, `fast-xml-parser`) and targeted upgrades (`@nestjs/config` ^4.0.4, `@typescript-eslint` v8); root production audit: 0 critical/high ([#445](https://github.com/mbc-net/mbc-cqrs-serverless/pull/445)–[#453](https://github.com/mbc-net/mbc-cqrs-serverless/pull/453))
 - **cli:** Upgrade `multer` to v2.2.0 in scaffolded templates to fix CVE-2026-5079 (DoS via deeply nested multipart field names) ([#463](https://github.com/mbc-net/mbc-cqrs-serverless/pull/463))
 - Add blocking CI gates: `npm audit --omit=dev --audit-level=high` and ESLint startup check run on every PR, failing the build on any production vulnerability ([#448](https://github.com/mbc-net/mbc-cqrs-serverless/pull/448))
+### Breaking Changes
+
+- **infra:** Replace LocalStack with Floci as the local S3 emulator
+
+  LocalStack Community Edition reached end of life in March 2026 — it now requires an auth
+  token and no longer receives security updates. The template pinned no version, so
+  scaffolded projects silently drifted onto an unmaintained image.
+
+  Floci serves S3 on the same port (4566) with the same path-style addressing, so no
+  application code or `.env` value changes. `S3_ENDPOINT`, `LOCAL_S3_PORT`, `S3_REGION`,
+  and `S3_BUCKET_NAME` are unaffected.
+
+  - **Migration:** In `infra-local/docker-compose.yml`, replace the `localstack` service with:
+
+    ```yaml
+      floci:
+        image: floci/floci:1.6.0
+        ports:
+          - '${LOCAL_S3_PORT:-4566}:4566'
+        environment:
+          - FLOCI_DEFAULT_REGION=ap-northeast-1
+          - FLOCI_STORAGE_MODE=persistent
+          - FLOCI_STORAGE_PERSISTENT_PATH=/data
+        volumes:
+          - ./docker-data/floci:/data
+    ```
+
+    Then remove `serverless-localstack` from `package.json` if present.
+
+  - **Data loss warning:** `FLOCI_STORAGE_MODE` defaults to `memory`. Omitting that line
+    discards all buckets on every `docker compose down`, with no error reported. Existing
+    objects under `docker-data/localstack` are not migrated — recreate buckets with
+    `infra-local/scripts/resources.sh`.
+
+  - Existing projects are not required to migrate immediately; the old stack still runs.
+    It runs on an image that no longer receives security patches.
 
 ## [1.3.1](https://github.com/mbc-net/mbc-cqrs-serverless/releases/tag/v1.3.1) (2026-06-02)
 
