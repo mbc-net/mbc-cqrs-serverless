@@ -24,6 +24,7 @@ module.exports = {
     '.eslintrc.js',
     'prisma',
     '**/*.spec.ts',
+    '**/*.smoke-spec.ts',
     '**/*.test.ts',
     'examples/**',
   ],
