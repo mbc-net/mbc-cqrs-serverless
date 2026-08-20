@@ -268,7 +268,7 @@ cp .env.example .env
 ### 3. Start Local Infrastructure
 
 ```bash
-# Start Docker services (DynamoDB Local, LocalStack, etc.)
+# Start Docker services (DynamoDB Local, Floci, etc.)
 npm run offline:docker
 ```
 

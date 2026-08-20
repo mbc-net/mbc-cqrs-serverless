@@ -473,11 +473,11 @@ fields @timestamp, @message
 
 ## Local Development Debugging
 
-### LocalStack Issues
+### Floci Issues
 
-**Start LocalStack:**
+**Start Floci:**
 ```bash
-docker-compose up -d localstack
+docker-compose up -d floci
 ```
 
 **Verify Services:**

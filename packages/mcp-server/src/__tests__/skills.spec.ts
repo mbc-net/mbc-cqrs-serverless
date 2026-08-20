@@ -335,7 +335,7 @@ describe('Claude Code Skills', () => {
     })
 
     it('should contain local development debugging', () => {
-      expect(content).toContain('LocalStack')
+      expect(content).toContain('Floci')
       expect(content).toContain('Serverless Offline')
     })
 
@@ -354,7 +354,7 @@ describe('Claude Code Skills', () => {
     it('should have consistent code block formatting', () => {
       const skills = ['mbc-generate', 'mbc-review', 'mbc-migrate', 'mbc-debug']
 
-      skills.forEach(skillName => {
+      skills.forEach((skillName) => {
         const skillPath = path.join(skillsDir, skillName, 'SKILL.md')
         const content = fs.readFileSync(skillPath, 'utf-8')
 
@@ -370,7 +370,7 @@ describe('Claude Code Skills', () => {
     it('should not contain placeholder text', () => {
       const skills = ['mbc-generate', 'mbc-review', 'mbc-migrate', 'mbc-debug']
 
-      skills.forEach(skillName => {
+      skills.forEach((skillName) => {
         const skillPath = path.join(skillsDir, skillName, 'SKILL.md')
         const content = fs.readFileSync(skillPath, 'utf-8')
 
@@ -384,7 +384,7 @@ describe('Claude Code Skills', () => {
     it('should have all skills with valid YAML frontmatter', () => {
       const skills = ['mbc-generate', 'mbc-review', 'mbc-migrate', 'mbc-debug']
 
-      skills.forEach(skillName => {
+      skills.forEach((skillName) => {
         const skillPath = path.join(skillsDir, skillName, 'SKILL.md')
         const content = fs.readFileSync(skillPath, 'utf-8')
 
