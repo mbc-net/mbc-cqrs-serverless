@@ -3,6 +3,43 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+### Breaking Changes
+
+- **infra:** Replace LocalStack with Floci as the local S3 emulator
+
+  LocalStack Community Edition reached end of life in March 2026 — it now requires an auth
+  token and no longer receives security updates. The template pinned no version, so
+  scaffolded projects silently drifted onto an unmaintained image.
+
+  Floci serves S3 on the same port (4566) with the same path-style addressing, so no
+  application code or `.env` value changes. `S3_ENDPOINT`, `LOCAL_S3_PORT`, `S3_REGION`,
+  and `S3_BUCKET_NAME` are unaffected.
+
+  - **Migration:** In `infra-local/docker-compose.yml`, replace the `localstack` service with:
+
+    ```yaml
+      floci:
+        image: floci/floci:1.6.0
+        ports:
+          - '${LOCAL_S3_PORT:-4566}:4566'
+        environment:
+          - FLOCI_DEFAULT_REGION=ap-northeast-1
+          - FLOCI_STORAGE_MODE=persistent
+          - FLOCI_STORAGE_PERSISTENT_PATH=/data
+        volumes:
+          - ./docker-data/floci:/data
+    ```
+
+    Then remove `serverless-localstack` from `package.json` if present.
+
+  - **Data loss warning:** `FLOCI_STORAGE_MODE` defaults to `memory`. Omitting that line
+    discards all buckets on every `docker compose down`, with no error reported. Existing
+    objects under `docker-data/localstack` are not migrated — recreate buckets with
+    `infra-local/scripts/resources.sh`.
+
+  - Existing projects are not required to migrate immediately; the old stack still runs.
+    It runs on an image that no longer receives security patches.
+
 ## [1.3.1](https://github.com/mbc-net/mbc-cqrs-serverless/releases/tag/v1.3.1) (2026-06-02)
 
 ### Features
