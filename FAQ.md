@@ -12,7 +12,7 @@ MBC CQRS Serverless is a TypeScript framework for building serverless applicatio
 - **Event Sourcing**: Complete audit trail of all changes
 - **Multi-tenancy**: Built-in tenant isolation
 - **AWS Integration**: Ready-to-use integrations with AWS services
-- **Local Development**: Full local development support with LocalStack
+- **Local Development**: Full local development support with Floci
 
 ### What AWS services does this framework integrate with?
 
@@ -44,7 +44,7 @@ Node.js 18 or higher is required.
 ### How do I set up local development?
 
 1. Copy environment template: `cp .env.example .env`
-2. Start LocalStack: `npm run start:localstack`
+2. Start the local stack: `npm run offline:docker`
 3. Create tables: `npm run ddb:create`
 4. Start server: `npm run offline`
 

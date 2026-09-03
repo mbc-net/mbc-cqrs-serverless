@@ -43,7 +43,7 @@ cd PROJECT_NAME
 # Start local development
 npm install
 npm run build
-npm run start:localstack
+npm run offline:docker
 npm run offline
 ```
 

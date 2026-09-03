@@ -473,23 +473,22 @@ fields @timestamp, @message
 
 ## Local Development Debugging
 
-### LocalStack Issues
+### Floci Issues
 
-**Start LocalStack:**
+**Start Floci:**
 ```bash
-docker-compose up -d localstack
+docker-compose up -d floci
 ```
 
 **Verify Services:**
 ```bash
-# Check DynamoDB
-aws --endpoint-url=http://localhost:4566 dynamodb list-tables
-
-# Check S3
+# Check S3 (Floci is S3-only on :4566)
 aws --endpoint-url=http://localhost:4566 s3 ls
+```
 
-# Check SQS
-aws --endpoint-url=http://localhost:4566 sqs list-queues
+DynamoDB Local runs separately on `:8000` (not Floci):
+```bash
+aws --endpoint-url=http://localhost:8000 dynamodb list-tables
 ```
 
 ### Serverless Offline Debug

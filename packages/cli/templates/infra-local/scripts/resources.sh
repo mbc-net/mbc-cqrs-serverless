@@ -19,5 +19,26 @@ else
   echo "Bucket $S3_BUCKET_NAME already exists."
 fi
 
+# Presigned upload/view URLs (see DirectoryFileService) are fetched by the
+# browser, so the bucket needs a CORS rule or the preflight fails with 403 and
+# the real request is never sent. The previous LocalStack service granted this
+# implicitly through EXTRA_CORS_ALLOWED_ORIGINS=*; Floci has no such switch.
+# Production configures CORS in the CDK stack — this is the local equivalent.
+# Applied unconditionally so buckets created before this script gained the rule
+# are brought up to date too.
+echo "======= configure S3 bucket CORS ======="
+aws --endpoint-url=${S3_ENDPOINT_URL} s3api put-bucket-cors \
+  --bucket $S3_BUCKET_NAME \
+  --cors-configuration '{
+    "CORSRules": [
+      {
+        "AllowedOrigins": ["*"],
+        "AllowedMethods": ["GET", "PUT", "POST", "DELETE", "HEAD"],
+        "AllowedHeaders": ["*"],
+        "ExposeHeaders": ["ETag"]
+      }
+    ]
+  }'
+
 echo "======= list S3 buckets ======="
 aws --endpoint-url=${S3_ENDPOINT_URL} s3 ls

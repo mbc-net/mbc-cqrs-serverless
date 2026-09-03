@@ -17,7 +17,7 @@ TechStack:
   - DynamoDB
 
 - RDS - PostgreSQL
-- Serverless fw && Localstack for local development
+- Serverless fw && Floci for local development
 
 ## Prepare
 
@@ -147,8 +147,7 @@ $ aws stepfunctions --endpoint-url http://localhost:8083 start-execution --state
 - sns: http://localhost:4002
 - sqs: http://localhost:9324
 - sqs admin: http://localhost:9325
-- localstack: http://localhost:4566
-  - S3
+- floci (S3): http://localhost:4566
 - appsync: http://localhost:4001
 - cognito: http://localhost:9229
 - eventbridge: http://localhost:4010

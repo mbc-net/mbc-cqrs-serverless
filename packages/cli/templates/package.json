@@ -77,7 +77,6 @@
     "run-script-os": "^1.1.6",
     "serverless": "^3.40.0",
     "serverless-dynamodb": "^0.2.47",
-    "serverless-localstack": "^1.1.2",
     "serverless-offline": "^13.3.2",
     "serverless-offline-aws-eventbridge": "^2.1.0",
     "serverless-offline-dynamodb-streams": "^7.0.0",

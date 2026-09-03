@@ -200,7 +200,7 @@ npm run test                # Run unit tests
 npm run test:e2e            # Run E2E tests
 npm run lint                # ESLint check
 npm run format              # Prettier format
-npm run start:localstack    # Start local AWS services
+npm run offline:docker      # Start local AWS services
 npm run offline             # Start serverless offline
 
 # Database
