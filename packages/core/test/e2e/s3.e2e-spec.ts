@@ -4,15 +4,31 @@ import {
   DeleteObjectsCommand,
   GetObjectCommand,
   ListObjectsV2Command,
+  PutBucketCorsCommand,
   PutObjectCommand,
   S3Client,
 } from '@aws-sdk/client-s3'
 import { Upload } from '@aws-sdk/lib-storage'
+import { getSignedUrl } from '@aws-sdk/s3-request-presigner'
 import { Readable } from 'stream'
 
 const ENDPOINT = process.env.S3_ENDPOINT || 'http://localhost:4566'
 const REGION = process.env.S3_REGION || 'ap-northeast-1'
 const BUCKET = 'e2e-s3-smoke'
+
+// A browser origin standing in for a local frontend. The value itself does not
+// matter to the assertions; what matters is that an Origin is present at all,
+// because that is what turns a plain request into a CORS request.
+const ORIGIN = 'http://localhost:3000'
+
+// Mirrors the rule applied locally by infra-local/scripts/resources.{sh,ps1}.
+// Keep the two in step: this suite is what proves the emulator honours it.
+const CORS_RULE = {
+  AllowedOrigins: ['*'],
+  AllowedMethods: ['GET', 'PUT', 'POST', 'DELETE', 'HEAD'],
+  AllowedHeaders: ['*'],
+  ExposeHeaders: ['ETag'],
+}
 
 // Mirrors packages/core/src/data-store/s3.service.ts:17-21
 const client = new S3Client({
@@ -123,5 +139,79 @@ describe('S3 emulator smoke test', () => {
         new GetObjectCommand({ Bucket: BUCKET, Key: 'smoke/does-not-exist' }),
       ),
     ).rejects.toMatchObject({ name: 'NoSuchKey' })
+  })
+
+  // --- Browser (presigned URL) access path ---------------------------------
+  // directory-file.service.ts hands presigned PUT/GET URLs to the browser, so
+  // every request on that path is a CORS request. LocalStack covered this with
+  // EXTRA_CORS_ALLOWED_ORIGINS=*; Floci has no such switch, so the bucket
+  // carries its own rule (see infra-local/scripts/resources.{sh,ps1}).
+  describe('presigned URL access from a browser origin', () => {
+    beforeAll(async () => {
+      await client.send(
+        new PutBucketCorsCommand({
+          Bucket: BUCKET,
+          CORSConfiguration: { CORSRules: [CORS_RULE] },
+        }),
+      )
+    })
+
+    // A failed preflight means the browser never sends the real request, so
+    // this is the assertion that catches a CORS regression.
+    it.each(['PUT', 'GET'])(
+      'answers the %s preflight with an allowed origin',
+      async (method) => {
+        const res = await fetch(`${ENDPOINT}/${BUCKET}/smoke/preflight.txt`, {
+          method: 'OPTIONS',
+          headers: {
+            Origin: ORIGIN,
+            'Access-Control-Request-Method': method,
+          },
+        })
+
+        expect(res.status).toBeLessThan(300)
+        expect(res.headers.get('access-control-allow-origin')).toBeTruthy()
+      },
+    )
+
+    // Mirrors genUploadDirectoryUrl then genViewUrl —
+    // directory-file.service.ts:47,22. ACL and ResponseContentDisposition are
+    // carried over deliberately: both are part of the signature the emulator
+    // has to accept.
+    it('round-trips through presigned upload and view URLs', async () => {
+      const key = 'smoke/presigned.txt'
+      const content = 'uploaded straight from the browser'
+
+      const uploadUrl = await getSignedUrl(
+        client,
+        new PutObjectCommand({ Bucket: BUCKET, Key: key, ACL: 'private' }),
+        { expiresIn: 60 * 60 },
+      )
+      const uploaded = await fetch(uploadUrl, {
+        method: 'PUT',
+        body: content,
+        headers: { Origin: ORIGIN },
+      })
+
+      expect(uploaded.status).toBe(200)
+      expect(uploaded.headers.get('access-control-allow-origin')).toBeTruthy()
+
+      const viewUrl = await getSignedUrl(
+        client,
+        new GetObjectCommand({
+          Bucket: BUCKET,
+          Key: key,
+          ResponseContentDisposition: `inline; filename="${encodeURIComponent(
+            'presigned.txt',
+          )}"`,
+        }),
+        { expiresIn: 60 * 60 },
+      )
+      const viewed = await fetch(viewUrl, { headers: { Origin: ORIGIN } })
+
+      expect(viewed.status).toBe(200)
+      expect(viewed.headers.get('access-control-allow-origin')).toBeTruthy()
+      expect(await viewed.text()).toBe(content)
+    })
   })
 })
