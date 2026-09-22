@@ -63,9 +63,8 @@ services:
     environment:
       - FLOCI_DEFAULT_REGION=ap-northeast-1
       - FLOCI_STORAGE_MODE=persistent
-      - FLOCI_STORAGE_PERSISTENT_PATH=/data
     volumes:
-      - ./docker-data/floci:/data
+      - floci-data:/app/data
 
   appsync:
     build:
@@ -85,3 +84,6 @@ services:
   #     - 9229:9229
   #   volumes:
   #     - ./docker-data/.cognito:/app/.cognito
+
+volumes:
+  floci-data:
