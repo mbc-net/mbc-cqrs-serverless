@@ -100,7 +100,7 @@ npm run lint                # ESLint check
 npm run format              # Prettier format
 
 # Local Development
-npm run start:localstack    # Start LocalStack services
+npm run offline:docker      # Start local AWS services
 npm run offline             # Start serverless offline
 
 # Database
@@ -110,7 +110,7 @@ npm run ddb:create          # Create DynamoDB tables
 ## Testing Guidelines
 
 - Unit tests: Use Jest with aws-sdk-client-mock for AWS service mocking
-- E2E tests: Use LocalStack for AWS service emulation
+- E2E tests: Use Floci and other local emulators for AWS service emulation
 - Always write tests for new features
 - Maintain test coverage for critical paths
 

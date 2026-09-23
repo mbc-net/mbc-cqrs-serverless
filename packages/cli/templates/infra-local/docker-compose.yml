@@ -56,19 +56,15 @@ services:
       - ./elasticmq.conf:/opt/elasticmq.conf
       - ./docker-data/elasticmq:/data
 
-  localstack:
-    image: localstack/localstack
+  floci:
+    image: floci/floci:1.6.0
     ports:
       - '${LOCAL_S3_PORT:-4566}:4566'
     environment:
-      - SERVICES=s3
-      - AWS_DEFAULT_REGION=ap-northeast-1
-      - SERVICE_ACCESS_KEY=local
-      - SERVICE_SECRET_KEY=local
-      - EXTRA_CORS_ALLOWED_ORIGINS=*
+      - FLOCI_DEFAULT_REGION=ap-northeast-1
+      - FLOCI_STORAGE_MODE=persistent
     volumes:
-      - ./docker-data/localstack:/var/lib/localstack
-      - ./docker-data/run/docker.sock:/var/run/docker.sock
+      - floci-data:/app/data
 
   appsync:
     build:
@@ -93,3 +89,6 @@ services:
       - ${LOCAL_COGNITO_PORT:-9229}:${LOCAL_COGNITO_PORT:-9229}
     volumes:
       - ./docker-data/.cognito:/app/.cognito
+
+volumes:
+  floci-data:

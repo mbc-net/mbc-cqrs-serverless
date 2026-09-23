@@ -215,7 +215,7 @@ npm run lint
 npm run format
 
 # Local Development
-npm run start:localstack
+npm run offline:docker
 npm run offline
 
 # Database
