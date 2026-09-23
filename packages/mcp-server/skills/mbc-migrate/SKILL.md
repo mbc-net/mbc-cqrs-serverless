@@ -794,7 +794,7 @@ npm run offline:docker
 bash infra-local/scripts/resources.sh   # Windows: npm run resources:win32
 ```
 
-`npm run offline:sls` (also run in Terminal 2) executes the same scripts before starting Serverless Offline.
+`npm run offline:sls` also runs these scripts, but on macOS/Linux it starts them in the background alongside Serverless Offline (not before it, and without stopping on failure); only on Windows does it wait for them. Run `resources.sh` by hand once as above and confirm it succeeded before you test presigned URLs.
 
 If you did not update the scripts in Step 3, apply the rule once by hand **after** the bucket exists:
 
