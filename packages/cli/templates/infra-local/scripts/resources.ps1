@@ -27,7 +27,9 @@ if (-not $bucketExists) {
 # Presigned upload/view URLs (see DirectoryFileService) are fetched by the
 # browser, so the bucket needs a CORS rule or the preflight fails with 403 and
 # the real request is never sent. The previous LocalStack service granted this
-# implicitly through EXTRA_CORS_ALLOWED_ORIGINS=*; Floci has no such switch.
+# implicitly through EXTRA_CORS_ALLOWED_ORIGINS=*, which Floci 1.6.0 does not
+# honor (its global switch is FLOCI_SECURITY_EXTRA_CORS_ALLOWED_ORIGINS); a bucket
+# rule is used instead so local matches production.
 # Production configures CORS in the CDK stack - this is the local equivalent.
 # Applied unconditionally so buckets created before this script gained the rule
 # are brought up to date too.
