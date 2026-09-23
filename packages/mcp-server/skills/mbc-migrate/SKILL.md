@@ -45,6 +45,7 @@ This skill helps migrate MBC CQRS Serverless projects between versions.
 | v1.3.0 | v1.3.1 | Low | Group-based roles (`@GroupRoleResolver`, `custom:groups`); `UserContext.tenantRoles`/`tenantGroupIds` added (opt-in, no breaking changes) |
 | v1.3.2 | v1.3.3 | Low | `ATTRIBUTE_LIMIT_SIZE` default lowered 389120 → 102400 for Step Functions payload limit (transparent unless overridden) |
 | v1.3.5 | v1.4.0 | Low | Configurable DynamoDB table names (opt-in) + `registerAsync` on domain modules; `prismaService` now always required; `MasterModule`+`SettingModule` shared-table alias warns |
+| v1.4.0 | v1.5.0 | Low | Local dev only: LocalStack → Floci as the local S3 emulator; bucket CORS must be applied locally for presigned URLs (no application code changes) |
 
 ## Migration Guides
 
@@ -746,10 +747,73 @@ MasterModule.register({ enableController: true, prismaService: PrismaService, ta
 
 ---
 
+### v1.4.0 → v1.5.0 (local development stack only; no application code changes)
+
+v1.5.0 replaces LocalStack with [Floci](https://github.com/floci-io/floci) (`floci/floci:1.6.0`) as the local S3 emulator. LocalStack Community Edition reached end of life in March 2026 (it now requires an auth token and no longer receives security updates), and the template pinned no image version. Floci serves S3 on the same port (`4566`) with the same path-style addressing, so **application code and `.env` values (`S3_ENDPOINT`, `LOCAL_S3_PORT`, `S3_REGION`, `S3_BUCKET_NAME`) do not change**. Deployed environments are not affected.
+
+Newly scaffolded projects (`mbc new`) already use Floci. Existing projects keep working on LocalStack, but that image no longer receives security patches, so migrate when convenient.
+
+**Step 1 — Replace the compose service.** In `infra-local/docker-compose.yml`, replace the `localstack` service with:
+
+```yaml
+  floci:
+    image: floci/floci:1.6.0
+    ports:
+      - '${LOCAL_S3_PORT:-4566}:4566'
+    environment:
+      - FLOCI_DEFAULT_REGION=ap-northeast-1
+      - FLOCI_STORAGE_MODE=persistent
+    volumes:
+      - floci-data:/app/data
+```
+
+and declare the named volume at the top level of the same file:
+
+```yaml
+volumes:
+  floci-data:
+```
+
+`FLOCI_STORAGE_MODE=persistent` is required: the default is `memory`, which silently discards every bucket on `docker compose down`. The volume is project-scoped through `COMPOSE_PROJECT_NAME` in `.env`, so projects on the same machine do not share S3 data.
+
+**Step 2 — Remove the plugin.** Remove `serverless-localstack` from `package.json` (and any commented `localStackConfig` block in `infra-local/serverless.yml`), then run `npm install`.
+
+**Step 3 — Add the bucket CORS rule to your resource scripts (required for presigned URLs).** LocalStack allowed every origin through `EXTRA_CORS_ALLOWED_ORIGINS=*`. Floci has no such switch and answers the browser preflight with `403` until the bucket has a CORS rule, so presigned upload/view URLs from `DirectoryFileService` fail in the browser. Copy the `configure S3 bucket CORS` block from the latest template's `infra-local/scripts/resources.sh` / `resources.ps1` into your own scripts, so the rule is re-applied every time the scripts run (`npm run offline:sls` runs them for you).
+
+On Windows, the template passes the JSON as `file://` and writes the file **without a BOM**: Windows PowerShell 5.1 adds one for `Set-Content -Encoding utf8`, and the AWS CLI rejects it with `Error parsing parameter '--cors-configuration'`. Keep the template's `[System.IO.File]::WriteAllText($path, $json, (New-Object System.Text.UTF8Encoding $false))` and `$LASTEXITCODE` check when you copy the block.
+
+**Step 4 — Start Floci and recreate the bucket.** Objects under `docker-data/localstack` are not migrated. From the project root:
+
+```bash
+npm run offline:docker                  # starts Floci with the rest of the local stack
+bash infra-local/scripts/resources.sh   # creates the bucket and applies the CORS rule (Windows: npm run resources:win32)
+```
+
+If you did not update the scripts in Step 3, apply the rule once by hand **after** the bucket exists:
+
+```bash
+set -a; . ./.env; set +a   # load S3_ENDPOINT, S3_BUCKET_NAME and the local credentials
+aws --endpoint-url="$S3_ENDPOINT" s3api put-bucket-cors \
+  --bucket "$S3_BUCKET_NAME" \
+  --cors-configuration '{"CORSRules":[{"AllowedOrigins":["*"],"AllowedMethods":["GET","PUT","POST","DELETE","HEAD"],"AllowedHeaders":["*"],"ExposeHeaders":["ETag"]}]}'
+```
+
+**Verify** (from the project root, with `.env` loaded as above):
+
+```bash
+aws --endpoint-url="$S3_ENDPOINT" s3 ls
+aws --endpoint-url="$S3_ENDPOINT" s3api get-bucket-cors --bucket "$S3_BUCKET_NAME"
+```
+
+**Action required:** Steps 1–4 for existing projects that want to leave LocalStack. None for application code.
+
+---
+
 ## Version Compatibility Matrix
 
 | Core Version | CLI Version | NestJS | Node.js | TypeScript |
 |--------------|-------------|--------|---------|------------|
+| v1.5.0 | v1.5.0 | 10.x | 18+ | 5.x |
 | v1.4.0 | v1.4.0 | 10.x | 18+ | 5.x |
 | v1.3.0 | v1.3.0 | 10.x | 18+ | 5.x |
 | v1.0.23 | v1.0.23 | 10.x | 18+ | 5.x |

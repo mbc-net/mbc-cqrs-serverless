@@ -22,6 +22,7 @@
   "files": [
     "dist",
     "bin",
+    "skills",
     "!dist/tsconfig.tsbuildinfo"
   ],
   "scripts": {

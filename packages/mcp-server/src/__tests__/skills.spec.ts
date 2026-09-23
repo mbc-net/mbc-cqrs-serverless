@@ -1,3 +1,4 @@
+import { execFileSync } from 'child_process'
 import * as fs from 'fs'
 import * as path from 'path'
 
@@ -285,6 +286,14 @@ describe('Claude Code Skills', () => {
       expect(content).toContain('v1.3.3')
       expect(content).toContain('ATTRIBUTE_LIMIT_SIZE')
     })
+
+    it('should contain v1.5.0 migration guide (LocalStack → Floci)', () => {
+      expect(content).toContain('### v1.4.0 → v1.5.0')
+      expect(content).toContain('floci/floci:1.6.0')
+      expect(content).toContain('FLOCI_STORAGE_MODE=persistent')
+      expect(content).toContain('put-bucket-cors')
+      expect(content).toContain('| v1.5.0 | v1.5.0 |')
+    })
   })
 
   describe('mbc-debug skill', () => {
@@ -339,6 +348,13 @@ describe('Claude Code Skills', () => {
       expect(content).toContain('Serverless Offline')
     })
 
+    it('should start Floci from infra-local, where the compose file lives', () => {
+      expect(content).toContain(
+        'cd infra-local && docker compose --env-file ../.env up -d floci',
+      )
+      expect(content).not.toMatch(/^docker-compose up -d floci$/m)
+    })
+
     it('should contain troubleshooting decision tree', () => {
       expect(content).toContain('Decision Tree')
       expect(content).toContain('Error Occurred')
@@ -347,6 +363,32 @@ describe('Claude Code Skills', () => {
     it('should contain States.DataLimitExceeded troubleshooting (v1.3.3+)', () => {
       expect(content).toContain('States.DataLimitExceeded')
       expect(content).toContain('ATTRIBUTE_LIMIT_SIZE')
+    })
+  })
+
+  describe('npm package contents', () => {
+    it('should ship every skill in the published package', () => {
+      // README tells users to copy node_modules/@mbc-cqrs-serverless/mcp-server/skills/*,
+      // so the skills must survive `files` filtering. Ask npm itself rather than
+      // re-implementing its rules.
+      const packageDir = path.join(__dirname, '../..')
+      const output = execFileSync(
+        'npm',
+        ['pack', '--dry-run', '--json', '--ignore-scripts'],
+        { cwd: packageDir, encoding: 'utf-8' },
+      )
+      const packed: string[] = JSON.parse(output)[0].files.map(
+        (file: { path: string }) => file.path,
+      )
+
+      for (const skill of [
+        'mbc-generate',
+        'mbc-review',
+        'mbc-migrate',
+        'mbc-debug',
+      ]) {
+        expect(packed).toContain(`skills/${skill}/SKILL.md`)
+      }
     })
   })
 
