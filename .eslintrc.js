@@ -24,7 +24,7 @@ module.exports = {
     '.eslintrc.js',
     'prisma',
     '**/*.spec.ts',
-    '**/*.smoke-spec.ts',
+    '**/*.e2e-spec.ts',
     '**/*.test.ts',
     'examples/**',
     // Scaffolding templates are excluded from tsconfig and reference

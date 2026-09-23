@@ -84,9 +84,15 @@ See [Conventional Commits](https://conventionalcommits.org) for commit guideline
         environment:
           - FLOCI_DEFAULT_REGION=ap-northeast-1
           - FLOCI_STORAGE_MODE=persistent
-          - FLOCI_STORAGE_PERSISTENT_PATH=/data
         volumes:
-          - ./docker-data/floci:/data
+          - floci-data:/app/data
+    ```
+
+    And declare the named volume at the top level of the same file:
+
+    ```yaml
+    volumes:
+      floci-data:
     ```
 
     Then remove `serverless-localstack` from `package.json` if present.
