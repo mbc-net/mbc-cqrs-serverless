@@ -48,9 +48,20 @@ $corsConfiguration = @'
 # Passed as file:// rather than inline: PowerShell mangles embedded quotes on
 # the way to the AWS CLI.
 $corsFile = Join-Path ([System.IO.Path]::GetTempPath()) "mbc-s3-cors.json"
-Set-Content -Path $corsFile -Value $corsConfiguration -Encoding utf8
+# Written BOM-less on purpose. Windows PowerShell 5.1 - still the default
+# powershell.exe - writes a BOM for "-Encoding utf8", and the AWS CLI rejects
+# the file with "Error parsing parameter '--cors-configuration'" before it
+# sends any request, so the rule silently never lands. PowerShell 7 writes no
+# BOM, which is why this only fails on stock Windows. WriteAllText behaves the
+# same on both.
+[System.IO.File]::WriteAllText($corsFile, $corsConfiguration, (New-Object System.Text.UTF8Encoding $false))
 try {
     aws --endpoint-url=http://localhost:$s3Port s3api put-bucket-cors --bucket $env:S3_BUCKET_NAME --cors-configuration "file://$corsFile"
+    # aws exits non-zero on both a rejected --cors-configuration (252) and an
+    # unreachable endpoint (255), but PowerShell does not throw on native
+    # command failure, so without this the rule can silently never land and the
+    # script still exits 0.
+    if ($LASTEXITCODE -ne 0) { throw "put-bucket-cors failed ($LASTEXITCODE)" }
 } finally {
     Remove-Item $corsFile -ErrorAction SilentlyContinue
 }
