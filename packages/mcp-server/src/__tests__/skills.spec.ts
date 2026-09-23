@@ -1,4 +1,4 @@
-import { execFileSync } from 'child_process'
+import { execSync } from 'child_process'
 import * as fs from 'fs'
 import * as path from 'path'
 
@@ -372,11 +372,11 @@ describe('Claude Code Skills', () => {
       // so the skills must survive `files` filtering. Ask npm itself rather than
       // re-implementing its rules.
       const packageDir = path.join(__dirname, '../..')
-      const output = execFileSync(
-        'npm',
-        ['pack', '--dry-run', '--json', '--ignore-scripts'],
-        { cwd: packageDir, encoding: 'utf-8' },
-      )
+      // execSync (shell) rather than execFileSync: npm is npm.cmd on Windows.
+      const output = execSync('npm pack --dry-run --json --ignore-scripts', {
+        cwd: packageDir,
+        encoding: 'utf-8',
+      })
       const packed: string[] = JSON.parse(output)[0].files.map(
         (file: { path: string }) => file.path,
       )

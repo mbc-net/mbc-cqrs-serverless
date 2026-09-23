@@ -482,7 +482,7 @@ npm run offline:docker                                        # whole local stac
 cd infra-local && docker compose --env-file ../.env up -d floci
 ```
 
-Without `--env-file ../.env` Compose falls back to the project name `infra-local` and port `4566`, i.e. a different container and data volume than `npm run offline:docker` uses.
+`--env-file ../.env` makes Compose read the project root's settings directly. Without it, Compose reads `infra-local/.env`, which `npm run offline:docker` links (copies on Windows) from the root `.env`; if that file does not exist yet, Compose falls back to the project name `infra-local` and port `4566`, i.e. a different container and data volume than `npm run offline:docker` uses.
 
 **Presigned URL returns 403 in the browser:** the bucket has no CORS rule (Floci does not allow any origin by default). From the project root, re-run `bash infra-local/scripts/resources.sh` (`npm run resources:win32` on Windows), or check the rule with:
 ```bash

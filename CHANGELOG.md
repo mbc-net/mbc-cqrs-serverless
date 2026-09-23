@@ -44,13 +44,16 @@ See [Conventional Commits](https://conventionalcommits.org) for commit guideline
   - **Data loss warning:** `FLOCI_STORAGE_MODE` defaults to `memory`. Omitting that line
     discards all buckets on every `docker compose down`, with no error reported. Existing
     objects under `docker-data/localstack` are not migrated — start the stack
-    (`npm run offline:docker`) and recreate the bucket with `bash infra-local/scripts/resources.sh`
-    (or `npm run resources:win32` on Windows).
+    (`npm run offline:docker`, which stays in the foreground) and, from a second terminal,
+    recreate the bucket with `bash infra-local/scripts/resources.sh` (or `npm run resources:win32`
+    on Windows).
 
   - **Migration — bucket CORS (required for presigned URLs):** LocalStack allowed every
-    origin through `EXTRA_CORS_ALLOWED_ORIGINS=*`; Floci has no such switch and answers the
-    browser preflight with `403` until the bucket has a CORS rule. Without it, presigned upload
-    and view URLs (`DirectoryFileService`) fail in the browser. Newly scaffolded projects apply
+    origin through `EXTRA_CORS_ALLOWED_ORIGINS=*`. Floci 1.6.0 does not honor that variable
+    (its own global switch is `FLOCI_SECURITY_EXTRA_CORS_ALLOWED_ORIGINS`), so without a CORS
+    rule it answers the browser preflight with `403` and presigned upload and view URLs
+    (`DirectoryFileService`) fail in the browser. The template applies a bucket CORS rule
+    instead, mirroring production. Newly scaffolded projects apply
     the rule in `infra-local/scripts/resources.sh` / `resources.ps1`; existing projects should copy
     the `configure S3 bucket CORS` block from the latest template into their own scripts, or
     apply it once by hand from the project root after the bucket exists:

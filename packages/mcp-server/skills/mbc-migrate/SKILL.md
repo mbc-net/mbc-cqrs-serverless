@@ -778,16 +778,23 @@ volumes:
 
 **Step 2 — Remove the plugin.** Remove `serverless-localstack` from `package.json` (and any commented `localStackConfig` block in `infra-local/serverless.yml`), then run `npm install`.
 
-**Step 3 — Add the bucket CORS rule to your resource scripts (required for presigned URLs).** LocalStack allowed every origin through `EXTRA_CORS_ALLOWED_ORIGINS=*`. Floci has no such switch and answers the browser preflight with `403` until the bucket has a CORS rule, so presigned upload/view URLs from `DirectoryFileService` fail in the browser. Copy the `configure S3 bucket CORS` block from the latest template's `infra-local/scripts/resources.sh` / `resources.ps1` into your own scripts, so the rule is re-applied every time the scripts run (`npm run offline:sls` runs them for you).
+**Step 3 — Add the bucket CORS rule to your resource scripts (required for presigned URLs).** LocalStack allowed every origin through `EXTRA_CORS_ALLOWED_ORIGINS=*`. Floci 1.6.0 does not honor that variable (its own global switch is `FLOCI_SECURITY_EXTRA_CORS_ALLOWED_ORIGINS`), so without a CORS rule it answers the browser preflight with `403` and presigned upload/view URLs from `DirectoryFileService` fail in the browser. The template applies a bucket CORS rule instead, mirroring how production configures CORS on the bucket in the CDK stack. Copy the `configure S3 bucket CORS` block from the latest template's `infra-local/scripts/resources.sh` / `resources.ps1` into your own scripts, so the rule is re-applied every time the scripts run (`npm run offline:sls` runs them for you).
 
 On Windows, the template passes the JSON as `file://` and writes the file **without a BOM**: Windows PowerShell 5.1 adds one for `Set-Content -Encoding utf8`, and the AWS CLI rejects it with `Error parsing parameter '--cors-configuration'`. Keep the template's `[System.IO.File]::WriteAllText($path, $json, (New-Object System.Text.UTF8Encoding $false))` and `$LASTEXITCODE` check when you copy the block.
 
-**Step 4 — Start Floci and recreate the bucket.** Objects under `docker-data/localstack` are not migrated. From the project root:
+**Step 4 — Start Floci and recreate the bucket.** Objects under `docker-data/localstack` are not migrated. `npm run offline:docker` runs `docker compose up` in the foreground and does not return, so use two terminals from the project root:
 
 ```bash
-npm run offline:docker                  # starts Floci with the rest of the local stack
-bash infra-local/scripts/resources.sh   # creates the bucket and applies the CORS rule (Windows: npm run resources:win32)
+# Terminal 1 — keeps running
+npm run offline:docker
 ```
+
+```bash
+# Terminal 2 — once Floci is up: creates the bucket and applies the CORS rule
+bash infra-local/scripts/resources.sh   # Windows: npm run resources:win32
+```
+
+`npm run offline:sls` (also run in Terminal 2) executes the same scripts before starting Serverless Offline.
 
 If you did not update the scripts in Step 3, apply the rule once by hand **after** the bucket exists:
 

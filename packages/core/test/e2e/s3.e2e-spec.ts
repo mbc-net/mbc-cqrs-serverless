@@ -144,8 +144,9 @@ describe('S3 emulator smoke test', () => {
   // --- Browser (presigned URL) access path ---------------------------------
   // directory-file.service.ts hands presigned PUT/GET URLs to the browser, so
   // every request on that path is a CORS request. LocalStack covered this with
-  // EXTRA_CORS_ALLOWED_ORIGINS=*; Floci has no such switch, so the bucket
-  // carries its own rule (see infra-local/scripts/resources.{sh,ps1}).
+  // EXTRA_CORS_ALLOWED_ORIGINS=*, which Floci 1.6.0 does not honor (its global
+  // switch is FLOCI_SECURITY_EXTRA_CORS_ALLOWED_ORIGINS), so the bucket carries
+  // its own rule (see infra-local/scripts/resources.{sh,ps1}).
   describe('presigned URL access from a browser origin', () => {
     beforeAll(async () => {
       await client.send(
