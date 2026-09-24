@@ -7,7 +7,7 @@ import {
   DynamoDbService,
   generateId,
   getUserContext,
-  IInvoke,
+  ICommandOptions,
   S3Service,
   TableType,
   VER_SEPARATOR,
@@ -78,10 +78,7 @@ export class DirectoryService {
       moduleOptions.prismaModelName ?? DEFAULT_DIRECTORY_PRISMA_MODEL
   }
 
-  async create(
-    createDto: DirectoryCreateDto,
-    opts: { invokeContext: IInvoke },
-  ) {
+  async create(createDto: DirectoryCreateDto, opts: ICommandOptions) {
     const { tenantCode } = getUserContext(opts.invokeContext)
     const pk = `${this.pkPrefix}${KEY_SEPARATOR}${tenantCode}`
     const sk = ulid()
@@ -163,7 +160,7 @@ export class DirectoryService {
   async copy(
     detailDto: DetailDto,
     copyDto: DirectoryCopyDto,
-    opts: { invokeContext: IInvoke },
+    opts: ICommandOptions,
   ) {
     const userContext = getUserContext(opts.invokeContext)
     const { tenantCode, userId } = userContext
@@ -228,7 +225,7 @@ export class DirectoryService {
   async move(
     detailDto: DetailDto,
     copyDto: DirectoryMoveDto,
-    opts: { invokeContext: IInvoke },
+    opts: ICommandOptions,
   ) {
     const userContext = getUserContext(opts.invokeContext)
     const { tenantCode } = userContext
@@ -405,7 +402,7 @@ export class DirectoryService {
 
   async findOne(
     detailDto: DetailDto,
-    opts: { invokeContext: IInvoke },
+    opts: ICommandOptions,
     queryDto: DirectoryDetailDto,
   ): Promise<DirectoryDataEntity> {
     const userContext = getUserContext(opts.invokeContext)
@@ -439,7 +436,7 @@ export class DirectoryService {
 
   async findHistory(
     detailDto: DetailDto,
-    opts: { invokeContext: IInvoke },
+    opts: ICommandOptions,
     queryDto: DirectoryDetailDto,
   ): Promise<DirectoryDataListEntity> {
     const userContext = getUserContext(opts.invokeContext)
@@ -501,7 +498,7 @@ export class DirectoryService {
     detailDto: DetailDto,
     version: string,
     queryDto: DirectoryDetailDto,
-    opts: { invokeContext: IInvoke },
+    opts: ICommandOptions,
   ): Promise<DirectoryDataEntity> {
     const item = await this.commandService.getItem({
       pk: detailDto.pk,
@@ -556,7 +553,7 @@ export class DirectoryService {
   async restoreTemporary(
     detailDto: DetailDto,
     queryDto: DirectoryDetailDto,
-    opts: { invokeContext: IInvoke },
+    opts: ICommandOptions,
   ): Promise<DirectoryDataEntity> {
     const data = (await this.dataService.getItem(
       detailDto,
@@ -617,7 +614,7 @@ export class DirectoryService {
   async update(
     detailDto: DetailDto,
     updateDto: DirectoryUpdateDto,
-    opts: { invokeContext: IInvoke },
+    opts: ICommandOptions,
   ): Promise<DirectoryDataEntity> {
     const userContext = getUserContext(opts.invokeContext)
     const { tenantCode: tenant } = userContext
@@ -682,7 +679,7 @@ export class DirectoryService {
   async updatePermission(
     detailDto: DetailDto,
     updateDto: DirectoryUpdatePermissionDto,
-    opts: { invokeContext: IInvoke },
+    opts: ICommandOptions,
   ): Promise<DirectoryDataEntity> {
     const userContext = getUserContext(opts.invokeContext)
     const { tenantCode: tenant } = userContext
@@ -751,7 +748,7 @@ export class DirectoryService {
   async rename(
     detailDto: DetailDto,
     updateDto: DirectoryRenameDto,
-    opts: { invokeContext: IInvoke },
+    opts: ICommandOptions,
   ): Promise<DirectoryDataEntity> {
     const { tenantCode: tenant } = getUserContext(opts.invokeContext)
 
@@ -796,7 +793,7 @@ export class DirectoryService {
 
   async remove(
     key: DetailDto,
-    opts: { invokeContext: IInvoke },
+    opts: ICommandOptions,
     queryDto: DirectoryDetailDto,
   ) {
     const userContext = getUserContext(opts.invokeContext)
@@ -839,7 +836,7 @@ export class DirectoryService {
 
   async removeFile(
     key: DetailDto,
-    opts: { invokeContext: IInvoke },
+    opts: ICommandOptions,
     queryDto: DirectoryDetailDto,
   ) {
     const userContext = getUserContext(opts.invokeContext)
