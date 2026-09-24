@@ -3,7 +3,7 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
-## [1.5.0](https://github.com/mbc-net/mbc-cqrs-serverless/releases/tag/v1.5.0) (Unreleased)
+## [1.5.0](https://github.com/mbc-net/mbc-cqrs-serverless/releases/tag/v1.5.0) (2026-09-24)
 
 ### Breaking Changes
 
