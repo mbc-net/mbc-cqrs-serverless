@@ -73,6 +73,8 @@ See [Conventional Commits](https://conventionalcommits.org) for commit guideline
 
 ### Bug Fixes
 
+- **cli:** Fix `mbc new` failing at dependency installation with `npm error EOVERRIDE: Override for js-yaml@^4.1.0 conflicts with direct dependency` (broken since v1.3.5). The template's `js-yaml` override now references the direct dependency (`$js-yaml`), which moves to `^4.3.2` and also clears the high-severity `js-yaml` advisory (4.0.0 – 4.3.1)
+- **cli:** Fix `npm run migrate` in scaffolded projects. `DATABASE_URL` used `${LOCAL_RDS_PORT:-3306}`, which Prisma does not expand (`P1013: invalid port number`), and `prisma/ddb.ts` loaded `.env` with plain `dotenv`, leaving `${LOCAL_DYNAMODB_PORT:-8000}` literal (`Invalid URL`). `DATABASE_URL` now uses `${LOCAL_RDS_PORT}` and `ddb.ts` expands the env with `dotenv-expand`; `dotenv` / `dotenv-expand` are declared as direct dependencies
 - **mcp-server:** Ship the Claude Code skills (`skills/`) in the published npm package. They were
   missing from `files`, so the documented `cp -r node_modules/@mbc-cqrs-serverless/mcp-server/skills/* ...`
   install step found nothing
