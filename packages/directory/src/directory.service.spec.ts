@@ -198,6 +198,38 @@ describe('DirectoryService', () => {
       )
     })
 
+    // ICommandOptions (#505): source / requestId must reach the command
+    // service unchanged so they end up on the command for tracing.
+    it('should pass source and requestId through to publishAsync', async () => {
+      const createDto: DirectoryCreateDto = {
+        name: 'Root Folder',
+        type: 'folder',
+        attributes: {
+          parentId: null,
+          ancestors: [],
+          owner: { email: 'owner@example.com', ownerId: 'user-123' },
+        },
+      }
+      commandService.publishAsync.mockResolvedValue(
+        createMockDirectoryData({ name: 'Root Folder' }) as any,
+      )
+
+      await service.create(createDto, {
+        invokeContext: mockInvokeContext,
+        source: 'POST /api/directory',
+        requestId: 'req-123',
+      })
+
+      expect(commandService.publishAsync).toHaveBeenCalledWith(
+        expect.any(Object),
+        {
+          invokeContext: mockInvokeContext,
+          source: 'POST /api/directory',
+          requestId: 'req-123',
+        },
+      )
+    })
+
     it('should create a child directory with correct ancestors', async () => {
       const parentData = createMockDirectoryData({
         sk: 'parent-ulid',
@@ -723,6 +755,34 @@ describe('DirectoryService', () => {
       )
 
       expect(result.name).toBe('Updated Name')
+    })
+
+    it('should pass source and requestId through to publishPartialUpdateAsync', async () => {
+      const mockData = createMockDirectoryData()
+      dataService.getItem.mockResolvedValue(mockData)
+      commandService.publishPartialUpdateAsync.mockResolvedValue({
+        ...mockData,
+        name: 'Updated Name',
+      } as any)
+
+      await service.update(
+        { pk: 'DIRECTORY#TEST_TENANT', sk: 'test-ulid' },
+        { name: 'Updated Name', email: 'user@example.com' },
+        {
+          invokeContext: mockInvokeContext,
+          source: 'PUT /api/directory',
+          requestId: 'req-456',
+        },
+      )
+
+      expect(commandService.publishPartialUpdateAsync).toHaveBeenCalledWith(
+        expect.any(Object),
+        {
+          invokeContext: mockInvokeContext,
+          source: 'PUT /api/directory',
+          requestId: 'req-456',
+        },
+      )
     })
 
     it('should throw BadRequestException for mismatched tenant', async () => {
