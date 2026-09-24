@@ -3,6 +3,89 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.5.0](https://github.com/mbc-net/mbc-cqrs-serverless/releases/tag/v1.5.0) (2026-09-24)
+
+### Breaking Changes
+
+- **cli:** Replace LocalStack with Floci as the local S3 emulator ([#503](https://github.com/mbc-net/mbc-cqrs-serverless/pull/503))
+
+  LocalStack Community Edition reached end of life in March 2026 — it now requires an auth
+  token and no longer receives security updates. The template pinned no version, so
+  scaffolded projects silently drifted onto an unmaintained image.
+
+  Floci serves S3 on the same port (4566) with the same path-style addressing, so no
+  application code or `.env` value changes. `S3_ENDPOINT`, `LOCAL_S3_PORT`, `S3_REGION`,
+  and `S3_BUCKET_NAME` are unaffected. Only the local development stack changes; deployed
+  environments are not affected.
+
+  - **Migration:** In `infra-local/docker-compose.yml`, replace the `localstack` service with:
+
+    ```yaml
+      floci:
+        image: floci/floci:1.6.0
+        ports:
+          - '${LOCAL_S3_PORT:-4566}:4566'
+        environment:
+          - FLOCI_DEFAULT_REGION=ap-northeast-1
+          - FLOCI_STORAGE_MODE=persistent
+        volumes:
+          - floci-data:/app/data
+    ```
+
+    And declare the named volume at the top level of the same file:
+
+    ```yaml
+    volumes:
+      floci-data:
+    ```
+
+    Then remove `serverless-localstack` from `package.json` if present.
+
+  - **Data loss warning:** `FLOCI_STORAGE_MODE` defaults to `memory`. Omitting that line
+    discards all buckets on every `docker compose down`, with no error reported. Existing
+    objects under `docker-data/localstack` are not migrated — start the stack
+    (`npm run offline:docker`, which stays in the foreground) and, from a second terminal,
+    recreate the bucket with `bash infra-local/scripts/resources.sh` (or `npm run resources:win32`
+    on Windows).
+
+  - **Migration — bucket CORS (required for presigned URLs):** LocalStack allowed every
+    origin through `EXTRA_CORS_ALLOWED_ORIGINS=*`. Floci 1.6.0 does not honor that variable
+    (its own global switch is `FLOCI_SECURITY_EXTRA_CORS_ALLOWED_ORIGINS`), so without a CORS
+    rule it answers the browser preflight with `403` and presigned upload and view URLs
+    (`DirectoryFileService`) fail in the browser. The template applies a bucket CORS rule
+    instead, mirroring production. Newly scaffolded projects apply
+    the rule in `infra-local/scripts/resources.sh` / `resources.ps1`; existing projects should copy
+    the `configure S3 bucket CORS` block from the latest template into their own scripts, or
+    apply it once by hand from the project root after the bucket exists:
+
+    ```bash
+    set -a; . ./.env; set +a   # load S3_ENDPOINT, S3_BUCKET_NAME and the local credentials
+    aws --endpoint-url="$S3_ENDPOINT" s3api put-bucket-cors \
+      --bucket "$S3_BUCKET_NAME" \
+      --cors-configuration '{"CORSRules":[{"AllowedOrigins":["*"],"AllowedMethods":["GET","PUT","POST","DELETE","HEAD"],"AllowedHeaders":["*"],"ExposeHeaders":["ETag"]}]}'
+    ```
+
+    On Windows, pass the JSON as `file://` and write that file **without a BOM** — Windows
+    PowerShell 5.1 adds one for `Set-Content -Encoding utf8`, and the AWS CLI rejects it.
+
+  - Existing projects are not required to migrate immediately; the old stack still runs.
+    It runs on an image that no longer receives security patches.
+
+### Bug Fixes
+
+- **cli:** Fix `mbc new` failing at dependency installation with `npm error EOVERRIDE: Override for js-yaml@^4.1.0 conflicts with direct dependency` (broken since v1.3.5). The template's `js-yaml` override now references the direct dependency (`$js-yaml`), which moves to `^4.3.2` and also clears the high-severity `js-yaml` advisory (4.0.0 – 4.3.1)
+- **cli:** Fix `npm run migrate` in scaffolded projects. `DATABASE_URL` used `${LOCAL_RDS_PORT:-3306}`, which Prisma does not expand (`P1013: invalid port number`), and `prisma/ddb.ts` loaded `.env` with plain `dotenv`, leaving `${LOCAL_DYNAMODB_PORT:-8000}` literal (`Invalid URL`). `DATABASE_URL` now uses `${LOCAL_RDS_PORT}` and `ddb.ts` expands the env with `dotenv-expand`; `dotenv` / `dotenv-expand` are declared as direct dependencies
+- **mcp-server:** Ship the Claude Code skills (`skills/`) in the published npm package. They were
+  missing from `files`, so the documented `cp -r node_modules/@mbc-cqrs-serverless/mcp-server/skills/* ...`
+  install step found nothing
+- **mcp-server:** Fix the Floci commands in the `mbc-debug` skill to run from `infra-local/`, where the
+  compose file lives
+
+### Documentation
+
+- **mcp-server:** Add the v1.4.0 → v1.5.0 migration guide (LocalStack → Floci, bucket CORS, data
+  migration) to the `mbc-migrate` skill
+
 ## [1.4.0](https://github.com/mbc-net/mbc-cqrs-serverless/releases/tag/v1.4.0) (2026-08-02)
 
 ### Features

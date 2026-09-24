@@ -24,5 +24,49 @@ if (-not $bucketExists) {
     Write-Host "Bucket $env:S3_BUCKET_NAME already exists."
 }
 
+# Presigned upload/view URLs (see DirectoryFileService) are fetched by the
+# browser, so the bucket needs a CORS rule or the preflight fails with 403 and
+# the real request is never sent. The previous LocalStack service granted this
+# implicitly through EXTRA_CORS_ALLOWED_ORIGINS=*, which Floci 1.6.0 does not
+# honor (its global switch is FLOCI_SECURITY_EXTRA_CORS_ALLOWED_ORIGINS); a bucket
+# rule is used instead so local matches production.
+# Production configures CORS in the CDK stack - this is the local equivalent.
+# Applied unconditionally so buckets created before this script gained the rule
+# are brought up to date too.
+Write-Host "======= configure S3 bucket CORS ======="
+$corsConfiguration = @'
+{
+  "CORSRules": [
+    {
+      "AllowedOrigins": ["*"],
+      "AllowedMethods": ["GET", "PUT", "POST", "DELETE", "HEAD"],
+      "AllowedHeaders": ["*"],
+      "ExposeHeaders": ["ETag"]
+    }
+  ]
+}
+'@
+
+# Passed as file:// rather than inline: PowerShell mangles embedded quotes on
+# the way to the AWS CLI.
+$corsFile = Join-Path ([System.IO.Path]::GetTempPath()) "mbc-s3-cors.json"
+# Written BOM-less on purpose. Windows PowerShell 5.1 - still the default
+# powershell.exe - writes a BOM for "-Encoding utf8", and the AWS CLI rejects
+# the file with "Error parsing parameter '--cors-configuration'" before it
+# sends any request, so the rule silently never lands. PowerShell 7 writes no
+# BOM, which is why this only fails on stock Windows. WriteAllText behaves the
+# same on both.
+[System.IO.File]::WriteAllText($corsFile, $corsConfiguration, (New-Object System.Text.UTF8Encoding $false))
+try {
+    aws --endpoint-url=http://localhost:$s3Port s3api put-bucket-cors --bucket $env:S3_BUCKET_NAME --cors-configuration "file://$corsFile"
+    # aws exits non-zero on both a rejected --cors-configuration (252) and an
+    # unreachable endpoint (255), but PowerShell does not throw on native
+    # command failure, so without this the rule can silently never land and the
+    # script still exits 0.
+    if ($LASTEXITCODE -ne 0) { throw "put-bucket-cors failed ($LASTEXITCODE)" }
+} finally {
+    Remove-Item $corsFile -ErrorAction SilentlyContinue
+}
+
 Write-Host "======= list S3 buckets ======="
 aws --endpoint-url=http://localhost:$s3Port s3 ls

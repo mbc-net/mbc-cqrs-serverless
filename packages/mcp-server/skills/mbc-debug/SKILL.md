@@ -473,23 +473,32 @@ fields @timestamp, @message
 
 ## Local Development Debugging
 
-### LocalStack Issues
+### Floci Issues
 
-**Start LocalStack:**
+**Start Floci** (the compose file lives in `infra-local/`; `.env` in the project root supplies `COMPOSE_PROJECT_NAME` and `LOCAL_S3_PORT`):
 ```bash
-docker-compose up -d localstack
+npm run offline:docker                                        # whole local stack, from the project root
+# or only Floci:
+cd infra-local && docker compose --env-file ../.env up -d floci
+```
+
+`--env-file ../.env` makes Compose read the project root's settings directly. Without it, Compose reads `infra-local/.env`, which `npm run offline:docker` links (copies on Windows) from the root `.env`; if that file does not exist yet, Compose falls back to the project name `infra-local` and port `4566`, i.e. a different container and data volume than `npm run offline:docker` uses.
+
+**Presigned URL returns 403 in the browser:** the bucket has no CORS rule (Floci does not allow any origin by default). From the project root, re-run `bash infra-local/scripts/resources.sh` (`npm run resources:win32` on Windows), or check the rule with:
+```bash
+set -a; . ./.env; set +a
+aws --endpoint-url="$S3_ENDPOINT" s3api get-bucket-cors --bucket "$S3_BUCKET_NAME"
 ```
 
 **Verify Services:**
 ```bash
-# Check DynamoDB
-aws --endpoint-url=http://localhost:4566 dynamodb list-tables
-
-# Check S3
+# Check S3 (Floci is S3-only on :4566)
 aws --endpoint-url=http://localhost:4566 s3 ls
+```
 
-# Check SQS
-aws --endpoint-url=http://localhost:4566 sqs list-queues
+DynamoDB Local runs separately on `:8000` (not Floci):
+```bash
+aws --endpoint-url=http://localhost:8000 dynamodb list-tables
 ```
 
 ### Serverless Offline Debug

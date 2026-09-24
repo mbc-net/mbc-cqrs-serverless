@@ -1,3 +1,4 @@
+import { execSync } from 'child_process'
 import * as fs from 'fs'
 import * as path from 'path'
 
@@ -285,6 +286,14 @@ describe('Claude Code Skills', () => {
       expect(content).toContain('v1.3.3')
       expect(content).toContain('ATTRIBUTE_LIMIT_SIZE')
     })
+
+    it('should contain v1.5.0 migration guide (LocalStack → Floci)', () => {
+      expect(content).toContain('### v1.4.0 → v1.5.0')
+      expect(content).toContain('floci/floci:1.6.0')
+      expect(content).toContain('FLOCI_STORAGE_MODE=persistent')
+      expect(content).toContain('put-bucket-cors')
+      expect(content).toContain('| v1.5.0 | v1.5.0 |')
+    })
   })
 
   describe('mbc-debug skill', () => {
@@ -335,8 +344,15 @@ describe('Claude Code Skills', () => {
     })
 
     it('should contain local development debugging', () => {
-      expect(content).toContain('LocalStack')
+      expect(content).toContain('Floci')
       expect(content).toContain('Serverless Offline')
+    })
+
+    it('should start Floci from infra-local, where the compose file lives', () => {
+      expect(content).toContain(
+        'cd infra-local && docker compose --env-file ../.env up -d floci',
+      )
+      expect(content).not.toMatch(/^docker-compose up -d floci$/m)
     })
 
     it('should contain troubleshooting decision tree', () => {
@@ -350,11 +366,37 @@ describe('Claude Code Skills', () => {
     })
   })
 
+  describe('npm package contents', () => {
+    it('should ship every skill in the published package', () => {
+      // README tells users to copy node_modules/@mbc-cqrs-serverless/mcp-server/skills/*,
+      // so the skills must survive `files` filtering. Ask npm itself rather than
+      // re-implementing its rules.
+      const packageDir = path.join(__dirname, '../..')
+      // execSync (shell) rather than execFileSync: npm is npm.cmd on Windows.
+      const output = execSync('npm pack --dry-run --json --ignore-scripts', {
+        cwd: packageDir,
+        encoding: 'utf-8',
+      })
+      const packed: string[] = JSON.parse(output)[0].files.map(
+        (file: { path: string }) => file.path,
+      )
+
+      for (const skill of [
+        'mbc-generate',
+        'mbc-review',
+        'mbc-migrate',
+        'mbc-debug',
+      ]) {
+        expect(packed).toContain(`skills/${skill}/SKILL.md`)
+      }
+    })
+  })
+
   describe('Skill content validation', () => {
     it('should have consistent code block formatting', () => {
       const skills = ['mbc-generate', 'mbc-review', 'mbc-migrate', 'mbc-debug']
 
-      skills.forEach(skillName => {
+      skills.forEach((skillName) => {
         const skillPath = path.join(skillsDir, skillName, 'SKILL.md')
         const content = fs.readFileSync(skillPath, 'utf-8')
 
@@ -370,7 +412,7 @@ describe('Claude Code Skills', () => {
     it('should not contain placeholder text', () => {
       const skills = ['mbc-generate', 'mbc-review', 'mbc-migrate', 'mbc-debug']
 
-      skills.forEach(skillName => {
+      skills.forEach((skillName) => {
         const skillPath = path.join(skillsDir, skillName, 'SKILL.md')
         const content = fs.readFileSync(skillPath, 'utf-8')
 
@@ -384,7 +426,7 @@ describe('Claude Code Skills', () => {
     it('should have all skills with valid YAML frontmatter', () => {
       const skills = ['mbc-generate', 'mbc-review', 'mbc-migrate', 'mbc-debug']
 
-      skills.forEach(skillName => {
+      skills.forEach((skillName) => {
         const skillPath = path.join(skillsDir, skillName, 'SKILL.md')
         const content = fs.readFileSync(skillPath, 'utf-8')
 

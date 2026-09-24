@@ -13,7 +13,7 @@ Please be respectful and constructive in all interactions. We welcome contributo
 - Node.js 18 or higher
 - npm 9 or higher
 - Git
-- Docker (for LocalStack)
+- Docker (for Floci and the other local emulators)
 
 ### Development Setup
 
