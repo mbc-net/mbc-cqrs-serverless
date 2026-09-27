@@ -16,7 +16,7 @@ jobs:
     if: github.event.workflow_run.event == 'pull_request'
     steps:
       - name: Download test results
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: dependency-test-results
           path: ./test-results/
