@@ -21,7 +21,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        node-version: [18.x, 20.x, 22.x, 24.x]
+        node-version: [22.x, 24.x]
     steps:
       - uses: actions/checkout@v4
         with:
@@ -72,7 +72,7 @@ jobs:
 
       - name: Security Scan (Trivy)
         uses: aquasecurity/trivy-action@v0.36.0
-        if: matrix.node-version == '20.x'
+        if: matrix.node-version == '22.x'
         with:
           scan-type: 'fs'
           scan-ref: '.'
@@ -84,7 +84,7 @@ jobs:
 
       - name: Upload Trivy scan results
         uses: github/codeql-action/upload-sarif@v3
-        if: matrix.node-version == '20.x' && (success() || failure())
+        if: matrix.node-version == '22.x' && (success() || failure())
         with:
           sarif_file: 'trivy-results.sarif'
         continue-on-error: true
@@ -107,7 +107,7 @@ jobs:
       # blocked on removing @aws/pdk (tracked in #486). The type-check and tests
       # do not import @aws/pdk, so its floating subtree does not affect them.
       - name: Infra template type-check & tests (blocking)
-        if: matrix.node-version == '20.x'
+        if: matrix.node-version == '22.x'
         working-directory: packages/cli/templates/infra
         run: |
           npm install --ignore-scripts --no-audit --no-fund
@@ -120,14 +120,14 @@ jobs:
       # member, so the root production audit above does not cover it. Surface it
       # here without blocking; the @aws/pdk chain is tracked separately.
       - name: Infra template audit (non-blocking, visibility)
-        if: matrix.node-version == '20.x'
+        if: matrix.node-version == '22.x'
         working-directory: packages/cli/templates/infra
         run: npm audit --omit=dev --audit-level=high
         continue-on-error: true
 
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v4
-        if: matrix.node-version == '20.x'
+        if: matrix.node-version == '22.x'
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
           files: ./coverage/lcov.info
@@ -151,7 +151,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        node-version: [18.x, 20.x, 22.x, 24.x]
+        node-version: [22.x, 24.x]
     steps:
       - uses: actions/checkout@v4
         with:

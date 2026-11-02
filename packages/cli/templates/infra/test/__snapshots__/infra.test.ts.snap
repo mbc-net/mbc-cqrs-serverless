@@ -1160,7 +1160,7 @@ exports[`snapshot test for InfraStack 1`] = `
             "Arn",
           ],
         },
-        "Runtime": "nodejs20.x",
+        "Runtime": "nodejs22.x",
         "Tags": [
           {
             "Key": "env",
@@ -2443,7 +2443,7 @@ exports[`snapshot test for InfraStack 1`] = `
           "arm64",
         ],
         "CompatibleRuntimes": [
-          "nodejs20.x",
+          "nodejs22.x",
         ],
         "Content": {
           "S3Bucket": "cdk-hnb659fds-assets-101010101010-ap-northeast-1",
