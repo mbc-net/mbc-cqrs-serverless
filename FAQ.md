@@ -39,7 +39,7 @@ npm install
 
 ### What Node.js version is required?
 
-Node.js 18 or higher is required.
+Node.js 22 or higher is required. Use 22.23.4 or later, which includes the fix for CVE-2026-111497 (Node2Shell).
 
 ### How do I set up local development?
 
