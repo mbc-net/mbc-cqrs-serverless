@@ -63,12 +63,11 @@
     "class-validator": "^0.14.0",
     "jwt-decode": "^4.0.0",
     "node-fetch": "^2.7.0",
-    "nodemailer": "^9.0.1",
+    "nodemailer": "^10.3.1",
     "reflect-metadata": "^0.2.2",
     "ulid": "^2.3.0"
   },
   "devDependencies": {
-    "@types/nodemailer": "^6.4.17",
     "serverless": "^3.40.0",
     "serverless-dynamodb": "^0.2.58",
     "serverless-offline": "^13.3.2",
@@ -87,5 +86,8 @@
     "serverless-step-functions": "^3.18.0",
     "serverless-step-functions-local": "^0.5.1",
     "supertest": "^7.0.0"
+  },
+  "engines": {
+    "node": ">=22"
   }
 }

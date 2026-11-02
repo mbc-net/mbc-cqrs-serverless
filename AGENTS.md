@@ -14,7 +14,7 @@ MBC CQRS Serverless is a TypeScript monorepo implementing the CQRS (Command Quer
 |----------|------------|
 | Language | TypeScript (ES2021) |
 | Framework | NestJS v10.x |
-| Runtime | Node.js 18+ / AWS Lambda |
+| Runtime | Node.js 22+ / AWS Lambda |
 | Database | DynamoDB (primary), RDS/Aurora (optional) |
 | Package Manager | npm with workspaces |
 | Monorepo Tool | Lerna v8.x |

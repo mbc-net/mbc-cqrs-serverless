@@ -8,7 +8,7 @@ This is a TypeScript/NestJS monorepo implementing the CQRS (Command Query Respon
 
 - Language: TypeScript (ES2021)
 - Framework: NestJS v10.x
-- Runtime: Node.js 18+ with AWS Lambda
+- Runtime: Node.js 22+ with AWS Lambda
 - Package Manager: npm with workspaces
 - Monorepo Tool: Lerna v8.x
 - Infrastructure: AWS CDK v2, Serverless Framework

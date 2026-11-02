@@ -48,8 +48,8 @@
     "access": "public"
   },
   "dependencies": {
-    "@modelcontextprotocol/sdk": "^1.29.0",
-    "zod": "^4.3.6"
+    "@modelcontextprotocol/sdk": "^1.32.2",
+    "zod": "^4.6.6"
   },
   "devDependencies": {
     "@types/jest": "^29.5.0",
@@ -58,6 +58,6 @@
     "ts-jest": "^29.1.0"
   },
   "engines": {
-    "node": ">=18.0.0"
+    "node": ">=22"
   }
 }

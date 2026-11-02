@@ -3,6 +3,36 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## Unreleased
+
+### Breaking Changes
+
+- **all packages:** Require Node.js 22 or later (`engines.node: ">=22"`)
+
+  Node.js 18 and 20 are end of life and will not receive the fix for CVE-2026-111497
+  (Node2Shell), an RCE in the Brotli decoder bundled with Node.js. The fix ships in Node.js
+  22.23.4, 24.22.1 and 26.12.1. `@mbc-cqrs-serverless/core` also now depends on nodemailer 10,
+  which itself requires Node.js 20 or later. CI tests only Node.js 22 and 24.
+
+  - **Migration:** Run your application, Lambda functions and Docker images on Node.js 22.23.4
+    or later. On Node.js 18 or 20, `npm install` reports `EBADENGINE`, and fails under
+    `engine-strict`.
+  - **nodemailer types:** nodemailer 10 ships its own types, and its default export is no longer
+    a namespace. If your code uses `nodemailer.SendMailOptions` (or `Transporter`,
+    `SentMessageInfo`), import them by name instead
+    (`import nodemailer, { SendMailOptions } from 'nodemailer'`) and remove `@types/nodemailer`.
+
+- **cli:** New projects use Node.js 22. The Lambda function and layer use `NODEJS_22_X`, and
+  the Docker image is based on `node:22-bookworm-slim`, which now installs `openssl` for Prisma.
+  The local `infra-local` images use `node:22-alpine`, and `serverless.yml` uses `nodejs22.x`
+  (serverless-offline 13.9.0 or later). Existing projects are not changed.
+
+### Security
+
+- Clear high and critical advisories in production dependencies: proxy-addr 2.0.8,
+  body-parser 1.20.9 / 2.4.0, multer 2.5.0, nodemailer 10.3.1, @modelcontextprotocol/sdk 1.32.2,
+  zod 4.6.7
+
 ## [1.5.0](https://github.com/mbc-net/mbc-cqrs-serverless/releases/tag/v1.5.0) (2026-09-24)
 
 ### Breaking Changes

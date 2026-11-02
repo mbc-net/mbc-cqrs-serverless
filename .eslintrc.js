@@ -25,6 +25,7 @@ module.exports = {
     'prisma',
     '**/*.spec.ts',
     '**/*.e2e-spec.ts',
+    'packages/core/test/scripts/**',
     '**/*.test.ts',
     'examples/**',
     // Scaffolding templates are excluded from tsconfig and reference

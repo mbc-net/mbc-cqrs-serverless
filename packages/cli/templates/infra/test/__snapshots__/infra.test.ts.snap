@@ -405,6 +405,25 @@ exports[`snapshot test for InfraStack 1`] = `
           "Statement": [
             {
               "Action": "sts:AssumeRole",
+              "Condition": {
+                "ArnLike": {
+                  "aws:SourceArn": {
+                    "Fn::Join": [
+                      "",
+                      [
+                        "arn:",
+                        {
+                          "Ref": "AWS::Partition",
+                        },
+                        ":states:ap-northeast-1:101010101010:stateMachine:*",
+                      ],
+                    ],
+                  },
+                },
+                "StringEquals": {
+                  "aws:SourceAccount": "101010101010",
+                },
+              },
               "Effect": "Allow",
               "Principal": {
                 "Service": "states.amazonaws.com",
@@ -931,6 +950,25 @@ exports[`snapshot test for InfraStack 1`] = `
           "Statement": [
             {
               "Action": "sts:AssumeRole",
+              "Condition": {
+                "ArnLike": {
+                  "aws:SourceArn": {
+                    "Fn::Join": [
+                      "",
+                      [
+                        "arn:",
+                        {
+                          "Ref": "AWS::Partition",
+                        },
+                        ":states:ap-northeast-1:101010101010:stateMachine:*",
+                      ],
+                    ],
+                  },
+                },
+                "StringEquals": {
+                  "aws:SourceAccount": "101010101010",
+                },
+              },
               "Effect": "Allow",
               "Principal": {
                 "Service": "states.amazonaws.com",
@@ -1160,7 +1198,7 @@ exports[`snapshot test for InfraStack 1`] = `
             "Arn",
           ],
         },
-        "Runtime": "nodejs20.x",
+        "Runtime": "nodejs22.x",
         "Tags": [
           {
             "Key": "env",
@@ -2443,7 +2481,7 @@ exports[`snapshot test for InfraStack 1`] = `
           "arm64",
         ],
         "CompatibleRuntimes": [
-          "nodejs20.x",
+          "nodejs22.x",
         ],
         "Content": {
           "S3Bucket": "cdk-hnb659fds-assets-101010101010-ap-northeast-1",
@@ -3153,6 +3191,25 @@ schema {
           "Statement": [
             {
               "Action": "sts:AssumeRole",
+              "Condition": {
+                "ArnLike": {
+                  "aws:SourceArn": {
+                    "Fn::Join": [
+                      "",
+                      [
+                        "arn:",
+                        {
+                          "Ref": "AWS::Partition",
+                        },
+                        ":states:ap-northeast-1:101010101010:stateMachine:*",
+                      ],
+                    ],
+                  },
+                },
+                "StringEquals": {
+                  "aws:SourceAccount": "101010101010",
+                },
+              },
               "Effect": "Allow",
               "Principal": {
                 "Service": "states.amazonaws.com",

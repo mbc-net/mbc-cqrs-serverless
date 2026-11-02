@@ -1,7 +1,10 @@
-FROM node:20-bullseye-slim AS builder
+FROM node:22-bookworm-slim AS builder
 
 # RUN apk update
 # RUN apk --no-cache add make gcc g++ --virtual .builds-deps build-base python3 musl-dev openssl-dev
+
+# Prisma's query engine needs libssl, which bookworm-slim does not ship
+RUN apt-get update -y && apt-get install -y --no-install-recommends openssl && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
 
@@ -14,10 +17,13 @@ COPY . .
 
 RUN npm run build:prod
 
-FROM node:20-bullseye-slim
+FROM node:22-bookworm-slim
 
 # RUN apk update
 # RUN apk --no-cache add make gcc g++ --virtual .builds-deps build-base python3 musl-dev openssl-dev
+
+# Prisma's query engine needs libssl, which bookworm-slim does not ship
+RUN apt-get update -y && apt-get install -y --no-install-recommends openssl && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
 
