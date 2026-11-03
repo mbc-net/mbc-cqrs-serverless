@@ -18,6 +18,8 @@ A command-line interface for the MBC CQRS Serverless framework. Quickly scaffold
 
 ## Installation
 
+Requires Node.js 22.23.4 or later (`engines.node: ">=22"` since v1.6.0). Projects created by `mbc new` also target Node.js 22 (Lambda `nodejs22.x`, Docker `node:22-bookworm-slim`).
+
 ### Global Installation (Recommended)
 
 ```bash

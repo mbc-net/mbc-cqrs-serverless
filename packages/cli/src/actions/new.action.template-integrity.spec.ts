@@ -36,6 +36,21 @@ describe('scaffolding template integrity', () => {
         expect([directDeps[name], `$${name}`]).toContain(spec)
       },
     )
+
+    // The root overrides that clear production advisories do not reach
+    // scaffolded projects: `mbc new` copies the template with its own
+    // package.json and lockfile. Keep the template in step with the root so
+    // new projects do not ship advisories the CHANGELOG reports as fixed.
+    const rootOverrides: Record<string, unknown> = JSON.parse(
+      readFileSync(path.join(templatesDir, '../../../package.json'), 'utf-8'),
+    ).overrides
+    it.each(['multer', 'proxy-addr', 'body-parser@1', 'body-parser@2'])(
+      'mirrors the root security override for %s',
+      (name) => {
+        expect(rootOverrides[name]).toBeDefined()
+        expect(packageJson.overrides?.[name]).toBe(rootOverrides[name])
+      },
+    )
   })
 
   describe('prisma/ddb.ts (npm run migrate:ddb)', () => {

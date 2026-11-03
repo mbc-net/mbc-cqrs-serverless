@@ -294,6 +294,20 @@ describe('Claude Code Skills', () => {
       expect(content).toContain('put-bucket-cors')
       expect(content).toContain('| v1.5.0 | v1.5.0 |')
     })
+
+    it('should contain v1.6.0 migration guide (Node.js 22)', () => {
+      expect(content).toContain('### v1.5.0 → v1.6.0')
+      expect(content).toContain('| v1.5.0 | v1.6.0 |')
+      expect(content).toContain('NODEJS_22_X')
+      expect(content).toContain('nodejs22.x')
+      expect(content).toContain(
+        'apt-get install -y --no-install-recommends openssl',
+      )
+      expect(content).toContain(
+        "import nodemailer, { SendMailOptions } from 'nodemailer'",
+      )
+      expect(content).toContain('| v1.6.0 | v1.6.0 | 10.x | 22.23.4+ |')
+    })
   })
 
   describe('mbc-debug skill', () => {
