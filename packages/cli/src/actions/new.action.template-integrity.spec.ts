@@ -39,18 +39,56 @@ describe('scaffolding template integrity', () => {
 
     // The root overrides that clear production advisories do not reach
     // scaffolded projects: `mbc new` copies the template with its own
-    // package.json and lockfile. Keep the template in step with the root so
-    // new projects do not ship advisories the CHANGELOG reports as fixed.
+    // package.json and lockfile. Every root override whose package ships in
+    // the template's production tree must therefore be mirrored in the
+    // template, so new projects do not keep advisories the CHANGELOG reports
+    // as fixed. Root overrides for packages that the template only has as dev
+    // dependencies (or not at all) are not required.
     const rootOverrides: Record<string, unknown> = JSON.parse(
       readFileSync(path.join(templatesDir, '../../../package.json'), 'utf-8'),
     ).overrides
-    it.each(['multer', 'proxy-addr', 'body-parser@1', 'body-parser@2'])(
-      'mirrors the root security override for %s',
-      (name) => {
-        expect(rootOverrides[name]).toBeDefined()
-        expect(packageJson.overrides?.[name]).toBe(rootOverrides[name])
-      },
+    const lockPackages: Record<
+      string,
+      { dev?: boolean; devOptional?: boolean }
+    > = JSON.parse(
+      readFileSync(path.join(templatesDir, 'package-lock.json'), 'utf-8'),
+    ).packages
+    const productionPackages = new Set(
+      Object.entries(lockPackages)
+        .filter(
+          ([key, entry]) =>
+            key.includes('node_modules/') && !entry.dev && !entry.devOptional,
+        )
+        .map(([key]) => key.slice(key.lastIndexOf('node_modules/') + 13)),
     )
+    // "body-parser@1" -> "body-parser", "@scope/name@2" -> "@scope/name"
+    const packageName = (selector: string) => {
+      const at = selector.lastIndexOf('@')
+      return at > 0 ? selector.slice(0, at) : selector
+    }
+    const mirrored = Object.keys(rootOverrides).filter((selector) =>
+      productionPackages.has(packageName(selector)),
+    )
+
+    it('finds the production overrides to mirror', () => {
+      expect(mirrored).toEqual(
+        expect.arrayContaining([
+          'multer',
+          'proxy-addr',
+          'body-parser@1',
+          'body-parser@2',
+          'qs',
+        ]),
+      )
+    })
+
+    it.each(mirrored)('mirrors the root override for %s', (selector) => {
+      const name = packageName(selector)
+      const override = packageJson.overrides?.[selector]
+      // A direct dependency must be overridden with "$name" (EOVERRIDE).
+      if (name in directDeps && override === `$${name}`) return
+      expect(override).toEqual(rootOverrides[selector])
+    })
   })
 
   describe('prisma/ddb.ts (npm run migrate:ddb)', () => {

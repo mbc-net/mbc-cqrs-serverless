@@ -307,6 +307,10 @@ describe('Claude Code Skills', () => {
         "import nodemailer, { SendMailOptions } from 'nodemailer'",
       )
       expect(content).toContain('| v1.6.0 | v1.6.0 | 10.x | 22.23.4+ |')
+      // CDK pipeline: pin CodeBuild to Node.js 22
+      expect(content).toContain("'runtime-versions': { nodejs: '22' }")
+      // Prisma engine is generated inside the image, not on the host
+      expect(content).not.toContain('Run `npx prisma generate` again')
     })
   })
 

@@ -838,6 +838,22 @@ compatibleRuntimes: [cdk.aws_lambda.Runtime.NODEJS_22_X],
 
 Rebuild the layer on Node.js 22 (the layer is built on the deploying host), then `cdk deploy`. The update is in place; deploy to a non-production stage first.
 
+If you deploy through the scaffolded CDK pipeline (`infra/libs/pipeline-stack.ts`), also pin the CodeBuild Node.js version, so that `npm ci`, the tests, the synth and the layer build run on Node.js 22 rather than the CodeBuild image's default (which can change):
+
+```typescript
+const pipeline = new CodePipeline(this, idName + 'PipelineV3', {
+  selfMutation: true,
+  codeBuildDefaults: {
+    partialBuildSpec: BuildSpec.fromObject({
+      phases: { install: { 'runtime-versions': { nodejs: '22' } } },
+    }),
+  },
+  // ...
+})
+```
+
+The pipeline updates itself (`selfMutation`) on the next run after you push this change.
+
 **Step 3 — Local Serverless config.** In `infra-local/serverless.yml`, set `provider.runtime: nodejs22.x`, and use `serverless-offline` `^13.9.0` or later (earlier 13.x releases do not know `nodejs22.x`).
 
 **Step 4 — Docker images.**
@@ -847,7 +863,7 @@ Rebuild the layer on Node.js 22 (the layer is built on the deploying host), then
   RUN apt-get update -y && apt-get install -y --no-install-recommends openssl && rm -rf /var/lib/apt/lists/*
   ```
 
-  Run `npx prisma generate` again so the `debian-openssl-3.0.x` engine is generated.
+  Then rebuild the image. The `prisma generate` that runs during `npm install` / `npm ci` **inside the image** (the template's `postinstall` script) detects OpenSSL 3 and generates the `debian-openssl-3.0.x` engine there. Running `npx prisma generate` on a macOS or Windows host does not produce that engine; if your Dockerfile copies a client generated on the host instead of installing inside the image, add `debian-openssl-3.0.x` (and `linux-arm64-openssl-3.0.x` for arm64) to `binaryTargets` in `prisma/schema.prisma`.
 - `infra-local/appsync-simulator/Dockerfile` and `infra-local/cognito-local/Dockerfile`: `node:18-alpine` → `node:22-alpine`, then rebuild with `docker compose build`.
 
 **Step 5 — nodemailer 10 types (only if your code imports `nodemailer` directly).** `@mbc-cqrs-serverless/core` now depends on nodemailer 10, which ships its own type definitions; its default export is no longer a namespace, so `nodemailer.SendMailOptions`, `nodemailer.Transporter` and `nodemailer.SentMessageInfo` no longer compile. Import the types by name and remove `@types/nodemailer`:
@@ -868,14 +884,15 @@ npm uninstall @types/nodemailer
 
 Apps that only send mail through `EmailService` need no code changes.
 
-**Optional — dependency overrides.** v1.6.0 clears the high/critical production advisories in proxy-addr, body-parser and multer through the framework's and the template's `overrides`. These overrides do not reach existing projects. To pick them up, add the same entries to your project's `package.json` and run `npm install`:
+**Optional — dependency overrides.** v1.6.0 clears the high/critical production advisories in proxy-addr, body-parser and multer through the framework's and the template's `overrides` (and raises `qs` to the minimum that the patched body-parser requires). These overrides do not reach existing projects. To pick them up, add the same entries to your project's `package.json` and run `npm install`:
 
 ```json
 "overrides": {
   "multer": "^2.5.0",
   "proxy-addr": "^2.0.8",
   "body-parser@1": "^1.20.9",
-  "body-parser@2": "^2.4.0"
+  "body-parser@2": "^2.4.0",
+  "qs": "^6.16.1"
 }
 ```
 

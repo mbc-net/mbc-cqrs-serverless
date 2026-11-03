@@ -218,7 +218,7 @@ Visit our [documentation site](https://mbc-cqrs-serverless.mbc-net.com/) for:
 
 ## Installation
 
-**Requirements:** Node.js 22.23.4 or later (all packages declare `engines.node: ">=22"` since v1.6.0; older Node.js lines do not receive the fix for CVE-2026-111497). See the [v1.6.0 migration notes](CHANGELOG.md).
+**Requirements:** Node.js 22.23.4 or later (all packages declare `engines.node: ">=22"` since v1.6.0; older Node.js lines do not receive the fix for CVE-2026-111497). See the [v1.6.0 migration guide](https://mbc-cqrs-serverless.mbc-net.com/docs/migration/v1.6.0) for the upgrade steps.
 
 ### Latest Stable Release
 ```bash

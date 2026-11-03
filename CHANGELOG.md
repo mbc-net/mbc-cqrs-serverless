@@ -25,8 +25,10 @@ See [Conventional Commits](https://conventionalcommits.org) for commit guideline
 - **cli:** New projects use Node.js 22. The Lambda function and layer use `NODEJS_22_X`, and
   the Docker image is based on `node:22-bookworm-slim`, which now installs `openssl` for Prisma.
   The local `infra-local` images use `node:22-alpine`, and `serverless.yml` uses `nodejs22.x`
-  (serverless-offline 13.9.0 or later). Existing projects are not changed; the `mbc-migrate`
-  skill and the documentation site's v1.6.0 migration guide list the places to update by hand.
+  (serverless-offline 13.9.0 or later). The CDK pipeline pins `nodejs: 22` in its CodeBuild
+  `runtime-versions`, and `@types/node` moves to 22. Existing projects are not changed; the
+  `mbc-migrate` skill and the documentation site's v1.6.0 migration guide list the places to
+  update by hand.
   ([#512](https://github.com/mbc-net/mbc-cqrs-serverless/pull/512))
 
 ### Security
@@ -36,8 +38,9 @@ See [Conventional Commits](https://conventionalcommits.org) for commit guideline
   zod 4.6.7 ([#512](https://github.com/mbc-net/mbc-cqrs-serverless/pull/512))
 - **cli:** The project template's dependency overrides now also pin proxy-addr 2.0.8,
   body-parser 1.20.9 / 2.4.0 and multer 2.5.0, so newly scaffolded projects no longer ship these
-  advisories. Root `overrides` do not reach existing projects; add the same entries to your own
-  `package.json` to pick them up.
+  advisories. The `qs` override (root and template) moves to `^6.16.1`, the minimum that
+  body-parser 1.20.9 / 2.4.0 and express 5 require. Root `overrides` do not reach existing
+  projects; add the same entries to your own `package.json` to pick them up.
 
 ### Documentation
 

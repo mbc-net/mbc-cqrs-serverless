@@ -6,10 +6,11 @@ import * as cdk from 'aws-cdk-lib'
 import { Match, Template } from 'aws-cdk-lib/assertions'
 import { getConfig } from '../config'
 import { InfraStack } from '../libs/infra-stack'
+import { PipelineStack } from '../libs/pipeline-stack'
 
 jest.mock('../config/constant', () => ({
   PIPELINE_NAME: 'test-pipeline',
-  GIT_REPO: 'test-repo',
+  GIT_REPO: 'test-owner/test-repo',
   GIT_CONNECTION_ARN:
     'arn:aws:codestar-connections:ap-northeast-1:101010101010:connection/test',
   ACM_HTTP_CERTIFICATE_ARN:
@@ -131,4 +132,34 @@ test('lambda-api SendTaskSuccess is scoped to command-handler state machine', ()
       ]),
     },
   })
+})
+
+test('pipeline CodeBuild projects pin the Node.js 22 runtime', () => {
+  // The Lambda functions and layer run on nodejs22.x and every package
+  // requires Node.js >=22, so tests, synth and the layer build must not
+  // depend on the CodeBuild image's default Node.js version.
+  const app = new cdk.App()
+  const stack = new PipelineStack(app, 'TestPipelineStack', {
+    env: { account: '101010101010', region: 'ap-northeast-1' },
+    envName: 'dev',
+  })
+  const projects = Template.fromStack(stack).findResources(
+    'AWS::CodeBuild::Project',
+  )
+
+  expect(Object.keys(projects).length).toBeGreaterThan(0)
+  // A buildspec that embeds CloudFormation references is an Fn::Join; render
+  // the references as placeholder text so the JSON can be parsed.
+  const render = (value: any): string =>
+    typeof value === 'string'
+      ? value
+      : value?.['Fn::Join']
+        ? value['Fn::Join'][1].map(render).join(value['Fn::Join'][0])
+        : 'TOKEN'
+  for (const project of Object.values(projects)) {
+    const buildSpec = JSON.parse(render(project.Properties.Source.BuildSpec))
+    expect(buildSpec.phases?.install?.['runtime-versions']).toEqual({
+      nodejs: '22',
+    })
+  }
 })
