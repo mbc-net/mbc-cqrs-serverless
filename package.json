@@ -147,17 +147,20 @@
     "brace-expansion@2": "5.0.12",
     "tmp": "^0.2.6",
     "webpack": "^5.105.0",
-    "qs": "^6.14.2",
+    "qs": "^6.16.1",
     "yaml": "^2.8.3",
     "follow-redirects": "^1.16.0",
     "flatted": "^3.4.2",
-    "multer": "^2.4.0",
+    "multer": "^2.5.0",
     "ip-address": "^10.7.2",
-    "nodemailer": "^9.1.1",
+    "nodemailer": "^10.3.1",
     "@angular-devkit/core": {
       "ajv": "^8.18.0",
       "picomatch": "^4.0.4"
-    }
+    },
+    "proxy-addr": "^2.0.8",
+    "body-parser@1": "^1.20.9",
+    "body-parser@2": "^2.4.0"
   },
   "dependencies": {
     "jszip": "^3.10.1"

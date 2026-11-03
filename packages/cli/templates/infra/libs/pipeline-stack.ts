@@ -73,6 +73,20 @@ export class PipelineStack extends Stack {
 
     const pipeline = new CodePipeline(this, idName + 'PipelineV3', {
       selfMutation: true,
+      // Build, test and synthesize on Node.js 22 to match the nodejs22.x
+      // Lambda runtime and the framework's engines (>=22). Without this the
+      // CodeBuild image's default Node.js version is used, which can change.
+      codeBuildDefaults: {
+        partialBuildSpec: BuildSpec.fromObject({
+          phases: {
+            install: {
+              'runtime-versions': {
+                nodejs: '22',
+              },
+            },
+          },
+        }),
+      },
       synth: new ShellStep('Synth', {
         input: CodePipelineSource.connection(GIT_REPO, branchName, {
           connectionArn: GIT_CONNECTION_ARN,

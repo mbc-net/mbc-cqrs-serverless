@@ -16,7 +16,7 @@ MBC CQRS Serverless is a production-ready TypeScript monorepo that implements:
 |----------|------------|
 | Language | TypeScript ES2021 (strict mode) |
 | Framework | NestJS v10.x |
-| Runtime | Node.js 18+ / AWS Lambda |
+| Runtime | Node.js 22+ / AWS Lambda |
 | Database | DynamoDB (primary), RDS Aurora (optional) |
 | Messaging | SNS for events, SQS for queues |
 | Auth | Amazon Cognito with JWT |

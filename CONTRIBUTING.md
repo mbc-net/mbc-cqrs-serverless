@@ -10,7 +10,7 @@ Please be respectful and constructive in all interactions. We welcome contributo
 
 ### Prerequisites
 
-- Node.js 18 or higher
+- Node.js 22 or higher (22.23.4+ recommended)
 - npm 9 or higher
 - Git
 - Docker (for Floci and the other local emulators)
