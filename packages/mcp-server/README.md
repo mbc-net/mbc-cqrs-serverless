@@ -96,6 +96,8 @@ Get guided assistance:
 
 ## Installation
 
+Requires Node.js 22.23.4 or later (`engines.node: ">=22"` since v1.6.0). Make sure the Node.js that your MCP client uses to launch the server (for example through `npx`) meets this requirement.
+
 ```bash
 npm install @mbc-cqrs-serverless/mcp-server
 ```

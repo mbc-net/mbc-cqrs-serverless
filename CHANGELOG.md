@@ -3,11 +3,11 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
-## Unreleased
+## [1.6.0](https://github.com/mbc-net/mbc-cqrs-serverless/releases/tag/v1.6.0) (2026-11-03)
 
 ### Breaking Changes
 
-- **all packages:** Require Node.js 22 or later (`engines.node: ">=22"`)
+- **all packages:** Require Node.js 22 or later (`engines.node: ">=22"`) ([#512](https://github.com/mbc-net/mbc-cqrs-serverless/pull/512))
 
   Node.js 18 and 20 are end of life and will not receive the fix for CVE-2026-111497
   (Node2Shell), an RCE in the Brotli decoder bundled with Node.js. The fix ships in Node.js
@@ -25,13 +25,30 @@ See [Conventional Commits](https://conventionalcommits.org) for commit guideline
 - **cli:** New projects use Node.js 22. The Lambda function and layer use `NODEJS_22_X`, and
   the Docker image is based on `node:22-bookworm-slim`, which now installs `openssl` for Prisma.
   The local `infra-local` images use `node:22-alpine`, and `serverless.yml` uses `nodejs22.x`
-  (serverless-offline 13.9.0 or later). Existing projects are not changed.
+  (serverless-offline 13.9.0 or later). The CDK pipeline pins `nodejs: 22` in its CodeBuild
+  `runtime-versions`, and `@types/node` moves to 22. Existing projects are not changed; the
+  `mbc-migrate` skill and the documentation site's v1.6.0 migration guide list the places to
+  update by hand.
+  ([#512](https://github.com/mbc-net/mbc-cqrs-serverless/pull/512))
 
 ### Security
 
 - Clear high and critical advisories in production dependencies: proxy-addr 2.0.8,
   body-parser 1.20.9 / 2.4.0, multer 2.5.0, nodemailer 10.3.1, @modelcontextprotocol/sdk 1.32.2,
-  zod 4.6.7
+  zod 4.6.7 ([#512](https://github.com/mbc-net/mbc-cqrs-serverless/pull/512))
+- **cli:** The project template's dependency overrides now also pin proxy-addr 2.0.8,
+  body-parser 1.20.9 / 2.4.0 and multer 2.5.0, so newly scaffolded projects no longer ship these
+  advisories. The `qs` override (root and template) moves to `^6.16.1`, the minimum that
+  body-parser 1.20.9 / 2.4.0 and express 5 require. Root `overrides` do not reach existing
+  projects; add the same entries to your own `package.json` to pick them up.
+
+### Documentation
+
+- **mcp-server:** Add the v1.5.0 → v1.6.0 migration guide (Node.js 22, nodemailer 10 types,
+  Docker `openssl` for Prisma) to the `mbc-migrate` skill and Node.js 22 to its compatibility
+  matrix.
+- State the Node.js 22.23.4+ requirement in the README of the repository, the CLI and the MCP
+  server.
 
 ## [1.5.0](https://github.com/mbc-net/mbc-cqrs-serverless/releases/tag/v1.5.0) (2026-09-24)
 

@@ -46,6 +46,7 @@ This skill helps migrate MBC CQRS Serverless projects between versions.
 | v1.3.2 | v1.3.3 | Low | `ATTRIBUTE_LIMIT_SIZE` default lowered 389120 → 102400 for Step Functions payload limit (transparent unless overridden) |
 | v1.3.5 | v1.4.0 | Low | Configurable DynamoDB table names (opt-in) + `registerAsync` on domain modules; `prismaService` now always required; `MasterModule`+`SettingModule` shared-table alias warns |
 | v1.4.0 | v1.5.0 | Low | Local dev only: LocalStack → Floci as the local S3 emulator; bucket CORS must be applied locally for presigned URLs (no application code changes) |
+| v1.5.0 | v1.6.0 | **Medium** | **Node.js 22.23.4+ required** (Node2Shell, CVE-2026-111497): runtime, Lambda (`nodejs22.x`), Docker and CI; nodemailer 10 types (only if you import `nodemailer` directly) |
 
 ## Migration Guides
 
@@ -816,10 +817,105 @@ aws --endpoint-url="$S3_ENDPOINT" s3api get-bucket-cors --bucket "$S3_BUCKET_NAM
 
 ---
 
+### v1.5.0 → v1.6.0 (Node.js 22 required)
+
+Every `@mbc-cqrs-serverless/*` package now declares `engines.node: ">=22"`. Node.js 18 and 20 are end of life and will not receive the fix for CVE-2026-111497 (Node2Shell), a remote code execution vulnerability in the Brotli decoder bundled with Node.js. The fix ships in **Node.js 22.23.4, 24.22.1 and 26.12.1**, so use one of those versions or later. On Node.js 18 or 20, `npm install` reports `EBADENGINE` (and fails when `engine-strict` is enabled). The public API of the framework (classes, method signatures, NestJS 10.x) does not change.
+
+Newly scaffolded projects (`mbc new`) already use Node.js 22. Existing projects are not changed automatically; update every place that pins a Node.js version:
+
+**Step 1 — Local and CI.** Install Node.js 22.23.4 or later (`node -v`), and update `.nvmrc` / `.node-version` / `engines` if your project has them, plus `node-version` in your CI workflows (for example `actions/setup-node`).
+
+**Step 2 — Lambda runtime (CDK).** In `infra/libs/infra-stack.ts`, change the Lambda function runtime and the layer's `compatibleRuntimes`:
+
+```typescript
+// Before
+runtime: cdk.aws_lambda.Runtime.NODEJS_20_X,
+compatibleRuntimes: [cdk.aws_lambda.Runtime.NODEJS_20_X],
+// After
+runtime: cdk.aws_lambda.Runtime.NODEJS_22_X,
+compatibleRuntimes: [cdk.aws_lambda.Runtime.NODEJS_22_X],
+```
+
+Rebuild the layer on Node.js 22 (the layer is built on the deploying host), then `cdk deploy`. The update is in place; deploy to a non-production stage first.
+
+If you deploy through the scaffolded CDK pipeline (`infra/libs/pipeline-stack.ts`), also pin the CodeBuild Node.js version, so that `npm ci`, the tests, the synth and the layer build run on Node.js 22 rather than the CodeBuild image's default (which can change):
+
+```typescript
+const pipeline = new CodePipeline(this, idName + 'PipelineV3', {
+  selfMutation: true,
+  codeBuildDefaults: {
+    partialBuildSpec: BuildSpec.fromObject({
+      phases: { install: { 'runtime-versions': { nodejs: '22' } } },
+    }),
+  },
+  // ...
+})
+```
+
+The pipeline updates itself (`selfMutation`) on the next run after you push this change.
+
+**Step 3 — Local Serverless config.** In `infra-local/serverless.yml`, set `provider.runtime: nodejs22.x`, and use `serverless-offline` `^13.9.0` or later (earlier 13.x releases do not know `nodejs22.x`).
+
+**Step 4 — Docker images.**
+- `Dockerfile` (ECS API image): `node:20-bullseye-slim` → `node:22-bookworm-slim` in both stages. **If you use Prisma, also install `openssl` in both stages** — bookworm-slim ships no libssl, and Prisma's query engine then fails to load with `libssl.so.1.1: cannot open shared object file`:
+
+  ```dockerfile
+  RUN apt-get update -y && apt-get install -y --no-install-recommends openssl && rm -rf /var/lib/apt/lists/*
+  ```
+
+  Then rebuild the image. The `prisma generate` that runs during `npm install` / `npm ci` **inside the image** (the template's `postinstall` script) detects OpenSSL 3 and generates the `debian-openssl-3.0.x` engine there. Running `npx prisma generate` on a macOS or Windows host does not produce that engine; if your Dockerfile copies a client generated on the host instead of installing inside the image, add `debian-openssl-3.0.x` (and `linux-arm64-openssl-3.0.x` for arm64) to `binaryTargets` in `prisma/schema.prisma`.
+- `infra-local/appsync-simulator/Dockerfile` and `infra-local/cognito-local/Dockerfile`: `node:18-alpine` → `node:22-alpine`, then rebuild with `docker compose build`.
+
+**Step 5 — nodemailer 10 types (only if your code imports `nodemailer` directly).** `@mbc-cqrs-serverless/core` now depends on nodemailer 10, which ships its own type definitions; its default export is no longer a namespace, so `nodemailer.SendMailOptions`, `nodemailer.Transporter` and `nodemailer.SentMessageInfo` no longer compile. Import the types by name and remove `@types/nodemailer`:
+
+```typescript
+// Before
+import nodemailer from 'nodemailer'
+const options: nodemailer.SendMailOptions = { /* ... */ }
+
+// After
+import nodemailer, { SendMailOptions } from 'nodemailer'
+const options: SendMailOptions = { /* ... */ }
+```
+
+```bash
+npm uninstall @types/nodemailer
+```
+
+Apps that only send mail through `EmailService` need no code changes.
+
+**Optional — dependency overrides.** v1.6.0 clears the high/critical production advisories in proxy-addr, body-parser and multer through the framework's and the template's `overrides`, and raises `qs` to the minimum that the patched body-parser and express 5 require. These overrides do not reach existing projects. To pick them up, add the same entries to your project's `package.json` and run `npm install`:
+
+```json
+"overrides": {
+  "multer": "^2.5.0",
+  "proxy-addr": "^2.0.8",
+  "body-parser@1": "^1.20.9",
+  "body-parser@2": "^2.4.0",
+  "qs": "^6.16.1"
+}
+```
+
+If your project lists any of these packages directly in `dependencies` (for example `multer`), override it as `"multer": "$multer"` and raise the direct dependency instead; otherwise npm aborts with `EOVERRIDE: Override for multer@^2.5.0 conflicts with direct dependency`. Then confirm with `npm audit --omit=dev --audit-level=high`.
+
+**Verify:**
+
+```bash
+node -v                                   # v22.23.4 or later
+npm ls @mbc-cqrs-serverless/core          # 1.6.0
+npx tsc --noEmit                          # no nodemailer type errors
+npm audit --omit=dev --audit-level=high   # no high/critical advisories
+```
+
+**Action required:** Steps 1–3 for every project (the CodeBuild pin in Step 2 only if you deploy through the scaffolded CDK pipeline). Step 4 for the Docker images you build (the `openssl` install only if the image runs Prisma). Step 5 only if you import `nodemailer` directly.
+
+---
+
 ## Version Compatibility Matrix
 
 | Core Version | CLI Version | NestJS | Node.js | TypeScript |
 |--------------|-------------|--------|---------|------------|
+| v1.6.0 | v1.6.0 | 10.x | 22.23.4+ | 5.x |
 | v1.5.0 | v1.5.0 | 10.x | 18+ | 5.x |
 | v1.4.0 | v1.4.0 | 10.x | 18+ | 5.x |
 | v1.3.0 | v1.3.0 | 10.x | 18+ | 5.x |
