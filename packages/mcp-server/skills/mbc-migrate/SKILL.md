@@ -884,7 +884,7 @@ npm uninstall @types/nodemailer
 
 Apps that only send mail through `EmailService` need no code changes.
 
-**Optional — dependency overrides.** v1.6.0 clears the high/critical production advisories in proxy-addr, body-parser and multer through the framework's and the template's `overrides` (and raises `qs` to the minimum that the patched body-parser requires). These overrides do not reach existing projects. To pick them up, add the same entries to your project's `package.json` and run `npm install`:
+**Optional — dependency overrides.** v1.6.0 clears the high/critical production advisories in proxy-addr, body-parser and multer through the framework's and the template's `overrides`, and keeps `qs` on 6.16.x, which the patched body-parser 1.20.9 (`~6.16.0`), body-parser 2.4 and express 5 accept. These overrides do not reach existing projects. To pick them up, add the same entries to your project's `package.json` and run `npm install`:
 
 ```json
 "overrides": {
@@ -892,11 +892,11 @@ Apps that only send mail through `EmailService` need no code changes.
   "proxy-addr": "^2.0.8",
   "body-parser@1": "^1.20.9",
   "body-parser@2": "^2.4.0",
-  "qs": "^6.16.1"
+  "qs": "~6.16.1"
 }
 ```
 
-Then confirm with `npm audit --omit=dev --audit-level=high`.
+If your project lists any of these packages directly in `dependencies` (for example `multer`), override it as `"multer": "$multer"` and raise the direct dependency instead; otherwise npm aborts with `EOVERRIDE: Override for multer@^2.5.0 conflicts with direct dependency`. Then confirm with `npm audit --omit=dev --audit-level=high`.
 
 **Verify:**
 
@@ -907,7 +907,7 @@ npx tsc --noEmit                          # no nodemailer type errors
 npm audit --omit=dev --audit-level=high   # no high/critical advisories
 ```
 
-**Action required:** Steps 1–4 for every project. Step 5 only if you import `nodemailer` directly.
+**Action required:** Steps 1–3 for every project (the CodeBuild pin in Step 2 only if you deploy through the scaffolded CDK pipeline). Step 4 for the Docker images you build (the `openssl` install only if the image runs Prisma). Step 5 only if you import `nodemailer` directly.
 
 ---
 

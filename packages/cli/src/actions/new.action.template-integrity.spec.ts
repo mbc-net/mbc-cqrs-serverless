@@ -1,6 +1,26 @@
 import { readFileSync } from 'fs'
 import path from 'path'
 
+// Minimal semver range check for the forms used in overrides: an exact
+// version ("4.3.2"), a major selector ("1"), "^x.y.z" and "~x.y.z". Anything
+// else throws, so a new override form fails the test instead of passing.
+function satisfies(version: string, range: string): boolean {
+  const parse = (v: string) => v.split('.').map(Number)
+  const [major, minor, patch] = parse(version)
+  const match = range.match(/^([\^~]?)(\d+)(?:\.(\d+)\.(\d+))?$/)
+  if (!match) throw new Error(`unsupported range "${range}"`)
+  const [, op, maj, min, pat] = match
+  if (min === undefined) return op === '' && major === Number(maj)
+  const [rMajor, rMinor, rPatch] = [Number(maj), Number(min), Number(pat)]
+  const atLeast =
+    major > rMajor ||
+    (major === rMajor &&
+      (minor > rMinor || (minor === rMinor && patch >= rPatch)))
+  if (op === '') return major === rMajor && minor === rMinor && patch === rPatch
+  if (op === '~') return atLeast && major === rMajor && minor === rMinor
+  return atLeast && major === rMajor && (rMajor > 0 || minor === rMinor)
+}
+
 // `mbc new` copies packages/cli/templates and runs `npm i` plus
 // `npm run migrate` against it, but CI never installs the template. These
 // checks catch template mistakes that only surface in a freshly scaffolded
@@ -85,9 +105,43 @@ describe('scaffolding template integrity', () => {
     it.each(mirrored)('mirrors the root override for %s', (selector) => {
       const name = packageName(selector)
       const override = packageJson.overrides?.[selector]
-      // A direct dependency must be overridden with "$name" (EOVERRIDE).
+      // A direct dependency must be overridden with "$name" (EOVERRIDE); the
+      // lockfile check below still holds its resolved version to the root.
       if (name in directDeps && override === `$${name}`) return
       expect(override).toEqual(rootOverrides[selector])
+    })
+
+    // The override strings can match while the committed lockfile, which is
+    // what `mbc new` installs from, still pins an older version. Every
+    // production copy of a mirrored package must satisfy the root range.
+    it.each(
+      mirrored.filter(
+        (selector) => typeof rootOverrides[selector] === 'string',
+      ),
+    )('template lockfile satisfies the root override for %s', (selector) => {
+      const name = packageName(selector)
+      const selectorRange = selector.slice(name.length + 1) // "1" in body-parser@1
+      const copies = Object.entries(lockPackages)
+        .filter(
+          ([key, entry]) =>
+            key.endsWith(`node_modules/${name}`) &&
+            !entry.dev &&
+            !entry.devOptional,
+        )
+        .map(([, entry]) => (entry as { version: string }).version)
+        .filter(
+          (version) => !selectorRange || satisfies(version, selectorRange),
+        )
+
+      // A version-scoped selector (body-parser@2) may match no copy in the
+      // template; an unscoped one always does, since it is in production.
+      if (!selectorRange) expect(copies.length).toBeGreaterThan(0)
+      for (const version of copies) {
+        expect({
+          version,
+          satisfies: satisfies(version, rootOverrides[selector] as string),
+        }).toEqual({ version, satisfies: true })
+      }
     })
   })
 
