@@ -310,7 +310,12 @@ describe('Claude Code Skills', () => {
       // CDK pipeline: pin CodeBuild to Node.js 22
       expect(content).toContain("'runtime-versions': { nodejs: '22' }")
       // Prisma engine is generated inside the image, not on the host
-      expect(content).not.toContain('Run `npx prisma generate` again')
+      const v160 = content.slice(
+        content.indexOf('### v1.5.0 → v1.6.0'),
+        content.indexOf('## Version Compatibility Matrix'),
+      )
+      expect(v160).toContain('**inside the image**')
+      expect(v160).not.toMatch(/^\s*Run `npx prisma generate`/m)
     })
   })
 

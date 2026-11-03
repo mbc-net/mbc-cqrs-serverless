@@ -2,15 +2,21 @@ import { readFileSync } from 'fs'
 import path from 'path'
 
 // Minimal semver range check for the forms used in overrides: an exact
-// version ("4.3.2"), a major selector ("1"), "^x.y.z" and "~x.y.z". Anything
-// else throws, so a new override form fails the test instead of passing.
+// version ("4.3.2"), a bare major selector ("1"), "^x.y.z" (x >= 1) and
+// "~x.y.z". Anything else (prerelease versions, "^1", 0.x caret ranges)
+// throws, so a new form fails the test loudly instead of being misjudged.
 function satisfies(version: string, range: string): boolean {
-  const parse = (v: string) => v.split('.').map(Number)
-  const [major, minor, patch] = parse(version)
+  if (!/^\d+\.\d+\.\d+$/.test(version)) {
+    throw new Error(`unsupported version "${version}"`)
+  }
+  const [major, minor, patch] = version.split('.').map(Number)
   const match = range.match(/^([\^~]?)(\d+)(?:\.(\d+)\.(\d+))?$/)
   if (!match) throw new Error(`unsupported range "${range}"`)
   const [, op, maj, min, pat] = match
-  if (min === undefined) return op === '' && major === Number(maj)
+  if (min === undefined) {
+    if (op !== '') throw new Error(`unsupported range "${range}"`)
+    return major === Number(maj)
+  }
   const [rMajor, rMinor, rPatch] = [Number(maj), Number(min), Number(pat)]
   const atLeast =
     major > rMajor ||
@@ -18,7 +24,8 @@ function satisfies(version: string, range: string): boolean {
       (minor > rMinor || (minor === rMinor && patch >= rPatch)))
   if (op === '') return major === rMajor && minor === rMinor && patch === rPatch
   if (op === '~') return atLeast && major === rMajor && minor === rMinor
-  return atLeast && major === rMajor && (rMajor > 0 || minor === rMinor)
+  if (rMajor === 0) throw new Error(`unsupported range "${range}"`)
+  return atLeast && major === rMajor
 }
 
 // `mbc new` copies packages/cli/templates and runs `npm i` plus

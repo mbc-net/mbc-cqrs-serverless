@@ -157,7 +157,11 @@ test('pipeline CodeBuild projects pin the Node.js 22 runtime', () => {
         ? value['Fn::Join'][1].map(render).join(value['Fn::Join'][0])
         : 'TOKEN'
   for (const project of Object.values(projects)) {
-    const buildSpec = JSON.parse(render(project.Properties.Source.BuildSpec))
+    const source = project.Properties.Source.BuildSpec
+    // Only a plain string or an Fn::Join renders to parseable JSON; fail with
+    // a clear message if a CDK upgrade emits another form (e.g. Fn::Sub).
+    expect(typeof source === 'string' || 'Fn::Join' in source).toBe(true)
+    const buildSpec = JSON.parse(render(source))
     expect(buildSpec.phases?.install?.['runtime-versions']).toEqual({
       nodejs: '22',
     })

@@ -884,7 +884,7 @@ npm uninstall @types/nodemailer
 
 Apps that only send mail through `EmailService` need no code changes.
 
-**Optional — dependency overrides.** v1.6.0 clears the high/critical production advisories in proxy-addr, body-parser and multer through the framework's and the template's `overrides`, and keeps `qs` on 6.16.x, which the patched body-parser 1.20.9 (`~6.16.0`), body-parser 2.4 and express 5 accept. These overrides do not reach existing projects. To pick them up, add the same entries to your project's `package.json` and run `npm install`:
+**Optional — dependency overrides.** v1.6.0 clears the high/critical production advisories in proxy-addr, body-parser and multer through the framework's and the template's `overrides`, and raises `qs` to the minimum that the patched body-parser and express 5 require. These overrides do not reach existing projects. To pick them up, add the same entries to your project's `package.json` and run `npm install`:
 
 ```json
 "overrides": {
@@ -892,7 +892,7 @@ Apps that only send mail through `EmailService` need no code changes.
   "proxy-addr": "^2.0.8",
   "body-parser@1": "^1.20.9",
   "body-parser@2": "^2.4.0",
-  "qs": "~6.16.1"
+  "qs": "^6.16.1"
 }
 ```
 
