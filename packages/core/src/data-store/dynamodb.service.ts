@@ -1,11 +1,13 @@
 import {
   AttributeValue,
+  ConditionCheck,
   DeleteItemCommand,
   DynamoDBClient,
   GetItemCommand,
   PutItemCommand,
   QueryCommand,
   ScanCommand,
+  TransactWriteItemsCommand,
   UpdateItemCommand,
 } from '@aws-sdk/client-dynamodb'
 import { marshall, unmarshall } from '@aws-sdk/util-dynamodb'
@@ -73,6 +75,116 @@ export class DynamoDbService {
     )
 
     return item
+  }
+
+  /** Persist an item atomically with server-owned, read-only admission checks. */
+  async putItemWithConditions(
+    tableName: string,
+    item: Record<string, any>,
+    conditions: string | undefined,
+    admissionConditions: ConditionCheck[],
+  ) {
+    // Validate before serialization, which can upload large attributes to S3.
+    this.validateAdmissionConditions(admissionConditions)
+    if (admissionConditions.length === 0) {
+      return this.putItem(tableName, item, conditions)
+    }
+    const data = await this.objToDdbItem(tableName, item)
+    await this.client.send(
+      new TransactWriteItemsCommand({
+        TransactItems: [
+          {
+            Put: {
+              TableName: tableName,
+              Item: data,
+              ConditionExpression: conditions,
+            },
+          },
+          ...admissionConditions.map((ConditionCheck) => ({ ConditionCheck })),
+        ],
+      }),
+    )
+    return item
+  }
+
+  private validateAdmissionConditions(conditions: ConditionCheck[]): void {
+    const isRecord = (value: unknown): value is Record<string, unknown> =>
+      value !== null && typeof value === 'object' && !Array.isArray(value)
+    const isString = (value: unknown) => typeof value === 'string'
+    const isAttribute = (value: unknown): boolean => {
+      if (!isRecord(value) || Object.keys(value).length !== 1) return false
+      const [type, data] = Object.entries(value)[0]
+      switch (type) {
+        case 'S':
+        case 'N':
+          return isString(data)
+        case 'B':
+          return data instanceof Uint8Array
+        case 'BOOL':
+          return typeof data === 'boolean'
+        case 'NULL':
+          return data === true
+        case 'SS':
+        case 'NS':
+          return Array.isArray(data) && data.length > 0 && data.every(isString)
+        case 'BS':
+          return (
+            Array.isArray(data) &&
+            data.length > 0 &&
+            data.every((v) => v instanceof Uint8Array)
+          )
+        case 'L':
+          return Array.isArray(data) && data.every(isAttribute)
+        case 'M':
+          return isRecord(data) && Object.values(data).every(isAttribute)
+        default:
+          return false
+      }
+    }
+    const allowed = [
+      'TableName',
+      'Key',
+      'ConditionExpression',
+      'ExpressionAttributeNames',
+      'ExpressionAttributeValues',
+      'ReturnValuesOnConditionCheckFailure',
+    ]
+    if (!Array.isArray(conditions) || conditions.length > 99) {
+      throw new TypeError(
+        'Admission conditions must be an array of at most 99 ConditionCheck objects',
+      )
+    }
+    for (const check of conditions) {
+      if (
+        !isRecord(check) ||
+        Object.keys(check).some((key) => !allowed.includes(key)) ||
+        typeof check.TableName !== 'string' ||
+        !check.TableName.trim() ||
+        typeof check.ConditionExpression !== 'string' ||
+        !check.ConditionExpression.trim() ||
+        !isRecord(check.Key) ||
+        Object.keys(check.Key).length === 0 ||
+        !Object.values(check.Key).every(
+          (value) =>
+            isAttribute(value) &&
+            Object.keys(value).every((key) => ['S', 'N', 'B'].includes(key)),
+        ) ||
+        (check.ExpressionAttributeNames !== undefined &&
+          (!isRecord(check.ExpressionAttributeNames) ||
+            !Object.values(check.ExpressionAttributeNames).every(isString))) ||
+        (check.ExpressionAttributeValues !== undefined &&
+          (!isRecord(check.ExpressionAttributeValues) ||
+            !Object.values(check.ExpressionAttributeValues).every(
+              isAttribute,
+            ))) ||
+        (check.ReturnValuesOnConditionCheckFailure !== undefined &&
+          !['NONE', 'ALL_OLD'].includes(
+            check.ReturnValuesOnConditionCheckFailure,
+          ))
+      ) {
+        throw new TypeError('Invalid admission ConditionCheck')
+      }
+    }
   }
 
   async updateItem(

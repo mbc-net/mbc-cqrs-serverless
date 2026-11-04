@@ -1,0 +1,114 @@
+# Atomic command admission
+
+`CommandService` exposes a protected extension point for server-owned subclasses:
+
+```ts
+protected async getCommandAdmissionConditions(
+  command: Readonly<CommandModel>,
+  options: ICommandOptions,
+): Promise<ConditionCheck[]>
+```
+
+`ConditionCheck` is the low-level AWS SDK type from `@aws-sdk/client-dynamodb`.
+The default implementation returns `[]`, preserving ordinary conditional
+`PutItem` behavior. There is no request option to bypass admission or supply
+arbitrary transaction writes.
+
+Override this method in the application's registered command-service subclass.
+Construct checks from trusted server context and authoritative witness state.
+For example, a generation witness check can use this shape (table, tenant key,
+and generation must be resolved by the application):
+
+```ts
+return [{
+  TableName: witnessTable,
+  Key: { pk: { S: tenantKey }, sk: { S: witnessKey } },
+  ConditionExpression: '#generation = :expected',
+  ExpressionAttributeNames: { '#generation': 'generation' },
+  ExpressionAttributeValues: { ':expected': { N: String(expectedGeneration) } },
+}]
+```
+
+Do not mutate the command, its nested attributes, or the returned checks during
+persistence. `Readonly` is a TypeScript contract, not a runtime deep freeze.
+Application policy, including which commands need fencing, trusted generation
+selection, tenant isolation, and coordinated witness updates, remains outside
+core. A preflight read alone is not atomic admission: the returned check is
+what enforces the witness at the command-write boundary.
+
+## Boundary and lifecycle
+
+The hook runs after existing input/version validation, dirty checking and command
+metadata construction, immediately before the initial command is serialized.
+It receives the persisted versioned sort key in every path. `publishSync`,
+`publishAsync`, and `duplicate` share this boundary; partial update entry points
+continue to merge/delegate to the corresponding publisher. A no-op dirty check
+still returns without calling the hook. Existing TTL calculation may read before
+the hook; initial-command persistence and downstream writes have not occurred.
+
+With checks, `DynamoDbService.putItemWithConditions(table, item, putCondition,
+checks)` sends one `TransactWriteItemsCommand` containing the command `Put` and
+then only `ConditionCheck` entries. The command retains
+`attribute_not_exists(pk) AND attribute_not_exists(sk)`. Without checks it calls
+the original `putItem`. Both use the same private serializer, preserving dates,
+undefined removal, class instances, and large-attribute S3 offload. Input
+attributes are not replaced with an S3 pointer.
+
+Hook exceptions and transaction failures propagate. There is no plain-Put
+fallback. Sync TTL/history/data/handlers/status and async session writes run only
+after successful acceptance, in their existing order. Duplicate retains its
+existing behavior (including no new session write). TTL updates, projections,
+status/task-token updates and draining already accepted commands do not invoke
+admission. Closing a witness does not retroactively reject accepted work.
+
+## Validation and operational limits
+
+The adapter rejects a non-array, more than 99 checks, unexpected fields (including
+transaction write actions), missing/wrong required types, malformed attribute
+value types and invalid return-value enums before serialization/S3 upload.
+Checks use AWS AttributeValue maps, not plain JavaScript values. DynamoDB still
+validates expressions, numeric value syntax, table/key schemas, duplicate item
+targets and service size limits. Do not target the command item itself, or the
+same item twice. All participating tables must support the same regional/account
+transaction. The command plus checks must fit DynamoDB's transaction limits;
+S3 offload does not remove limits on the remaining item or check payloads.
+
+Deployment IAM must allow transactional command writes and condition checks on
+the witness tables. This extension makes no IAM, deployment or application policy
+changes. Transaction cancellation differs from ordinary Put conditional failure;
+applications should handle the propagated AWS error without treating it as a
+successful acceptance or retrying through an unfenced path.
+
+S3 upload happens before the DynamoDB request, as it does with ordinary Put.
+A rejected transaction can leave an orphaned S3 object, just like a failed Put.
+No rollback/delete is attempted and the caller's object pointer remains unchanged.
+Account for orphan retention/cleanup separately.
+
+## Validation commands
+
+From the repository root:
+
+```sh
+npm ci --ignore-scripts --no-audit --no-fund --legacy-peer-deps
+NODE_ENV=test ./node_modules/.bin/jest --runInBand --silent packages/core/src/commands/command-admission.spec.ts packages/core/src/data-store/dynamodb-admission.spec.ts packages/core/src/commands/command.service.spec.ts packages/core/src/data-store/dynamodb.service.spec.ts
+npm run build --workspace @mbc-cqrs-serverless/core
+./node_modules/.bin/eslint packages/core/src/commands/command.service.ts packages/core/src/data-store/dynamodb.service.ts
+```
+
+The existing lockfile requires legacy peer resolution with npm 11.19.1 in the
+implementation environment; no manifest or lockfile update is needed.
+
+An independent real DynamoDB Local test is provided without the existing
+`posttest:e2e` kill script. Start your own DynamoDB Local Java distribution on
+port **18765**, then run the test directly:
+
+```sh
+java -Djava.library.path=/path/to/DynamoDBLocal_lib -jar /path/to/DynamoDBLocal.jar -inMemory -sharedDb -port 18765
+# In another terminal:
+./node_modules/.bin/jest --config packages/core/test/jest-admission-local.json --runInBand
+```
+
+It uses a fixed loopback endpoint and dummy credentials, creates a uniquely named
+table, and deletes only that table. It verifies stale-witness rejection without a
+command row, matching-witness acceptance, and immutable-command conflict
+rejection. Stop only the process you started. No cloud resources are used.
