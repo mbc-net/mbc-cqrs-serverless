@@ -10,9 +10,24 @@ import { ConfigService } from '@nestjs/config'
 import { DynamoDbService } from '../../src/data-store/dynamodb.service'
 import { S3Service } from '../../src/data-store/s3.service'
 
-// Dedicated local process only: never use environment-provided AWS endpoints or credentials.
+// Match the CI harness by default; allow only an explicit local test override.
+const endpoint =
+  process.env.COMMAND_ADMISSION_DYNAMODB_ENDPOINT ?? 'http://127.0.0.1:8000'
+const endpointMatch = endpoint.match(
+  /^http:\/\/(?:127\.0\.0\.1|localhost):([1-9]\d{0,4})\/?$/,
+)
+if (
+  !endpointMatch ||
+  endpointMatch[0] !== endpoint ||
+  Number(endpointMatch[1]) > 65535
+) {
+  throw new Error(
+    'COMMAND_ADMISSION_DYNAMODB_ENDPOINT must be http://127.0.0.1:<port> or http://localhost:<port> (port 1..65535, optional trailing slash)',
+  )
+}
+// Never use general AWS endpoint environment variables or ambient credentials.
 const client = new DynamoDBClient({
-  endpoint: 'http://127.0.0.1:18765',
+  endpoint,
   region: 'us-east-1',
   credentials: { accessKeyId: 'local', secretAccessKey: 'local' },
   maxAttempts: 1,

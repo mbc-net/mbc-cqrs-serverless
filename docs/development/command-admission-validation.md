@@ -133,3 +133,65 @@ The parent ran the existing local integration suite against a dedicated in-memor
 The broader core suite was rerun with localhost test-server permissions: `NODE_ENV=test ./node_modules/.bin/jest --maxWorkers=4 --silent packages/core/src`. Result: 95 suites passed, 2388 tests passed, 44 skipped, 19 snapshots passed. This supersedes the earlier EPERM limitation above.
 
 An independent reviewer reran the targeted 99 tests and found no confirmed CRITICAL/HIGH/MEDIUM defects. The two production source files at the baseline are byte-equivalent to v1.5.0. Application integration and package publication remain pending.
+
+## PR515 CI harness correction (2026-11-05)
+
+Correction baseline: `b221e86d47ac9b568d8cfb132246ebe80e3bf2f1`, clean working
+tree in the same isolated worktree. No production code or Jest selection changed.
+
+The parent reported CI run `41858722349`, job `126677952482`: only the new
+admission suite failed, with `ECONNREFUSED 127.0.0.1:18765`; the existing five
+suites / 22 tests passed. Source inspection confirmed the mismatch:
+`test/scripts/run_dynamodb_local.sh` starts port 8000 and `start.sh` waits on
+8000, while the new suite hardcoded 18765. This existing failure was used as
+the reproduction evidence; no unavailable-port request was repeated.
+
+The suite now defaults to `http://127.0.0.1:8000`. The optional
+`COMMAND_ADMISSION_DYNAMODB_ENDPOINT` accepts only HTTP loopback host literals
+`127.0.0.1` or `localhost`, explicit ports 1..65535, and an optional trailing
+slash. Invalid values fail before client creation. Dummy credentials remain
+fixed; general AWS endpoint/credential environment variables are not used.
+Existing harness conventions were reviewed in the workflow, shell setup,
+`test/e2e/config.ts`, and both Jest configurations. The general
+`DYNAMODB_ENDPOINT` convention was deliberately not adopted for this isolated
+test. The independent runner still supports a dedicated 18765 process via the
+explicit override documented in `command-admission.md`.
+
+Correction checks (repository root):
+
+```sh
+node /tmp/check-command-admission-endpoint.cjs
+./node_modules/.bin/jest --config packages/core/test/jest-e2e.json --listTests --runInBand
+./node_modules/.bin/jest --config packages/core/test/jest-admission-local.json --listTests --runInBand
+./node_modules/.bin/eslint --no-ignore --parser-options '{"project":null}' packages/core/test/e2e/command-admission.e2e-spec.ts
+npm run build --workspace @mbc-cqrs-serverless/core
+npm run build:test --workspace @mbc-cqrs-serverless/core
+git diff --check
+```
+
+- A temporary, network-free check transpiled the actual suite and captured its
+  client options using stubbed imports. Before the edit it failed on default
+  18765 versus expected 8000; afterward it passed the default, four valid
+  overrides (including 18765 and port boundaries), and 19 invalid values.
+  It also checked fixed dummy credentials and ignored general AWS variables.
+  The temporary script is a local validation artifact, not a repository test.
+- Standard E2E discovery passed: six suites including admission. Standalone
+  discovery passed: exactly the admission suite. Neither command runs setup.
+- Standalone Jest was also invoked with
+  `COMMAND_ADMISSION_DYNAMODB_ENDPOINT=https://localhost:8000`. It compiled the
+  suite and failed with the expected validation message before database setup;
+  a wrapper asserted exit 1 and no TypeScript or connection error. This checks
+  runner loading and early rejection, not successful database execution.
+- Affected-file lint, core build, and CI test build passed. The test build
+  excludes specs; standalone Jest supplied the changed spec's compilation check.
+- One MBC local code-review pass found no confirmed CRITICAL/HIGH/MEDIUM defect
+  in this correction. Checked strict endpoint matching (including trailing
+  newline rejection), fixed credentials, unchanged table cleanup, and unchanged
+  discovery. No additional repository test boilerplate was added.
+
+Actual DynamoDB Local execution on 8000 and 18765 and the full CI rerun remain
+for the parent. Earlier parent database success above predates this correction.
+No full CI green result is claimed. No credentials or `.env` files were read,
+and no production environment, commit, push, or remote mutation was performed.
+
+Parent verification of the CI-port fix: the standalone integration suite passed against real DynamoDB Local on default port 8000 and again with COMMAND_ADMISSION_DYNAMODB_ENDPOINT=http://127.0.0.1:18765. An independent reviewer confirmed standard discovery still includes all six suites and standalone discovery includes one; no confirmed major findings. CI rerun remains pending at this point.

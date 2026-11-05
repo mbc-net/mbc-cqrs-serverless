@@ -98,17 +98,34 @@ npm run build --workspace @mbc-cqrs-serverless/core
 The existing lockfile requires legacy peer resolution with npm 11.19.1 in the
 implementation environment; no manifest or lockfile update is needed.
 
-An independent real DynamoDB Local test is provided without the existing
-`posttest:e2e` kill script. Start your own DynamoDB Local Java distribution on
-port **18765**, then run the test directly:
+The standard CI command, `npx lerna run test:e2e --scope=@mbc-cqrs-serverless/core`,
+uses `test/jest-e2e.json`, which discovers `command-admission.e2e-spec.ts`
+alongside the existing suites. Its setup starts DynamoDB Local on port **8000**;
+the admission test defaults to `http://127.0.0.1:8000`. No exclusion or separate
+CI service is required.
+
+An independent runner is also provided without the existing `posttest:e2e`
+kill script or full harness setup. With DynamoDB Local already running on 8000:
 
 ```sh
-java -Djava.library.path=/path/to/DynamoDBLocal_lib -jar /path/to/DynamoDBLocal.jar -inMemory -sharedDb -port 18765
-# In another terminal:
 ./node_modules/.bin/jest --config packages/core/test/jest-admission-local.json --runInBand
 ```
 
-It uses a fixed loopback endpoint and dummy credentials, creates a uniquely named
-table, and deletes only that table. It verifies stale-witness rejection without a
+For a dedicated process on port **18765**, start your own DynamoDB Local Java
+distribution and explicitly override the test endpoint:
+
+```sh
+java -Djava.library.path=/path/to/DynamoDBLocal_lib -jar /path/to/DynamoDBLocal.jar -inMemory -sharedDb -port 18765
+# In another terminal, from the repository root:
+COMMAND_ADMISSION_DYNAMODB_ENDPOINT=http://127.0.0.1:18765 ./node_modules/.bin/jest --config packages/core/test/jest-admission-local.json --runInBand
+```
+
+`COMMAND_ADMISSION_DYNAMODB_ENDPOINT` accepts only `http://127.0.0.1:<port>`
+or `http://localhost:<port>`, with an integer port from 1 through 65535 and an
+optional trailing slash. Empty values, credentials, paths, queries, fragments,
+and other hosts or schemes are rejected before client creation. General AWS
+endpoint variables (including `DYNAMODB_ENDPOINT`) are ignored; credentials
+remain fixed dummy values. The test creates a uniquely named table and deletes
+only that table. It verifies stale-witness rejection without a
 command row, matching-witness acceptance, and immutable-command conflict
 rejection. Stop only the process you started. No cloud resources are used.
