@@ -1271,6 +1271,7 @@ export class InfraStack extends cdk.Stack {
         'dynamodb:UpdateItem',
         'dynamodb:GetItem',
         'dynamodb:Query',
+        'dynamodb:ConditionCheckItem',
       ],
       resources: [dynamoDbTablePrefixArn], // Access to all resources
     })
