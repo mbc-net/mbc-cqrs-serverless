@@ -73,9 +73,10 @@ never reset it or recreate a gate with a previously used generation.
   tenant/key ownership fail closed for protected writes reaching the hook.
 - [example.module.ts](./example.module.ts): real Nest registration. Call
   `ConfigurationExampleModule.register({ tableName: 'settings',
-  witnessTableName: 'configuration-gates', infrastructureImports: [...] })`
+  witnessTableName: 'dev-myapp-configuration-gates', infrastructureImports: [...] })`
   from your application's imports. `tableName` is the core base name; the witness
-  name is the full physical table name. Supply existing modules exporting
+  name is the full physical table name, including any stack prefix that your IAM
+  policy requires. Supply existing modules exporting
   `DynamoDbService`, `SessionService`, `S3Service`, `SnsService`, `ConfigService`
   and `StepFunctionService`, or use the application's existing global providers.
 - [admission.spec.ts](./admission.spec.ts): verifies ordering, missing/cross-tenant
@@ -122,9 +123,17 @@ check that finds no change skips admission because it creates no command.
 Previously accepted work can still drain: close admission, coordinate/drain
 accepted work, then migrate; reopening alone does not complete maintenance.
 Witness and command tables must participate in the same account/Region
-transaction and have suitable IAM permissions. A rejected write can leave an
-S3 object uploaded before the transaction; plan orphan retention/cleanup.
-See [boundary and operational details](../../docs/development/command-admission.md#boundary-and-lifecycle).
+transaction, and the witness table needs `dynamodb:ConditionCheckItem`. A rejected
+write can leave an S3 object uploaded before the transaction; plan orphan
+retention/cleanup. See [boundary and operational details](../../docs/development/command-admission.md#boundary-and-lifecycle).
+
+A stale or closed gate surfaces as `CommandAdmissionRejectedException` (HTTP 409),
+which is distinct from an ordinary version conflict. Every command in this example
+checks one tenant-wide gate, so concurrent updates may also fail with
+`CommandAdmissionContentionException` (HTTP 503) on the DynamoDB service, even
+though DynamoDB Local does not reproduce it. See
+[rejections and HTTP responses](../../docs/development/command-admission.md#rejections-and-http-responses)
+and [capacity and contention](../../docs/development/command-admission.md#capacity-and-contention).
 
 Potential adaptations include maintenance/data migration, stale-job or
 lease-owner fencing, and approval/authorization revocation. Each needs an

@@ -1,5 +1,6 @@
 import {
   AttributeValue,
+  ConditionalCheckFailedException,
   ConditionCheck,
   DeleteItemCommand,
   DynamoDBClient,
@@ -7,6 +8,7 @@ import {
   PutItemCommand,
   QueryCommand,
   ScanCommand,
+  TransactionCanceledException,
   TransactWriteItemsCommand,
   UpdateItemCommand,
 } from '@aws-sdk/client-dynamodb'
@@ -16,6 +18,10 @@ import { ConfigService } from '@nestjs/config'
 import { ulid } from 'ulid'
 
 import { TableType } from '../commands'
+import {
+  CommandAdmissionContentionException,
+  CommandAdmissionRejectedException,
+} from '../exceptions'
 import {
   isS3AttributeKey,
   parseS3AttributeKey,
@@ -90,21 +96,61 @@ export class DynamoDbService {
       return this.putItem(tableName, item, conditions)
     }
     const data = await this.objToDdbItem(tableName, item)
-    await this.client.send(
-      new TransactWriteItemsCommand({
-        TransactItems: [
-          {
-            Put: {
-              TableName: tableName,
-              Item: data,
-              ConditionExpression: conditions,
+    try {
+      await this.client.send(
+        new TransactWriteItemsCommand({
+          TransactItems: [
+            {
+              Put: {
+                TableName: tableName,
+                Item: data,
+                ConditionExpression: conditions,
+              },
             },
-          },
-          ...admissionConditions.map((ConditionCheck) => ({ ConditionCheck })),
-        ],
-      }),
-    )
+            ...admissionConditions.map((ConditionCheck) => ({
+              ConditionCheck,
+            })),
+          ],
+        }),
+      )
+    } catch (error) {
+      throw this.translateAdmissionFailure(error, item)
+    }
     return item
+  }
+
+  /**
+   * Reasons follow TransactItems order: [0] is the Put, the rest are checks.
+   * A failed check wins over a version conflict because the request is stale.
+   */
+  private translateAdmissionFailure(
+    error: unknown,
+    item: Record<string, any>,
+  ): unknown {
+    if (!(error instanceof TransactionCanceledException)) {
+      return error
+    }
+    const codes = (error.CancellationReasons ?? []).map(({ Code }) => Code)
+    const context = `pk=${item.pk} sk=${item.sk} reasons=${codes.join(',')}`
+    if (codes.slice(1).includes('ConditionalCheckFailed')) {
+      this.logger.warn(`Command admission rejected: ${context}`)
+      return new CommandAdmissionRejectedException(error)
+    }
+    if (codes[0] === 'ConditionalCheckFailed') {
+      this.logger.warn(`Command version conflict: ${context}`)
+      return Object.assign(
+        new ConditionalCheckFailedException({
+          message: 'The conditional request failed',
+          $metadata: error.$metadata,
+        }),
+        { cause: error },
+      )
+    }
+    if (codes.includes('TransactionConflict')) {
+      this.logger.warn(`Command admission contention: ${context}`)
+      return new CommandAdmissionContentionException(error)
+    }
+    return error
   }
 
   private validateAdmissionConditions(conditions: ConditionCheck[]): void {

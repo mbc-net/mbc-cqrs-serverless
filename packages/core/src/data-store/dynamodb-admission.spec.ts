@@ -1,10 +1,17 @@
 import {
+  ConditionalCheckFailedException,
   ConditionCheck,
   PutItemCommand,
+  TransactionCanceledException,
   TransactWriteItemsCommand,
 } from '@aws-sdk/client-dynamodb'
+import { Logger } from '@nestjs/common'
 import { ConfigService } from '@nestjs/config'
 
+import {
+  CommandAdmissionContentionException,
+  CommandAdmissionRejectedException,
+} from '../exceptions'
 import { DynamoDbService } from './dynamodb.service'
 import { S3Service } from './s3.service'
 
@@ -105,6 +112,85 @@ describe('conditional command persistence', () => {
     expect(send).toHaveBeenCalledTimes(1)
     expect(input.attributes.big).toHaveLength(100)
     expect(upload).toHaveBeenCalledTimes(1)
+  })
+  describe('transaction cancellation classification', () => {
+    const canceled = (...codes: string[]) =>
+      new TransactionCanceledException({
+        message: 'Transaction cancelled',
+        $metadata: { httpStatusCode: 400 },
+        CancellationReasons: codes.map((Code) => ({ Code })),
+      })
+    const persist = () =>
+      service.putItemWithConditions('commands', item(), undefined, [check])
+    // Reasons follow TransactItems order: [0] is the Put, the rest are checks.
+    it.each([
+      [['None', 'ConditionalCheckFailed'], CommandAdmissionRejectedException],
+      [
+        ['ConditionalCheckFailed', 'ConditionalCheckFailed'],
+        CommandAdmissionRejectedException,
+      ],
+      [
+        ['TransactionConflict', 'ConditionalCheckFailed'],
+        CommandAdmissionRejectedException,
+      ],
+      [['ConditionalCheckFailed', 'None'], ConditionalCheckFailedException],
+      [
+        ['ConditionalCheckFailed', 'TransactionConflict'],
+        ConditionalCheckFailedException,
+      ],
+      [['TransactionConflict', 'None'], CommandAdmissionContentionException],
+      [['None', 'TransactionConflict'], CommandAdmissionContentionException],
+      [
+        ['TransactionConflict', 'ThrottlingError'],
+        CommandAdmissionContentionException,
+      ],
+    ])('classifies %j without retrying', async (codes, expected) => {
+      send.mockRejectedValueOnce(canceled(...codes))
+      await expect(persist()).rejects.toBeInstanceOf(expected)
+      expect(send).toHaveBeenCalledTimes(1)
+    })
+    it.each([
+      [['None', 'ThrottlingError']],
+      [['ValidationError', 'None']],
+      [[]],
+    ])('keeps the original exception for %j', async (codes) => {
+      const failure = canceled(...codes)
+      send.mockRejectedValueOnce(failure)
+      await expect(persist()).rejects.toBe(failure)
+    })
+    it('keeps the original exception when reasons are absent', async () => {
+      const failure = canceled()
+      delete failure.CancellationReasons
+      send.mockRejectedValueOnce(failure)
+      await expect(persist()).rejects.toBe(failure)
+    })
+    it.each([
+      ['None', 'ConditionalCheckFailed'],
+      ['TransactionConflict', 'None'],
+      ['ConditionalCheckFailed', 'None'],
+    ])(
+      'keeps the AWS error and logs the context for %s/%s',
+      async (...codes) => {
+        const warn = jest.spyOn(Logger.prototype, 'warn').mockImplementation()
+        const failure = canceled(...codes)
+        send.mockRejectedValueOnce(failure)
+        await expect(persist()).rejects.toMatchObject({ cause: failure })
+        expect(warn).toHaveBeenCalledTimes(1)
+        expect(warn.mock.calls[0][0]).toContain('pk=tenant sk=command@1')
+        expect(warn.mock.calls[0][0]).toContain(`reasons=${codes.join(',')}`)
+        warn.mockRestore()
+      },
+    )
+    it('does not translate plain Put conditional failures', async () => {
+      const failure = new ConditionalCheckFailedException({
+        message: 'The conditional request failed',
+        $metadata: {},
+      })
+      send.mockRejectedValueOnce(failure)
+      await expect(
+        service.putItemWithConditions('commands', item(), undefined, []),
+      ).rejects.toBe(failure)
+    })
   })
   it('accepts 99 checks', async () => {
     await service.putItemWithConditions(

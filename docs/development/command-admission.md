@@ -80,12 +80,37 @@ the original `putItem`. Both use the same private serializer, preserving dates,
 undefined removal, class instances, and large-attribute S3 offload. Input
 attributes are not replaced with an S3 pointer.
 
-Hook exceptions and transaction failures propagate. There is no plain-Put
+Hook exceptions propagate unchanged, and transaction failures propagate as
+described in [Rejections and HTTP responses](#rejections-and-http-responses).
+There is no plain-Put
 fallback. Sync TTL/history/data/handlers/status and async session writes run only
 after successful acceptance, in their existing order. Duplicate retains its
 existing behavior (including no new session write). TTL updates, projections,
 status/task-token updates and draining already accepted commands do not invoke
 admission. Closing a witness does not retroactively reject accepted work.
+
+## Rejections and HTTP responses
+
+`putItemWithConditions` classifies a cancelled transaction by its
+`CancellationReasons`, which follow `TransactItems` order: index 0 is the command
+`Put` and the remaining entries are the checks. The first matching row applies:
+
+| Cancellation reasons | Exception | HTTP | What the caller should do |
+| --- | --- | --- | --- |
+| A check has `ConditionalCheckFailed` | `CommandAdmissionRejectedException` | 409 | Stop. A new attempt must capture again, reread and rebuild |
+| The `Put` has `ConditionalCheckFailed` | `ConditionalCheckFailedException` | 409 | Same as a version conflict on an ordinary Put: reread and rebuild |
+| Any entry has `TransactionConflict` | `CommandAdmissionContentionException` | 503 | Retry later. A new attempt must still capture again, reread and rebuild |
+| Anything else, or no reasons | Original `TransactionCanceledException` | 500 | Treat as a server error |
+
+A failed check takes priority over a version conflict because the whole request
+is stale. Core does not retry automatically. The admission exceptions keep the
+AWS error as `cause`, and applications can catch them to return another response,
+such as 503 during a planned maintenance window. None of these outcomes means the
+command was accepted. Never retry through an unfenced path.
+
+The two new exceptions are Nest `HttpException` subclasses, so outside HTTP
+handlers they behave like any other thrown error. Without checks, the ordinary
+`PutItem` path and its exceptions are unchanged.
 
 ## Validation and operational limits
 
@@ -99,11 +124,32 @@ same item twice. All participating tables must support the same regional/account
 transaction. The command plus checks must fit DynamoDB's transaction limits;
 S3 offload does not remove limits on the remaining item or check payloads.
 
-Deployment IAM must allow transactional command writes and condition checks on
-the witness tables. This extension makes no IAM, deployment or application policy
-changes. Transaction cancellation differs from ordinary Put conditional failure;
-applications should handle the propagated AWS error without treating it as a
-successful acceptance or retrying through an unfenced path.
+The transaction needs `dynamodb:PutItem` on the command table and
+`dynamodb:ConditionCheckItem` on every witness table. The CLI infrastructure
+template grants both, but only on tables whose names start with the stack prefix.
+Give a witness table that prefix or grant it separately. Projects generated from
+an earlier template must add the permission themselves. Without it, the request
+fails with an access-denied error rather than a rejection.
+
+### Capacity and contention
+
+DynamoDB performs two underlying operations for every item in a transaction, and
+consumes that capacity even when the transaction is cancelled. A check therefore
+adds cost to each protected command, on top of the doubled cost of the `Put`.
+
+According to the AWS documentation, an item in a `TransactWriteItems` request
+conflicts with another ongoing `TransactWriteItems` request that includes the same
+item. A single witness checked by many concurrent commands may therefore cancel
+some of them with `TransactionConflict`, even while the gate is open. A
+`PutItem`, `UpdateItem` or `DeleteItem` on the witness can also fail with
+`TransactionConflictException`, so a maintenance controller that updates the gate
+must retry until the update succeeds. The AWS SDK does not retry cancelled
+transactions.
+
+This has not been measured against the DynamoDB service. DynamoDB Local reported
+no conflicts in a test with 200 concurrent transactions on one witness, so passing
+local tests say nothing about this behavior. Load test the expected concurrency in
+a real environment, and consider narrower witnesses if conflicts are frequent.
 
 S3 upload happens before the DynamoDB request, as it does with ordinary Put.
 A rejected transaction can leave an orphaned S3 object, just like a failed Put.

@@ -1821,6 +1821,7 @@ exports[`snapshot test for InfraStack 1`] = `
                 "dynamodb:UpdateItem",
                 "dynamodb:GetItem",
                 "dynamodb:Query",
+                "dynamodb:ConditionCheckItem",
               ],
               "Effect": "Allow",
               "Resource": "arn:aws:dynamodb:ap-northeast-1:101010101010:table/dev--*",

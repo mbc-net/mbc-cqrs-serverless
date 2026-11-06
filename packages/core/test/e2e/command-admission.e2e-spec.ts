@@ -1,14 +1,15 @@
 import {
+  ConditionalCheckFailedException,
   CreateTableCommand,
   DeleteTableCommand,
   DynamoDBClient,
   PutItemCommand,
-  TransactionCanceledException,
 } from '@aws-sdk/client-dynamodb'
 import { ConfigService } from '@nestjs/config'
 
 import { DynamoDbService } from '../../src/data-store/dynamodb.service'
 import { S3Service } from '../../src/data-store/s3.service'
+import { CommandAdmissionRejectedException } from '../../src/exceptions'
 
 // Match the CI harness by default; allow only an explicit local test override.
 const endpoint =
@@ -99,7 +100,7 @@ describe('atomic admission on isolated DynamoDB Local', () => {
     const condition = 'attribute_not_exists(pk) AND attribute_not_exists(sk)'
     await expect(
       service.putItemWithConditions(tableName, item, condition, check('1')),
-    ).rejects.toBeInstanceOf(TransactionCanceledException)
+    ).rejects.toBeInstanceOf(CommandAdmissionRejectedException)
     expect(
       await service.getItem(
         tableName,
@@ -115,7 +116,16 @@ describe('atomic admission on isolated DynamoDB Local', () => {
         condition,
         check('2'),
       ),
-    ).rejects.toBeInstanceOf(TransactionCanceledException)
+    ).rejects.toBeInstanceOf(ConditionalCheckFailedException)
+    // A stale witness wins when the same request also conflicts on version.
+    await expect(
+      service.putItemWithConditions(
+        tableName,
+        { ...item, attributes: { value: 'replacement' } },
+        condition,
+        check('1'),
+      ),
+    ).rejects.toBeInstanceOf(CommandAdmissionRejectedException)
     expect(
       await service.getItem(
         tableName,

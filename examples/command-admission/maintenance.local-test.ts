@@ -3,11 +3,11 @@ import { randomUUID } from 'node:crypto'
 import {
   CreateTableCommand,
   DeleteTableCommand,
-  TransactionCanceledException,
   UpdateItemCommand,
 } from '@aws-sdk/client-dynamodb'
 import { createMock } from '@golevelup/ts-jest'
 import {
+  CommandAdmissionRejectedException,
   DynamoDbService,
   S3Service,
   TableType,
@@ -148,7 +148,7 @@ describe('maintenance freeze with the real publisher and DynamoDB Local', () => 
             options,
           )
         }),
-      ).rejects.toBeInstanceOf(TransactionCanceledException)
+      ).rejects.toBeInstanceOf(CommandAdmissionRejectedException)
       expect(await acceptedRow()).toBeUndefined()
       expect(f.session.put).not.toHaveBeenCalled()
     },
