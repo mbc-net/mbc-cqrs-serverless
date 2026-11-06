@@ -418,6 +418,74 @@ describe('data migration with the real publisher and DynamoDB Local', () => {
     })
   })
 
+  describe('when the data row has expired', () => {
+    const closed = expect.objectContaining({
+      active: false,
+      mode: 'migration',
+      generation: 8,
+    })
+    beforeEach(async () => {
+      await db.deleteItem(dataTable, key)
+    })
+    afterEach(async () => {
+      await db.deleteItem(commandTable, { ...key, sk: `${input.sk}@1` })
+    })
+
+    it('stays closed until an accepted command drains', async () => {
+      await db.putItem(commandTable, {
+        ...input,
+        sk: `${input.sk}@13`,
+        version: 13,
+      })
+      await expect(f.migration.migrate('demo', options)).rejects.toThrow(
+        `${input.pk}@13 status=undefined`,
+      )
+      expect(await gate()).toEqual(closed)
+
+      // The stream and Step Functions pipeline finish the accepted command.
+      const synced = {
+        ...input,
+        version: 13,
+        attributes: { value: 'accepted' },
+      }
+      await db.putItem(dataTable, synced)
+      await f.commands.updateStatus({ ...key, sk: `${input.sk}@13` }, finished)
+      await expect(f.migration.migrate('demo', options)).resolves.toEqual({
+        generation: 9,
+        migrated: true,
+      })
+      expect((await command(14)).attributes).toEqual(v2('accepted'))
+    })
+
+    it('stays closed when an accepted command failed', async () => {
+      await db.putItem(commandTable, {
+        ...input,
+        sk: `${input.sk}@13`,
+        version: 13,
+        status: 'sync_data:FAILED',
+      })
+      await expect(f.migration.migrate('demo', options)).rejects.toThrow(
+        `Configuration command failed: ${input.pk}@13`,
+      )
+      expect(await gate()).toEqual(closed)
+    })
+
+    it('reopens without a command when every command finished', async () => {
+      await db.putItem(commandTable, {
+        ...input,
+        sk: `${input.sk}@1`,
+        version: 1,
+        status: finished,
+      })
+      await expect(f.migration.migrate('demo', options)).resolves.toEqual({
+        generation: 9,
+        migrated: false,
+      })
+      expect(await command(13)).toBeUndefined()
+      expect(await read(dataTable, input.sk)).toBeUndefined()
+    })
+  })
+
   it('is idempotent and adds no command when already migrated', async () => {
     await f.migration.migrate('demo', options)
     await expect(f.migration.migrate('demo', options)).resolves.toEqual({

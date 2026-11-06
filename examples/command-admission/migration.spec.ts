@@ -1,5 +1,6 @@
 import {
   ConditionalCheckFailedException,
+  QueryCommand,
   TransactionConflictException,
 } from '@aws-sdk/client-dynamodb'
 import { createMock } from '@golevelup/ts-jest'
@@ -12,7 +13,11 @@ import { ConfigurationMigration } from './migration'
 import { fixture, options } from './test-support'
 
 describe('migration gate updates', () => {
-  const send = jest.fn()
+  const moveGate = jest.fn()
+  const listCommands = jest.fn()
+  const send = jest.fn(async (command) =>
+    command instanceof QueryCommand ? listCommands(command) : moveGate(command),
+  )
   const db = createMock<DynamoDbService>({ client: { send } as never })
   const conflict = () =>
     new TransactionConflictException({ message: 'conflict', $metadata: {} })
@@ -23,7 +28,8 @@ describe('migration gate updates', () => {
 
   beforeEach(async () => {
     jest.clearAllMocks()
-    send.mockReset()
+    moveGate.mockReset()
+    listCommands.mockReset().mockResolvedValue({ Items: [] })
     db.getTableName.mockImplementation(
       (name, type) => `example-${name}-${type}`,
     )
@@ -38,7 +44,7 @@ describe('migration gate updates', () => {
   afterEach(async () => f?.module.close())
 
   it('retries a gate update that loses to an in-flight transaction', async () => {
-    send
+    moveGate
       .mockRejectedValueOnce(conflict())
       .mockRejectedValueOnce(conflict())
       .mockResolvedValueOnce(updated(8))
@@ -47,11 +53,11 @@ describe('migration gate updates', () => {
       generation: 9,
       migrated: false,
     })
-    expect(send).toHaveBeenCalledTimes(4)
+    expect(moveGate).toHaveBeenCalledTimes(4)
   })
 
   it('gives up after bounded retries without reopening', async () => {
-    send.mockImplementation(async () => {
+    moveGate.mockImplementation(async () => {
       throw conflict()
     })
     const failure = f.migration.migrate('demo', options)
@@ -59,20 +65,20 @@ describe('migration gate updates', () => {
     await expect(failure).rejects.toMatchObject({
       cause: expect.any(TransactionConflictException),
     })
-    expect(send).toHaveBeenCalledTimes(5)
+    expect(moveGate).toHaveBeenCalledTimes(5)
   })
 
   it('does not retry other failures', async () => {
     const failure = new Error('denied')
-    send.mockRejectedValueOnce(failure)
+    moveGate.mockRejectedValueOnce(failure)
     await expect(f.migration.migrate('demo', options)).rejects.toBe(failure)
-    expect(send).toHaveBeenCalledTimes(1)
+    expect(moveGate).toHaveBeenCalledTimes(1)
   })
 
   it('reopens only the generation it closed', async () => {
-    send.mockResolvedValueOnce(updated(8)).mockResolvedValueOnce(updated(9))
+    moveGate.mockResolvedValueOnce(updated(8)).mockResolvedValueOnce(updated(9))
     await f.migration.migrate('demo', options)
-    const reopen = send.mock.calls[1][0].input
+    const reopen = moveGate.mock.calls[1][0].input
     expect(reopen.ConditionExpression).toContain('#generation = :held')
     expect(reopen.ExpressionAttributeValues[':held']).toEqual({ N: '8' })
     expect(reopen.ExpressionAttributeValues[':toMode']).toEqual({ S: 'normal' })
@@ -84,9 +90,9 @@ describe('migration gate updates', () => {
         ? { active: false, mode: 'migration', generation: 8 }
         : undefined,
     )
-    send.mockResolvedValueOnce(updated(9))
+    moveGate.mockResolvedValueOnce(updated(9))
     await f.migration.migrate('demo', options)
-    expect(send).toHaveBeenCalledTimes(1)
+    expect(moveGate).toHaveBeenCalledTimes(1)
   })
 
   it('names the gate when it cannot be moved', async () => {
@@ -94,7 +100,7 @@ describe('migration gate updates', () => {
       message: 'The conditional request failed',
       $metadata: {},
     })
-    send.mockRejectedValueOnce(conditional)
+    moveGate.mockRejectedValueOnce(conditional)
     db.getItem.mockImplementation(async (table) =>
       table === 'example-gates'
         ? { active: false, mode: 'maintenance', generation: 8 }
@@ -103,6 +109,27 @@ describe('migration gate updates', () => {
     const failure = f.migration.migrate('demo', options)
     await expect(failure).rejects.toThrow('TENANT#demo')
     await expect(failure).rejects.toMatchObject({ cause: conditional })
+  })
+
+  it('checks every page of commands when the data row is gone', async () => {
+    const lastKey = { pk: { S: 'TENANT#demo' }, sk: { S: 'CONFIG#main@1' } }
+    listCommands
+      .mockResolvedValueOnce({
+        Items: [{ version: { N: '1' }, status: { S: 'finish:FINISHED' } }],
+        LastEvaluatedKey: lastKey,
+      })
+      .mockResolvedValueOnce({
+        Items: [{ version: { N: '13' }, status: { S: 'sync_data:STARTED' } }],
+      })
+    moveGate.mockResolvedValueOnce(updated(8))
+    await expect(f.migration.migrate('demo', options)).rejects.toThrow(
+      'TENANT#demo@13 status=sync_data:STARTED',
+    )
+    expect(moveGate).toHaveBeenCalledTimes(1)
+    expect(listCommands.mock.calls[0][0].input.ConsistentRead).toBe(true)
+    expect(listCommands.mock.calls[1][0].input.ExclusiveStartKey).toEqual(
+      lastKey,
+    )
   })
 
   it('resolves DynamoDbService from non-global infrastructureImports', async () => {

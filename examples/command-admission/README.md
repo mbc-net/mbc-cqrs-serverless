@@ -116,7 +116,7 @@ core DynamoDB adapter restores date fields when reading a stored command.
 | Step | What happens | Why |
 | --- | --- | --- |
 | 1. Close | The gate moves to `active = false`, `mode = migration` and a new generation | New requests fail, and requests holding an older generation are rejected atomically |
-| 2. Drain | Requires no command newer than the data row, and the latest command at `finish:FINISHED` | A command accepted before the close could otherwise overwrite migrated data |
+| 2. Drain | Requires no command newer than the data row, and the latest command at `finish:FINISHED`. If the data row has expired, requires every command for the key at `finish:FINISHED` | A command accepted before the close could otherwise overwrite migrated data, or recreate expired data in the old format |
 | 3. Migrate | Publishes the new format with `publishSync` under a migration witness | Keeps the command history, version check and history table |
 | 4. Verify | Rereads the data row with a consistent read | Reopens only if the stored data is what was written |
 | 5. Reopen | Moves the gate back to `normal` if it still holds the generation from step 1 | Reopening also rejects anything holding an older generation |
@@ -145,7 +145,7 @@ closed:
 
 | Blocking command `@N` | What to do | Then |
 | --- | --- | --- |
-| The migration wrote it, and the data row is **below** `N` | Delete the command row. No data was applied, so this only removes the attempt | Call `migrate` |
+| The migration wrote it, and the data row is **below** `N` or missing | Delete the command row. No data was applied, so this only removes the attempt | Call `migrate` |
 | The data row is **at** `N` | Repair what failed, such as a custom data sync handler, then set the status with `commands.updateStatus(key, 'finish:FINISHED')` | Call `migrate` |
 | A normal request wrote it | Decide per application. Deleting it discards an update that was accepted | Call `migrate` |
 

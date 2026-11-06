@@ -1,11 +1,13 @@
 import { isDeepStrictEqual } from 'node:util'
 
 import {
+  AttributeValue,
   ConditionalCheckFailedException,
+  QueryCommand,
   TransactionConflictException,
   UpdateItemCommand,
 } from '@aws-sdk/client-dynamodb'
-import { marshall } from '@aws-sdk/util-dynamodb'
+import { marshall, unmarshall } from '@aws-sdk/util-dynamodb'
 import {
   CommandInputModel,
   CommandService,
@@ -59,6 +61,15 @@ const stored = (attributes: Attributes) =>
   })
 const sameStored = (left: Attributes, right: Attributes) =>
   isDeepStrictEqual(stored(left), stored(right))
+
+const undrained = (pk: string, version: number, status?: string) =>
+  new Error(
+    // Waiting will not help a failed command: see the recovery steps in the README.
+    status?.endsWith(`:${CommandStatus.STATUS_FAILED}`)
+      ? `Configuration command failed: ${pk}@${version}`
+      : // A crashed writer leaves this state forever, so show what to inspect.
+        `Configuration commands have not drained: ${pk}@${version} status=${status}`,
+  )
 
 // The example format change. Rerunning it on migrated data changes nothing.
 export const toSchemaV2: Transform = (attributes) =>
@@ -137,29 +148,59 @@ export class ConfigurationMigration {
   private async readDrained(tenant: string) {
     const key = configurationKey(tenant)
     const current = await this.readData(tenant)
-    const version = current?.version ?? 0
+    if (!current) {
+      await this.requireFinishedCommands(key)
+      return current
+    }
     const commandAt = (at: number) =>
       this.db.getItem(
         this.commands.tableName,
         { pk: key.pk, sk: `${key.sk}@${at}` },
         { consistentRead: true },
       )
-    const newer = await commandAt(version + 1)
-    const latest = newer ?? (version > 0 ? await commandAt(version) : undefined)
-    if (latest?.status?.endsWith(`:${CommandStatus.STATUS_FAILED}`)) {
-      // Waiting will not help: see the recovery steps in the README.
-      throw new Error(
-        `Configuration command failed: ${key.pk}@${latest.version}`,
-      )
-    }
-    if (newer || (current && latest?.status !== FINISHED)) {
-      // A crashed writer leaves this state forever, so show what to inspect.
-      throw new Error(
-        `Configuration commands have not drained: ${key.pk}` +
-          `@${latest?.version ?? version} status=${latest?.status}`,
+    const newer = await commandAt(current.version + 1)
+    const latest = newer ?? (await commandAt(current.version))
+    if (newer || latest?.status !== FINISHED) {
+      throw undrained(
+        key.pk,
+        latest?.version ?? current.version,
+        latest?.status,
       )
     }
     return current
+  }
+
+  /**
+   * Without a data row, the version of the latest command is unknown: the row can
+   * expire while an accepted command is still waiting to sync, and that sync would
+   * recreate it in the old format. So every command for the key must be finished.
+   */
+  private async requireFinishedCommands(key: { pk: string; sk: string }) {
+    let ExclusiveStartKey: Record<string, AttributeValue> | undefined
+    do {
+      const page = await this.db.client.send(
+        new QueryCommand({
+          TableName: this.commands.tableName,
+          ConsistentRead: true,
+          KeyConditionExpression: 'pk = :pk AND begins_with(sk, :versioned)',
+          ProjectionExpression: '#version, #status',
+          ExpressionAttributeNames: {
+            '#version': 'version',
+            '#status': 'status',
+          },
+          ExpressionAttributeValues: {
+            ':pk': { S: key.pk },
+            ':versioned': { S: `${key.sk}@` },
+          },
+          ExclusiveStartKey,
+        }),
+      )
+      for (const item of page.Items ?? []) {
+        const { version, status } = unmarshall(item)
+        if (status !== FINISHED) throw undrained(key.pk, version, status)
+      }
+      ExclusiveStartKey = page.LastEvaluatedKey
+    } while (ExclusiveStartKey)
   }
 
   private async verify(tenant: string, attributes: Attributes): Promise<void> {
