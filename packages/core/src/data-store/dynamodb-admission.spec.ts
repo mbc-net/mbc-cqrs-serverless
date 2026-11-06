@@ -172,13 +172,16 @@ describe('conditional command persistence', () => {
       'keeps the AWS error and logs the context for %s/%s',
       async (...codes) => {
         const warn = jest.spyOn(Logger.prototype, 'warn').mockImplementation()
-        const failure = canceled(...codes)
-        send.mockRejectedValueOnce(failure)
-        await expect(persist()).rejects.toMatchObject({ cause: failure })
-        expect(warn).toHaveBeenCalledTimes(1)
-        expect(warn.mock.calls[0][0]).toContain('pk=tenant sk=command@1')
-        expect(warn.mock.calls[0][0]).toContain(`reasons=${codes.join(',')}`)
-        warn.mockRestore()
+        try {
+          const failure = canceled(...codes)
+          send.mockRejectedValueOnce(failure)
+          await expect(persist()).rejects.toMatchObject({ cause: failure })
+          expect(warn).toHaveBeenCalledTimes(1)
+          expect(warn.mock.calls[0][0]).toContain('pk=tenant sk=command@1')
+          expect(warn.mock.calls[0][0]).toContain(`reasons=${codes.join(',')}`)
+        } finally {
+          warn.mockRestore()
+        }
       },
     )
     it('does not translate plain Put conditional failures', async () => {

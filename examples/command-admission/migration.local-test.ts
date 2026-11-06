@@ -59,6 +59,22 @@ const moveGate = () =>
     }),
   )
 
+// Makes the next call fail, then calls through. Restored even if a test fails,
+// so an unused failure cannot leak into a later test.
+const failures: jest.SpyInstance[] = []
+function failNext<T extends object>(
+  target: T,
+  method: keyof T & string,
+  message: string,
+) {
+  failures.push(
+    jest
+      .spyOn(target as Record<string, any>, method)
+      .mockRejectedValueOnce(new Error(message)),
+  )
+}
+afterEach(() => failures.splice(0).forEach((spy) => spy.mockRestore()))
+
 beforeAll(async () => {
   jest.spyOn(db, 'client', 'get').mockReturnValue(client)
   for (const TableName of [commandTable, dataTable, historyTable, gateTable]) {
@@ -310,17 +326,11 @@ describe('data migration with the real publisher and DynamoDB Local', () => {
 
   it('names the command and status that block a stuck migration', async () => {
     // The process died after persisting the command, so it stays STARTED.
-    const history = jest
-      .spyOn(f.module.get(HistoryService), 'publish')
-      .mockRejectedValueOnce(new Error('throttled'))
-    const status = jest
-      .spyOn(f.commands, 'updateStatus')
-      .mockRejectedValueOnce(new Error('also down'))
+    failNext(f.module.get(HistoryService), 'publish', 'throttled')
+    failNext(f.commands, 'updateStatus', 'also down')
     await expect(f.migration.migrate('demo', options)).rejects.toThrow(
       'throttled',
     )
-    history.mockRestore()
-    status.mockRestore()
     await expect(f.migration.migrate('demo', options)).rejects.toThrow(
       `${input.pk}@13 status=publish_sync:STARTED`,
     )
@@ -339,14 +349,10 @@ describe('data migration with the real publisher and DynamoDB Local', () => {
       })
 
     it('recovers by deleting the failed command when no data was applied', async () => {
-      const history = f.module.get(HistoryService)
-      const publish = jest
-        .spyOn(history, 'publish')
-        .mockRejectedValueOnce(new Error('throttled'))
+      failNext(f.module.get(HistoryService), 'publish', 'throttled')
       await expect(f.migration.migrate('demo', options)).rejects.toThrow(
         'throttled',
       )
-      publish.mockRestore()
       expect(await command(13)).toEqual(failed(13))
       expect((await read(dataTable, input.sk)).version).toBe(12)
       await expect(f.migration.migrate('demo', options)).rejects.toThrow(
@@ -362,13 +368,10 @@ describe('data migration with the real publisher and DynamoDB Local', () => {
     })
 
     it('recovers by completing the command when the data was applied', async () => {
-      const status = jest
-        .spyOn(f.commands, 'updateStatus')
-        .mockRejectedValueOnce(new Error('handler failed'))
+      failNext(f.commands, 'updateStatus', 'handler failed')
       await expect(f.migration.migrate('demo', options)).rejects.toThrow(
         'handler failed',
       )
-      status.mockRestore()
       expect(await command(13)).toEqual(failed(13))
       expect((await read(dataTable, input.sk)).version).toBe(13)
       await expect(f.migration.migrate('demo', options)).rejects.toThrow(
