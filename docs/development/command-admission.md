@@ -1,5 +1,31 @@
 # Atomic command admission
 
+## Why use admission checks?
+
+A maintenance window may need to freeze configuration updates while messages
+and other commands continue. A preflight gate read can become stale before the
+command is persisted. Command version CAS protects the command's version, but
+cannot detect a separate gate closing and reopening in between. Checking the
+original tenant-scoped gate generation in the command-write transaction closes
+that gap.
+
+Start with the [runnable configuration-freeze example](../../examples/command-admission/README.md).
+It includes an actual `CommandService` subclass, server-owned witness context,
+same-module Nest registration, offline DI tests and a separate DynamoDB Local
+runner. Capture the witness **before** reading/building the update, retain the
+observed command version, and never refresh the witness inside the hook or retry
+an old payload with a new generation.
+
+Potential applications include maintenance/data migrations, stale-job or
+lease-owner fencing, and approval/authorization revocation. These require
+application-specific authoritative witnesses updated atomically, same-account/
+Region transaction tables, and coordination of already accepted work and external
+side effects. The hook alone is not a complete maintenance or authorization
+system. Using the extension rather than copying the publisher preserves its
+serializer, S3, TTL, session and history lifecycle.
+
+## Extension point
+
 `CommandService` exposes a protected extension point for server-owned subclasses:
 
 ```ts
