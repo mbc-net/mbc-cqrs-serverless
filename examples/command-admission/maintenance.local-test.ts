@@ -132,6 +132,19 @@ describe('maintenance freeze with the real publisher and DynamoDB Local', () => 
     )
   })
 
+  it('keeps the observed seq when updating', async () => {
+    await db.putItem(commandTable, {
+      ...input,
+      sk: 'CONFIG#main@12',
+      seq: 42,
+      attributes: { value: 'old' },
+    })
+    await f.application.update('demo', 'new', options)
+    expect(await acceptedRow()).toEqual(
+      expect.objectContaining({ version: 13, seq: 42 }),
+    )
+  })
+
   it.each([false, true])(
     'rejects gen7 after close (reopened=%s) with no command',
     async (reopen) => {

@@ -38,6 +38,7 @@ export class ConfigurationApplication {
           name: observed.name,
           type: observed.type,
           tenantCode: tenant,
+          seq: observed.seq,
           attributes: withValue(observed.attributes, value),
           version: observed.version,
         },
