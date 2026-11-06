@@ -196,8 +196,10 @@ transaction, and the witness table needs `dynamodb:ConditionCheckItem`. A reject
 write can leave an S3 object uploaded before the transaction; plan orphan
 retention/cleanup. See [boundary and operational details](../../docs/development/command-admission.md#boundary-and-lifecycle).
 
-A stale or closed gate surfaces as `CommandAdmissionRejectedException` (HTTP 409),
-which is distinct from an ordinary version conflict. Every command in this example
+A gate that is already closed fails in `capture` with a plain `Configuration
+updates are unavailable` error, before anything is read. A stale generation, or a
+gate that closes after `capture`, surfaces as `CommandAdmissionRejectedException`
+(HTTP 409), which is distinct from an ordinary version conflict. Every command in this example
 checks one tenant-wide gate, so concurrent updates may also fail with
 `CommandAdmissionContentionException` (HTTP 503) on the DynamoDB service, even
 though DynamoDB Local does not reproduce it. See

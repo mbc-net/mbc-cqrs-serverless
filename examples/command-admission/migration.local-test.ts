@@ -14,6 +14,7 @@ import {
   S3Service,
   TableType,
 } from '@mbc-cqrs-serverless/core'
+import { TtlService } from '@mbc-cqrs-serverless/core/dist/commands/ttl.service'
 import { ConfigService } from '@nestjs/config'
 
 import { gateKey } from './admission'
@@ -61,19 +62,19 @@ const moveGate = () =>
 
 // Makes the next call fail, then calls through. Restored even if a test fails,
 // so an unused failure cannot leak into a later test.
-const failures: jest.SpyInstance[] = []
+const spies: jest.SpyInstance[] = []
 function failNext<T extends object>(
   target: T,
   method: keyof T & string,
   message: string,
 ) {
-  failures.push(
+  spies.push(
     jest
       .spyOn(target as Record<string, any>, method)
       .mockRejectedValueOnce(new Error(message)),
   )
 }
-afterEach(() => failures.splice(0).forEach((spy) => spy.mockRestore()))
+afterEach(() => spies.splice(0).forEach((spy) => spy.mockRestore()))
 
 beforeAll(async () => {
   jest.spyOn(db, 'client', 'get').mockReturnValue(client)
@@ -304,6 +305,36 @@ describe('data migration with the real publisher and DynamoDB Local', () => {
     expect(await read(dataTable, input.sk)).toEqual(
       expect.objectContaining({ seq: 42, version: 13, attributes: v2('old') }),
     )
+  })
+
+  describe('with a default TTL for the table', () => {
+    beforeEach(() => {
+      spies.push(
+        jest
+          .spyOn(f.module.get(TtlService), 'calculateTtl')
+          .mockResolvedValue(999),
+      )
+    })
+
+    it('keeps the expiry that the configuration already has', async () => {
+      await db.putItem(dataTable, {
+        ...input,
+        ttl: 1234,
+        attributes: { value: 'old' },
+      })
+      await f.migration.migrate('demo', options)
+      expect(await read(dataTable, input.sk)).toEqual(
+        expect.objectContaining({ version: 13, ttl: 1234 }),
+      )
+      expect((await command(13)).ttl).toBe(1234)
+    })
+
+    it('does not add an expiry to a configuration without one', async () => {
+      await f.migration.migrate('demo', options)
+      const stored = await read(dataTable, input.sk)
+      expect(stored.version).toBe(13)
+      expect(stored.ttl ?? null).toBeNull()
+    })
   })
 
   it('sees a change that exists only inside a Set', async () => {

@@ -7,12 +7,14 @@ import {
 } from '@aws-sdk/client-dynamodb'
 import { marshall } from '@aws-sdk/util-dynamodb'
 import {
+  CommandInputModel,
   CommandService,
   CommandStatus,
   DataService,
   DynamoDbService,
   getCommandStatus,
   ICommandOptions,
+  pickKeys,
 } from '@mbc-cqrs-serverless/core'
 import { Injectable } from '@nestjs/common'
 
@@ -29,6 +31,25 @@ const NORMAL: GateState = { active: true, mode: 'normal' }
 const MIGRATION: GateState = { active: false, mode: 'migration' }
 const FINISHED = getCommandStatus('finish', CommandStatus.STATUS_FINISHED)
 const MAX_ATTEMPTS = 5
+
+// A migration changes only the attributes. This fails to compile if core adds an
+// input field, so a new field cannot be dropped from migrated data unnoticed.
+const INHERITED: Record<
+  Exclude<keyof CommandInputModel, 'attributes'>,
+  true
+> = {
+  pk: true,
+  sk: true,
+  id: true,
+  code: true,
+  name: true,
+  version: true,
+  tenantCode: true,
+  type: true,
+  isDeleted: true,
+  seq: true,
+  ttl: true,
+}
 
 // Compare in the stored format, as undefined members do not survive storage.
 const stored = (attributes: Attributes) =>
@@ -79,17 +100,11 @@ export class ConfigurationMigration {
         await this.admission.asMigration(tenant, held, () =>
           this.commands.publishSync(
             {
-              pk: current.pk,
-              sk: current.sk,
-              id: current.id,
-              code: current.code,
-              name: current.name,
-              type: current.type,
-              tenantCode: tenant,
-              seq: current.seq,
-              version: current.version,
+              ...pickKeys(current, Object.keys(INHERITED)),
+              // Without a value, core would calculate a new default expiry.
+              ttl: current.ttl ?? null,
               attributes,
-            },
+            } as CommandInputModel,
             options,
           ),
         )
