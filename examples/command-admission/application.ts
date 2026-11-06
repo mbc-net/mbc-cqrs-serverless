@@ -3,6 +3,12 @@ import { Injectable } from '@nestjs/common'
 
 import { ConfigurationAdmission, configurationKey } from './admission'
 
+// Data can be in either format until the migration has run for this tenant.
+const withValue = (attributes: Record<string, any>, value: string) =>
+  attributes?.schemaVersion === 2
+    ? { ...attributes, settings: { ...attributes.settings, value } }
+    : { ...attributes, value }
+
 @Injectable()
 export class ConfigurationApplication {
   constructor(
@@ -32,7 +38,7 @@ export class ConfigurationApplication {
           name: observed.name,
           type: observed.type,
           tenantCode: tenant,
-          attributes: { ...observed.attributes, value },
+          attributes: withValue(observed.attributes, value),
           version: observed.version,
         },
         options,

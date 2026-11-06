@@ -64,14 +64,14 @@ describe('server-owned admission and Nest registration', () => {
         expect.objectContaining({
           TableName: 'example-gates',
           ConditionExpression:
-            '#active = :active AND #mode = :normal AND #generation = :generation',
+            '#active = :active AND #mode = :mode AND #generation = :generation',
           Key: {
             pk: { S: 'TENANT#demo' },
             sk: { S: 'CONFIGURATION_ADMISSION' },
           },
           ExpressionAttributeValues: {
             ':active': { BOOL: true },
-            ':normal': { S: 'normal' },
+            ':mode': { S: 'normal' },
             ':generation': { N: '7' },
           },
         }),

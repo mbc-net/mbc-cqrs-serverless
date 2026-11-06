@@ -3,7 +3,8 @@
 This small server-side example uses the real `CommandService` extension point
 to admit configuration updates only while a tenant's gate is open **and still
 at the generation the request originally observed**. Other commands continue.
-It is an educational policy, not a maintenance controller or an HTTP server.
+It is an educational policy, not a production maintenance controller or an HTTP
+server.
 
 ## Try it from the repository root
 
@@ -83,6 +84,11 @@ never reset it or recreate a gate with a previously used generation.
   witnesses, checks, propagation of failure and real Nest injection.
 - [maintenance.local-test.ts](./maintenance.local-test.ts): runnable acceptance,
   stop, close/reopen, unrelated-command and fresh-request demonstrations.
+- [migration.ts](./migration.ts): a data migration built on the same gate. See
+  [Migrate data behind the gate](#migrate-data-behind-the-gate).
+- [migration.spec.ts](./migration.spec.ts) and
+  [migration.local-test.ts](./migration.local-test.ts): gate retries, draining,
+  fencing, resuming and idempotence.
 
 The registration helper appends `{ provide: CommandService, useClass:
 ConfigurationCommands }` to the **same registered `CommandModule`**. Its exports,
@@ -101,6 +107,69 @@ projections, S3 offload or a deployed maintenance workflow. Mock tests alone do
 not prove DynamoDB atomicity.
 The local acceptance assertion expects `createdAt` to be a `Date`: the real
 core DynamoDB adapter restores date fields when reading a stored command.
+
+## Migrate data behind the gate
+
+`ConfigurationMigration.migrate(tenant, options)` changes the stored format from
+`{ value }` to `{ schemaVersion: 2, settings: { value } }`:
+
+| Step | What happens | Why |
+| --- | --- | --- |
+| 1. Close | The gate moves to `active = false`, `mode = migration` and a new generation | New requests fail, and requests holding an older generation are rejected atomically |
+| 2. Drain | Requires no command newer than the data row, and the latest command at `finish:FINISHED` | A command accepted before the close could otherwise overwrite migrated data |
+| 3. Migrate | Publishes the new format with `publishSync` under a migration witness | Keeps the command history, version check and history table |
+| 4. Verify | Rereads the data row with a consistent read | Reopens only if the stored data is what was written |
+| 5. Reopen | Moves the gate back to `normal` if it still holds the generation from step 1 | Reopening also rejects anything holding an older generation |
+
+The migration command passes through the same hook. It needs the gate **closed at
+the held generation**, while requests need it open, so neither can write under the
+other's state. If another controller moves the gate, the migration command is
+rejected and the gate is not reopened.
+
+Every failure leaves the gate closed, which stops updates rather than risking
+mixed data. A deleted configuration stays deleted. The application keeps writing
+either format because data can be in the old format until a tenant has been migrated.
+
+### Recover from a failure
+
+Call `migrate` again after fixing the cause. It keeps the generation it holds,
+skips data that is already migrated, and adds no command when nothing changes.
+
+There are two exceptions: `Configuration command failed`, and
+`have not drained` for a command that never finishes. A process that dies after
+persisting a command leaves it at its starting status, so that message shows the
+command and status to inspect. Wait for as long as your pipeline normally takes and
+confirm that the writer has stopped. Rerunning cannot clear these commands, and core
+cannot publish the same version twice, so resolve them first while the gate stays
+closed:
+
+| Blocking command `@N` | What to do | Then |
+| --- | --- | --- |
+| The migration wrote it, and the data row is **below** `N` | Delete the command row. No data was applied, so this only removes the attempt | Call `migrate` |
+| The data row is **at** `N` | Repair what failed, such as a custom data sync handler, then set the status with `commands.updateStatus(key, 'finish:FINISHED')` | Call `migrate` |
+| A normal request wrote it | Decide per application. Deleting it discards an update that was accepted | Call `migrate` |
+
+Command rows are the audit log, so record what you changed and why.
+
+This example has limits that a production migration must address:
+
+- It writes no log and sends no alert. A failure leaves updates blocked, so the
+  controller must alert on it. Errors are plain messages for reading, not a typed
+  API to branch on.
+- It migrates one key per tenant. Real data needs a key list or scan, resumable
+  progress, and a drain check for every key.
+- `migrate` does not wait or poll. A controller should retry later when commands
+  have not drained.
+- It assumes one controller at a time and has no authorization. A resuming
+  controller reuses the held generation, so the fence does not stop it from racing
+  an earlier run that is still alive. Use a lock, protect the controller, and never
+  expose it to a request path.
+- A closed gate blocks only the keys that the hook protects. Other writers,
+  including anything writing to the data table directly, need their own controls.
+- Only the configuration data row is verified. Projections from custom data sync
+  handlers and external side effects need their own checks.
+- The local tests stand in for the stream pipeline by writing the data row and
+  status directly, so the deployed pipeline is not exercised.
 
 ## Trust boundary and operational limits
 
@@ -135,8 +204,7 @@ though DynamoDB Local does not reproduce it. See
 [rejections and HTTP responses](../../docs/development/command-admission.md#rejections-and-http-responses)
 and [capacity and contention](../../docs/development/command-admission.md#capacity-and-contention).
 
-Potential adaptations include maintenance/data migration, stale-job or
-lease-owner fencing, and approval/authorization revocation. Each needs an
+Potential adaptations also include stale-job or lease-owner fencing, and approval/authorization revocation. Each needs an
 authoritative, atomically updated witness and suitable scope. Lease changes
 must advance a fencing token; revocation must change the checked authorization
 witness. External side effects, previously accepted work, and authorization in

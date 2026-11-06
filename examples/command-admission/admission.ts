@@ -13,6 +13,10 @@ const WITNESS_TABLE = Symbol('configuration witness table')
 interface Witness {
   readonly tenant: string
   readonly generation: number
+  // The gate state that this writer needs. Requests need it open; only the
+  // migration needs it closed, so requests cannot write during a migration.
+  readonly active: boolean
+  readonly mode: 'normal' | 'migration'
 }
 
 export const configurationKey = (tenant: string) => ({
@@ -47,7 +51,24 @@ export class ConfigurationAdmission {
       throw new Error('Configuration updates are unavailable')
     }
     return this.storage.run(
-      Object.freeze({ tenant, generation: gate.generation }),
+      Object.freeze({
+        tenant,
+        generation: gate.generation,
+        active: true,
+        mode: 'normal',
+      }),
+      work,
+    )
+  }
+
+  // Migration controller only: the hook still checks this state atomically.
+  asMigration<T>(
+    tenant: string,
+    generation: number,
+    work: () => Promise<T>,
+  ): Promise<T> {
+    return this.storage.run(
+      Object.freeze({ tenant, generation, active: false, mode: 'migration' }),
       work,
     )
   }
@@ -85,15 +106,15 @@ export class ConfigurationCommands extends CommandService {
           sk: { S: gateKey(witness.tenant).sk },
         },
         ConditionExpression:
-          '#active = :active AND #mode = :normal AND #generation = :generation',
+          '#active = :active AND #mode = :mode AND #generation = :generation',
         ExpressionAttributeNames: {
           '#active': 'active',
           '#mode': 'mode',
           '#generation': 'generation',
         },
         ExpressionAttributeValues: {
-          ':active': { BOOL: true },
-          ':normal': { S: 'normal' },
+          ':active': { BOOL: witness.active },
+          ':mode': { S: witness.mode },
           ':generation': { N: String(witness.generation) },
         },
       },

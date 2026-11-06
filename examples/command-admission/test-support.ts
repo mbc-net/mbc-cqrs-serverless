@@ -10,6 +10,7 @@ import { Test } from '@nestjs/testing'
 import { ConfigurationAdmission } from './admission'
 import { ConfigurationApplication } from './application'
 import { ConfigurationExampleModule } from './example.module'
+import { ConfigurationMigration } from './migration'
 
 // Only external infrastructure and TTL lookup are mocked. CommandModule,
 // its event handler, inherited constructor and onModuleInit remain real.
@@ -41,6 +42,7 @@ export async function fixture(
     commands: module.get(CommandService),
     admission: module.get(ConfigurationAdmission),
     application: module.get(ConfigurationApplication),
+    migration: module.get(ConfigurationMigration),
   }
 }
 

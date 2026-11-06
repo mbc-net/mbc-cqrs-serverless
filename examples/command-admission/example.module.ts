@@ -2,6 +2,7 @@ import { DynamicModule, Module, ModuleMetadata } from '@nestjs/common'
 
 import { configurationCommandModule } from './admission'
 import { ConfigurationApplication } from './application'
+import { ConfigurationMigration } from './migration'
 
 @Module({})
 export class ConfigurationExampleModule {
@@ -18,9 +19,11 @@ export class ConfigurationExampleModule {
           options.witnessTableName,
           options.infrastructureImports,
         ),
+        // ConfigurationMigration needs DynamoDbService in this module as well.
+        ...(options.infrastructureImports ?? []),
       ],
-      providers: [ConfigurationApplication],
-      exports: [ConfigurationApplication],
+      providers: [ConfigurationApplication, ConfigurationMigration],
+      exports: [ConfigurationApplication, ConfigurationMigration],
     }
   }
 }

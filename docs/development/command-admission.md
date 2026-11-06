@@ -14,10 +14,10 @@ It includes an actual `CommandService` subclass, server-owned witness context,
 same-module Nest registration, offline DI tests and a separate DynamoDB Local
 runner. Capture the witness **before** reading/building the update, retain the
 observed command version, and never refresh the witness inside the hook or retry
-an old payload with a new generation.
+an old payload with a new generation. The example also includes a
+[data migration behind the gate](../../examples/command-admission/README.md#migrate-data-behind-the-gate).
 
-Potential applications include maintenance/data migrations, stale-job or
-lease-owner fencing, and approval/authorization revocation. These require
+Potential applications also include stale-job or lease-owner fencing, and approval/authorization revocation. These require
 application-specific authoritative witnesses updated atomically, same-account/
 Region transaction tables, and coordination of already accepted work and external
 side effects. The hook alone is not a complete maintenance or authorization
