@@ -471,7 +471,7 @@ function getMigrationGuideMessages(
 
 ## Where to find version-specific breaking changes
 
-Detailed, per-version migration notes (v1.0.x → v1.6.0, including data migrations,
+Detailed, per-version migration notes (v1.0.x → v1.7.0, including data migrations,
 removed APIs, and step-by-step upgrade instructions) live in the **\`mbc-migrate\` skill**
 (\`skills/mbc-migrate/SKILL.md\`) and in the framework **CHANGELOG.md**. These are the
 single source of truth and are kept current with each release — consult them for the
@@ -488,6 +488,7 @@ exact changes between ${fromVersion} and ${toVersion}.
 - **v1.4.0** — Configurable DynamoDB table names and \`registerAsync\` on the domain modules (opt-in; defaults keep the current names).
 - **v1.5.0** — Local development only: Floci replaces LocalStack as the local S3 emulator (no application code changes).
 - **v1.6.0** — *Breaking*: Node.js 22.23.4 or later is required (\`engines.node >=22\`); update the Lambda runtime to \`nodejs22.x\`, Docker images and CI. nodemailer 10 ships its own types (import \`SendMailOptions\` etc. by name if you use \`nodemailer\` directly).
+- **v1.7.0** — Opt-in atomic command admission (\`CommandService.getCommandAdmissionConditions\`, \`CommandAdmissionRejectedException\` 409 / \`CommandAdmissionContentionException\` 503). No runtime change without the hook, but unit tests that run the real \`CommandService\` with a mocked \`DynamoDbService\` must also mock \`putItemWithConditions\`; adopting the hook needs \`dynamodb:ConditionCheckItem\` on witness tables.
 
 For the full instructions on any of the above, open the \`mbc-migrate\` skill and read the matching \`### <version>\` section.
 
