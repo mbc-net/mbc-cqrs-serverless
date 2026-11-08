@@ -3,6 +3,78 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.7.0](https://github.com/mbc-net/mbc-cqrs-serverless/releases/tag/v1.7.0) (2026-11-09)
+
+### Upgrade Notes
+
+- **core (test mocks):** `CommandService` now persists the initial command through
+  `DynamoDbService.putItemWithConditions` instead of `putItem` (in `publishSync`, `publishAsync`
+  and `duplicate`, and so also in the partial update methods that delegate to them). Unit tests
+  that run the real `CommandService` against a hand-written `DynamoDbService` mock object that
+  only provides `putItem` now fail with `TypeError: ...putItemWithConditions is not a function`.
+  Add a `putItemWithConditions` mock that forwards its first three arguments (table name, item
+  and condition) to your existing `putItem` mock. With an auto-mock such as `createMock` from
+  `@golevelup/ts-jest`, the call does not fail but no longer reaches `putItem`, so assertions on
+  `putItem` must move to `putItemWithConditions` (or forward it the same way). Tests that use a
+  real `DynamoDbService` and only spy on or stub its `putItem` keep working, because
+  `putItemWithConditions` calls `putItem` when there are no admission conditions. Application code that does not override the new hook
+  needs no changes: the runtime behavior is the same conditional `PutItem` as before.
+  ([#515](https://github.com/mbc-net/mbc-cqrs-serverless/pull/515))
+- **cli (IAM, only if you adopt the hook):** Admission checks run in a DynamoDB transaction that
+  needs `dynamodb:ConditionCheckItem` on every witness table. Newly scaffolded projects grant it
+  on tables whose names start with the stack prefix. Existing projects must add it to the
+  Lambda role by hand; without it, a protected command fails with an access-denied error
+  instead of a rejection.
+- **core (capacity and contention):** A protected command is written with `TransactWriteItems`.
+  DynamoDB performs two underlying operations for every item in a transaction (the command and
+  each check) and consumes that capacity even when the transaction is cancelled. Many concurrent commands checking the same
+  witness item may be cancelled with `TransactionConflict` (returned as 503). This has not been
+  measured on the DynamoDB service, because DynamoDB Local does not reproduce it; load test
+  hot witnesses before relying on them.
+
+### Features
+
+- **core:** Add atomic command admission: a protected `CommandService.getCommandAdmissionConditions(command, options)` hook that lets a server-owned subclass fence the initial command write with DynamoDB condition checks ([#515](https://github.com/mbc-net/mbc-cqrs-serverless/pull/515))
+
+  The hook returns a list of AWS SDK `ConditionCheck` objects and defaults to an empty list.
+  `publishSync`, `publishAsync` and `duplicate` pass the result to the new
+  `DynamoDbService.putItemWithConditions`. With no conditions it delegates to the existing
+  `putItem`, so nothing changes unless you override the hook. With conditions it sends one
+  `TransactWriteItems` request containing the command `Put` (still guarded by
+  `attribute_not_exists(pk) AND attribute_not_exists(sk)`) followed by the checks, so a gate such
+  as a maintenance-window generation is checked atomically with the command write. Up to 99
+  checks are accepted; malformed checks are rejected with a `TypeError` before serialization or
+  S3 upload. TTL updates, projections, status updates and already accepted commands do not
+  invoke the hook.
+
+  A cancelled transaction is classified by its cancellation reasons (the first match applies):
+
+  | Cancellation reasons | Exception | HTTP |
+  | --- | --- | --- |
+  | A check has `ConditionalCheckFailed` | `CommandAdmissionRejectedException` (new) | 409 |
+  | The `Put` has `ConditionalCheckFailed` | `ConditionalCheckFailedException` (as for a version conflict today) | 409 |
+  | Any entry has `TransactionConflict` | `CommandAdmissionContentionException` (new) | 503 |
+  | Anything else | Original `TransactionCanceledException` | 500 |
+
+  Both new exceptions are exported from `@mbc-cqrs-serverless/core` and keep the AWS error as
+  `cause`. Core does not retry; a new attempt must capture the witness again, reread and rebuild
+  the update.
+
+### Documentation
+
+- Add the atomic command admission guide
+  ([docs/development/command-admission.md](docs/development/command-admission.md)): boundary
+  and lifecycle, rejection handling, validation limits, IAM, capacity and contention
+  ([#515](https://github.com/mbc-net/mbc-cqrs-serverless/pull/515))
+- Add `CommandAdmissionRejectedException` and `CommandAdmissionContentionException` to the
+  error catalog ([#515](https://github.com/mbc-net/mbc-cqrs-serverless/pull/515))
+- Add a runnable configuration-freeze example
+  ([examples/command-admission](examples/command-admission/README.md)) with a `CommandService`
+  subclass, offline tests, a DynamoDB Local runner and a data migration behind the gate
+  ([#515](https://github.com/mbc-net/mbc-cqrs-serverless/pull/515))
+- **mcp-server:** Add the v1.6.0 → v1.7.0 migration guide to the `mbc-migrate` skill and v1.7.0
+  to its compatibility matrix.
+
 ## [1.6.0](https://github.com/mbc-net/mbc-cqrs-serverless/releases/tag/v1.6.0) (2026-11-03)
 
 ### Breaking Changes

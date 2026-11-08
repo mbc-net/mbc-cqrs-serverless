@@ -165,6 +165,7 @@ export class TodoController {
 - **CQRS Pattern** - Clean separation of commands (writes) and queries (reads)
 - **Event Sourcing** - Complete audit trail with immutable event log
 - **Optimistic Locking** - Automatic conflict resolution for concurrent updates
+- **Atomic Command Admission** - Opt-in DynamoDB condition checks written atomically with each command, e.g. to freeze updates during maintenance ([guide](docs/development/command-admission.md))
 
 ### AWS Integration
 - **Lambda** - Serverless compute with automatic scaling

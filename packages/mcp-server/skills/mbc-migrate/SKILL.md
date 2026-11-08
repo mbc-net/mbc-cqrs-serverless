@@ -47,6 +47,7 @@ This skill helps migrate MBC CQRS Serverless projects between versions.
 | v1.3.5 | v1.4.0 | Low | Configurable DynamoDB table names (opt-in) + `registerAsync` on domain modules; `prismaService` now always required; `MasterModule`+`SettingModule` shared-table alias warns |
 | v1.4.0 | v1.5.0 | Low | Local dev only: LocalStack → Floci as the local S3 emulator; bucket CORS must be applied locally for presigned URLs (no application code changes) |
 | v1.5.0 | v1.6.0 | **Medium** | **Node.js 22.23.4+ required** (Node2Shell, CVE-2026-111497): runtime, Lambda (`nodejs22.x`), Docker and CI; nodemailer 10 types (only if you import `nodemailer` directly) |
+| v1.6.0 | v1.7.0 | Low | Opt-in atomic command admission (`getCommandAdmissionConditions`, `CommandAdmissionRejectedException` / `CommandAdmissionContentionException`); unit-test mocks of `DynamoDbService` used with the real `CommandService` need `putItemWithConditions`; `dynamodb:ConditionCheckItem` only if you adopt the hook |
 
 ## Migration Guides
 
@@ -911,10 +912,71 @@ npm audit --omit=dev --audit-level=high   # no high/critical advisories
 
 ---
 
+### v1.6.0 → v1.7.0 (opt-in atomic command admission; test mocks may need a new method)
+
+v1.7.0 adds atomic command admission: a protected `CommandService.getCommandAdmissionConditions(command, options)` hook that lets a server-owned `CommandService` subclass check DynamoDB conditions (for example a maintenance-window generation) atomically with the initial command write. The hook defaults to `[]`, and with no conditions the command is written with the same conditional `PutItem` as before, so **applications that do not override the hook need no code changes**. Two exceptions are added to `@mbc-cqrs-serverless/core`: `CommandAdmissionRejectedException` (409, a check failed) and `CommandAdmissionContentionException` (503, `TransactionConflict`). See `docs/development/command-admission.md` and `examples/command-admission/` in the framework repository.
+
+The one change that can affect existing projects is internal: `publishSync`, `publishAsync` and `duplicate` (and the partial update methods that delegate to them) now persist the initial command through `DynamoDbService.putItemWithConditions(tableName, item, condition, admissionConditions)` instead of `putItem`. With an empty `admissionConditions` it calls `this.putItem(tableName, item, condition)`.
+
+**Step 1 — Update packages.**
+
+```bash
+npm install @mbc-cqrs-serverless/core@^1.7.0 @mbc-cqrs-serverless/cli@^1.7.0
+# also update any other @mbc-cqrs-serverless/* packages you use to the same version
+```
+
+**Step 2 — Fix unit-test mocks of `DynamoDbService`.** Only tests that run the **real** `CommandService` against a mocked `DynamoDbService` are affected:
+
+| How the test provides `DynamoDbService` | Result after upgrading | Fix |
+|---|---|---|
+| Hand-written object with only `putItem` (`useValue: { putItem: jest.fn(), ... }`) | `TypeError: ...putItemWithConditions is not a function` | Add `putItemWithConditions` that forwards to `putItem` (below) |
+| Auto-mock (`createMock<DynamoDbService>()` from `@golevelup/ts-jest`) | No error, but `putItem` is no longer called, so `putItem` assertions fail | Assert on `putItemWithConditions`, or forward it to `putItem` as below |
+| Real `DynamoDbService` with `jest.spyOn(dynamoDbService, 'putItem')` | Works unchanged (empty conditions delegate to `putItem`) | None |
+
+```typescript
+const dynamoDbServiceMock = {
+  putItem: jest.fn(async (tableName: string, item: any) => item),
+  // v1.7.0: CommandService writes the initial command through this method
+  putItemWithConditions: jest.fn(function (
+    tableName: string,
+    item: any,
+    condition: string,
+  ) {
+    return this.putItem(tableName, item, condition)
+  }),
+  // ...the other methods your test already mocks
+}
+```
+
+Tests that mock `CommandService` itself (the usual pattern for testing your own services) are not affected.
+
+**Step 3 — IAM (only if you override `getCommandAdmissionConditions`).** A protected command is written with `TransactWriteItems`, which needs `dynamodb:ConditionCheckItem` on every witness table in addition to `dynamodb:PutItem` on the command table. Newly scaffolded projects grant it on tables whose names start with the stack prefix. In an existing project, add it to the Lambda role's DynamoDB statement in `infra/libs/infra-stack.ts`:
+
+```typescript
+actions: [
+  // ...existing DynamoDB actions
+  'dynamodb:ConditionCheckItem',
+],
+```
+
+Without it, a protected command fails with an access-denied error rather than `CommandAdmissionRejectedException`. Also note: every item in a transaction costs two underlying operations (also when the transaction is cancelled), and many concurrent commands checking the same witness item may be cancelled with `TransactionConflict` (503). That contention has not been measured on the DynamoDB service (DynamoDB Local does not reproduce it), so load test a hot witness before relying on it. Core does not retry; a new attempt must capture the witness again, reread and rebuild the update.
+
+**Verify:**
+
+```bash
+npm ls @mbc-cqrs-serverless/core   # 1.7.0
+npm test                           # no "putItemWithConditions is not a function" errors
+```
+
+**Action required:** Step 1 for every project. Step 2 only if your unit tests run the real `CommandService` with a mocked `DynamoDbService`. Step 3 only if you adopt the admission hook.
+
+---
+
 ## Version Compatibility Matrix
 
 | Core Version | CLI Version | NestJS | Node.js | TypeScript |
 |--------------|-------------|--------|---------|------------|
+| v1.7.0 | v1.7.0 | 10.x | 22.23.4+ | 5.x |
 | v1.6.0 | v1.6.0 | 10.x | 22.23.4+ | 5.x |
 | v1.5.0 | v1.5.0 | 10.x | 18+ | 5.x |
 | v1.4.0 | v1.4.0 | 10.x | 18+ | 5.x |

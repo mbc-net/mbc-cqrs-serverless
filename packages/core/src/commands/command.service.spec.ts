@@ -121,6 +121,13 @@ describe('CommandService', () => {
               if (!table) return undefined
               return table.find(({ pk, sk }) => pk === key.pk && sk === key.sk)
             }),
+            putItemWithConditions: jest.fn(function (
+              tableName: string,
+              item: any,
+              condition: string,
+            ) {
+              return this.putItem(tableName, item, condition)
+            }),
             putItem: jest.fn((tableName: string, item: any) => {
               console.log('DynamoDbService.putItem', tableName, item)
               const table = dataSet[tableName] as any[]
