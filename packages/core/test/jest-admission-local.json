@@ -1,0 +1,8 @@
+{
+  "moduleFileExtensions": ["js", "json", "ts"],
+  "rootDir": "./e2e",
+  "testEnvironment": "node",
+  "testRegex": "command-admission.e2e-spec.ts$",
+  "transform": { "^.+\\.ts$": "ts-jest" },
+  "testTimeout": 15000
+}

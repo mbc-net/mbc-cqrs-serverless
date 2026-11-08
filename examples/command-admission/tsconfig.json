@@ -1,0 +1,11 @@
+{
+  "extends": "../../tsconfig.json",
+  "compilerOptions": {
+    "noEmit": true,
+    "incremental": false,
+    "baseUrl": "../..",
+    "paths": { "@mbc-cqrs-serverless/core": ["packages/core/dist"] }
+  },
+  "include": ["./*.ts"],
+  "exclude": []
+}

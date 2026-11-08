@@ -1,3 +1,4 @@
+import { ConditionCheck } from '@aws-sdk/client-dynamodb'
 import {
   BadRequestException,
   Inject,
@@ -236,6 +237,32 @@ export class CommandService implements OnModuleInit, ICommandService {
     return await this.publishAsync(fullInput, options)
   }
 
+  /** Override in a server-owned subclass to fence initial command acceptance. */
+  protected async getCommandAdmissionConditions(
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    command: Readonly<CommandModel>,
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    options: ICommandOptions,
+  ): Promise<ConditionCheck[]> {
+    return []
+  }
+
+  private async persistInitialCommand(
+    command: CommandModel,
+    options: ICommandOptions,
+  ): Promise<void> {
+    const conditions = await this.getCommandAdmissionConditions(
+      command,
+      options,
+    )
+    await this.dynamoDbService.putItemWithConditions(
+      this.tableName,
+      command,
+      'attribute_not_exists(pk) AND attribute_not_exists(sk)',
+      conditions,
+    )
+  }
+
   async publishSync(
     input: CommandInputModel,
     options: ICommandOptions,
@@ -287,11 +314,7 @@ export class CommandService implements OnModuleInit, ICommandService {
     this.logger.debug('publishSync::', command)
 
     // 1. Write to Command table first (Immutable Audit Log)
-    await this.dynamoDbService.putItem(
-      this.tableName,
-      { ...command, sk: versionedSk },
-      'attribute_not_exists(pk) AND attribute_not_exists(sk)',
-    )
+    await this.persistInitialCommand({ ...command, sk: versionedSk }, options)
 
     try {
       // 2. SET_TTL_COMMAND: set TTL on the previous command version (matches SFN)
@@ -401,11 +424,7 @@ export class CommandService implements OnModuleInit, ICommandService {
       updatedIp: sourceIp,
     }
     this.logger.debug('publish::', command)
-    await this.dynamoDbService.putItem(
-      this.tableName,
-      command,
-      'attribute_not_exists(pk) AND attribute_not_exists(sk)',
-    )
+    await this.persistInitialCommand(command, options)
     await this.writeRywSessionIfApplicable(command, options)
     return command
   }
@@ -465,11 +484,7 @@ export class CommandService implements OnModuleInit, ICommandService {
       options.invokeContext?.event?.requestContext?.http?.sourceIp
 
     this.logger.debug('duplicate::', item)
-    await this.dynamoDbService.putItem(
-      this.tableName,
-      item,
-      'attribute_not_exists(pk) AND attribute_not_exists(sk)',
-    )
+    await this.persistInitialCommand(item, options)
 
     return item
   }

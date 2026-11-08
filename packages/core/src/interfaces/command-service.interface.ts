@@ -14,6 +14,8 @@ export interface ICommandService {
    * @param {ICommandOptions} options - Options for command execution, including context and additional parameters.
    * @returns {Promise<CommandModel|null>} The published command model, or `null` if the command was not updated (not dirty).
    * @throws {BadRequestException} If the item does not exist or the input version is invalid.
+   * @throws {CommandAdmissionRejectedException} If an admission check fails.
+   * @throws {CommandAdmissionContentionException} If the admission transaction loses a race.
    */
   publishSync(
     input: CommandInputModel,
@@ -27,6 +29,8 @@ export interface ICommandService {
    * @param {ICommandOptions} options - Options for command execution, including context and additional parameters.
    * @returns {Promise<CommandModel|null>} The published command model, or `null` if the command was not updated (not dirty).
    * @throws {BadRequestException} If the input version is invalid.
+   * @throws {CommandAdmissionRejectedException} If an admission check fails.
+   * @throws {CommandAdmissionContentionException} If the admission transaction loses a race.
    */
   publishAsync(
     input: CommandInputModel,
@@ -40,6 +44,8 @@ export interface ICommandService {
    * @param {ICommandOptions} options - Options for command execution, including context and additional parameters.
    * @returns {Promise<CommandModel|null>} The updated command model, or `null` if the command was not updated (not dirty).
    * @throws {BadRequestException} If the item does not exist for the provided keys.
+   * @throws {CommandAdmissionRejectedException} If an admission check fails.
+   * @throws {CommandAdmissionContentionException} If the admission transaction loses a race.
    */
   publishPartialUpdateSync(
     input: CommandPartialInputModel,
@@ -53,6 +59,8 @@ export interface ICommandService {
    * @param {ICommandOptions} options - Options for command execution, including context and additional parameters.
    * @returns {Promise<CommandModel>} The updated command model after the publish operation.
    * @throws {BadRequestException} If the item does not exist for the provided keys.
+   * @throws {CommandAdmissionRejectedException} If an admission check fails.
+   * @throws {CommandAdmissionContentionException} If the admission transaction loses a race.
    */
   publishPartialUpdateAsync(
     input: CommandPartialInputModel,
