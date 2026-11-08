@@ -3,7 +3,7 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
-## [1.7.0](https://github.com/mbc-net/mbc-cqrs-serverless/releases/tag/v1.7.0) (Unreleased)
+## [1.7.0](https://github.com/mbc-net/mbc-cqrs-serverless/releases/tag/v1.7.0) (2026-11-09)
 
 ### Upgrade Notes
 
