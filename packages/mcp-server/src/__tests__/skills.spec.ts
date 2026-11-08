@@ -317,6 +317,20 @@ describe('Claude Code Skills', () => {
       expect(v160).toContain('**inside the image**')
       expect(v160).not.toMatch(/^\s*Run `npx prisma generate`/m)
     })
+
+    it('should contain v1.7.0 migration guide (command admission)', () => {
+      expect(content).toContain('### v1.6.0 → v1.7.0')
+      expect(content).toContain('| v1.6.0 | v1.7.0 |')
+      expect(content).toContain('| v1.7.0 | v1.7.0 | 10.x | 22.23.4+ |')
+      const v170 = content.slice(
+        content.indexOf('### v1.6.0 → v1.7.0'),
+        content.indexOf('## Version Compatibility Matrix'),
+      )
+      expect(v170).toContain('getCommandAdmissionConditions')
+      expect(v170).toContain('putItemWithConditions')
+      expect(v170).toContain('dynamodb:ConditionCheckItem')
+      expect(v170).toContain('npm ls @mbc-cqrs-serverless/core   # 1.7.0')
+    })
   })
 
   describe('mbc-debug skill', () => {
