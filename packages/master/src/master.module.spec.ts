@@ -4,6 +4,7 @@ import { Global, Logger, Module } from '@nestjs/common'
 import { ConfigModule } from '@nestjs/config'
 import { Test } from '@nestjs/testing'
 
+import { MasterSfnTaskEventHandler } from './handler/master-sfn-task.handler'
 import { MasterModule } from './master.module'
 import { MasterDataService } from './services'
 
@@ -85,6 +86,50 @@ describe('MasterModule', () => {
       expect(warnSpy).not.toHaveBeenCalledWith(
         expect.stringMatching(/not fully supported/),
       )
+    })
+  })
+
+  describe('controllerAuth and enableCopyTask', () => {
+    const warnedUnguarded = (spy: jest.SpyInstance) =>
+      spy.mock.calls.some(([m]) => /controllerAuth/.test(m))
+
+    it('warns when controllers are enabled without controllerAuth', () => {
+      const warnSpy = jest.spyOn(Logger.prototype, 'warn')
+      MasterModule.register({
+        prismaService: MockPrismaService,
+        enableController: true,
+      })
+      expect(warnedUnguarded(warnSpy)).toBe(true)
+    })
+
+    it('does not warn when controllerAuth is set', () => {
+      const warnSpy = jest.spyOn(Logger.prototype, 'warn')
+      MasterModule.register({
+        prismaService: MockPrismaService,
+        enableController: true,
+        controllerAuth: {},
+      })
+      expect(warnedUnguarded(warnSpy)).toBe(false)
+    })
+
+    it('registers the copy handler with enableCopyTask and no controllers', () => {
+      const mod = MasterModule.register({
+        prismaService: MockPrismaService,
+        enableCopyTask: true,
+      })
+      expect(mod.providers).toContain(MasterSfnTaskEventHandler)
+      expect(mod.controllers).toHaveLength(0)
+    })
+
+    it('defaults enableCopyTask to enableController', () => {
+      const on = MasterModule.register({
+        prismaService: MockPrismaService,
+        enableController: true,
+        controllerAuth: {},
+      })
+      const off = MasterModule.register({ prismaService: MockPrismaService })
+      expect(on.providers).toContain(MasterSfnTaskEventHandler)
+      expect(off.providers).not.toContain(MasterSfnTaskEventHandler)
     })
   })
 

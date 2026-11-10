@@ -3,7 +3,13 @@ import {
   IInvoke,
   INVOKE_CONTEXT,
 } from '@mbc-cqrs-serverless/core'
-import { BadRequestException, Body, Controller, Post } from '@nestjs/common'
+import {
+  BadRequestException,
+  Body,
+  Controller,
+  Post,
+  UseGuards,
+} from '@nestjs/common'
 import { ApiTags } from '@nestjs/swagger'
 
 import { MasterBulkDto } from '../dto/master-bulk'
@@ -11,11 +17,13 @@ import { MasterDataCreateDto } from '../dto/master-copy/master-data-create.dto'
 import { MasterDataCreateBulkDto } from '../dto/master-copy/master-data-create-bulk.dto'
 import { CommonSettingDto } from '../dto/master-setting/common-setting-create.dto'
 import { CommonSettingBulkDto } from '../dto/master-setting/common-setting-create-bulk.dto'
+import { MasterControllerGuard } from '../guards'
 import { MasterDataService } from '../services/master-data.service'
 import { MasterSettingService } from '../services/master-setting.service'
 
 @Controller('api/master-bulk')
 @ApiTags('master-bulk')
+@UseGuards(MasterControllerGuard)
 export class MasterBulkController {
   constructor(
     private readonly masterSettingService: MasterSettingService,

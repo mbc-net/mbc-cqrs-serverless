@@ -16,6 +16,7 @@ import {
   Post,
   Put,
   Query,
+  UseGuards,
 } from '@nestjs/common'
 import { ApiTags } from '@nestjs/swagger'
 
@@ -32,11 +33,13 @@ import { GetSettingDto } from '../dto/master-setting/setting-get.dto'
 import { TenantSettingDto } from '../dto/master-setting/tenant-setting-create.dto'
 import { UpdateSettingDto } from '../dto/master-setting/update.setting.dto'
 import { UserSettingDto } from '../dto/master-setting/user-setting-create.dto'
+import { MasterControllerGuard, MasterRoute } from '../guards'
 import { parsePk } from '../helpers'
 import { MasterSettingService } from '../services/master-setting.service'
 
 @Controller('api/master-setting')
 @ApiTags('master-settings')
+@UseGuards(MasterControllerGuard)
 export class MasterSettingController {
   private readonly logger = new Logger(MasterSettingController.name)
 
@@ -173,6 +176,7 @@ export class MasterSettingController {
     return this.masterSettingService.delete(key, invokeContext)
   }
 
+  @MasterRoute({ read: true })
   @Post('/check-exist/:code')
   async checkExistCode(
     @Param('code') code: string,

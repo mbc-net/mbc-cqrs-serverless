@@ -14,6 +14,7 @@ import {
   Post,
   Put,
   Query,
+  UseGuards,
 } from '@nestjs/common'
 import { ApiTags } from '@nestjs/swagger'
 
@@ -27,11 +28,13 @@ import { MasterDataCreateBulkDto } from '../dto/master-copy/master-data-create-b
 import { CreateMasterDataDto } from '../dto/master-data/data-create.dto'
 import { MasterDataSearchDto } from '../dto/master-data/data-search.dto'
 import { UpdateDataSettingDto } from '../dto/master-data/data-update.dto'
+import { MasterControllerGuard, MasterRoute } from '../guards'
 import { parsePk } from '../helpers'
 import { MasterDataService } from '../services/master-data.service'
 
 @Controller('api/master-data')
 @ApiTags('master-data')
+@UseGuards(MasterControllerGuard)
 export class MasterDataController {
   constructor(private readonly masterDataService: MasterDataService) {}
 
@@ -80,6 +83,7 @@ export class MasterDataController {
     return this.masterDataService.delete(key, { invokeContext })
   }
 
+  @MasterRoute({ read: true })
   @Post('/check-exist/:settingCode/:code')
   async checkExistCode(
     @INVOKE_CONTEXT() ctx: IInvoke,

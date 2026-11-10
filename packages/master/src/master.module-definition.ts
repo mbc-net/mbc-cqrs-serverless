@@ -11,6 +11,14 @@ export interface MasterModuleOptions {
   tableName?: string
   /** Tenant code that holds the shared (common) master data. Default: 'common'. */
   commonTenantCode?: string
+  /**
+   * Opt-in guard for the built-in routes. When set (even as `{}`), callers must be
+   * logged in; reads need one of `read` (default: any user) and writes need one of
+   * `write` (default: system_admin). When unset the routes are unguarded.
+   */
+  controllerAuth?: { read?: string[]; write?: string[] }
+  /** Register the copy-task handler. Default: the value of `enableController`. */
+  enableCopyTask?: boolean
 }
 
 export interface MasterModuleAsyncOptions
@@ -19,6 +27,8 @@ export interface MasterModuleAsyncOptions
   dataSyncHandlers?: Type<IDataSyncHandler>[]
   tableName?: string
   commonTenantCode?: string
+  controllerAuth?: { read?: string[]; write?: string[] }
+  enableCopyTask?: boolean
   inject?: any[]
   /**
    * Resolves the runtime module options. Must return the resolved PrismaService
