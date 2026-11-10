@@ -59,3 +59,5 @@ export const genSequenceSk = (
 
 export const sequencePk = (tenantCode: string) =>
   `SEQ${KEY_SEPARATOR}${tenantCode}`
+
+export * from './system-attribute'
