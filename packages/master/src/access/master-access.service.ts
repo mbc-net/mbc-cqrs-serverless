@@ -20,7 +20,9 @@ import {
 import {
   generateMasterPk,
   generateMasterSettingSk,
+  getSettingCodeFromSk,
   getSystemId,
+  isPersonalSettingSk,
 } from '../helpers'
 import {
   MasterModuleOptions,
@@ -163,6 +165,25 @@ export class MasterAccessService {
       }
     }
     return null
+  }
+
+  /**
+   * Owner of a row for access checks. A group or user setting row stores none, so it follows the
+   * effective setting for its code.
+   */
+  async resolveRowOwner(
+    row: { sk: string; tenantCode?: string; attributes?: unknown },
+    tenantCode: string,
+  ): Promise<string | undefined> {
+    if (!isPersonalSettingSk(row.sk)) {
+      return getSystemId(row)
+    }
+    return getSystemId(
+      await this.getEffectiveSetting(
+        row.tenantCode ?? tenantCode,
+        getSettingCodeFromSk(row.sk),
+      ),
+    )
   }
 
   /**

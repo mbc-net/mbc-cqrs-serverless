@@ -414,7 +414,7 @@ export class MasterDataService implements IMasterDataService {
     await this.access.assertAccess(
       {
         tenantCode: row.tenantCode,
-        systemId: getSystemId(row),
+        systemId: await this.access.resolveRowOwner(row, row.tenantCode),
         settingCode: getSettingCodeFromSk(row.sk),
       },
       'read',

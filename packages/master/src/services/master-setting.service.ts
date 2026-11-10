@@ -165,14 +165,10 @@ export class MasterSettingService implements IMasterSettingService {
     options: MasterAccessOptions,
   ): Promise<MasterSettingEntity> {
     if (this.access?.isEnabled()) {
-      // A personal row has no owner of its own; it follows its base setting.
-      const owner = isPersonalSettingSk(setting.sk)
-        ? getSystemId(await this.access.getEffectiveSetting(tenantCode, code))
-        : getSystemId(setting)
       await this.access.assertAccess(
         {
           tenantCode: setting.tenantCode ?? tenantCode,
-          systemId: owner,
+          systemId: await this.access.resolveRowOwner(setting, tenantCode),
           settingCode: code,
         },
         'read',
@@ -452,11 +448,7 @@ export class MasterSettingService implements IMasterSettingService {
       await this.access.assertAccess(
         {
           tenantCode: data.tenantCode,
-          systemId: isPersonalSettingSk(key.sk)
-            ? getSystemId(
-                await this.access.getEffectiveSetting(data.tenantCode, code),
-              )
-            : getSystemId(data),
+          systemId: await this.access.resolveRowOwner(data, data.tenantCode),
           settingCode: code,
         },
         'read',

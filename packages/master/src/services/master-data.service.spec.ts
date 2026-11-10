@@ -2711,6 +2711,22 @@ describe('MasterDataService read access', () => {
     ).rejects.toThrow(ForbiddenException)
   })
 
+  it('checks a personal setting key against the base setting owner', async () => {
+    const key = { pk: 'MASTER#ta', sk: 'MASTER_SETTING#USER#u1#S1' }
+    const row = { tenantCode: 'ta', sk: key.sk, attributes: { v: 1 } }
+    // the base setting S1 is owned by app-a (getLatestItem in build)
+    const shared = await build([
+      { systemId: 'shared', settingCode: '*', read: true, write: false },
+    ])
+    shared.dataService.getItem.mockResolvedValue(row as any)
+    await expect(shared.service.getDetail(key, opts)).rejects.toThrow(
+      ForbiddenException,
+    )
+    const owner = await build(appA)
+    owner.dataService.getItem.mockResolvedValue(row as any)
+    await expect(owner.service.getDetail(key, opts)).resolves.toBeDefined()
+  })
+
   it('reports an existing code owned by another system', async () => {
     const { service, dataService } = await build(appA)
     dataService.getItem.mockResolvedValue({
