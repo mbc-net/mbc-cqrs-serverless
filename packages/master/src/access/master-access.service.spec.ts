@@ -532,6 +532,25 @@ describe('prepareSettingOwner', () => {
     ).resolves.toBe('B')
   })
 
+  it('treats a blank requested systemId as absent on a new row', async () => {
+    const { service, commandService } = build(all)
+    commandService.getLatestItem.mockResolvedValue(null)
+    expect(
+      await service.prepareSettingOwner(input({ requested: '' }), opts()),
+    ).toBeUndefined()
+  })
+
+  it('does not treat a null requested systemId as a conflict', async () => {
+    const { service } = build(all)
+    const existing = { attributes: { __systemId: 'A' } } as any
+    expect(
+      await service.prepareSettingOwner(
+        input({ existing, requested: null }),
+        opts(),
+      ),
+    ).toBe('A')
+  })
+
   it('uses options.systemId from internal callers', async () => {
     const { service, commandService } = build(all)
     commandService.getLatestItem.mockResolvedValue(null)

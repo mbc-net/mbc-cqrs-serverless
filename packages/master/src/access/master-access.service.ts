@@ -181,7 +181,9 @@ export class MasterAccessService {
     if (!this.isEnabled()) {
       return undefined
     }
-    const { tenantCode, code, requested, existing } = input
+    const { tenantCode, code, existing } = input
+    // A blank systemId ('' or null) counts as absent.
+    const requested = input.requested || undefined
     const conflict = () =>
       new BadRequestException(
         `systemId of setting ${code} cannot be changed or set to a different value`,
