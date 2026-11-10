@@ -1,6 +1,7 @@
 import {
   CommandModel,
   CommandService,
+  DataModel,
   DEFAULT_COMMON_TENANT_CODES,
   DEFAULT_CROSS_TENANT_ROLES,
   getAuthorizerClaims,
@@ -9,13 +10,18 @@ import {
   IInvoke,
 } from '@mbc-cqrs-serverless/core'
 import {
+  BadRequestException,
   ForbiddenException,
   Inject,
   Injectable,
   Optional,
 } from '@nestjs/common'
 
-import { generateMasterPk, generateMasterSettingSk } from '../helpers'
+import {
+  generateMasterPk,
+  generateMasterSettingSk,
+  getSystemId,
+} from '../helpers'
 import {
   MasterModuleOptions,
   MODULE_OPTIONS_TOKEN,
@@ -157,6 +163,52 @@ export class MasterAccessService {
       }
     }
     return null
+  }
+
+  /**
+   * Work out the owner to store on a setting write and assert write access to it.
+   * Returns undefined when access control is disabled.
+   */
+  async prepareSettingOwner(
+    input: {
+      tenantCode: string
+      code: string
+      requested?: string
+      existing?: DataModel | null
+    },
+    options: MasterAccessOptions,
+  ): Promise<string | undefined> {
+    if (!this.isEnabled()) {
+      return undefined
+    }
+    const { tenantCode, code, requested, existing } = input
+    const conflict = () =>
+      new BadRequestException(
+        `systemId of setting ${code} cannot be changed or set to a different value`,
+      )
+    let owner: string | undefined
+    if (existing) {
+      owner = getSystemId(existing)
+      if (requested !== undefined && requested !== owner) throw conflict()
+    } else {
+      const inherited = getSystemId(
+        await this.getEffectiveSetting(tenantCode, code),
+      )
+      if (
+        inherited !== undefined &&
+        requested !== undefined &&
+        requested !== inherited
+      ) {
+        throw conflict()
+      }
+      owner = inherited ?? requested ?? options.systemId
+    }
+    await this.assertAccess(
+      { tenantCode, systemId: owner, settingCode: code },
+      'write',
+      options,
+    )
+    return owner
   }
 
   /** Tenant gate, the anonymous rules, shared by assertAccess and assertTenant. */

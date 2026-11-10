@@ -37,6 +37,15 @@ export class CommonSettingDto {
   @IsOptional()
   tenantCode?: string
 
+  @ApiProperty({
+    type: String,
+    required: false,
+    description: 'The system that owns the setting.',
+  })
+  @IsString()
+  @IsOptional()
+  systemId?: string
+
   /**
    * Additional attributes for the tenant (required).
    */

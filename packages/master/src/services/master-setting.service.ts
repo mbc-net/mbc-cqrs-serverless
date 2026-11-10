@@ -2,6 +2,7 @@ import {
   CommandDto,
   CommandModel,
   CommandService,
+  DataModel,
   DataService,
   DetailDto,
   DetailKey,
@@ -25,6 +26,8 @@ import {
   Optional,
 } from '@nestjs/common'
 
+import { MasterWriteOptions } from '../access/master-access.interface'
+import { MasterAccessService } from '../access/master-access.service'
 import {
   MASTER_COPY_SK_PREFIX,
   MASTER_PK_PREFIX,
@@ -52,9 +55,13 @@ import { SettingTypeEnum } from '../enums'
 import {
   generateMasterPk,
   generateMasterSettingSk,
+  getSettingCodeFromSk,
+  getSystemId,
+  isPersonalSettingSk,
   parseId,
   stripSystemAttribute,
   toPublicRow,
+  withSystemAttribute,
 } from '../helpers'
 import { buildTenantScope, getOrderBys } from '../helpers/rds'
 import { IMasterSettingService } from '../interfaces'
@@ -71,6 +78,10 @@ export class MasterSettingService implements IMasterSettingService {
   @Optional()
   @Inject(MODULE_OPTIONS_TOKEN)
   private readonly moduleOptions?: MasterModuleOptions
+
+  @Optional()
+  @Inject(MasterAccessService)
+  private readonly access?: MasterAccessService
 
   private get commonTenantCode(): string {
     return this.moduleOptions?.commonTenantCode ?? SettingTypeEnum.TENANT_COMMON
@@ -89,6 +100,21 @@ export class MasterSettingService implements IMasterSettingService {
       TableType.DATA,
     )
     this.logger.debug('tableName: ' + this.tenantTableName)
+  }
+
+  /** Group and user settings have no owner of their own; check the base setting's. */
+  private async assertPersonalWrite(
+    tenantCode: string,
+    code: string,
+    options: MasterWriteOptions,
+  ): Promise<void> {
+    if (!this.access?.isEnabled()) return
+    const base = await this.access.getEffectiveSetting(tenantCode, code)
+    await this.access.assertAccess(
+      { tenantCode, systemId: getSystemId(base), settingCode: code },
+      'write',
+      options,
+    )
   }
 
   private async fetchSetting(
@@ -214,7 +240,7 @@ export class MasterSettingService implements IMasterSettingService {
 
   async createCommonTenantSetting(
     dto: CommonSettingDto,
-    options: { invokeContext: IInvoke },
+    options: MasterWriteOptions,
   ): Promise<CommandModel> {
     const { name, settingValue, code } = dto
 
@@ -224,6 +250,15 @@ export class MasterSettingService implements IMasterSettingService {
     if (setting && setting.isDeleted === false) {
       throw new BadRequestException(`Setting already exists: ${code}`)
     }
+    const systemId = await this.access?.prepareSettingOwner(
+      {
+        tenantCode: this.commonTenantCode,
+        code,
+        requested: dto.systemId,
+        existing: setting,
+      },
+      options,
+    )
     const command: CommandDto = {
       sk,
       pk,
@@ -234,13 +269,16 @@ export class MasterSettingService implements IMasterSettingService {
       type: MASTER_PK_PREFIX,
       version: setting?.version ?? VERSION_FIRST,
       isDeleted: false,
-      attributes: stripSystemAttribute(settingValue),
+      attributes: withSystemAttribute(
+        stripSystemAttribute(settingValue),
+        systemId,
+      ),
     }
-    return await this.commandService.publishAsync(command, options)
+    return toPublicRow(await this.commandService.publishAsync(command, options))
   }
   async createTenantSetting(
     dto: TenantSettingDto,
-    options: { invokeContext: IInvoke },
+    options: MasterWriteOptions,
   ): Promise<CommandModel> {
     return this.createOrUpsertTenantSetting(dto, options, {
       throwIfExists: true,
@@ -249,7 +287,7 @@ export class MasterSettingService implements IMasterSettingService {
 
   async createGroupSetting(
     dto: GroupSettingDto,
-    options: { invokeContext: IInvoke },
+    options: MasterWriteOptions,
   ): Promise<CommandModel> {
     const { name, tenantCode, settingValue, code, groupId } = dto
 
@@ -261,6 +299,7 @@ export class MasterSettingService implements IMasterSettingService {
     if (setting && setting.isDeleted === false) {
       throw new BadRequestException(`Setting already exists: ${code}`)
     }
+    await this.assertPersonalWrite(tenantCode, code, options)
 
     const command: CommandDto = {
       sk,
@@ -274,11 +313,11 @@ export class MasterSettingService implements IMasterSettingService {
       isDeleted: false,
       attributes: stripSystemAttribute(settingValue),
     }
-    return await this.commandService.publishAsync(command, options)
+    return toPublicRow(await this.commandService.publishAsync(command, options))
   }
   async createUserSetting(
     dto: UserSettingDto,
-    options: { invokeContext: IInvoke },
+    options: MasterWriteOptions,
   ): Promise<CommandModel> {
     const { name, tenantCode, settingValue, code, userId } = dto
 
@@ -290,6 +329,7 @@ export class MasterSettingService implements IMasterSettingService {
     if (setting && setting.isDeleted === false) {
       throw new BadRequestException(`Setting already exists: ${code}`)
     }
+    await this.assertPersonalWrite(tenantCode, code, options)
 
     const command: CommandDto = {
       sk,
@@ -303,41 +343,50 @@ export class MasterSettingService implements IMasterSettingService {
       isDeleted: false,
       attributes: stripSystemAttribute(settingValue),
     }
-    return await this.commandService.publishAsync(command, options)
+    return toPublicRow(await this.commandService.publishAsync(command, options))
   }
 
   async updateSetting(
     key: DetailKey,
     dto: UpdateSettingDto,
-    context: { invokeContext: IInvoke },
+    context: MasterWriteOptions,
   ): Promise<CommandModel> {
     const { pk, sk } = key
     const data = await this.dataService.getItem(key)
     if (!data) {
       throw new BadRequestException("Setting doesn't exist")
     }
+    await this.assertSettingRowWrite(key, data, context)
+    const owner = getSystemId(data)
     const item = await this.commandService.publishPartialUpdateAsync(
       {
         pk,
         sk,
         name: dto.name,
-        attributes: stripSystemAttribute(dto.settingValue),
+        attributes:
+          dto.settingValue === undefined
+            ? undefined
+            : withSystemAttribute(
+                stripSystemAttribute(dto.settingValue),
+                owner,
+              ),
         version: data.version,
       },
       context,
     )
-    return item
+    return toPublicRow(item)
   }
 
   async deleteSetting(
     key: DetailKey,
-    options: { invokeContext: IInvoke },
+    options: MasterWriteOptions,
   ): Promise<CommandModel> {
     const { pk, sk } = key
     const data = await this.dataService.getItem(key)
     if (!data) {
       throw new BadRequestException("Setting doesn't exist")
     }
+    await this.assertSettingRowWrite(key, data, options)
     const item = await this.commandService.publishPartialUpdateAsync(
       {
         pk,
@@ -348,7 +397,29 @@ export class MasterSettingService implements IMasterSettingService {
       options,
     )
 
-    return item
+    return toPublicRow(item)
+  }
+
+  /** Write access to an existing setting row; a personal row follows its base setting. */
+  private async assertSettingRowWrite(
+    key: DetailKey,
+    data: DataModel,
+    options: MasterWriteOptions,
+  ): Promise<void> {
+    if (!this.access?.isEnabled()) return
+    const code = getSettingCodeFromSk(key.sk)
+    if (isPersonalSettingSk(key.sk)) {
+      return this.assertPersonalWrite(data.tenantCode, code, options)
+    }
+    await this.access.assertAccess(
+      {
+        tenantCode: data.tenantCode,
+        systemId: getSystemId(data),
+        settingCode: code,
+      },
+      'write',
+      options,
+    )
   }
 
   async getDetail(key: DetailDto) {
@@ -378,7 +449,7 @@ export class MasterSettingService implements IMasterSettingService {
 
   async upsertTenantSetting(
     dto: TenantSettingDto,
-    options: { invokeContext: IInvoke },
+    options: MasterWriteOptions,
   ): Promise<CommandModel> {
     return this.createOrUpsertTenantSetting(dto, options, {
       throwIfExists: false,
@@ -387,7 +458,7 @@ export class MasterSettingService implements IMasterSettingService {
 
   private async createOrUpsertTenantSetting(
     dto: TenantSettingDto,
-    options: { invokeContext: IInvoke },
+    options: MasterWriteOptions,
     { throwIfExists }: { throwIfExists: boolean },
   ): Promise<CommandModel> {
     const { name, tenantCode, settingValue, code } = dto
@@ -401,6 +472,10 @@ export class MasterSettingService implements IMasterSettingService {
       throw new BadRequestException(`Setting already exists: ${code}`)
     }
 
+    const systemId = await this.access?.prepareSettingOwner(
+      { tenantCode, code, requested: dto.systemId, existing: setting },
+      options,
+    )
     const command: CommandDto = {
       sk,
       pk,
@@ -411,7 +486,10 @@ export class MasterSettingService implements IMasterSettingService {
       type: MASTER_PK_PREFIX,
       version: setting?.version ?? VERSION_FIRST,
       isDeleted: false,
-      attributes: stripSystemAttribute(settingValue),
+      attributes: withSystemAttribute(
+        stripSystemAttribute(settingValue),
+        systemId,
+      ),
     }
 
     const item = await this.commandService.publishAsync(command, options)
@@ -424,10 +502,10 @@ export class MasterSettingService implements IMasterSettingService {
       }
       // eslint-disable-next-line @typescript-eslint/no-unused-vars
       const { requestId, ...rest } = setting
-      return rest as CommandModel
+      return toPublicRow(rest as CommandModel)
     }
 
-    return item
+    return toPublicRow(item)
   }
 
   async upsertSetting(createDto: CommonSettingDto, invokeContext: IInvoke) {
@@ -442,6 +520,26 @@ export class MasterSettingService implements IMasterSettingService {
   }
 
   async upsertBulk(createDto: CommonSettingBulkDto, invokeContext: IInvoke) {
+    if (this.access?.isEnabled()) {
+      // Check every item first so a forbidden one leaves nothing half-written.
+      const { tenantCode } = getUserContext(invokeContext)
+      for (const item of createDto.items) {
+        const tenant = item.tenantCode ?? tenantCode
+        const existing = await this.dataService.getItem({
+          pk: generateMasterPk(tenant),
+          sk: generateMasterSettingSk(item.code),
+        })
+        await this.access.prepareSettingOwner(
+          {
+            tenantCode: tenant,
+            code: item.code,
+            requested: item.systemId,
+            existing,
+          },
+          { invokeContext },
+        )
+      }
+    }
     const results = []
     for (const item of createDto.items) {
       results.push(await this.upsertSetting(item, invokeContext))

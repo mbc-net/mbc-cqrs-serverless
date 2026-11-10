@@ -1,5 +1,5 @@
 import { GroupRoleResolverRegistry, IInvoke } from '@mbc-cqrs-serverless/core'
-import { ForbiddenException } from '@nestjs/common'
+import { BadRequestException, ForbiddenException } from '@nestjs/common'
 
 import { getSettingCodeFromSk, isPersonalSettingSk } from '../helpers'
 import { MasterAccessGrant } from './master-access.interface'
@@ -441,5 +441,102 @@ describe('setting key helpers', () => {
     expect(isPersonalSettingSk('MASTER_SETTING#X')).toBe(false)
     expect(isPersonalSettingSk('MASTER_SETTING#USER#u1#X')).toBe(true)
     expect(isPersonalSettingSk('X#A1')).toBe(false)
+  })
+})
+
+describe('prepareSettingOwner', () => {
+  const all = [grant('*', '*', true, true)]
+  const opts = () => ({ invokeContext: ctx() })
+  const input = (extra: object = {}) => ({
+    tenantCode: 'ta',
+    code: 'S1',
+    ...extra,
+  })
+
+  it('stores nothing and does no lookup without a resolver', async () => {
+    const { service, commandService } = build()
+    expect(
+      await service.prepareSettingOwner(input({ requested: 'X' }), opts()),
+    ).toBeUndefined()
+    expect(commandService.getLatestItem).not.toHaveBeenCalled()
+  })
+
+  it('returns the requested systemId for a new setting', async () => {
+    const { service, commandService } = build(all)
+    commandService.getLatestItem.mockResolvedValue(null)
+    expect(
+      await service.prepareSettingOwner(input({ requested: 'A' }), opts()),
+    ).toBe('A')
+  })
+
+  it('leaves systemId unset when none is requested', async () => {
+    const { service, commandService } = build(all)
+    commandService.getLatestItem.mockResolvedValue(null)
+    expect(await service.prepareSettingOwner(input(), opts())).toBeUndefined()
+  })
+
+  it('inherits from the common tenant setting', async () => {
+    const { service, commandService } = build(all)
+    commandService.getLatestItem.mockResolvedValue({
+      attributes: { __systemId: 'A' },
+    })
+    expect(await service.prepareSettingOwner(input(), opts())).toBe('A')
+  })
+
+  it('rejects a value conflicting with the inherited owner', async () => {
+    const { service, commandService } = build(all)
+    commandService.getLatestItem.mockResolvedValue({
+      attributes: { __systemId: 'A' },
+    })
+    await expect(
+      service.prepareSettingOwner(input({ requested: 'B' }), opts()),
+    ).rejects.toThrow(BadRequestException)
+  })
+
+  it('keeps the owner of an existing row without a lookup', async () => {
+    const { service, commandService } = build(all)
+    const existing = { isDeleted: true, attributes: { __systemId: 'A' } } as any
+    expect(
+      await service.prepareSettingOwner(input({ existing, requested: 'A' }), {
+        ...opts(),
+        systemId: 'Z',
+      }),
+    ).toBe('A')
+    expect(commandService.getLatestItem).not.toHaveBeenCalled()
+  })
+
+  it('rejects a different systemId on an existing row', async () => {
+    const { service } = build(all)
+    const existing = { attributes: { __systemId: 'A' } } as any
+    await expect(
+      service.prepareSettingOwner(input({ existing, requested: 'B' }), opts()),
+    ).rejects.toThrow(BadRequestException)
+  })
+
+  it('rejects a requested systemId on an untagged existing row', async () => {
+    const { service } = build(all)
+    const existing = { attributes: {} } as any
+    await expect(
+      service.prepareSettingOwner(input({ existing, requested: 'B' }), opts()),
+    ).rejects.toThrow(BadRequestException)
+  })
+
+  it('checks write access against the final owner', async () => {
+    const { service, commandService } = build([grant('B', '*', true, true)])
+    commandService.getLatestItem.mockResolvedValue(null)
+    await expect(
+      service.prepareSettingOwner(input({ requested: 'A' }), opts()),
+    ).rejects.toThrow(ForbiddenException)
+    await expect(
+      service.prepareSettingOwner(input({ requested: 'B' }), opts()),
+    ).resolves.toBe('B')
+  })
+
+  it('uses options.systemId from internal callers', async () => {
+    const { service, commandService } = build(all)
+    commandService.getLatestItem.mockResolvedValue(null)
+    expect(
+      await service.prepareSettingOwner(input(), { ...opts(), systemId: 'Z' }),
+    ).toBe('Z')
   })
 })

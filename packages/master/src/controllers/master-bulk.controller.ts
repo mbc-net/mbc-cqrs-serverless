@@ -68,6 +68,7 @@ export class MasterBulkController {
             name: item.name,
             code: item.code,
             tenantCode: item.tenantCode,
+            systemId: item.systemId,
             settingValue: item.attributes,
           },
         })

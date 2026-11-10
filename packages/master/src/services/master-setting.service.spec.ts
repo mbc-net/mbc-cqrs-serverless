@@ -25,7 +25,13 @@ import {
   PRISMA_SERVICE,
 } from '../master.module-definition'
 import { TaskService } from '@mbc-cqrs-serverless/task'
-import { BadRequestException, NotFoundException } from '@nestjs/common'
+import {
+  BadRequestException,
+  ForbiddenException,
+  NotFoundException,
+} from '@nestjs/common'
+import { MasterAccessService } from '../access/master-access.service'
+import { MasterAccessResolverRegistry } from '../access/master-access-resolver.registry'
 import { createMock } from '@golevelup/ts-jest'
 import { DataModel, CommandModel, DetailKey } from '@mbc-cqrs-serverless/core'
 import { MasterDataEntity } from '../entities'
@@ -2184,5 +2190,231 @@ describe('MasterSettingService list includeCommon', () => {
     await service.list({ includeCommon: true } as any, ctxFor('Common'))
     expect(prisma.master.findMany).toHaveBeenCalledTimes(1)
     expect(whereOf(prisma).tenantCode).toBe('common')
+  })
+})
+
+describe('MasterSettingService ownership', () => {
+  const ctx = {
+    event: {
+      headers: { 'x-tenant-code': 'ta' },
+      requestContext: {
+        authorizer: {
+          jwt: {
+            claims: {
+              sub: 'u1',
+              'custom:tenant': 'ta',
+              'custom:roles': JSON.stringify([{ tenant: 'ta', role: 'user' }]),
+            },
+          },
+        },
+      },
+    },
+  } as any
+  const opts = { invokeContext: ctx }
+
+  const build = async (grants?: any[]) => {
+    const dataService = { getItem: jest.fn().mockResolvedValue(null) }
+    const commandService = {
+      publishAsync: jest.fn().mockResolvedValue({ id: 'i' }),
+      publishPartialUpdateAsync: jest.fn().mockResolvedValue({ id: 'i' }),
+      getLatestItem: jest.fn().mockResolvedValue(null),
+    }
+    const registry = new MasterAccessResolverRegistry()
+    if (grants) registry.set({ resolveGrants: async () => grants })
+    const access = new MasterAccessService(registry, commandService as any)
+    const module = await Test.createTestingModule({
+      providers: [
+        MasterSettingService,
+        { provide: TaskService, useValue: {} },
+        { provide: PRISMA_SERVICE, useValue: {} },
+        { provide: CommandService, useValue: commandService },
+        { provide: DataService, useValue: dataService },
+        {
+          provide: DynamoDbService,
+          useValue: { getItem: jest.fn(), getTableName: jest.fn() },
+        },
+        { provide: MasterAccessService, useValue: access },
+      ],
+    }).compile()
+    return {
+      service: module.get(MasterSettingService),
+      dataService,
+      commandService,
+    }
+  }
+  const all = [{ systemId: '*', settingCode: '*', read: true, write: true }]
+  const dto = (extra: object = {}) => ({
+    code: 'S1',
+    name: 'n',
+    tenantCode: 'ta',
+    settingValue: { a: 1 },
+    ...extra,
+  })
+  const published = (fn: jest.Mock) => fn.mock.calls[0][0]
+
+  it('stores nothing and does no lookup without a resolver', async () => {
+    const { service, commandService } = await build()
+    await service.createTenantSetting(dto({ systemId: 'A' }), opts)
+    expect(published(commandService.publishAsync).attributes).toEqual({ a: 1 })
+    expect(commandService.getLatestItem).not.toHaveBeenCalled()
+  })
+
+  it('stores the requested systemId and hides it in the response', async () => {
+    const { service, commandService } = await build(all)
+    commandService.publishAsync.mockImplementation(async (c) => c)
+    const res: any = await service.createTenantSetting(
+      dto({ systemId: 'A' }),
+      opts,
+    )
+    expect(published(commandService.publishAsync).attributes).toEqual({
+      a: 1,
+      __systemId: 'A',
+    })
+    expect(res).toMatchObject({ systemId: 'A', attributes: { a: 1 } })
+  })
+
+  it('stores the owner on createCommonTenantSetting', async () => {
+    const { service, commandService } = await build(all)
+    await service.createCommonTenantSetting(
+      { code: 'S1', name: 'n', settingValue: {}, systemId: 'A' } as any,
+      { invokeContext: ctx, skipAccessCheck: true },
+    )
+    expect(published(commandService.publishAsync).attributes).toEqual({
+      __systemId: 'A',
+    })
+  })
+
+  it('keeps the owner across delete and recreate', async () => {
+    const { service, dataService, commandService } = await build(all)
+    dataService.getItem.mockResolvedValue({
+      isDeleted: true,
+      version: 2,
+      attributes: { __systemId: 'A' },
+    })
+    await service.upsertTenantSetting(dto(), opts)
+    expect(published(commandService.publishAsync).attributes).toEqual({
+      a: 1,
+      __systemId: 'A',
+    })
+  })
+
+  it('rejects a different systemId on upsert', async () => {
+    const { service, dataService } = await build(all)
+    dataService.getItem.mockResolvedValue({ attributes: { __systemId: 'A' } })
+    await expect(
+      service.upsertTenantSetting(dto({ systemId: 'B' }), opts),
+    ).rejects.toThrow(BadRequestException)
+  })
+
+  it('rejects a requested systemId on an untagged existing row', async () => {
+    const { service, dataService } = await build(all)
+    dataService.getItem.mockResolvedValue({ attributes: {} })
+    await expect(
+      service.upsertTenantSetting(dto({ systemId: 'B' }), opts),
+    ).rejects.toThrow(BadRequestException)
+  })
+
+  it('checks write access against the final owner', async () => {
+    const { service, commandService } = await build([
+      { systemId: 'B', settingCode: '*', read: true, write: true },
+    ])
+    await expect(
+      service.createTenantSetting(dto({ systemId: 'A' }), opts),
+    ).rejects.toThrow(ForbiddenException)
+    expect(commandService.publishAsync).not.toHaveBeenCalled()
+  })
+
+  it('uses options.systemId from internal callers', async () => {
+    const { service, commandService } = await build(all)
+    await service.createTenantSetting(dto(), { ...opts, systemId: 'Z' })
+    expect(published(commandService.publishAsync).attributes).toEqual({
+      a: 1,
+      __systemId: 'Z',
+    })
+  })
+
+  it('stores no systemId on group and user settings', async () => {
+    const { service, commandService } = await build(all)
+    await service.createGroupSetting(
+      dto({ groupId: 'g', systemId: 'A' }) as any,
+      opts,
+    )
+    await service.createUserSetting(
+      dto({ userId: 'u', systemId: 'A' }) as any,
+      opts,
+    )
+    for (const [c] of commandService.publishAsync.mock.calls) {
+      expect(c.attributes).toEqual({ a: 1 })
+    }
+  })
+
+  it('checks group settings against the base setting owner', async () => {
+    const { service, commandService } = await build([
+      { systemId: 'B', settingCode: '*', read: true, write: true },
+    ])
+    commandService.getLatestItem.mockResolvedValue({
+      attributes: { __systemId: 'A' },
+    })
+    await expect(
+      service.createGroupSetting(dto({ groupId: 'g' }) as any, opts),
+    ).rejects.toThrow(ForbiddenException)
+    expect(commandService.getLatestItem).toHaveBeenCalledWith({
+      pk: 'MASTER#ta',
+      sk: 'MASTER_SETTING#S1',
+    })
+  })
+
+  it('carries systemId through updateSetting', async () => {
+    const { service, dataService, commandService } = await build(all)
+    dataService.getItem.mockResolvedValue({
+      version: 1,
+      tenantCode: 'ta',
+      attributes: { __systemId: 'A' },
+    })
+    await service.updateSetting(
+      { pk: 'MASTER#ta', sk: 'MASTER_SETTING#S1' },
+      { settingValue: { b: 2, __systemId: 'evil' } } as any,
+      opts,
+    )
+    expect(
+      published(commandService.publishPartialUpdateAsync).attributes,
+    ).toEqual({ b: 2, __systemId: 'A' })
+  })
+
+  it('rejects updateSetting and deleteSetting without write access', async () => {
+    const { service, dataService, commandService } = await build([
+      { systemId: 'B', settingCode: '*', read: true, write: true },
+    ])
+    dataService.getItem.mockResolvedValue({
+      version: 1,
+      tenantCode: 'ta',
+      attributes: { __systemId: 'A' },
+    })
+    const key = { pk: 'MASTER#ta', sk: 'MASTER_SETTING#S1' }
+    await expect(
+      service.updateSetting(key, { settingValue: {} } as any, opts),
+    ).rejects.toThrow(ForbiddenException)
+    await expect(service.deleteSetting(key, opts)).rejects.toThrow(
+      ForbiddenException,
+    )
+    expect(commandService.publishPartialUpdateAsync).not.toHaveBeenCalled()
+  })
+
+  it('writes nothing when one bulk item is forbidden', async () => {
+    const { service, commandService } = await build([
+      { systemId: 'A', settingCode: '*', read: true, write: true },
+    ])
+    await expect(
+      service.upsertBulk(
+        {
+          items: [
+            { code: 'S1', name: 'n', settingValue: {}, systemId: 'A' },
+            { code: 'S2', name: 'n', settingValue: {}, systemId: 'B' },
+          ],
+        } as any,
+        ctx,
+      ),
+    ).rejects.toThrow(ForbiddenException)
+    expect(commandService.publishAsync).not.toHaveBeenCalled()
   })
 })

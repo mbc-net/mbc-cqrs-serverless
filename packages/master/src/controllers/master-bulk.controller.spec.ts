@@ -127,6 +127,42 @@ describe('MasterBulkController', () => {
       expect(result).toEqual(dataResults)
     })
 
+    it('forwards systemId for setting items', async () => {
+      jest.spyOn(settingService, 'upsertBulk').mockResolvedValue([{}] as any)
+      await controller.upsertBulk(
+        {
+          items: [{ name: 'S', code: 'SET1', systemId: 'A', attributes: {} }],
+        } as any,
+        mockInvokeContext,
+      )
+      expect(settingService.upsertBulk).toHaveBeenCalledWith(
+        expect.objectContaining({
+          items: [expect.objectContaining({ code: 'SET1', systemId: 'A' })],
+        }),
+        mockInvokeContext,
+      )
+    })
+
+    it('does not forward systemId for data items', async () => {
+      jest.spyOn(dataService, 'upsertBulk').mockResolvedValue([{}] as any)
+      await controller.upsertBulk(
+        {
+          items: [
+            {
+              name: 'D',
+              code: 'C1',
+              settingCode: 'SET1',
+              systemId: 'A',
+              attributes: {},
+            },
+          ],
+        } as any,
+        mockInvokeContext,
+      )
+      const [dto] = (dataService.upsertBulk as jest.Mock).mock.calls[0]
+      expect(dto.items[0]).not.toHaveProperty('systemId')
+    })
+
     it('should route items without settingCode to settingService.upsertBulk', async () => {
       const bulkDto = {
         items: [
