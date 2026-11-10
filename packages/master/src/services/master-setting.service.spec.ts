@@ -2012,3 +2012,115 @@ describe('MasterSettingService commonTenantCode option', () => {
     }
   })
 })
+
+describe('MasterSettingService reserved system attribute', () => {
+  const build = async () => {
+    const dataService = { getItem: jest.fn(), listItemsByPk: jest.fn() }
+    const commandService = {
+      publishAsync: jest.fn(),
+      publishPartialUpdateAsync: jest.fn(),
+    }
+    const prisma = { master: { count: jest.fn(), findMany: jest.fn() } }
+    const module = await Test.createTestingModule({
+      providers: [
+        MasterSettingService,
+        { provide: TaskService, useValue: {} },
+        { provide: PRISMA_SERVICE, useValue: prisma },
+        { provide: CommandService, useValue: commandService },
+        { provide: DataService, useValue: dataService },
+        {
+          provide: DynamoDbService,
+          useValue: { getItem: jest.fn(), getTableName: jest.fn() },
+        },
+      ],
+    }).compile()
+    return {
+      service: module.get(MasterSettingService),
+      dataService,
+      commandService,
+      prisma,
+    }
+  }
+  const bad = { a: 1, __systemId: 'evil' }
+  const attrsOf = (fn: jest.Mock) => fn.mock.calls[0][0].attributes
+
+  it.each([
+    ['createCommonTenantSetting', { code: 'C', name: 'n', settingValue: bad }],
+    [
+      'createTenantSetting',
+      { code: 'C', name: 'n', tenantCode: 'T', settingValue: bad },
+    ],
+    [
+      'upsertTenantSetting',
+      { code: 'C', name: 'n', tenantCode: 'T', settingValue: bad },
+    ],
+    [
+      'createGroupSetting',
+      {
+        code: 'C',
+        name: 'n',
+        tenantCode: 'T',
+        groupId: 'g',
+        settingValue: bad,
+      },
+    ],
+    [
+      'createUserSetting',
+      { code: 'C', name: 'n', tenantCode: 'T', userId: 'u', settingValue: bad },
+    ],
+  ])('removes a client __systemId on %s', async (method, dto) => {
+    const { service, dataService, commandService } = await build()
+    dataService.getItem.mockResolvedValue(null)
+    commandService.publishAsync.mockResolvedValue({ id: 'i' })
+    await (service as any)[method](dto, optionsMock)
+    expect(attrsOf(commandService.publishAsync)).toEqual({ a: 1 })
+  })
+
+  it('removes a client __systemId on updateSetting', async () => {
+    const { service, dataService, commandService } = await build()
+    dataService.getItem.mockResolvedValue({ version: 1 })
+    await service.updateSetting(
+      { pk: 'p', sk: 's' },
+      { settingValue: bad } as any,
+      optionsMock,
+    )
+    expect(attrsOf(commandService.publishPartialUpdateAsync)).toEqual({ a: 1 })
+  })
+
+  it('returns systemId at the top level from getDetail', async () => {
+    const { service, dataService } = await build()
+    dataService.getItem.mockResolvedValue({
+      id: 'i',
+      attributes: { a: 1, __systemId: 'S1' },
+    })
+    const res: any = await service.getDetail({ pk: 'p', sk: 's' })
+    expect(res).toMatchObject({ systemId: 'S1', attributes: { a: 1 } })
+  })
+
+  it('hides the key from getSetting settingValue', async () => {
+    const { service, dataService } = await build()
+    dataService.getItem.mockResolvedValue({
+      id: 'i',
+      attributes: { a: 1, __systemId: 'S1' },
+    })
+    const res = await service.getSetting({ code: 'X' }, optionsMock)
+    expect(res.settingValue).toEqual({ a: 1 })
+  })
+
+  it('maps list items', async () => {
+    const { service, prisma } = await build()
+    prisma.master.count.mockResolvedValue(1)
+    prisma.master.findMany.mockResolvedValue([
+      { id: 'i', attributes: { a: 1, __systemId: 'S1' } },
+    ])
+    const res = await service.list({} as any, optionsMock.invokeContext)
+    expect(res.items[0]).toMatchObject({ systemId: 'S1', attributes: { a: 1 } })
+  })
+
+  it('leaves rows with no owner unchanged', async () => {
+    const { service, dataService } = await build()
+    dataService.getItem.mockResolvedValue({ id: 'i', attributes: { a: 1 } })
+    const res: any = await service.getDetail({ pk: 'p', sk: 's' })
+    expect(res).not.toHaveProperty('systemId')
+  })
+})

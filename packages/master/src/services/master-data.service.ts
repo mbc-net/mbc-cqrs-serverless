@@ -37,7 +37,12 @@ import {
 import { MasterDataCreateBulkDto } from '../dto/master-copy/master-data-create-bulk.dto'
 import { MasterDataEntity, MasterDataListEntity } from '../entities'
 import { SettingTypeEnum } from '../enums'
-import { generateMasterDataSk, generateMasterPk } from '../helpers'
+import {
+  generateMasterDataSk,
+  generateMasterPk,
+  stripSystemAttribute,
+  toPublicRow,
+} from '../helpers'
 import { getOrderBys } from '../helpers/rds'
 import { IMasterDataService } from '../interfaces'
 import {
@@ -149,7 +154,7 @@ export class MasterDataService implements IMasterDataService {
 
     return new MasterRdsListEntity({
       total,
-      items: items.map((item) => new MasterRdsEntity(item)),
+      items: items.map((item) => new MasterRdsEntity(toPublicRow(item))),
     })
   }
 
@@ -170,12 +175,15 @@ export class MasterDataService implements IMasterDataService {
       },
     }
     const res = await this.dataService.listItemsByPk(pk, query)
-    return new MasterDataListEntity(res)
+    return new MasterDataListEntity({
+      ...res,
+      items: res.items?.map((item) => new MasterDataEntity(toPublicRow(item))),
+    })
   }
 
   async get(key: DetailDto) {
     const res = await this.dataService.getItem(key)
-    return new MasterDataEntity(res)
+    return new MasterDataEntity(toPublicRow(res))
   }
 
   async create(
@@ -217,6 +225,7 @@ export class MasterDataService implements IMasterDataService {
       tenantCode,
       isDeleted: false,
       ...createDto,
+      attributes: stripSystemAttribute(createDto.attributes),
     }
 
     const item = await this.commandService.publishAsync(createCmd, {
@@ -259,7 +268,7 @@ export class MasterDataService implements IMasterDataService {
       type: data.type,
       tenantCode: data.tenantCode,
       isDeleted: updateDto.isDeleted ?? data.isDeleted,
-      attributes: updateDto.attributes ?? data.attributes,
+      attributes: stripSystemAttribute(updateDto.attributes) ?? data.attributes,
     }
 
     const item = await this.commandService.publishPartialUpdateAsync(
@@ -318,7 +327,7 @@ export class MasterDataService implements IMasterDataService {
 
     if (!data) throw new NotFoundException('Master data not found')
 
-    return new MasterRdsEntity(data)
+    return new MasterRdsEntity(toPublicRow(data))
   }
 
   async createSetting(createDto: MasterDataCreateDto, invokeContext: IInvoke) {

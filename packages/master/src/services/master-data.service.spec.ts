@@ -2069,3 +2069,142 @@ describe('MasterDataService commonTenantCode option', () => {
     }
   })
 })
+
+describe('MasterDataService reserved system attribute', () => {
+  const invoke = {
+    context: { awsRequestId: 'r' },
+    event: { requestContext: { http: { sourceIp: '127.0.0.1' } } },
+  } as any
+  const build = async () => {
+    const dataService = createMock<DataService>()
+    const commandService = createMock<CommandService>()
+    const prisma = {
+      master: {
+        findMany: jest.fn(),
+        count: jest.fn(),
+        aggregate: jest.fn().mockResolvedValue({ _max: { seq: 0 } }),
+      },
+    }
+    const module = await Test.createTestingModule({
+      providers: [
+        MasterDataService,
+        { provide: PRISMA_SERVICE, useValue: prisma },
+        { provide: CommandService, useValue: commandService },
+        { provide: DataService, useValue: dataService },
+      ],
+    }).compile()
+    return {
+      service: module.get(MasterDataService),
+      dataService,
+      commandService,
+      prisma,
+    }
+  }
+  const owned = () => ({ id: 'i', attributes: { a: 1, __systemId: 'S1' } })
+
+  it('removes a client __systemId on create', async () => {
+    const { service, dataService, commandService } = await build()
+    dataService.getItem.mockResolvedValue(null as any)
+    commandService.publishAsync.mockResolvedValue({ id: 'i' } as any)
+    await service.create(
+      {
+        settingCode: 'S',
+        code: 'C',
+        tenantCode: 'T',
+        name: 'n',
+        attributes: { a: 1, __systemId: 'evil' },
+      } as any,
+      { invokeContext: invoke },
+    )
+    expect(commandService.publishAsync.mock.calls[0][0].attributes).toEqual({
+      a: 1,
+    })
+  })
+
+  it('removes a client __systemId on update', async () => {
+    const { service, dataService, commandService } = await build()
+    dataService.getItem.mockResolvedValue({
+      id: 'i',
+      attributes: { a: 1 },
+    } as any)
+    commandService.publishPartialUpdateAsync.mockResolvedValue({
+      id: 'i',
+    } as any)
+    await service.update(
+      { pk: 'p', sk: 's' },
+      { attributes: { b: 2, __systemId: 'evil' } } as any,
+      { invokeContext: invoke },
+    )
+    expect(
+      commandService.publishPartialUpdateAsync.mock.calls[0][0].attributes,
+    ).toEqual({ b: 2 })
+  })
+
+  it('removes it from data going through upsertBulk', async () => {
+    const { service, dataService, commandService } = await build()
+    dataService.getItem.mockResolvedValue(null as any)
+    commandService.publishAsync.mockResolvedValue({ id: 'i' } as any)
+    await service.upsertBulk(
+      {
+        items: [
+          {
+            settingCode: 'S',
+            code: 'C',
+            tenantCode: 'T',
+            name: 'n',
+            attributes: { __systemId: 'evil', a: 1 },
+          },
+        ],
+      } as any,
+      invoke,
+    )
+    expect(
+      commandService.publishAsync.mock.calls[0][0].attributes,
+    ).not.toHaveProperty('__systemId')
+  })
+
+  it('returns systemId at the top level from get and getDetail', async () => {
+    const { service, dataService } = await build()
+    dataService.getItem.mockResolvedValue(owned() as any)
+    for (const res of [
+      await service.get({ pk: 'p', sk: 's' }),
+      await service.getDetail({ pk: 'p', sk: 's' }),
+    ] as any[]) {
+      expect(res.systemId).toBe('S1')
+      expect(res.attributes).toEqual({ a: 1 })
+    }
+  })
+
+  it('maps list items', async () => {
+    const { service, dataService } = await build()
+    dataService.listItemsByPk.mockResolvedValue({ items: [owned()] } as any)
+    const res = await service.list({ settingCode: 'X' } as any)
+    expect(res.items[0]).toMatchObject({ systemId: 'S1', attributes: { a: 1 } })
+  })
+
+  it('maps listByRds items', async () => {
+    const { service, prisma } = await build()
+    prisma.master.findMany
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([owned()])
+    prisma.master.count.mockResolvedValue(1)
+    mockedUser()
+    const res = await service.listByRds({} as any, { invokeContext: invoke })
+    expect(res.items[0]).toMatchObject({ systemId: 'S1', attributes: { a: 1 } })
+  })
+
+  it('leaves rows with no owner unchanged', async () => {
+    const { service, dataService } = await build()
+    dataService.getItem.mockResolvedValue({
+      id: 'i',
+      attributes: { a: 1 },
+    } as any)
+    const res: any = await service.get({ pk: 'p', sk: 's' })
+    expect(res).toEqual({ id: 'i', attributes: { a: 1 } })
+    expect(res).not.toHaveProperty('systemId')
+  })
+})
+
+function mockedUser() {
+  ;(getUserContext as jest.Mock).mockReturnValue({ tenantCode: 'T' })
+}

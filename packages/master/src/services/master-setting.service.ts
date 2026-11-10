@@ -49,7 +49,13 @@ import {
 import { CommonSettingBulkDto } from '../dto/master-setting/common-setting-create-bulk.dto'
 import { MasterSettingEntity } from '../entities'
 import { SettingTypeEnum } from '../enums'
-import { generateMasterPk, generateMasterSettingSk, parseId } from '../helpers'
+import {
+  generateMasterPk,
+  generateMasterSettingSk,
+  parseId,
+  stripSystemAttribute,
+  toPublicRow,
+} from '../helpers'
 import { getOrderBys } from '../helpers/rds'
 import { IMasterSettingService } from '../interfaces'
 import {
@@ -142,7 +148,7 @@ export class MasterSettingService implements IMasterSettingService {
     if (setting) {
       return new MasterSettingEntity({
         id: setting.id,
-        settingValue: setting.attributes,
+        settingValue: stripSystemAttribute(setting.attributes),
       })
     }
 
@@ -168,7 +174,7 @@ export class MasterSettingService implements IMasterSettingService {
           if (setting) {
             return new MasterSettingEntity({
               id: setting.id,
-              settingValue: setting.attributes,
+              settingValue: stripSystemAttribute(setting.attributes),
             })
           }
         }
@@ -186,7 +192,7 @@ export class MasterSettingService implements IMasterSettingService {
     if (setting) {
       return new MasterSettingEntity({
         id: setting.id,
-        settingValue: setting.attributes,
+        settingValue: stripSystemAttribute(setting.attributes),
       })
     }
 
@@ -202,7 +208,7 @@ export class MasterSettingService implements IMasterSettingService {
 
     return new MasterSettingEntity({
       id: setting.id,
-      settingValue: setting.attributes,
+      settingValue: stripSystemAttribute(setting.attributes),
     })
   }
 
@@ -228,7 +234,7 @@ export class MasterSettingService implements IMasterSettingService {
       type: MASTER_PK_PREFIX,
       version: setting?.version ?? VERSION_FIRST,
       isDeleted: false,
-      attributes: settingValue,
+      attributes: stripSystemAttribute(settingValue),
     }
     return await this.commandService.publishAsync(command, options)
   }
@@ -266,7 +272,7 @@ export class MasterSettingService implements IMasterSettingService {
       type: MASTER_PK_PREFIX,
       version: setting?.version ?? VERSION_FIRST,
       isDeleted: false,
-      attributes: settingValue,
+      attributes: stripSystemAttribute(settingValue),
     }
     return await this.commandService.publishAsync(command, options)
   }
@@ -295,7 +301,7 @@ export class MasterSettingService implements IMasterSettingService {
       type: MASTER_PK_PREFIX,
       version: setting?.version ?? VERSION_FIRST,
       isDeleted: false,
-      attributes: settingValue,
+      attributes: stripSystemAttribute(settingValue),
     }
     return await this.commandService.publishAsync(command, options)
   }
@@ -315,7 +321,7 @@ export class MasterSettingService implements IMasterSettingService {
         pk,
         sk,
         name: dto.name,
-        attributes: dto.settingValue,
+        attributes: stripSystemAttribute(dto.settingValue),
         version: data.version,
       },
       context,
@@ -350,7 +356,7 @@ export class MasterSettingService implements IMasterSettingService {
 
     if (!data) throw new NotFoundException('Master setting not found')
 
-    return new MasterRdsEntity(data)
+    return new MasterRdsEntity(toPublicRow(data))
   }
 
   async create(createDto: CommonSettingDto, invokeContext: IInvoke) {
@@ -405,7 +411,7 @@ export class MasterSettingService implements IMasterSettingService {
       type: MASTER_PK_PREFIX,
       version: setting?.version ?? VERSION_FIRST,
       isDeleted: false,
-      attributes: settingValue,
+      attributes: stripSystemAttribute(settingValue),
     }
 
     const item = await this.commandService.publishAsync(command, options)
@@ -536,7 +542,7 @@ export class MasterSettingService implements IMasterSettingService {
 
     return new MasterRdsListEntity({
       total,
-      items: items.map((item) => new MasterRdsEntity(item)),
+      items: items.map((item) => new MasterRdsEntity(toPublicRow(item))),
     })
   }
 
