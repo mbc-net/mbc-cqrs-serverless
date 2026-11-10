@@ -61,6 +61,7 @@ export class MasterSettingController {
     return await this.masterSettingService.getSetting(dto, { invokeContext })
   }
 
+  @MasterRoute({ targetsCommon: true })
   @Post('common')
   async createCommonTenantSetting(
     @INVOKE_CONTEXT() invokeContext: IInvoke,

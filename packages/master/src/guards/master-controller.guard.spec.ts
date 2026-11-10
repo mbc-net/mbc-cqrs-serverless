@@ -3,7 +3,7 @@ import {
   GroupRoleResolverRegistry,
   IGroupRoleResolver,
 } from '@mbc-cqrs-serverless/core'
-import { ExecutionContext } from '@nestjs/common'
+import { BadRequestException, ExecutionContext } from '@nestjs/common'
 import { Reflector } from '@nestjs/core'
 import * as jwtDecode from 'jwt-decode'
 
@@ -19,19 +19,27 @@ class Routes {
 
   @MasterRoute({ read: true })
   checkExist() {}
+
+  @MasterRoute({ targetsCommon: true })
+  createCommon() {}
 }
 
-const claims = (roles: { role: string }[], sub = 'user-1') => ({
+const claims = (
+  roles: { role: string }[],
+  sub = 'user-1',
+  tenant = 'test',
+) => ({
   ...(sub ? { sub } : {}),
-  'custom:tenant': 'test',
-  'custom:roles': JSON.stringify(roles.map((r) => ({ tenant: 'test', ...r }))),
-  'custom:groups': JSON.stringify([{ tenant: 'test', groups: ['team'] }]),
+  'custom:tenant': tenant,
+  'custom:roles': JSON.stringify(roles.map((r) => ({ tenant, ...r }))),
+  'custom:groups': JSON.stringify([{ tenant, groups: ['team'] }]),
 })
 
 const buildContext = (
   method: string,
   handler: () => void = Routes.prototype.handler,
   tenant = 'test',
+  req: { params?: any; query?: any; body?: any } = {},
 ): ExecutionContext =>
   createMock<ExecutionContext>({
     getHandler: () => handler as any,
@@ -39,6 +47,10 @@ const buildContext = (
     switchToHttp: () => ({
       getRequest: () => ({
         method,
+        params: {},
+        query: {},
+        body: {},
+        ...req,
         headers: { 'x-tenant-code': tenant },
         get: () => 'dummy.jwt.token',
       }),
@@ -123,5 +135,159 @@ describe('MasterControllerGuard', () => {
     mockJwtDecode.mockReturnValue(claims([{ role: 'user' }]))
     const ctx = buildContext('POST', Routes.prototype.checkExist)
     expect(await buildGuard({}).canActivate(ctx)).toBe(true)
+  })
+
+  describe('requested tenants', () => {
+    const admin = [{ role: 'editor' }]
+    const as = (tenant: string, roles = admin) =>
+      mockJwtDecode.mockReturnValue(claims(roles, 'user-1', tenant))
+    const ctx = (
+      method: string,
+      req: { params?: any; query?: any; body?: any },
+      handler?: () => void,
+    ) => buildContext(method, handler, 'ta', req)
+    const user = [{ role: 'user' }]
+
+    it('rejects a pk param from another tenant', async () => {
+      as('ta')
+      await expect(
+        buildGuard({ write: ['editor'] }).canActivate(
+          ctx('PUT', { params: { pk: 'MASTER#tb' } }),
+        ),
+      ).rejects.toThrow(new BadRequestException('Invalid tenant code'))
+    })
+
+    it('rejects an id param from another tenant', async () => {
+      as('ta')
+      await expect(
+        buildGuard({ write: ['editor'] }).canActivate(
+          ctx('PUT', { params: { id: 'MASTER#tb#code' } }),
+        ),
+      ).rejects.toThrow(BadRequestException)
+    })
+
+    it('rejects a malformed pk or id param', async () => {
+      as('ta')
+      await expect(
+        buildGuard({ write: ['editor'] }).canActivate(
+          ctx('PUT', { params: { pk: 'MASTER' } }),
+        ),
+      ).rejects.toThrow(new BadRequestException('Invalid tenant code'))
+      await expect(
+        buildGuard({ write: ['editor'] }).canActivate(
+          ctx('PUT', { params: { id: 'x' } }),
+        ),
+      ).rejects.toThrow(BadRequestException)
+    })
+
+    it('rejects a body tenantCode from another tenant', async () => {
+      as('ta')
+      await expect(
+        buildGuard({ write: ['editor'] }).canActivate(
+          ctx('POST', { body: { tenantCode: 'tb' } }),
+        ),
+      ).rejects.toThrow(BadRequestException)
+    })
+
+    it('rejects a query tenantCode from another tenant', async () => {
+      as('ta')
+      await expect(
+        buildGuard({ write: ['editor'] }).canActivate(
+          ctx('GET', { query: { tenantCode: 'tb' } }),
+        ),
+      ).rejects.toThrow(BadRequestException)
+    })
+
+    it('rejects an array tenantCode in the query', async () => {
+      as('ta')
+      await expect(
+        buildGuard({ write: ['editor'] }).canActivate(
+          ctx('GET', { query: { tenantCode: ['ta', 'tb'] } }),
+        ),
+      ).rejects.toThrow(new BadRequestException('Invalid tenant code'))
+    })
+
+    it('rejects a malformed targetTenants', async () => {
+      as('ta')
+      await expect(
+        buildGuard({ write: ['editor'] }).canActivate(
+          ctx('POST', { body: { targetTenants: 'tb' } }),
+        ),
+      ).rejects.toThrow(BadRequestException)
+      await expect(
+        buildGuard({ write: ['editor'] }).canActivate(
+          ctx('POST', { body: { targetTenants: ['ta', 1] } }),
+        ),
+      ).rejects.toThrow(BadRequestException)
+    })
+
+    it('treats tenant codes case-insensitively', async () => {
+      as('ta')
+      const c = ctx('PUT', { params: { pk: 'MASTER#TA' } })
+      expect(await buildGuard({ write: ['editor'] }).canActivate(c)).toBe(true)
+    })
+
+    it('allows reading the common tenant', async () => {
+      as('ta', user)
+      const c = ctx('GET', { query: { tenantCode: 'common' } })
+      expect(await buildGuard({ write: ['editor'] }).canActivate(c)).toBe(true)
+    })
+
+    it('rejects writing common from another tenant', async () => {
+      as('ta')
+      await expect(
+        buildGuard({ write: ['editor'] }).canActivate(
+          ctx('PUT', { params: { pk: 'MASTER#common' } }),
+        ),
+      ).rejects.toThrow(BadRequestException)
+    })
+
+    it('allows writing another tenant with a cross-tenant role', async () => {
+      as('ta', [{ role: 'system_admin' }])
+      const guard = buildGuard({})
+      const c = ctx('PUT', { params: { pk: 'MASTER#tb' } })
+      expect(await guard.canActivate(c)).toBe(true)
+    })
+
+    it('uses the configured common tenant', async () => {
+      as('ta', user)
+      const guard = new MasterControllerGuard(new Reflector(), undefined, {
+        controllerAuth: {},
+        commonTenantCode: 'shared',
+      } as MasterModuleOptions)
+      const c = ctx('GET', { query: { tenantCode: 'shared' } })
+      expect(await guard.canActivate(c)).toBe(true)
+    })
+
+    it('applies targetsCommon to POST /common', async () => {
+      as('ta')
+      await expect(
+        buildGuard({ write: ['editor'] }).canActivate(
+          ctx('POST', {}, Routes.prototype.createCommon),
+        ),
+      ).rejects.toThrow(BadRequestException)
+    })
+
+    it('checks masterSettingId as a read and targetTenants as writes', async () => {
+      as('ta')
+      const guard = buildGuard({ write: ['editor'] })
+      expect(
+        await guard.canActivate(
+          ctx('POST', { body: { masterSettingId: 'common' } }),
+        ),
+      ).toBe(true)
+      await expect(
+        guard.canActivate(ctx('POST', { body: { targetTenants: ['tb'] } })),
+      ).rejects.toThrow(BadRequestException)
+      await expect(
+        guard.canActivate(ctx('POST', { body: { targetTenants: ['common'] } })),
+      ).rejects.toThrow(BadRequestException)
+    })
+
+    it('skips these checks when controllerAuth is not set', async () => {
+      as('ta')
+      const c = ctx('PUT', { params: { pk: 'MASTER#tb' } })
+      expect(await buildGuard().canActivate(c)).toBe(true)
+    })
   })
 })
