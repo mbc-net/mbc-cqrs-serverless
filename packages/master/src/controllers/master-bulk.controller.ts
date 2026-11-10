@@ -81,14 +81,16 @@ export class MasterBulkController {
     const dataBulkDto = new MasterDataCreateBulkDto()
     dataBulkDto.items = dataItems.map((d) => d.item)
 
-    const [settingResults, dataResults] = await Promise.all([
-      settingItems.length > 0
-        ? this.masterSettingService.upsertBulk(settingBulkDto, invokeContext)
-        : Promise.resolve([]),
-      dataItems.length > 0
-        ? this.masterDataService.upsertBulk(dataBulkDto, invokeContext)
-        : Promise.resolve([]),
-    ])
+    // Settings first, so data rows can find a setting created in the same request.
+    const settingResults = settingItems.length
+      ? await this.masterSettingService.upsertBulk(
+          settingBulkDto,
+          invokeContext,
+        )
+      : []
+    const dataResults = dataItems.length
+      ? await this.masterDataService.upsertBulk(dataBulkDto, invokeContext)
+      : []
 
     // Restore original input order
     const results = new Array(bulkDto.items.length)

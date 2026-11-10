@@ -143,6 +143,31 @@ describe('MasterBulkController', () => {
       )
     })
 
+    it('finishes settings before starting data', async () => {
+      let release: (v: any) => void
+      jest.spyOn(settingService, 'upsertBulk').mockReturnValue(
+        new Promise((resolve) => {
+          release = resolve
+        }) as any,
+      )
+      jest.spyOn(dataService, 'upsertBulk').mockResolvedValue([{}] as any)
+      const pending = controller.upsertBulk(
+        {
+          items: [
+            { name: 'S', code: 'SET1', attributes: {} },
+            { name: 'D', code: 'C1', settingCode: 'SET1', attributes: {} },
+          ],
+        } as any,
+        mockInvokeContext,
+      )
+      await new Promise((r) => setImmediate(r))
+      expect(settingService.upsertBulk).toHaveBeenCalled()
+      expect(dataService.upsertBulk).not.toHaveBeenCalled()
+      release([{ s: 1 }])
+      expect(await pending).toEqual([{ s: 1 }, {}])
+      expect(dataService.upsertBulk).toHaveBeenCalled()
+    })
+
     it('does not forward systemId for data items', async () => {
       jest.spyOn(dataService, 'upsertBulk').mockResolvedValue([{}] as any)
       await controller.upsertBulk(

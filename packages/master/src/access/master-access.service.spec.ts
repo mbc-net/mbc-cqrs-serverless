@@ -559,3 +559,107 @@ describe('prepareSettingOwner', () => {
     ).toBe('Z')
   })
 })
+
+describe('prepareDataOwner', () => {
+  const all = [grant('*', '*', true, true)]
+  const opts = () => ({ invokeContext: ctx() })
+  const input = (extra: object = {}) => ({
+    tenantCode: 'ta',
+    settingCode: 'S1',
+    ...extra,
+  })
+
+  it('does no lookup without a resolver', async () => {
+    const { service, commandService } = build()
+    expect(
+      await service.prepareDataOwner(input(), { ...opts(), systemId: 'X' }),
+    ).toBeUndefined()
+    expect(commandService.getLatestItem).not.toHaveBeenCalled()
+  })
+
+  it('takes the owner from the tenant setting', async () => {
+    const { service, commandService } = build(all)
+    commandService.getLatestItem.mockResolvedValueOnce({
+      attributes: { __systemId: 'A' },
+    })
+    expect(await service.prepareDataOwner(input(), opts())).toBe('A')
+    expect(commandService.getLatestItem).toHaveBeenCalledTimes(1)
+  })
+
+  it('takes the owner from the common setting', async () => {
+    const { service, commandService } = build(all)
+    commandService.getLatestItem
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce({ attributes: { __systemId: 'C' } })
+    expect(await service.prepareDataOwner(input(), opts())).toBe('C')
+  })
+
+  it('rejects a row whose setting does not exist', async () => {
+    const { service, commandService } = build(all)
+    commandService.getLatestItem.mockResolvedValue(null)
+    await expect(service.prepareDataOwner(input(), opts())).rejects.toThrow(
+      BadRequestException,
+    )
+  })
+
+  it('keeps the stored owner of an existing row without a lookup', async () => {
+    const { service, commandService } = build(all)
+    const existing = { attributes: { __systemId: 'A' } } as any
+    expect(
+      await service.prepareDataOwner(input({ existing }), {
+        ...opts(),
+        systemId: 'Z',
+      }),
+    ).toBe('A')
+    expect(commandService.getLatestItem).not.toHaveBeenCalled()
+  })
+
+  it('adopts the setting owner for an untagged existing row', async () => {
+    const { service, commandService } = build(all)
+    commandService.getLatestItem.mockResolvedValue({
+      attributes: { __systemId: 'A' },
+    })
+    const existing = { attributes: {} } as any
+    expect(await service.prepareDataOwner(input({ existing }), opts())).toBe(
+      'A',
+    )
+  })
+
+  it('leaves an untagged existing row untagged when its setting is gone', async () => {
+    const { service, commandService } = build([
+      grant('shared', '*', true, true),
+    ])
+    commandService.getLatestItem.mockResolvedValue(null)
+    const existing = { attributes: {} } as any
+    expect(
+      await service.prepareDataOwner(input({ existing }), opts()),
+    ).toBeUndefined()
+  })
+
+  it('uses options.systemId without a lookup', async () => {
+    const { service, commandService } = build(all)
+    expect(
+      await service.prepareDataOwner(input(), { ...opts(), systemId: 'Z' }),
+    ).toBe('Z')
+    expect(commandService.getLatestItem).not.toHaveBeenCalled()
+  })
+
+  it('denies a user without write on the owner', async () => {
+    const { service } = build([grant('B', '*', true, true)])
+    const existing = { attributes: { __systemId: 'A' } } as any
+    await expect(
+      service.prepareDataOwner(input({ existing }), opts()),
+    ).rejects.toThrow(ForbiddenException)
+  })
+
+  it('skips the check for internal callers', async () => {
+    const { service } = build([grant('B', '*', true, true)])
+    const existing = { attributes: { __systemId: 'A' } } as any
+    expect(
+      await service.prepareDataOwner(input({ existing }), {
+        ...opts(),
+        skipAccessCheck: true,
+      }),
+    ).toBe('A')
+  })
+})

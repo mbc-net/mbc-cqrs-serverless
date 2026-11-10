@@ -213,6 +213,39 @@ export class MasterAccessService {
     return owner
   }
 
+  /**
+   * Work out the owner to store on a data row write and assert write access to it.
+   * The row keeps its own owner, else options.systemId, else its setting's owner.
+   * Returns undefined when access control is disabled.
+   */
+  async prepareDataOwner(
+    input: {
+      tenantCode: string
+      settingCode: string
+      existing?: DataModel | null
+    },
+    options: MasterAccessOptions,
+  ): Promise<string | undefined> {
+    if (!this.isEnabled()) {
+      return undefined
+    }
+    const { tenantCode, settingCode, existing } = input
+    let owner = getSystemId(existing) ?? (options.systemId || undefined)
+    if (owner === undefined) {
+      const setting = await this.getEffectiveSetting(tenantCode, settingCode)
+      if (!setting && !existing) {
+        throw new BadRequestException(`Setting not found: ${settingCode}`)
+      }
+      owner = getSystemId(setting)
+    }
+    await this.assertAccess(
+      { tenantCode, systemId: owner, settingCode },
+      'write',
+      options,
+    )
+    return owner
+  }
+
   /** Tenant gate, the anonymous rules, shared by assertAccess and assertTenant. */
   private gate(
     tenantCode: string,

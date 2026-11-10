@@ -19,6 +19,8 @@ import {
 } from '@nestjs/common'
 import { ulid } from 'ulid'
 
+import { MasterWriteOptions } from '../access/master-access.interface'
+import { MasterAccessService } from '../access/master-access.service'
 import {
   DATA_SK_PREFIX,
   MASTER_PK_PREFIX,
@@ -40,8 +42,10 @@ import { SettingTypeEnum } from '../enums'
 import {
   generateMasterDataSk,
   generateMasterPk,
+  getSettingCodeFromSk,
   stripSystemAttribute,
   toPublicRow,
+  withSystemAttribute,
 } from '../helpers'
 import { buildTenantScope, getOrderBys } from '../helpers/rds'
 import { IMasterDataService } from '../interfaces'
@@ -58,6 +62,10 @@ export class MasterDataService implements IMasterDataService {
   @Optional()
   @Inject(MODULE_OPTIONS_TOKEN)
   private readonly moduleOptions?: MasterModuleOptions
+
+  @Optional()
+  @Inject(MasterAccessService)
+  private readonly access?: MasterAccessService
 
   private get commonTenantCode(): string {
     return this.moduleOptions?.commonTenantCode ?? SettingTypeEnum.TENANT_COMMON
@@ -199,26 +207,25 @@ export class MasterDataService implements IMasterDataService {
     return new MasterDataEntity(toPublicRow(res))
   }
 
-  async create(
-    createDto: CreateMasterDataDto,
-    opts: { invokeContext: IInvoke },
-  ) {
+  async create(createDto: CreateMasterDataDto, opts: MasterWriteOptions) {
     return this.createOrUpsert(createDto, opts, { throwIfExists: true })
   }
 
-  async upsert(
-    createDto: CreateMasterDataDto,
-    opts: { invokeContext: IInvoke },
-  ) {
+  async upsert(createDto: CreateMasterDataDto, opts: MasterWriteOptions) {
     return this.createOrUpsert(createDto, opts, { throwIfExists: false })
   }
 
   private async createOrUpsert(
     createDto: CreateMasterDataDto,
-    opts: { invokeContext: IInvoke },
+    opts: MasterWriteOptions,
     { throwIfExists }: { throwIfExists: boolean },
   ): Promise<MasterDataEntity> {
-    const { settingCode, code, tenantCode } = createDto
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    const { systemId: _clientSystemId, ...dto } =
+      createDto as CreateMasterDataDto & {
+        systemId?: unknown
+      }
+    const { settingCode, code, tenantCode } = dto
     const pk = generateMasterPk(tenantCode)
     const sk = generateMasterDataSk(settingCode, code)
     const id = generateId(pk, sk)
@@ -229,6 +236,11 @@ export class MasterDataService implements IMasterDataService {
       throw new BadRequestException('Master data already exists')
     }
 
+    const systemId = await this.access?.prepareDataOwner(
+      { tenantCode, settingCode, existing: existingData },
+      opts,
+    )
+
     const createCmd = {
       id,
       pk,
@@ -237,8 +249,11 @@ export class MasterDataService implements IMasterDataService {
       type: MASTER_PK_PREFIX,
       tenantCode,
       isDeleted: false,
-      ...createDto,
-      attributes: stripSystemAttribute(createDto.attributes),
+      ...dto,
+      attributes: withSystemAttribute(
+        stripSystemAttribute(dto.attributes),
+        systemId,
+      ),
     }
 
     const item = await this.commandService.publishAsync(createCmd, {
@@ -253,22 +268,31 @@ export class MasterDataService implements IMasterDataService {
       }
       // eslint-disable-next-line @typescript-eslint/no-unused-vars
       const { requestId, ...rest } = existingData
-      return new MasterDataEntity(rest)
+      return new MasterDataEntity(toPublicRow(rest))
     }
 
-    return new MasterDataEntity(item)
+    return new MasterDataEntity(toPublicRow(item))
   }
 
   async update(
     key: DetailDto,
     updateDto: UpdateDataSettingDto,
-    opts: { invokeContext: IInvoke },
+    opts: MasterWriteOptions,
   ) {
     const data = (await this.dataService.getItem(key)) as MasterDataEntity
 
     if (!data) {
       throw new NotFoundException('Master data not found')
     }
+
+    const systemId = await this.access?.prepareDataOwner(
+      {
+        tenantCode: data.tenantCode,
+        settingCode: getSettingCodeFromSk(data.sk),
+        existing: data,
+      },
+      opts,
+    )
 
     const updateCmd = {
       id: data.id,
@@ -281,7 +305,10 @@ export class MasterDataService implements IMasterDataService {
       type: data.type,
       tenantCode: data.tenantCode,
       isDeleted: updateDto.isDeleted ?? data.isDeleted,
-      attributes: stripSystemAttribute(updateDto.attributes) ?? data.attributes,
+      attributes: withSystemAttribute(
+        stripSystemAttribute(updateDto.attributes) ?? data.attributes,
+        systemId,
+      ),
     }
 
     const item = await this.commandService.publishPartialUpdateAsync(
@@ -291,10 +318,10 @@ export class MasterDataService implements IMasterDataService {
       },
     )
 
-    return new MasterDataEntity(item)
+    return new MasterDataEntity(toPublicRow(item))
   }
 
-  async delete(key: DetailDto, opts: { invokeContext: IInvoke }) {
+  async delete(key: DetailDto, opts: MasterWriteOptions) {
     const data = (await this.dataService.getItem(key)) as MasterDataEntity
 
     if (!data) {
@@ -304,6 +331,15 @@ export class MasterDataService implements IMasterDataService {
     if (data.isDeleted) {
       throw new BadRequestException('This master data is already deleted')
     }
+
+    await this.access?.prepareDataOwner(
+      {
+        tenantCode: data.tenantCode,
+        settingCode: getSettingCodeFromSk(data.sk),
+        existing: data,
+      },
+      opts,
+    )
 
     const deleteCmd = {
       ...data,
@@ -317,7 +353,7 @@ export class MasterDataService implements IMasterDataService {
       },
     )
 
-    return new MasterDataEntity(item)
+    return new MasterDataEntity(toPublicRow(item))
   }
 
   async checkExistCode(tenantCode: string, type: string, code: string) {
@@ -392,6 +428,23 @@ export class MasterDataService implements IMasterDataService {
   }
 
   async upsertBulk(createDto: MasterDataCreateBulkDto, invokeContext: IInvoke) {
+    if (this.access?.isEnabled()) {
+      // Check every item first so a forbidden one leaves nothing half-written.
+      const { tenantCode } = getUserContext(invokeContext)
+      for (const item of createDto.items) {
+        const tenant = item.tenantCode ?? tenantCode
+        const existing = item.code
+          ? await this.dataService.getItem({
+              pk: generateMasterPk(tenant),
+              sk: generateMasterDataSk(item.settingCode, item.code),
+            })
+          : null
+        await this.access.prepareDataOwner(
+          { tenantCode: tenant, settingCode: item.settingCode, existing },
+          { invokeContext },
+        )
+      }
+    }
     const results = []
     for (const item of createDto.items) {
       results.push(await this.upsertSetting(item, invokeContext))
