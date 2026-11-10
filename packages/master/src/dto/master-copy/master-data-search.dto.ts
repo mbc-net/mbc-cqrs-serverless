@@ -17,4 +17,11 @@ export class CustomMasterDataSearchDto extends SearchDto {
   )
   @IsOptional()
   isDeleted?: boolean
+
+  @IsBoolean()
+  @Transform(({ value }) =>
+    value === 'true' ? true : value === 'false' ? false : value,
+  )
+  @IsOptional()
+  includeCommon?: boolean
 }

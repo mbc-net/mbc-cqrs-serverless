@@ -56,7 +56,7 @@ import {
   stripSystemAttribute,
   toPublicRow,
 } from '../helpers'
-import { getOrderBys } from '../helpers/rds'
+import { buildTenantScope, getOrderBys } from '../helpers/rds'
 import { IMasterSettingService } from '../interfaces'
 import {
   MasterModuleOptions,
@@ -493,7 +493,12 @@ export class MasterSettingService implements IMasterSettingService {
     const userContext = getUserContext(invokeContext)
 
     const where: any = {
-      tenantCode: this.getUserTenantCode(userContext),
+      ...(await buildTenantScope(this.prismaService, {
+        tenantCode: this.getUserTenantCode(userContext),
+        commonTenantCode: this.commonTenantCode,
+        masterType: SETTING_SK_PREFIX,
+        includeCommon: searchDto.includeCommon,
+      })),
       masterType: SETTING_SK_PREFIX,
     }
 

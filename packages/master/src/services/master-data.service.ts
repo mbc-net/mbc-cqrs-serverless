@@ -43,7 +43,7 @@ import {
   stripSystemAttribute,
   toPublicRow,
 } from '../helpers'
-import { getOrderBys } from '../helpers/rds'
+import { buildTenantScope, getOrderBys } from '../helpers/rds'
 import { IMasterDataService } from '../interfaces'
 import {
   MasterModuleOptions,
@@ -82,9 +82,16 @@ export class MasterDataService implements IMasterDataService {
   ) {
     const { invokeContext } = context
     const userContext = getUserContext(invokeContext)
+    const tenantCode = this.getTenantCode(userContext)
+    const commonTenantCode = this.commonTenantCode
+    const withCommon =
+      !!searchDto.includeCommon &&
+      tenantCode?.toLowerCase() !== commonTenantCode?.toLowerCase()
     const deletedSettingData = await this.prismaService.master.findMany({
       where: {
-        tenantCode: this.getTenantCode(userContext),
+        tenantCode: withCommon
+          ? { in: [tenantCode, commonTenantCode] }
+          : tenantCode,
         isDeleted: true,
         masterType: SETTING_SK_PREFIX,
       },
@@ -98,7 +105,13 @@ export class MasterDataService implements IMasterDataService {
     )
 
     const where: any = {
-      tenantCode: this.getTenantCode(userContext),
+      ...(await buildTenantScope(this.prismaService, {
+        tenantCode,
+        commonTenantCode,
+        masterType: DATA_SK_PREFIX,
+        masterTypeCode: searchDto.settingCode?.trim() || undefined,
+        includeCommon: searchDto.includeCommon,
+      })),
       masterType: DATA_SK_PREFIX,
     }
 

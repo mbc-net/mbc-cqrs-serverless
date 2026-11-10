@@ -2124,3 +2124,65 @@ describe('MasterSettingService reserved system attribute', () => {
     expect(res).not.toHaveProperty('systemId')
   })
 })
+
+describe('MasterSettingService list includeCommon', () => {
+  const build = async () => {
+    const prisma = { master: { count: jest.fn(), findMany: jest.fn() } }
+    const module = await Test.createTestingModule({
+      providers: [
+        MasterSettingService,
+        { provide: TaskService, useValue: {} },
+        { provide: PRISMA_SERVICE, useValue: prisma },
+        { provide: CommandService, useValue: {} },
+        { provide: DataService, useValue: {} },
+        {
+          provide: DynamoDbService,
+          useValue: { getItem: jest.fn(), getTableName: jest.fn() },
+        },
+      ],
+    }).compile()
+    prisma.master.count.mockResolvedValue(0)
+    return { service: module.get(MasterSettingService), prisma }
+  }
+  const ctxFor = (tenant: string) => {
+    const ctx = JSON.parse(JSON.stringify(optionsMock.invokeContext))
+    ctx.event.requestContext.authorizer.jwt.claims['custom:tenant'] = tenant
+    return ctx
+  }
+  const whereOf = (prisma: any) => prisma.master.count.mock.calls[0][0].where
+
+  it('returns only the caller tenant by default', async () => {
+    const { service, prisma } = await build()
+    prisma.master.findMany.mockResolvedValue([])
+    await service.list({} as any, ctxFor('MBC'))
+    expect(whereOf(prisma).tenantCode).toBe('mbc')
+    expect(whereOf(prisma).OR).toBeUndefined()
+    expect(prisma.master.findMany).toHaveBeenCalledTimes(1)
+  })
+
+  it('merges common rows and excludes codes the tenant has, soft-deleted included', async () => {
+    const { service, prisma } = await build()
+    prisma.master.findMany
+      .mockResolvedValueOnce([{ code: 'SETTING#A' }])
+      .mockResolvedValueOnce([])
+    await service.list({ includeCommon: true } as any, ctxFor('MBC'))
+    const exclusion = prisma.master.findMany.mock.calls[0][0]
+    expect(exclusion.where).toEqual({
+      tenantCode: 'mbc',
+      masterType: 'MASTER_SETTING',
+    })
+    expect(whereOf(prisma).OR).toEqual([
+      { tenantCode: 'mbc' },
+      { tenantCode: 'common', code: { notIn: ['SETTING#A'] } },
+    ])
+    expect(whereOf(prisma).tenantCode).toBeUndefined()
+  })
+
+  it('does not query exclusions when the caller is in the common tenant', async () => {
+    const { service, prisma } = await build()
+    prisma.master.findMany.mockResolvedValue([])
+    await service.list({ includeCommon: true } as any, ctxFor('Common'))
+    expect(prisma.master.findMany).toHaveBeenCalledTimes(1)
+    expect(whereOf(prisma).tenantCode).toBe('common')
+  })
+})

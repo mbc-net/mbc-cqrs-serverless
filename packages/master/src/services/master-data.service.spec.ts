@@ -98,6 +98,76 @@ describe('MasterDataService', () => {
     expect(service).toBeDefined()
   })
 
+  describe('listByRds includeCommon', () => {
+    const dto = (extra: any = {}) => ({ pageSize: 10, page: 1, ...extra })
+    const list = (extra: any = {}) =>
+      service.listByRds(dto(extra), { invokeContext: mockInvokeContext })
+    const countWhere = () => prismaService.master.count.mock.calls[0][0].where
+
+    beforeEach(() => {
+      prismaService.master.count.mockResolvedValue(0)
+    })
+
+    it('returns only the caller tenant by default', async () => {
+      prismaService.master.findMany.mockResolvedValue([])
+      await list()
+      expect(countWhere().tenantCode).toBe('TEST_TENANT')
+      expect(countWhere().OR).toBeUndefined()
+      expect(prismaService.master.findMany).toHaveBeenCalledTimes(2)
+    })
+
+    it('merges common rows when includeCommon is true', async () => {
+      prismaService.master.findMany.mockResolvedValue([])
+      await list({ includeCommon: true })
+      expect(countWhere().OR).toEqual([
+        { tenantCode: 'TEST_TENANT' },
+        { tenantCode: 'common', code: { notIn: [] } },
+      ])
+      expect(countWhere().tenantCode).toBeUndefined()
+    })
+
+    it('excludes codes the tenant has, including soft-deleted', async () => {
+      prismaService.master.findMany
+        .mockResolvedValueOnce([]) // deleted settings
+        .mockResolvedValueOnce([{ code: 'MASTER#S#A' }]) // own codes
+        .mockResolvedValue([])
+      await list({ includeCommon: true, settingCode: ' S ' })
+      const own = prismaService.master.findMany.mock.calls[1][0]
+      expect(own.where).toEqual({
+        tenantCode: 'TEST_TENANT',
+        masterType: 'MASTER_DATA',
+        masterTypeCode: 'S',
+      })
+      expect(own.where.isDeleted).toBeUndefined()
+      expect(countWhere().OR[1].code).toEqual({ notIn: ['MASTER#S#A'] })
+    })
+
+    it('does not query exclusions when the caller is in the common tenant', async () => {
+      mockGetUserContext.mockReturnValue({
+        ...mockUserContext,
+        tenantCode: 'COMMON',
+      })
+      prismaService.master.findMany.mockResolvedValue([])
+      await list({ includeCommon: true })
+      expect(prismaService.master.findMany).toHaveBeenCalledTimes(2)
+      expect(countWhere().tenantCode).toBe('COMMON')
+      expect(
+        prismaService.master.findMany.mock.calls[0][0].where.tenantCode,
+      ).toBe('COMMON')
+    })
+
+    it('hides rows of a setting deleted in the common tenant', async () => {
+      prismaService.master.findMany
+        .mockResolvedValueOnce([{ masterCode: 'GONE' }])
+        .mockResolvedValue([])
+      await list({ includeCommon: true })
+      expect(
+        prismaService.master.findMany.mock.calls[0][0].where.tenantCode,
+      ).toEqual({ in: ['TEST_TENANT', 'common'] })
+      expect(countWhere().masterTypeCode).toEqual({ notIn: ['GONE'] })
+    })
+  })
+
   describe('listByRds', () => {
     it('should list master data by RDS with search criteria', async () => {
       const searchDto: CustomMasterDataSearchDto = {
