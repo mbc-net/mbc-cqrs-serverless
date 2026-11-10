@@ -1,0 +1,5 @@
+export * from './master-access.interface'
+export * from './master-access.service'
+export * from './master-access-bootstrap.service'
+export * from './master-access-resolver.decorator'
+export * from './master-access-resolver.registry'

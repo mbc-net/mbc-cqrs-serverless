@@ -3,11 +3,17 @@ import {
   buildPrismaProviderAsync,
   buildPrismaProviderSync,
   DataStoreModule,
+  ExplorerService,
   QueueModule,
 } from '@mbc-cqrs-serverless/core'
 import { SequencesModule } from '@mbc-cqrs-serverless/sequence'
 import { DynamicModule, Logger, Module, Provider, Type } from '@nestjs/common'
 
+import {
+  MasterAccessBootstrapService,
+  MasterAccessResolverRegistry,
+  MasterAccessService,
+} from './access'
 import { TABLE_NAME } from './constants'
 import {
   MasterBulkController,
@@ -28,8 +34,15 @@ import { MasterDataService, MasterSettingService } from './services'
 
 @Module({
   imports: [DataStoreModule, QueueModule],
-  providers: [MasterDataService, MasterSettingService],
-  exports: [MasterDataService, MasterSettingService],
+  providers: [
+    MasterDataService,
+    MasterSettingService,
+    ExplorerService,
+    MasterAccessResolverRegistry,
+    MasterAccessBootstrapService,
+    MasterAccessService,
+  ],
+  exports: [MasterDataService, MasterSettingService, MasterAccessService],
 })
 export class MasterModule extends ConfigurableModuleClass {
   private static readonly logger = new Logger(MasterModule.name)

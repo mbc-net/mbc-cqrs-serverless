@@ -50,6 +50,18 @@ export function parseId(masterId: string): { pk: string; sk: string } {
   return { pk, sk }
 }
 
+/** Last segment for a MASTER_SETTING key (also personal ones), first segment otherwise. */
+export function getSettingCodeFromSk(sk: string): string {
+  const parts = removeSortKeyVersion(sk).split(KEY_SEPARATOR)
+  return parts[0] === SETTING_SK_PREFIX ? parts[parts.length - 1] : parts[0]
+}
+
+/** A MASTER_SETTING key with more than two segments, e.g. MASTER_SETTING#USER#u1#CODE. */
+export function isPersonalSettingSk(sk: string): boolean {
+  const parts = sk.split(KEY_SEPARATOR)
+  return parts[0] === SETTING_SK_PREFIX && parts.length > 2
+}
+
 export const genSequenceSk = (
   seqSettingCode: string,
   settingCode: string,
