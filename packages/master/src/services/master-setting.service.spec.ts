@@ -20,7 +20,10 @@ import {
   TenantSettingDto,
   UserSettingDto,
 } from '../dto'
-import { PRISMA_SERVICE } from '../master.module-definition'
+import {
+  MODULE_OPTIONS_TOKEN,
+  PRISMA_SERVICE,
+} from '../master.module-definition'
 import { TaskService } from '@mbc-cqrs-serverless/task'
 import { BadRequestException, NotFoundException } from '@nestjs/common'
 import { createMock } from '@golevelup/ts-jest'
@@ -1931,5 +1934,81 @@ describe('SettingService', () => {
         expect(result1.version).toBe(2)
       })
     })
+  })
+})
+
+describe('MasterSettingService commonTenantCode option', () => {
+  const build = async (moduleOptions?: any) => {
+    const dataService = { getItem: jest.fn(), listItemsByPk: jest.fn() }
+    const commandService = { publishAsync: jest.fn() }
+    const providers: any[] = [
+      MasterSettingService,
+      { provide: TaskService, useValue: {} },
+      { provide: PRISMA_SERVICE, useValue: {} },
+      { provide: CommandService, useValue: commandService },
+      { provide: DataService, useValue: dataService },
+      {
+        provide: DynamoDbService,
+        useValue: { getItem: jest.fn(), getTableName: jest.fn() },
+      },
+    ]
+    if (moduleOptions) {
+      providers.push({ provide: MODULE_OPTIONS_TOKEN, useValue: moduleOptions })
+    }
+    const module = await Test.createTestingModule({ providers }).compile()
+    return {
+      service: module.get(MasterSettingService),
+      dataService,
+      commandService,
+    }
+  }
+
+  it('creates common settings in the configured tenant', async () => {
+    const { service, dataService, commandService } = await build({
+      commonTenantCode: 'shared-tenant',
+    })
+    dataService.getItem.mockResolvedValue(null)
+    await service.createCommonTenantSetting(
+      { code: 'C', name: 'N', settingValue: {} } as any,
+      optionsMock,
+    )
+    expect(commandService.publishAsync).toHaveBeenCalledWith(
+      expect.objectContaining({
+        pk: 'MASTER#shared-tenant',
+        tenantCode: 'shared-tenant',
+      }),
+      optionsMock,
+    )
+  })
+
+  it('falls back to the configured tenant in getSetting', async () => {
+    const { service, dataService } = await build({
+      commonTenantCode: 'shared-tenant',
+    })
+    dataService.getItem.mockImplementation(async ({ pk }: any) =>
+      pk === 'MASTER#shared-tenant'
+        ? { id: 'shared-id', attributes: { a: 1 } }
+        : null,
+    )
+    const res = await service.getSetting({ code: 'X' }, optionsMock)
+    expect(res.id).toBe('shared-id')
+  })
+
+  it('keeps common when the option is unset', async () => {
+    process.env.COMMON_TENANT_CODES = 'other'
+    try {
+      const { service, commandService, dataService } = await build()
+      dataService.getItem.mockResolvedValue(null)
+      await service.createCommonTenantSetting(
+        { code: 'C', name: 'N', settingValue: {} } as any,
+        optionsMock,
+      )
+      expect(commandService.publishAsync).toHaveBeenCalledWith(
+        expect.objectContaining({ pk: 'MASTER#common', tenantCode: 'common' }),
+        optionsMock,
+      )
+    } finally {
+      delete process.env.COMMON_TENANT_CODES
+    }
   })
 })

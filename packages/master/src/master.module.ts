@@ -99,6 +99,7 @@ export class MasterModule extends ConfigurableModuleClass {
         return {
           ...resolved,
           enableController: options.enableController,
+          commonTenantCode: options.commonTenantCode,
           dataSyncHandlers: options.dataSyncHandlers,
           tableName: options.tableName ?? TABLE_NAME,
         }

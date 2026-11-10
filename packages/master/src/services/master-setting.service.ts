@@ -22,6 +22,7 @@ import {
   Injectable,
   Logger,
   NotFoundException,
+  Optional,
 } from '@nestjs/common'
 
 import {
@@ -51,11 +52,23 @@ import { SettingTypeEnum } from '../enums'
 import { generateMasterPk, generateMasterSettingSk, parseId } from '../helpers'
 import { getOrderBys } from '../helpers/rds'
 import { IMasterSettingService } from '../interfaces'
-import { PRISMA_SERVICE } from '../master.module-definition'
+import {
+  MasterModuleOptions,
+  MODULE_OPTIONS_TOKEN,
+  PRISMA_SERVICE,
+} from '../master.module-definition'
 @Injectable()
 export class MasterSettingService implements IMasterSettingService {
   private readonly logger = new Logger(MasterSettingService.name)
   private tenantTableName: string
+
+  @Optional()
+  @Inject(MODULE_OPTIONS_TOKEN)
+  private readonly moduleOptions?: MasterModuleOptions
+
+  private get commonTenantCode(): string {
+    return this.moduleOptions?.commonTenantCode ?? SettingTypeEnum.TENANT_COMMON
+  }
 
   constructor(
     @Inject(PRISMA_SERVICE)
@@ -178,7 +191,7 @@ export class MasterSettingService implements IMasterSettingService {
     }
 
     setting = await this.fetchSetting(
-      `${SETTING_TENANT_PREFIX}${KEY_SEPARATOR}${SettingTypeEnum.TENANT_COMMON}`,
+      `${SETTING_TENANT_PREFIX}${KEY_SEPARATOR}${this.commonTenantCode}`,
       `${SETTING_SK_PREFIX}${KEY_SEPARATOR}`,
       code,
     )
@@ -199,7 +212,7 @@ export class MasterSettingService implements IMasterSettingService {
   ): Promise<CommandModel> {
     const { name, settingValue, code } = dto
 
-    const pk = generateMasterPk(SettingTypeEnum.TENANT_COMMON)
+    const pk = generateMasterPk(this.commonTenantCode)
     const sk = generateMasterSettingSk(code)
     const setting = await this.dataService.getItem({ pk, sk })
     if (setting && setting.isDeleted === false) {
@@ -211,7 +224,7 @@ export class MasterSettingService implements IMasterSettingService {
       code: code,
       name: name,
       id: generateId(pk, sk),
-      tenantCode: SettingTypeEnum.TENANT_COMMON,
+      tenantCode: this.commonTenantCode,
       type: MASTER_PK_PREFIX,
       version: setting?.version ?? VERSION_FIRST,
       isDeleted: false,

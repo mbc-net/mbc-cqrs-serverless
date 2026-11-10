@@ -12,7 +12,10 @@ import {
   DataListEntity,
   DataEntity,
 } from '@mbc-cqrs-serverless/core'
-import { PRISMA_SERVICE } from '../master.module-definition'
+import {
+  MODULE_OPTIONS_TOKEN,
+  PRISMA_SERVICE,
+} from '../master.module-definition'
 import {
   CreateMasterDataDto,
   CustomMasterDataSearchDto,
@@ -2020,5 +2023,49 @@ describe('MasterDataService', () => {
         expect(result1.version).toBe(2)
       })
     })
+  })
+})
+
+describe('MasterDataService commonTenantCode option', () => {
+  const build = async (moduleOptions?: any) => {
+    const dataService = createMock<DataService>()
+    const providers: any[] = [
+      MasterDataService,
+      { provide: PRISMA_SERVICE, useValue: {} },
+      { provide: CommandService, useValue: createMock<CommandService>() },
+      { provide: DataService, useValue: dataService },
+    ]
+    if (moduleOptions) {
+      providers.push({ provide: MODULE_OPTIONS_TOKEN, useValue: moduleOptions })
+    }
+    const module = await Test.createTestingModule({ providers }).compile()
+    return { service: module.get(MasterDataService), dataService }
+  }
+
+  it('lists from the configured common tenant', async () => {
+    const { service, dataService } = await build({
+      commonTenantCode: 'shared-tenant',
+    })
+    dataService.listItemsByPk.mockResolvedValue({ items: [] } as any)
+    await service.list({ settingCode: 'X' } as any)
+    expect(dataService.listItemsByPk).toHaveBeenCalledWith(
+      'MASTER#shared-tenant',
+      expect.anything(),
+    )
+  })
+
+  it('keeps common when the option is unset', async () => {
+    process.env.COMMON_TENANT_CODES = 'other'
+    try {
+      const { service, dataService } = await build()
+      dataService.listItemsByPk.mockResolvedValue({ items: [] } as any)
+      await service.list({ settingCode: 'X' } as any)
+      expect(dataService.listItemsByPk).toHaveBeenCalledWith(
+        'MASTER#common',
+        expect.anything(),
+      )
+    } finally {
+      delete process.env.COMMON_TENANT_CODES
+    }
   })
 })

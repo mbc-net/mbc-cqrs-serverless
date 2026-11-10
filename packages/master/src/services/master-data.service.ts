@@ -15,6 +15,7 @@ import {
   Injectable,
   Logger,
   NotFoundException,
+  Optional,
 } from '@nestjs/common'
 import { ulid } from 'ulid'
 
@@ -35,14 +36,27 @@ import {
 } from '../dto'
 import { MasterDataCreateBulkDto } from '../dto/master-copy/master-data-create-bulk.dto'
 import { MasterDataEntity, MasterDataListEntity } from '../entities'
+import { SettingTypeEnum } from '../enums'
 import { generateMasterDataSk, generateMasterPk } from '../helpers'
 import { getOrderBys } from '../helpers/rds'
 import { IMasterDataService } from '../interfaces'
-import { PRISMA_SERVICE } from '../master.module-definition'
+import {
+  MasterModuleOptions,
+  MODULE_OPTIONS_TOKEN,
+  PRISMA_SERVICE,
+} from '../master.module-definition'
 
 @Injectable()
 export class MasterDataService implements IMasterDataService {
   private readonly logger = new Logger(MasterDataService.name)
+
+  @Optional()
+  @Inject(MODULE_OPTIONS_TOKEN)
+  private readonly moduleOptions?: MasterModuleOptions
+
+  private get commonTenantCode(): string {
+    return this.moduleOptions?.commonTenantCode ?? SettingTypeEnum.TENANT_COMMON
+  }
 
   constructor(
     @Inject(PRISMA_SERVICE)
@@ -145,7 +159,7 @@ export class MasterDataService implements IMasterDataService {
     if (tenantCode) {
       pk = generateMasterPk(tenantCode)
     } else {
-      pk = generateMasterPk('common')
+      pk = generateMasterPk(this.commonTenantCode)
     }
     const query = { sk: undefined }
 

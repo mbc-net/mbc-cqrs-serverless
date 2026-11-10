@@ -9,6 +9,8 @@ export interface MasterModuleOptions {
   prismaService?: Type<any>
   /** DynamoDB base table name. Default: 'master'. */
   tableName?: string
+  /** Tenant code that holds the shared (common) master data. Default: 'common'. */
+  commonTenantCode?: string
 }
 
 export interface MasterModuleAsyncOptions
@@ -16,6 +18,7 @@ export interface MasterModuleAsyncOptions
   enableController?: boolean
   dataSyncHandlers?: Type<IDataSyncHandler>[]
   tableName?: string
+  commonTenantCode?: string
   inject?: any[]
   /**
    * Resolves the runtime module options. Must return the resolved PrismaService
