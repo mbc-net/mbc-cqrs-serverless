@@ -33,7 +33,7 @@ import { MasterAccessResolverRegistry } from './master-access-resolver.registry'
 @Injectable()
 export class MasterAccessService {
   private readonly grantCache = new WeakMap<
-    IInvoke,
+    object,
     Promise<MasterAccessGrant[]>
   >()
 
@@ -142,7 +142,7 @@ export class MasterAccessService {
     tenantCode: string,
     settingCode: string,
   ): Promise<CommandModel | null> {
-    const common = this.commonTenantCodes()[0]
+    const common = this.moduleOptions?.commonTenantCode ?? 'common'
     const tenants = [tenantCode]
     if (common.toLowerCase() !== tenantCode.toLowerCase()) {
       tenants.push(common)
@@ -170,6 +170,18 @@ export class MasterAccessService {
       this.deny()
     }
     const anonymous = !getUserContext(invokeContext).userId
+    // Without a custom:tenant claim the tenant comes from x-tenant-code, which
+    // RolesGuard may not have validated; accept it like RolesGuard.canOverrideTenant.
+    if (
+      !anonymous &&
+      !getAuthorizerClaims(invokeContext)['custom:tenant'] &&
+      !this.commonTenantCodes().includes(
+        getUserContext(invokeContext).tenantCode?.toLowerCase(),
+      ) &&
+      !this.isCrossTenant(invokeContext)
+    ) {
+      this.deny()
+    }
     if (
       !this.tenantAllowed(tenantCode, this.callerTenant(options), action) &&
       (anonymous || !this.isCrossTenant(invokeContext))
@@ -212,10 +224,12 @@ export class MasterAccessService {
     invokeContext: IInvoke,
     anonymousTenant: string | undefined,
   ): Promise<MasterAccessGrant[]> {
-    let pending = this.grantCache.get(invokeContext)
+    // On Lambda one invoke object is reused across invocations; its event is per request.
+    const key: object = invokeContext.event ?? invokeContext
+    let pending = this.grantCache.get(key)
     if (!pending) {
       pending = this.resolve(invokeContext, anonymousTenant)
-      this.grantCache.set(invokeContext, pending)
+      this.grantCache.set(key, pending)
     }
     return pending
   }

@@ -11,6 +11,7 @@ const ctx = (
     sub?: string
     tenant?: string
     role?: string
+    noClaim?: boolean
     groups?: string[]
   } = {},
 ): IInvoke => {
@@ -23,7 +24,7 @@ const ctx = (
           jwt: {
             claims: {
               ...(sub ? { sub } : {}),
-              'custom:tenant': tenant,
+              ...(opts.noClaim ? {} : { 'custom:tenant': tenant }),
               'custom:roles': JSON.stringify([{ tenant, role }]),
               'custom:groups': JSON.stringify([{ tenant, groups }]),
             },
@@ -185,6 +186,48 @@ describe('MasterAccessService', () => {
       ).rejects.toBeInstanceOf(ForbiddenException)
     })
 
+    it('denies an anonymous read of a common target with no scope.tenantCode', async () => {
+      const { service, resolveGrants } = build([grant('*', '*', true)])
+      await expect(
+        read(service, target('common'), { invokeContext: ctx({ sub: '' }) }),
+      ).rejects.toBeInstanceOf(ForbiddenException)
+      expect(resolveGrants).not.toHaveBeenCalled()
+    })
+
+    it('denies a header-named tenant with no custom:tenant claim', async () => {
+      const { service } = build([grant('*', '*', true, true)])
+      await expect(
+        read(service, target('ta'), { invokeContext: ctx({ noClaim: true }) }),
+      ).rejects.toBeInstanceOf(ForbiddenException)
+    })
+
+    it('lets a common header tenant with no claim reach the grants check', async () => {
+      const ok = build([grant('shared', 'S1', true)])
+      const invokeContext = ctx({ noClaim: true, tenant: 'common' })
+      await expect(
+        read(ok.service, target('common'), { invokeContext }),
+      ).resolves.toBeUndefined()
+      const none = build([])
+      await expect(
+        read(none.service, target('common'), { invokeContext }),
+      ).rejects.toBeInstanceOf(ForbiddenException)
+      expect(none.resolveGrants).toHaveBeenCalledTimes(1)
+    })
+
+    it('lets a cross-tenant role with no claim pass the gate', async () => {
+      const { service } = build([grant('*', '*', true, true)])
+      await expect(
+        write(service, target('ta'), {
+          invokeContext: ctx({ noClaim: true, role: 'system_admin' }),
+        }),
+      ).resolves.toBeUndefined()
+    })
+
+    it('is unaffected by the header rule when the claim is present', async () => {
+      const { service } = build([grant('*', '*', true)])
+      await expect(read(service, target('ta'))).resolves.toBeUndefined()
+    })
+
     it('denies an anonymous caller with no scope.tenantCode', async () => {
       const { service } = build([grant('*', '*', true, true)])
       await expect(
@@ -274,6 +317,24 @@ describe('MasterAccessService', () => {
       expect(resolveGrants).toHaveBeenCalledTimes(1)
     })
 
+    it('resolves again when the event of a reused invoke object changes', async () => {
+      const { service, resolveGrants } = build()
+      resolveGrants.mockReset()
+      ;(service as any).registry.set({ resolveGrants })
+      resolveGrants
+        .mockResolvedValueOnce([grant('s1', 'S1', true)])
+        .mockResolvedValueOnce([grant('s2', 'S1', true)])
+      const invokeContext = ctx({ sub: 'u1' })
+      expect(
+        (await service.getAccess({ invokeContext })).grants[0].systemId,
+      ).toBe('s1')
+      invokeContext.event = ctx({ sub: 'u2' }).event
+      expect(
+        (await service.getAccess({ invokeContext })).grants[0].systemId,
+      ).toBe('s2')
+      expect(resolveGrants).toHaveBeenCalledTimes(2)
+    })
+
     it('passes direct and group-derived roles to the resolver', async () => {
       const { service, resolveGrants } = build(
         [grant('*', '*', true)],
@@ -348,6 +409,16 @@ describe('MasterAccessService', () => {
       expect(await service.getEffectiveSetting('ta', 'S1')).toBe(common)
       commandService.getLatestItem.mockResolvedValue(null)
       expect(await service.getEffectiveSetting('ta', 'S1')).toBeNull()
+    })
+
+    it('uses the configured common tenant code as written', async () => {
+      const { service, commandService } = build([], undefined, 'Hub')
+      commandService.getLatestItem.mockResolvedValue(null)
+      await service.getEffectiveSetting('ta', 'S1')
+      expect(commandService.getLatestItem).toHaveBeenLastCalledWith({
+        pk: 'MASTER#Hub',
+        sk: 'MASTER_SETTING#S1',
+      })
     })
 
     it('does not look up the common tenant twice', async () => {
