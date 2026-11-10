@@ -99,6 +99,14 @@ describe('MasterControllerGuard', () => {
     expect(await guard.canActivate(buildContext('PATCH'))).toBe(false)
   })
 
+  it('treats an empty write list as system_admin only', async () => {
+    const guard = buildGuard({ write: [] })
+    mockJwtDecode.mockReturnValue(claims([{ role: 'user' }]))
+    expect(await guard.canActivate(buildContext('POST'))).toBe(false)
+    mockJwtDecode.mockReturnValue(claims([{ role: 'system_admin' }]))
+    expect(await guard.canActivate(buildContext('POST'))).toBe(true)
+  })
+
   it('enforces a configured read role', async () => {
     mockJwtDecode.mockReturnValue(claims([{ role: 'user' }]))
     const guard = buildGuard({ read: ['viewer'] })

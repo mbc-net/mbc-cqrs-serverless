@@ -46,7 +46,9 @@ export class MasterControllerGuard extends RolesGuard {
     const { read, write } = this.options?.controllerAuth ?? {}
     const requiredRoles = this.isRead(context)
       ? (read ?? [])
-      : (write ?? [ROLE_SYSTEM_ADMIN])
+      : write?.length
+        ? write
+        : [ROLE_SYSTEM_ADMIN]
     if (!requiredRoles.length) {
       return true
     }
