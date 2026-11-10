@@ -98,7 +98,7 @@ export class MasterControllerGuard extends RolesGuard {
       named.push({ tenant: query.tenantCode, read })
     }
     if (body?.masterSettingId !== undefined) {
-      named.push({ tenant: body.masterSettingId, read: true })
+      named.push({ tenant: segment(body.masterSettingId), read: true })
     }
     if (body?.targetTenants !== undefined) {
       if (!Array.isArray(body.targetTenants)) {

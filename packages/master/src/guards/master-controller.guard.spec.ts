@@ -166,6 +166,12 @@ describe('MasterControllerGuard', () => {
       ).rejects.toThrow(BadRequestException)
     })
 
+    it('allows an own-tenant id param with several segments', async () => {
+      as('ta')
+      const c = ctx('PUT', { params: { id: 'MASTER#ta#MASTER_SETTING#X' } })
+      expect(await buildGuard({ write: ['editor'] }).canActivate(c)).toBe(true)
+    })
+
     it('rejects a malformed pk or id param', async () => {
       as('ta')
       await expect(
@@ -271,11 +277,13 @@ describe('MasterControllerGuard', () => {
     it('checks masterSettingId as a read and targetTenants as writes', async () => {
       as('ta')
       const guard = buildGuard({ write: ['editor'] })
-      expect(
-        await guard.canActivate(
-          ctx('POST', { body: { masterSettingId: 'common' } }),
-        ),
-      ).toBe(true)
+      const copy = (masterSettingId: string) =>
+        guard.canActivate(ctx('POST', { body: { masterSettingId } }))
+      expect(await copy('MASTER#ta#MASTER_SETTING#X')).toBe(true)
+      expect(await copy('MASTER#common#MASTER_SETTING#X')).toBe(true)
+      await expect(copy('MASTER#tb#MASTER_SETTING#X')).rejects.toThrow(
+        BadRequestException,
+      )
       await expect(
         guard.canActivate(ctx('POST', { body: { targetTenants: ['tb'] } })),
       ).rejects.toThrow(BadRequestException)
