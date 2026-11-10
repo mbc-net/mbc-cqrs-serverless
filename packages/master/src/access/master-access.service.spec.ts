@@ -663,3 +663,106 @@ describe('prepareDataOwner', () => {
     ).toBe('A')
   })
 })
+
+describe('buildListFilter', () => {
+  const opts = (extra: object = {}) => ({ invokeContext: ctx(), ...extra })
+
+  it('returns undefined with no resolver', async () => {
+    const { service } = build()
+    expect(await service.buildListFilter('data', opts())).toBeUndefined()
+  })
+
+  it('returns undefined for internal callers', async () => {
+    const { service } = build([grant('app-a', '*', true)])
+    expect(
+      await service.buildListFilter('data', opts({ skipAccessCheck: true })),
+    ).toBeUndefined()
+  })
+
+  it('returns undefined for a * and * grant', async () => {
+    const { service } = build([grant('*', '*', true)])
+    expect(await service.buildListFilter('data', opts())).toBeUndefined()
+  })
+
+  it('builds one condition per grant', async () => {
+    const { service } = build([
+      grant('app-a', '*', true),
+      grant('shared', 'PREFECTURE', true),
+    ])
+    expect(await service.buildListFilter('data', opts())).toEqual({
+      OR: [
+        { systemId: 'app-a' },
+        {
+          OR: [{ systemId: 'shared' }, { systemId: null }],
+          masterTypeCode: 'PREFECTURE',
+        },
+      ],
+    })
+  })
+
+  it('returns a single condition as it is', async () => {
+    const { service } = build([grant('app-a', 'S1', true)])
+    expect(await service.buildListFilter('data', opts())).toEqual({
+      systemId: 'app-a',
+      masterTypeCode: 'S1',
+    })
+  })
+
+  it('uses masterCode for settings', async () => {
+    const { service } = build([grant('app-a', 'S1', true)])
+    expect(await service.buildListFilter('setting', opts())).toEqual({
+      systemId: 'app-a',
+      masterCode: 'S1',
+    })
+  })
+
+  it('counts only grants with read or write', async () => {
+    const { service } = build([
+      grant('a', '*', false),
+      grant('b', '*', false, true),
+    ])
+    expect(await service.buildListFilter('data', opts())).toEqual({
+      systemId: 'b',
+    })
+  })
+
+  it('returns an empty match with no grants', async () => {
+    const { service } = build([])
+    expect(await service.buildListFilter('data', opts())).toEqual({
+      id: { in: [] },
+    })
+  })
+
+  it('narrows a * grant to the search systemId', async () => {
+    const { service } = build([grant('*', '*', true)])
+    expect(await service.buildListFilter('data', opts(), 'app-a')).toEqual({
+      systemId: 'app-a',
+    })
+  })
+
+  it('treats a blank search systemId as absent', async () => {
+    const { service } = build([grant('*', '*', true)])
+    expect(await service.buildListFilter('data', opts(), '  ')).toBeUndefined()
+  })
+
+  it('ignores a search systemId the user has no grant for', async () => {
+    const { service } = build([grant('app-a', '*', true)])
+    expect(await service.buildListFilter('data', opts(), 'other')).toEqual({
+      id: { in: [] },
+    })
+  })
+
+  it('intersects scope.systemId with the search value', async () => {
+    const { service } = build([grant('*', '*', true)])
+    const scoped = opts({ scope: { systemId: 'app-a' } })
+    expect(await service.buildListFilter('data', scoped, 'app-a')).toEqual({
+      systemId: 'app-a',
+    })
+    expect(await service.buildListFilter('data', scoped, 'other')).toEqual({
+      id: { in: [] },
+    })
+    expect(await service.buildListFilter('data', scoped)).toEqual({
+      systemId: 'app-a',
+    })
+  })
+})

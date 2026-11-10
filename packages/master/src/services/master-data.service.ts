@@ -1,5 +1,6 @@
 import {
   CommandService,
+  DataModel,
   DataService,
   DetailDto,
   generateId,
@@ -19,7 +20,10 @@ import {
 } from '@nestjs/common'
 import { ulid } from 'ulid'
 
-import { MasterWriteOptions } from '../access/master-access.interface'
+import {
+  MasterAccessOptions,
+  MasterWriteOptions,
+} from '../access/master-access.interface'
 import { MasterAccessService } from '../access/master-access.service'
 import {
   DATA_SK_PREFIX,
@@ -43,6 +47,7 @@ import {
   generateMasterDataSk,
   generateMasterPk,
   getSettingCodeFromSk,
+  getSystemId,
   stripSystemAttribute,
   toPublicRow,
   withSystemAttribute,
@@ -86,11 +91,17 @@ export class MasterDataService implements IMasterDataService {
    */
   async listByRds(
     searchDto: CustomMasterDataSearchDto,
-    context: { invokeContext: IInvoke },
+    context: MasterWriteOptions,
   ) {
     const { invokeContext } = context
     const userContext = getUserContext(invokeContext)
-    const tenantCode = this.getTenantCode(userContext)
+    const enabled = !!this.access?.isEnabled()
+    const tenantCode = enabled
+      ? this.access.callerTenant(context)
+      : this.getTenantCode(userContext)
+    if (enabled) {
+      await this.access.assertTenant(tenantCode, 'read', context)
+    }
     const commonTenantCode = this.commonTenantCode
     const withCommon =
       !!searchDto.includeCommon &&
@@ -153,6 +164,15 @@ export class MasterDataService implements IMasterDataService {
       })
     }
 
+    const accessFilter = await this.access?.buildListFilter(
+      'data',
+      context,
+      searchDto.systemId,
+    )
+    if (accessFilter) {
+      andConditions.push(accessFilter)
+    }
+
     if (andConditions.length) {
       where.AND = andConditions
     }
@@ -179,13 +199,20 @@ export class MasterDataService implements IMasterDataService {
     })
   }
 
-  async list(searchDto: MasterDataSearchDto) {
+  async list(searchDto: MasterDataSearchDto, options?: MasterAccessOptions) {
     const { tenantCode, settingCode } = searchDto
-    let pk
-    if (tenantCode) {
-      pk = generateMasterPk(tenantCode)
-    } else {
-      pk = generateMasterPk(this.commonTenantCode)
+    const pkTenant = tenantCode || this.commonTenantCode
+    const pk = generateMasterPk(pkTenant)
+    if (this.access?.isEnabled()) {
+      const setting = await this.access.getEffectiveSetting(
+        pkTenant,
+        settingCode,
+      )
+      await this.access.assertAccess(
+        { tenantCode: pkTenant, systemId: getSystemId(setting), settingCode },
+        'read',
+        options ?? {},
+      )
     }
     const query = { sk: undefined }
 
@@ -202,8 +229,9 @@ export class MasterDataService implements IMasterDataService {
     })
   }
 
-  async get(key: DetailDto) {
+  async get(key: DetailDto, options?: MasterAccessOptions) {
     const res = await this.dataService.getItem(key)
+    await this.assertRowRead(res, options)
     return new MasterDataEntity(toPublicRow(res))
   }
 
@@ -356,7 +384,13 @@ export class MasterDataService implements IMasterDataService {
     return new MasterDataEntity(toPublicRow(item))
   }
 
-  async checkExistCode(tenantCode: string, type: string, code: string) {
+  async checkExistCode(
+    tenantCode: string,
+    type: string,
+    code: string,
+    options?: MasterAccessOptions,
+  ) {
+    await this.access?.assertTenant(tenantCode, 'read', options ?? {})
     const pk = generateMasterPk(tenantCode)
     const sk = generateMasterDataSk(type, code)
     const item = (await this.dataService.getItem({
@@ -371,10 +405,28 @@ export class MasterDataService implements IMasterDataService {
     return userContext.tenantCode
   }
 
-  async getDetail(key: DetailDto) {
+  /** Read access to a found row; a setting key works too, as the frontend loads settings here. */
+  private async assertRowRead(
+    row: DataModel | null | undefined,
+    options?: MasterAccessOptions,
+  ): Promise<void> {
+    if (!row || !this.access?.isEnabled()) return
+    await this.access.assertAccess(
+      {
+        tenantCode: row.tenantCode,
+        systemId: getSystemId(row),
+        settingCode: getSettingCodeFromSk(row.sk),
+      },
+      'read',
+      options ?? {},
+    )
+  }
+
+  async getDetail(key: DetailDto, options?: MasterAccessOptions) {
     const data = await this.dataService.getItem(key)
 
     if (!data) throw new NotFoundException('Master data not found')
+    await this.assertRowRead(data, options)
 
     return new MasterRdsEntity(toPublicRow(data))
   }

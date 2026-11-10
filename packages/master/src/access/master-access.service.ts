@@ -166,6 +166,61 @@ export class MasterAccessService {
   }
 
   /**
+   * Prisma condition limiting a list to the rows the caller may read, or undefined when nothing
+   * needs limiting. The search value and scope.systemId narrow it; both set and different match
+   * nothing.
+   */
+  async buildListFilter(
+    kind: 'setting' | 'data',
+    options: MasterAccessOptions,
+    searchSystemId?: string,
+  ): Promise<Record<string, unknown> | undefined> {
+    if (!this.isEnabled() || options.skipAccessCheck) {
+      return undefined
+    }
+    const none = { id: { in: [] } }
+    const search = searchSystemId?.trim() || undefined
+    const scoped = options.scope?.systemId || undefined
+    if (search && scoped && search.toLowerCase() !== scoped.toLowerCase()) {
+      return none
+    }
+    const narrow = scoped ?? search
+
+    const grants = await this.loadGrants(
+      options.invokeContext,
+      options.scope?.tenantCode,
+    )
+    const codeKey = kind === 'setting' ? 'masterCode' : 'masterTypeCode'
+    const conditions: Record<string, unknown>[] = []
+    for (const g of grants) {
+      if (!(g.read || g.write)) continue
+      if (
+        narrow &&
+        g.systemId !== '*' &&
+        g.systemId.toLowerCase() !== narrow.toLowerCase()
+      ) {
+        continue
+      }
+      const system = narrow ?? g.systemId
+      const condition: Record<string, unknown> = {}
+      if (system.toLowerCase() === MASTER_SYSTEM_SHARED) {
+        condition.OR = [{ systemId: MASTER_SYSTEM_SHARED }, { systemId: null }]
+      } else if (system !== '*') {
+        condition.systemId = system
+      }
+      if (g.settingCode !== '*') {
+        condition[codeKey] = g.settingCode
+      }
+      if (!Object.keys(condition).length) {
+        return undefined
+      }
+      conditions.push(condition)
+    }
+    if (!conditions.length) return none
+    return conditions.length === 1 ? conditions[0] : { OR: conditions }
+  }
+
+  /**
    * Work out the owner to store on a setting write and assert write access to it.
    * Returns undefined when access control is disabled.
    */

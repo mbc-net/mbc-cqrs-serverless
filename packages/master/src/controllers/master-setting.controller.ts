@@ -50,7 +50,9 @@ export class MasterSettingController {
     @Query() searchDto: MasterSettingSearchDto,
     @INVOKE_CONTEXT() invokeContext: IInvoke,
   ) {
-    return this.masterSettingService.list(searchDto, invokeContext)
+    return this.masterSettingService.list(searchDto, invokeContext, {
+      invokeContext,
+    })
   }
 
   @Get('/:code')
@@ -120,8 +122,11 @@ export class MasterSettingController {
   }
 
   @Get('/detail/:id')
-  async getDetailById(@DetailKeys() key: DetailDto) {
-    return this.masterSettingService.getDetail(key)
+  async getDetailById(
+    @DetailKeys() key: DetailDto,
+    @INVOKE_CONTEXT() invokeContext: IInvoke,
+  ) {
+    return this.masterSettingService.getDetail(key, { invokeContext })
   }
 
   @Post('/')
@@ -183,7 +188,9 @@ export class MasterSettingController {
     @Param('code') code: string,
     @INVOKE_CONTEXT() invokeContext: IInvoke,
   ) {
-    return this.masterSettingService.checkExistCode(code, invokeContext)
+    return this.masterSettingService.checkExistCode(code, invokeContext, {
+      invokeContext,
+    })
   }
 
   @Post('/copy')

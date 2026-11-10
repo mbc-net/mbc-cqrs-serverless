@@ -2529,3 +2529,201 @@ describe('MasterDataService ownership and access', () => {
     expect(commandService.publishAsync).not.toHaveBeenCalled()
   })
 })
+
+describe('MasterDataService read access', () => {
+  const invoke = {
+    context: { awsRequestId: 'r' },
+    event: {
+      requestContext: {
+        authorizer: {
+          jwt: {
+            claims: {
+              sub: 'u1',
+              'custom:tenant': 'ta',
+              'custom:roles': JSON.stringify([{ tenant: 'ta', role: 'user' }]),
+            },
+          },
+        },
+      },
+    },
+  } as any
+  const opts = { invokeContext: invoke }
+  const appA = [
+    { systemId: 'app-a', settingCode: '*', read: true, write: false },
+  ]
+  const all = [{ systemId: '*', settingCode: '*', read: true, write: true }]
+  const build = async (grants?: any[], user: any = { userId: 'u1' }) => {
+    ;(getUserContext as jest.Mock).mockReturnValue({
+      tenantCode: 'ta',
+      tenantRole: 'user',
+      tenantRoles: ['user'],
+      tenantGroupIds: [],
+      ...user,
+    })
+    const dataService = createMock<DataService>()
+    const commandService = createMock<CommandService>()
+    commandService.getLatestItem.mockResolvedValue({
+      attributes: { __systemId: 'app-a' },
+    } as any)
+    const prisma = {
+      master: {
+        findMany: jest.fn().mockResolvedValue([]),
+        count: jest.fn().mockResolvedValue(0),
+      },
+    }
+    const registry = new MasterAccessResolverRegistry()
+    if (grants) registry.set({ resolveGrants: async () => grants })
+    const access = new MasterAccessService(registry, commandService as any)
+    const module = await Test.createTestingModule({
+      providers: [
+        MasterDataService,
+        { provide: PRISMA_SERVICE, useValue: prisma },
+        { provide: CommandService, useValue: commandService },
+        { provide: DataService, useValue: dataService },
+        { provide: MasterAccessService, useValue: access },
+      ],
+    }).compile()
+    return {
+      service: module.get(MasterDataService),
+      dataService,
+      commandService,
+      prisma,
+    }
+  }
+  const countWhere = (prisma: any) => prisma.master.count.mock.calls[0][0].where
+
+  it('adds the filter to listByRds so total is filtered', async () => {
+    const { service, prisma } = await build(appA)
+    await service.listByRds({ pageSize: 10, page: 1 } as any, opts)
+    expect(countWhere(prisma).AND).toEqual([{ systemId: 'app-a' }])
+    expect(prisma.master.findMany.mock.calls.at(-1)[0].where.AND).toEqual([
+      { systemId: 'app-a' },
+    ])
+  })
+
+  it('narrows listByRds to the search systemId', async () => {
+    const { service, prisma } = await build(all)
+    await service.listByRds(
+      { pageSize: 10, page: 1, systemId: 'app-a' } as any,
+      opts,
+    )
+    expect(countWhere(prisma).AND).toEqual([{ systemId: 'app-a' }])
+  })
+
+  it('does not reference systemId in where without a resolver', async () => {
+    const { service, prisma } = await build()
+    await service.listByRds(
+      { pageSize: 10, page: 1, systemId: 'app-a' } as any,
+      opts,
+    )
+    expect(JSON.stringify(countWhere(prisma))).not.toContain('systemId')
+  })
+
+  it('still applies grants with includeCommon', async () => {
+    const { service, prisma } = await build(appA)
+    await service.listByRds(
+      { pageSize: 10, page: 1, includeCommon: true } as any,
+      opts,
+    )
+    const where = countWhere(prisma)
+    expect(where.OR).toBeDefined()
+    expect(where.AND).toEqual([{ systemId: 'app-a' }])
+  })
+
+  it('rejects listByRds for another tenant header', async () => {
+    const { service } = await build(all, { userId: undefined })
+    await expect(
+      service.listByRds({ pageSize: 10, page: 1 } as any, opts),
+    ).rejects.toThrow(ForbiddenException)
+  })
+
+  it('uses scope.tenantCode for an anonymous list', async () => {
+    const { service, prisma } = await build(appA, { userId: undefined })
+    await service.listByRds({ pageSize: 10, page: 1 } as any, {
+      invokeContext: invoke,
+      scope: { tenantCode: 'tz' },
+    })
+    expect(countWhere(prisma).tenantCode).toBe('tz')
+  })
+
+  it('checks list against the setting owner', async () => {
+    const { service, dataService, commandService } = await build(appA)
+    dataService.listItemsByPk.mockResolvedValue({ items: [] } as any)
+    const search = { tenantCode: 'ta', settingCode: 'S1' } as any
+    await expect(service.list(search, opts)).resolves.toBeDefined()
+    commandService.getLatestItem.mockResolvedValue({
+      attributes: { __systemId: 'other' },
+    } as any)
+    await expect(service.list(search, opts)).rejects.toThrow(ForbiddenException)
+  })
+
+  it('denies get for a system with no grant', async () => {
+    const { service, dataService } = await build(appA)
+    dataService.getItem.mockResolvedValue({
+      tenantCode: 'ta',
+      sk: 'S1#C1',
+      attributes: { __systemId: 'other' },
+    } as any)
+    await expect(
+      service.get({ pk: 'MASTER#ta', sk: 'S1#C1' }, opts),
+    ).rejects.toThrow(ForbiddenException)
+  })
+
+  it('returns a granted row from get', async () => {
+    const { service, dataService } = await build(appA)
+    dataService.getItem.mockResolvedValue({
+      tenantCode: 'ta',
+      sk: 'S1#C1',
+      attributes: { __systemId: 'app-a' },
+    } as any)
+    expect(
+      await service.get({ pk: 'MASTER#ta', sk: 'S1#C1' }, opts),
+    ).toMatchObject({ systemId: 'app-a' })
+  })
+
+  it('does not check get when the row is missing', async () => {
+    const { service, dataService } = await build(appA)
+    dataService.getItem.mockResolvedValue(null as any)
+    await expect(
+      service.get({ pk: 'MASTER#ta', sk: 'S1#C1' }, opts),
+    ).resolves.toBeDefined()
+  })
+
+  it('handles a setting key on getDetail', async () => {
+    const { service, dataService } = await build([
+      { systemId: 'app-a', settingCode: 'S1', read: true, write: false },
+    ])
+    dataService.getItem.mockResolvedValue({
+      tenantCode: 'ta',
+      sk: 'MASTER_SETTING#S1',
+      attributes: { __systemId: 'app-a' },
+    } as any)
+    await expect(
+      service.getDetail({ pk: 'MASTER#ta', sk: 'MASTER_SETTING#S1' }, opts),
+    ).resolves.toBeDefined()
+    dataService.getItem.mockResolvedValue({
+      tenantCode: 'ta',
+      sk: 'MASTER_SETTING#S2',
+      attributes: { __systemId: 'app-a' },
+    } as any)
+    await expect(
+      service.getDetail({ pk: 'MASTER#ta', sk: 'MASTER_SETTING#S2' }, opts),
+    ).rejects.toThrow(ForbiddenException)
+  })
+
+  it('reports an existing code owned by another system', async () => {
+    const { service, dataService } = await build(appA)
+    dataService.getItem.mockResolvedValue({
+      isDeleted: false,
+      attributes: { __systemId: 'other' },
+    } as any)
+    expect(await service.checkExistCode('ta', 'S1', 'C1', opts)).toBe(true)
+  })
+
+  it('rejects checkExistCode for another tenant', async () => {
+    const { service } = await build(appA)
+    await expect(
+      service.checkExistCode('tb', 'S1', 'C1', opts),
+    ).rejects.toThrow(ForbiddenException)
+  })
+})

@@ -26,7 +26,10 @@ import {
   Optional,
 } from '@nestjs/common'
 
-import { MasterWriteOptions } from '../access/master-access.interface'
+import {
+  MasterAccessOptions,
+  MasterWriteOptions,
+} from '../access/master-access.interface'
 import { MasterAccessService } from '../access/master-access.service'
 import {
   MASTER_COPY_SK_PREFIX,
@@ -154,13 +157,43 @@ export class MasterSettingService implements IMasterSettingService {
     return { searchDto, context }
   }
 
+  /** Check read access to the row getSetting resolved, then wrap it. */
+  private async toReadableSetting(
+    setting: any,
+    tenantCode: string,
+    code: string,
+    options: MasterAccessOptions,
+  ): Promise<MasterSettingEntity> {
+    if (this.access?.isEnabled()) {
+      // A personal row has no owner of its own; it follows its base setting.
+      const owner = isPersonalSettingSk(setting.sk)
+        ? getSystemId(await this.access.getEffectiveSetting(tenantCode, code))
+        : getSystemId(setting)
+      await this.access.assertAccess(
+        {
+          tenantCode: setting.tenantCode ?? tenantCode,
+          systemId: owner,
+          settingCode: code,
+        },
+        'read',
+        options,
+      )
+    }
+    return new MasterSettingEntity({
+      id: setting.id,
+      settingValue: stripSystemAttribute(setting.attributes),
+    })
+  }
+
   async getSetting(
     dto: GetSettingDto,
-    options: { invokeContext: IInvoke },
+    options: MasterWriteOptions,
   ): Promise<MasterSettingEntity> {
-    const { tenantCode, tenantRole, userId } = getUserContext(
-      options.invokeContext,
-    )
+    const userContext = getUserContext(options.invokeContext)
+    const { tenantRole, userId } = userContext
+    const tenantCode = this.access?.isEnabled()
+      ? this.access.callerTenant(options)
+      : userContext.tenantCode
     const { code } = dto
     const pk = `${SETTING_TENANT_PREFIX}${KEY_SEPARATOR}${tenantCode}`
 
@@ -172,10 +205,7 @@ export class MasterSettingService implements IMasterSettingService {
     )
 
     if (setting) {
-      return new MasterSettingEntity({
-        id: setting.id,
-        settingValue: stripSystemAttribute(setting.attributes),
-      })
+      return this.toReadableSetting(setting, tenantCode, code, options)
     }
 
     // Fetch tenant-level group settings
@@ -198,10 +228,7 @@ export class MasterSettingService implements IMasterSettingService {
             code,
           )
           if (setting) {
-            return new MasterSettingEntity({
-              id: setting.id,
-              settingValue: stripSystemAttribute(setting.attributes),
-            })
+            return this.toReadableSetting(setting, tenantCode, code, options)
           }
         }
       }
@@ -216,10 +243,7 @@ export class MasterSettingService implements IMasterSettingService {
       code,
     )
     if (setting) {
-      return new MasterSettingEntity({
-        id: setting.id,
-        settingValue: stripSystemAttribute(setting.attributes),
-      })
+      return this.toReadableSetting(setting, tenantCode, code, options)
     }
 
     setting = await this.fetchSetting(
@@ -232,10 +256,7 @@ export class MasterSettingService implements IMasterSettingService {
       throw new BadRequestException(`Setting not found with code: ${code}`)
     }
 
-    return new MasterSettingEntity({
-      id: setting.id,
-      settingValue: stripSystemAttribute(setting.attributes),
-    })
+    return this.toReadableSetting(setting, tenantCode, code, options)
   }
 
   async createCommonTenantSetting(
@@ -422,10 +443,26 @@ export class MasterSettingService implements IMasterSettingService {
     )
   }
 
-  async getDetail(key: DetailDto) {
+  async getDetail(key: DetailDto, options?: MasterAccessOptions) {
     const data = await this.dataService.getItem(key)
 
     if (!data) throw new NotFoundException('Master setting not found')
+    if (this.access?.isEnabled()) {
+      const code = getSettingCodeFromSk(key.sk)
+      await this.access.assertAccess(
+        {
+          tenantCode: data.tenantCode,
+          systemId: isPersonalSettingSk(key.sk)
+            ? getSystemId(
+                await this.access.getEffectiveSetting(data.tenantCode, code),
+              )
+            : getSystemId(data),
+          settingCode: code,
+        },
+        'read',
+        options ?? {},
+      )
+    }
 
     return new MasterRdsEntity(toPublicRow(data))
   }
@@ -573,8 +610,16 @@ export class MasterSettingService implements IMasterSettingService {
     return this.deleteSetting(key, { invokeContext })
   }
 
-  async checkExistCode(code: string, invokeContext: IInvoke) {
+  async checkExistCode(
+    code: string,
+    invokeContext: IInvoke,
+    access?: MasterAccessOptions,
+  ) {
     const userContext = getUserContext(invokeContext)
+    await this.access?.assertTenant(userContext.tenantCode, 'read', {
+      invokeContext,
+      ...access,
+    })
 
     const item = await this.prismaService.master.findFirst({
       where: {
@@ -587,12 +632,24 @@ export class MasterSettingService implements IMasterSettingService {
     return !!item && !item.isDeleted
   }
 
-  async list(searchDto: MasterSettingSearchDto, invokeContext: IInvoke) {
+  async list(
+    searchDto: MasterSettingSearchDto,
+    invokeContext: IInvoke,
+    access?: MasterAccessOptions,
+  ) {
     const userContext = getUserContext(invokeContext)
+    const options = { invokeContext, ...access }
+    const enabled = !!this.access?.isEnabled()
+    const tenantCode = enabled
+      ? this.access.callerTenant(options)
+      : this.getUserTenantCode(userContext)
+    if (enabled) {
+      await this.access.assertTenant(tenantCode, 'read', options)
+    }
 
     const where: any = {
       ...(await buildTenantScope(this.prismaService, {
-        tenantCode: this.getUserTenantCode(userContext),
+        tenantCode,
         commonTenantCode: this.commonTenantCode,
         masterType: SETTING_SK_PREFIX,
         includeCommon: searchDto.includeCommon,
@@ -625,6 +682,15 @@ export class MasterSettingService implements IMasterSettingService {
       andConditions.push({
         masterCode: { contains: searchDto.code.trim(), mode: 'insensitive' },
       })
+    }
+
+    const accessFilter = await this.access?.buildListFilter(
+      'setting',
+      options,
+      searchDto.systemId,
+    )
+    if (accessFilter) {
+      andConditions.push(accessFilter)
     }
 
     if (andConditions.length) {

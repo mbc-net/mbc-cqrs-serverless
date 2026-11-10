@@ -43,17 +43,22 @@ export class MasterDataController {
     @INVOKE_CONTEXT() ctx: IInvoke,
     @Query() searchDto: MasterDataSearchDto,
   ) {
-    return await this.masterDataService.list(searchDto)
+    return await this.masterDataService.list(searchDto, {
+      invokeContext: ctx,
+    })
   }
 
   @Get('/detail/:id')
-  async getDetailById(@DetailKeys() key: DetailDto) {
-    return this.masterDataService.getDetail(key)
+  async getDetailById(
+    @DetailKeys() key: DetailDto,
+    @INVOKE_CONTEXT() invokeContext: IInvoke,
+  ) {
+    return this.masterDataService.getDetail(key, { invokeContext })
   }
 
   @Get('/:pk/:sk')
   async getDetail(@INVOKE_CONTEXT() ctx: IInvoke, @Param() key: DetailDto) {
-    return await this.masterDataService.get(key)
+    return await this.masterDataService.get(key, { invokeContext: ctx })
   }
 
   @Post('/')
@@ -95,6 +100,7 @@ export class MasterDataController {
       userContext.tenantCode,
       settingCode,
       code,
+      { invokeContext: ctx },
     )
   }
 

@@ -11,6 +11,10 @@ export class CustomMasterDataSearchDto extends SearchDto {
   @IsString()
   code?: string
 
+  @IsOptional()
+  @IsString()
+  systemId?: string
+
   @IsBoolean()
   @Transform(({ value }) =>
     value === 'true' ? true : value === 'false' ? false : value,

@@ -2418,3 +2418,156 @@ describe('MasterSettingService ownership', () => {
     expect(commandService.publishAsync).not.toHaveBeenCalled()
   })
 })
+
+describe('MasterSettingService read access', () => {
+  const ctx = {
+    event: {
+      headers: { 'x-tenant-code': 'ta' },
+      requestContext: {
+        authorizer: {
+          jwt: {
+            claims: {
+              sub: 'u1',
+              'custom:tenant': 'ta',
+              'custom:roles': JSON.stringify([{ tenant: 'ta', role: 'user' }]),
+            },
+          },
+        },
+      },
+    },
+  } as any
+  const opts = { invokeContext: ctx }
+  const appA = [
+    { systemId: 'app-a', settingCode: '*', read: true, write: false },
+  ]
+
+  const build = async (grants?: any[]) => {
+    const dataService = { getItem: jest.fn().mockResolvedValue(null) }
+    const commandService = {
+      getLatestItem: jest.fn().mockResolvedValue({
+        attributes: { __systemId: 'other' },
+      }),
+    }
+    const prisma = {
+      master: {
+        findMany: jest.fn().mockResolvedValue([]),
+        count: jest.fn().mockResolvedValue(0),
+        findFirst: jest.fn().mockResolvedValue({ isDeleted: false }),
+      },
+    }
+    const registry = new MasterAccessResolverRegistry()
+    if (grants) registry.set({ resolveGrants: async () => grants })
+    const access = new MasterAccessService(registry, commandService as any)
+    const module = await Test.createTestingModule({
+      providers: [
+        MasterSettingService,
+        { provide: TaskService, useValue: {} },
+        { provide: PRISMA_SERVICE, useValue: prisma },
+        { provide: CommandService, useValue: commandService },
+        { provide: DataService, useValue: dataService },
+        {
+          provide: DynamoDbService,
+          useValue: {
+            getItem: jest.fn().mockResolvedValue(null),
+            getTableName: jest.fn(),
+          },
+        },
+        { provide: MasterAccessService, useValue: access },
+      ],
+    }).compile()
+    return { service: module.get(MasterSettingService), dataService, prisma }
+  }
+  const countWhere = (prisma: any) => prisma.master.count.mock.calls[0][0].where
+  const row = (extra: object = {}) => ({
+    id: 'i',
+    tenantCode: 'ta',
+    sk: 'MASTER_SETTING#S1',
+    attributes: { v: 1, __systemId: 'app-a' },
+    ...extra,
+  })
+
+  it('adds the filter to list', async () => {
+    const { service, prisma } = await build(appA)
+    await service.list({} as any, ctx, opts)
+    expect(countWhere(prisma).AND).toEqual([{ systemId: 'app-a' }])
+  })
+
+  it('narrows list to the search systemId', async () => {
+    const { service, prisma } = await build([
+      { systemId: '*', settingCode: '*', read: true, write: false },
+    ])
+    await service.list({ systemId: 'app-a' } as any, ctx, opts)
+    expect(countWhere(prisma).AND).toEqual([{ systemId: 'app-a' }])
+  })
+
+  it('does not reference systemId in where without a resolver', async () => {
+    const { service, prisma } = await build()
+    await service.list({ systemId: 'app-a' } as any, ctx, opts)
+    expect(JSON.stringify(countWhere(prisma))).not.toContain('systemId')
+  })
+
+  it('uses masterCode for the setting list filter', async () => {
+    const { service, prisma } = await build([
+      { systemId: 'app-a', settingCode: 'S1', read: true, write: false },
+    ])
+    await service.list({} as any, ctx, opts)
+    expect(countWhere(prisma).AND).toEqual([
+      { systemId: 'app-a', masterCode: 'S1' },
+    ])
+  })
+
+  it('denies get for a system with no grant', async () => {
+    const { service, dataService } = await build(appA)
+    dataService.getItem.mockResolvedValue(
+      row({ attributes: { __systemId: 'x' } }),
+    )
+    await expect(
+      service.getDetail({ pk: 'MASTER#ta', sk: 'MASTER_SETTING#S1' }, opts),
+    ).rejects.toThrow(ForbiddenException)
+  })
+
+  it('returns a granted row from getDetail', async () => {
+    const { service, dataService } = await build(appA)
+    dataService.getItem.mockResolvedValue(row())
+    await expect(
+      service.getDetail({ pk: 'MASTER#ta', sk: 'MASTER_SETTING#S1' }, opts),
+    ).resolves.toBeDefined()
+  })
+
+  it('denies getSetting when the resolved row is not granted', async () => {
+    const { service, dataService } = await build(appA)
+    dataService.getItem.mockResolvedValue(
+      row({ attributes: { __systemId: 'x' } }),
+    )
+    await expect(
+      service.getSetting({ code: 'S1' } as any, opts),
+    ).rejects.toThrow(ForbiddenException)
+  })
+
+  it('returns getSetting for a granted row', async () => {
+    const { service, dataService } = await build(appA)
+    dataService.getItem.mockResolvedValue(row())
+    expect(await service.getSetting({ code: 'S1' } as any, opts)).toMatchObject(
+      {
+        id: 'i',
+        settingValue: { v: 1 },
+      },
+    )
+  })
+
+  it('checks a personal row against its base setting owner', async () => {
+    const { service, dataService } = await build(appA)
+    // base setting owner is "other" (getLatestItem), the personal row carries none
+    dataService.getItem.mockResolvedValue(
+      row({ sk: 'MASTER_SETTING#USER#u1#S1', attributes: { v: 1 } }),
+    )
+    await expect(
+      service.getSetting({ code: 'S1' } as any, opts),
+    ).rejects.toThrow(ForbiddenException)
+  })
+
+  it('reports an existing code owned by another system', async () => {
+    const { service } = await build(appA)
+    expect(await service.checkExistCode('S1', ctx, opts)).toBe(true)
+  })
+})
