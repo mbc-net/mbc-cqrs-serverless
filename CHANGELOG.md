@@ -11,9 +11,12 @@ See [Conventional Commits](https://conventionalcommits.org) for commit guideline
   copy now reads data from the source setting's tenant instead of a hard-coded `meltec` tenant,
   and it now copies sequences, which it never did because both keys were built from the target
   tenant. A target sequence behind the source jumps to the source's value.
-- **master:** nothing else changes for an application that sets neither `controllerAuth` nor a
-  resolver, apart from those two fixes and one removal: a `__systemId` key sent by a client in
-  `attributes` is now always removed.
+- **master:** for an application that sets neither `controllerAuth` nor a resolver, the other
+  changes are: a `__systemId` key sent by a client in `attributes` is now always removed;
+  responses go through `toPublicRow`, so a row stored earlier with a client-planted `__systemId`
+  returns it as a top-level `systemId`; `GET /api/master-access` is added when the controllers
+  are enabled; the DTOs accept `systemId` and `includeCommon`; and `POST /api/master-bulk` upserts
+  settings before data instead of both at once.
 - **master (RDS):** applications generated earlier must add a nullable `system_id` column and
   write `systemId: getSystemId(cmd)` in their own RDS handler, because `update-scheme.ts` does
   not change an existing schema or handler. Needed only when a resolver is registered.

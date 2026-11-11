@@ -15,8 +15,18 @@ opt-in parts:
    `IDataSyncHandler`.
 
 An application that sets neither `controllerAuth` nor a resolver keeps today's
-behaviour. The only differences are the two copy fixes and the removal of a
-client-sent `__systemId` (see [Behaviour changes](#behaviour-changes)).
+behaviour, apart from these differences:
+
+- The two copy fixes (see [Behaviour changes](#behaviour-changes)).
+- A `__systemId` key sent by a client in `attributes` is removed.
+- Responses go through `toPublicRow`, so a row stored earlier with a
+  client-planted `__systemId` comes back with that value as a top-level
+  `systemId` and without the key in `attributes`.
+- With `enableController`, the `GET /api/master-access` route is added.
+- The DTOs accept `systemId` (setting create and bulk items, list searches) and
+  `includeCommon` (list searches). Without a resolver `systemId` is ignored.
+- `POST /api/master-bulk` upserts the settings first and the data rows after,
+  instead of both at once.
 
 ## Terms
 
@@ -79,8 +89,10 @@ its own routes can still copy.
   explicit value is a 400.
 - A data row never accepts `systemId` from the client. It takes the value of
   its effective setting (the tenant's, then the common tenant's).
+- `systemId` is stored in lower case, so `APP-A` is stored as `app-a`. `'*'` is
+  not a valid owner and is a 400.
 - `systemId` is immutable once set, including on soft-deleted rows. A
-  differing value on upsert is a 400.
+  differing value on upsert is a 400. The comparison ignores case.
 - Group and user settings are personal overrides. They never store `systemId`,
   and access checks use the effective setting for the last key segment.
 - Ownership rules run only when a resolver is registered. Without one the
@@ -129,7 +141,8 @@ export class AppMasterAccessResolver implements IMasterAccessResolver {
 A grant has `systemId` (or `'*'`), `settingCode` (or `'*'`), `read` and
 `write`. Write implies read. The resolver returns grants, not yes or no,
 because list endpoints put the filter in the SQL query, which keeps pagination
-and `total` correct. Grants are resolved once per request event.
+and `total` correct. Grants are resolved once per request event, and for a
+caller who is not logged in, once per `scope.tenantCode` within that event.
 
 Add the class to the providers of a module that is loaded with `MasterModule`.
 
@@ -164,12 +177,21 @@ With a resolver registered, the checks run in this order:
 6. Grants must cover the record's `systemId` (or `shared`) and setting code.
 
 List endpoints build an `OR` of the grants into the Prisma `where`. `shared`
-also matches `NULL`. A search `systemId` or `scope.systemId` only narrows the
-result. No grants means an empty list. `checkExistCode` applies the tenant gate
-only, so a form can warn about a code owned by a system the user cannot see.
+also matches `NULL`. Grant values and the search value are compared in lower
+case. A search `systemId` or `scope.systemId` only narrows the result. No grants
+means an empty list. `checkExistCode` applies the tenant gate only, so a form
+can warn about a code owned by a system the user cannot see.
+
+Group and user setting rows sync to RDS with a `NULL` system id. A limited
+settings list leaves them out (`sk` starting with `MASTER_SETTING#GROUP#` or
+`MASTER_SETTING#USER#`), because their access follows the base setting. Only a
+caller whose grants need no filter, such as `*` on `*`, sees them in the list.
 
 Pass `includeCommon: true` in the search of `listByRds` or `list` to add common
-tenant rows whose code the caller's tenant does not have. It is off by default.
+tenant rows whose code the caller's tenant does not have. It is off by default
+and only adds rows. In `listByRds`, data rows of a soft-deleted setting are
+hidden per tenant: the tenant's rows by the settings deleted in the tenant, the
+common rows by the settings deleted in the common tenant.
 
 ### Master copy
 
@@ -197,8 +219,13 @@ await masterSettingService.assignSystem(
 - It requires a resolver, and write access on the target system and on
   `shared`. With no `tenantCode` it covers every tenant and needs a
   cross-tenant role.
-- It tags only rows with no stored `systemId`, settings by `masterCode` and
-  data rows by `masterTypeCode`, found through RDS. Tagged rows are untouched.
+- `systemId` is stored in lower case. `'*'` is a 400.
+- It finds candidate rows through RDS, settings by `masterCode` and data rows
+  by `masterTypeCode`, where `system_id` is `NULL`. For each one it reads the
+  latest command and skips the row when that command already has a
+  `systemId` or does not exist, so a column that is not written yet or lags
+  behind cannot overwrite an owner. It publishes with the command's version
+  and counts only the rows it publishes.
 - It is a migration tool with no built-in route. Run it before consumers
   subscribe. The Lambda timeout is a ceiling, so split the work per tenant.
 
@@ -330,8 +357,9 @@ The framework ships nothing for the receiving side.
 
 - Create an SQS queue subscribed to the topic with `rawMessageDelivery: true`,
   a DLQ and a filter such as
-  `{ "action": ["master-sync"], "systemId": ["app-a", "shared"] }`. A filter
-  change can take up to 15 minutes to apply.
+  `{ "action": ["master-sync"], "systemId": ["app-a", "shared"] }`. SNS filter
+  values are case-sensitive, and `systemId` is stored in lower case, so write
+  the values in lower case. A filter change can take up to 15 minutes to apply.
 - Delivery is at least once and unordered. Apply a message only if `version` is
   greater than the stored version.
 - Deletes are soft (`isDeleted: true`). Deleting a setting emits no messages for
