@@ -3,6 +3,39 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## Unreleased
+
+### Upgrade Notes
+
+- **master (behaviour changes):** two copy fixes change behaviour for every application. Master
+  copy now reads data from the source setting's tenant instead of a hard-coded `meltec` tenant,
+  and it now copies sequences, which it never did because both keys were built from the target
+  tenant. A target sequence behind the source jumps to the source's value.
+- **master:** nothing else changes for an application that sets neither `controllerAuth` nor a
+  resolver, apart from those two fixes and one removal: a `__systemId` key sent by a client in
+  `attributes` is now always removed.
+- **master (RDS):** applications generated earlier must add a nullable `system_id` column and
+  write `systemId: getSystemId(cmd)` in their own RDS handler, because `update-scheme.ts` does
+  not change an existing schema or handler. Needed only when a resolver is registered.
+- **master (resolver):** with a resolver registered, read methods called without `invokeContext`
+  are denied. Server-side code must pass `{ invokeContext }`, or `skipAccessCheck: true` for
+  trusted internal work. See `docs/development/master-access-and-sync.md`.
+
+### Features
+
+- **master:** opt-in `controllerAuth` guard for the built-in routes, with tenant checks.
+- **master:** `systemId` per master setting, an optional `@MasterAccessResolver()` with grants
+  per system and setting, `GET /api/master-access`, `assignSystem` for tagging existing data,
+  and `includeCommon` on the list endpoints.
+- **master:** `commonTenantCode` and `enableCopyTask` module options.
+- **master:** `system_id` RDS column and `systemId` on API responses.
+- **master (docs):** guide for access control and per-system SNS sync.
+
+### Bug Fixes
+
+- **master:** master copy reads data from the source setting's tenant (was `meltec`).
+- **master:** master copy compares and copies sequences with separate source and target keys.
+
 ## [1.7.0](https://github.com/mbc-net/mbc-cqrs-serverless/releases/tag/v1.7.0) (2026-11-09)
 
 ### Upgrade Notes
