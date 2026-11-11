@@ -16,6 +16,7 @@ import {
 } from './access'
 import { TABLE_NAME } from './constants'
 import {
+  MasterAccessController,
   MasterBulkController,
   MasterDataController,
   MasterSettingController,
@@ -94,6 +95,7 @@ export class MasterModule extends ConfigurableModuleClass {
   ): void {
     if (options.enableController) {
       controllers.push(
+        MasterAccessController,
         MasterBulkController,
         MasterDataController,
         MasterSettingController,
