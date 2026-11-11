@@ -55,7 +55,7 @@ const PERSONAL_SETTING_ROWS = [
 export class MasterAccessService {
   private readonly grantCache = new WeakMap<
     object,
-    Promise<MasterAccessGrant[]>
+    Map<string, Promise<MasterAccessGrant[]>>
   >()
 
   constructor(
@@ -409,10 +409,19 @@ export class MasterAccessService {
   ): Promise<MasterAccessGrant[]> {
     // On Lambda one invoke object is reused across invocations; its event is per request.
     const key: object = invokeContext.event ?? invokeContext
-    let pending = this.grantCache.get(key)
+    let byTenant = this.grantCache.get(key)
+    if (!byTenant) {
+      byTenant = new Map()
+      this.grantCache.set(key, byTenant)
+    }
+    // An anonymous caller's grants depend on scope.tenantCode, which can differ per call.
+    const tenant = getUserContext(invokeContext).userId
+      ? ''
+      : (anonymousTenant ?? '')
+    let pending = byTenant.get(tenant)
     if (!pending) {
       pending = this.resolve(invokeContext, anonymousTenant)
-      this.grantCache.set(key, pending)
+      byTenant.set(tenant, pending)
     }
     return pending
   }

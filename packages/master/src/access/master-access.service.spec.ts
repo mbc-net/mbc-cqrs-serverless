@@ -317,6 +317,28 @@ describe('MasterAccessService', () => {
       expect(resolveGrants).toHaveBeenCalledTimes(1)
     })
 
+    it('resolves anonymous grants once per scope.tenantCode', async () => {
+      const { service, resolveGrants } = build([grant('*', '*', true)])
+      const invokeContext = ctx({ sub: '' })
+      await read(service, target('ta'), {
+        invokeContext,
+        scope: { tenantCode: 'ta' },
+      })
+      await read(service, target('tb'), {
+        invokeContext,
+        scope: { tenantCode: 'tb' },
+      })
+      expect(resolveGrants).toHaveBeenCalledTimes(2)
+      expect(resolveGrants).toHaveBeenNthCalledWith(
+        1,
+        expect.objectContaining({ tenantCode: 'ta' }),
+      )
+      expect(resolveGrants).toHaveBeenNthCalledWith(
+        2,
+        expect.objectContaining({ tenantCode: 'tb' }),
+      )
+    })
+
     it('resolves again when the event of a reused invoke object changes', async () => {
       const { service, resolveGrants } = build()
       resolveGrants.mockReset()
