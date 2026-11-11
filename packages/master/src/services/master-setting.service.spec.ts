@@ -2708,6 +2708,15 @@ describe('MasterSettingService assignSystem', () => {
           : [{ pk: 'MASTER#ta', sk: 'MASTER_DATA#S1#a', version: 5 }],
       )
     const publish = jest.fn().mockResolvedValue({})
+    // The command table is ahead of RDS: its versions differ from the RDS rows'.
+    const getLatestItem = jest
+      .fn()
+      .mockImplementation(async ({ pk, sk }: any) => ({
+        pk,
+        sk,
+        version: sk.startsWith('MASTER_SETTING') ? 4 : 6,
+        attributes: { a: 1 },
+      }))
     const registry = new MasterAccessResolverRegistry()
     if (withResolver) registry.set({ resolveGrants: async () => rowGrants })
     const access = new MasterAccessService(registry, {} as any)
@@ -2718,14 +2727,19 @@ describe('MasterSettingService assignSystem', () => {
         { provide: PRISMA_SERVICE, useValue: { master: { findMany } } },
         {
           provide: CommandService,
-          useValue: { publishPartialUpdateAsync: publish },
+          useValue: { publishPartialUpdateAsync: publish, getLatestItem },
         },
         { provide: DataService, useValue: {} },
         { provide: DynamoDbService, useValue: { getTableName: jest.fn() } },
         { provide: MasterAccessService, useValue: access },
       ],
     }).compile()
-    return { service: module.get(MasterSettingService), findMany, publish }
+    return {
+      service: module.get(MasterSettingService),
+      findMany,
+      publish,
+      getLatestItem,
+    }
   }
 
   it('throws when no resolver is registered', async () => {
@@ -2769,6 +2783,34 @@ describe('MasterSettingService assignSystem', () => {
     expect(publish.mock.calls[0][0].attributes).toEqual({ __systemId: 'app-a' })
   })
 
+  it('skips a row whose latest command already has an owner', async () => {
+    const { service, publish, getLatestItem } = await build()
+    getLatestItem.mockImplementationOnce(async ({ pk, sk }: any) => ({
+      pk,
+      sk,
+      version: 4,
+      attributes: { __systemId: 'other' },
+    }))
+    const res = await service.assignSystem(
+      { code: 'S1', systemId: 'app-a', tenantCode: 'ta' },
+      { invokeContext: admin },
+    )
+    expect(res).toEqual({ updated: 1 })
+    expect(publish).toHaveBeenCalledTimes(1)
+    expect(publish.mock.calls[0][0].sk).toBe('MASTER_DATA#S1#a')
+  })
+
+  it('skips a row with no command', async () => {
+    const { service, publish, getLatestItem } = await build()
+    getLatestItem.mockResolvedValue(null)
+    const res = await service.assignSystem(
+      { code: 'S1', systemId: 'app-a', tenantCode: 'ta' },
+      { invokeContext: admin },
+    )
+    expect(res).toEqual({ updated: 0 })
+    expect(publish).not.toHaveBeenCalled()
+  })
+
   it('tags setting and data rows with the reserved key', async () => {
     const { service, publish } = await build()
     const opts = { invokeContext: admin }
@@ -2782,7 +2824,7 @@ describe('MasterSettingService assignSystem', () => {
       {
         pk: 'MASTER#ta',
         sk: 'MASTER_SETTING#S1',
-        version: 3,
+        version: 4,
         attributes: { __systemId: 'app-a' },
       },
       { invokeContext: admin },
@@ -2792,7 +2834,7 @@ describe('MasterSettingService assignSystem', () => {
       {
         pk: 'MASTER#ta',
         sk: 'MASTER_DATA#S1#a',
-        version: 5,
+        version: 6,
         attributes: { __systemId: 'app-a' },
       },
       { invokeContext: admin },

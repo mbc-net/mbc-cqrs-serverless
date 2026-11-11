@@ -812,11 +812,17 @@ export class MasterSettingService implements IMasterSettingService {
     let updated = 0
     // ponytail: sequential loop, ceiling is the Lambda timeout; split the work per tenantCode.
     for (const row of [...settings, ...data]) {
+      // RDS can lag the command table, or an app's RDS handler may not fill systemId yet.
+      const latest = await this.commandService.getLatestItem({
+        pk: row.pk,
+        sk: row.sk,
+      })
+      if (!latest || getSystemId(latest) !== undefined) continue
       await this.commandService.publishPartialUpdateAsync(
         {
           pk: row.pk,
           sk: row.sk,
-          version: row.version,
+          version: latest.version,
           attributes: { [MASTER_SYSTEM_ATTRIBUTE]: systemId },
         },
         { invokeContext: options.invokeContext },
