@@ -2660,3 +2660,165 @@ describe('MasterSettingService copy access', () => {
     expect(taskService.createStepFunctionTask).toHaveBeenCalled()
   })
 })
+
+describe('MasterSettingService assignSystem', () => {
+  const ctx = (roles: any[]) =>
+    ({
+      event: {
+        headers: { 'x-tenant-code': 'ta' },
+        requestContext: {
+          authorizer: {
+            jwt: {
+              claims: {
+                sub: 'u1',
+                'custom:tenant': 'ta',
+                'custom:roles': JSON.stringify(roles),
+              },
+            },
+          },
+        },
+      },
+    }) as any
+  const admin = ctx([{ tenant: 'ta', role: 'system_admin' }])
+  const userCtx = ctx([{ tenant: 'ta', role: 'user' }])
+  const grants = [{ systemId: '*', settingCode: '*', read: true, write: true }]
+
+  const build = async (withResolver = true, rowGrants: any[] = grants) => {
+    const findMany = jest
+      .fn()
+      .mockImplementation(async ({ where }: any) =>
+        where.masterType === 'MASTER_SETTING'
+          ? [{ pk: 'MASTER#ta', sk: 'MASTER_SETTING#S1', version: 3 }]
+          : [{ pk: 'MASTER#ta', sk: 'MASTER_DATA#S1#a', version: 5 }],
+      )
+    const publish = jest.fn().mockResolvedValue({})
+    const registry = new MasterAccessResolverRegistry()
+    if (withResolver) registry.set({ resolveGrants: async () => rowGrants })
+    const access = new MasterAccessService(registry, {} as any)
+    const module = await Test.createTestingModule({
+      providers: [
+        MasterSettingService,
+        { provide: TaskService, useValue: {} },
+        { provide: PRISMA_SERVICE, useValue: { master: { findMany } } },
+        {
+          provide: CommandService,
+          useValue: { publishPartialUpdateAsync: publish },
+        },
+        { provide: DataService, useValue: {} },
+        { provide: DynamoDbService, useValue: { getTableName: jest.fn() } },
+        { provide: MasterAccessService, useValue: access },
+      ],
+    }).compile()
+    return { service: module.get(MasterSettingService), findMany, publish }
+  }
+
+  it('throws when no resolver is registered', async () => {
+    const { service, findMany } = await build(false)
+    await expect(
+      service.assignSystem(
+        { code: 'S1', systemId: 'app-a', tenantCode: 'ta' },
+        { invokeContext: admin },
+      ),
+    ).rejects.toThrow(BadRequestException)
+    expect(findMany).not.toHaveBeenCalled()
+  })
+
+  it('throws on a blank systemId', async () => {
+    const { service } = await build()
+    await expect(
+      service.assignSystem(
+        { code: 'S1', systemId: ' ', tenantCode: 'ta' },
+        { invokeContext: admin },
+      ),
+    ).rejects.toThrow(BadRequestException)
+  })
+
+  it('tags setting and data rows with the reserved key', async () => {
+    const { service, publish } = await build()
+    const opts = { invokeContext: admin }
+    const res = await service.assignSystem(
+      { code: 'S1', systemId: 'app-a', tenantCode: 'ta' },
+      opts,
+    )
+    expect(res).toEqual({ updated: 2 })
+    expect(publish).toHaveBeenNthCalledWith(
+      1,
+      {
+        pk: 'MASTER#ta',
+        sk: 'MASTER_SETTING#S1',
+        version: 3,
+        attributes: { __systemId: 'app-a' },
+      },
+      { invokeContext: admin },
+    )
+    expect(publish).toHaveBeenNthCalledWith(
+      2,
+      {
+        pk: 'MASTER#ta',
+        sk: 'MASTER_DATA#S1#a',
+        version: 5,
+        attributes: { __systemId: 'app-a' },
+      },
+      { invokeContext: admin },
+    )
+  })
+
+  it('only selects untagged rows, settings and data, limited to tenantCode', async () => {
+    const { service, findMany } = await build()
+    await service.assignSystem(
+      { code: 'S1', systemId: 'app-a', tenantCode: 'ta' },
+      { invokeContext: admin },
+    )
+    expect(findMany).toHaveBeenNthCalledWith(1, {
+      where: {
+        masterType: 'MASTER_SETTING',
+        masterCode: 'S1',
+        systemId: null,
+        tenantCode: 'ta',
+      },
+    })
+    expect(findMany).toHaveBeenNthCalledWith(2, {
+      where: {
+        masterType: 'MASTER_DATA',
+        masterTypeCode: 'S1',
+        systemId: null,
+        tenantCode: 'ta',
+      },
+    })
+  })
+
+  it('does not touch group and user settings', async () => {
+    const { service, findMany } = await build()
+    await service.assignSystem(
+      { code: 'S1', systemId: 'app-a', tenantCode: 'ta' },
+      { invokeContext: admin },
+    )
+    const types = findMany.mock.calls.map((c) => c[0].where.masterType)
+    expect(types).toEqual(['MASTER_SETTING', 'MASTER_DATA'])
+  })
+
+  it('requires write on the target and on shared', async () => {
+    const { service, findMany, publish } = await build(true, [
+      { systemId: 'app-a', settingCode: '*', read: true, write: true },
+    ])
+    await expect(
+      service.assignSystem(
+        { code: 'S1', systemId: 'app-a', tenantCode: 'ta' },
+        { invokeContext: admin },
+      ),
+    ).rejects.toThrow(ForbiddenException)
+    expect(findMany).not.toHaveBeenCalled()
+    expect(publish).not.toHaveBeenCalled()
+  })
+
+  it('requires a cross-tenant role without tenantCode', async () => {
+    const { service, findMany } = await build()
+    await expect(
+      service.assignSystem(
+        { code: 'S1', systemId: 'app-a' },
+        { invokeContext: userCtx },
+      ),
+    ).rejects.toThrow(ForbiddenException)
+    expect(findMany).not.toHaveBeenCalled()
+  })
+})

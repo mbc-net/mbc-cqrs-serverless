@@ -32,6 +32,7 @@ import {
 } from '../access/master-access.interface'
 import { MasterAccessService } from '../access/master-access.service'
 import {
+  DATA_SK_PREFIX,
   MASTER_COPY_SK_PREFIX,
   MASTER_PK_PREFIX,
   SETTING_SK_PREFIX,
@@ -67,6 +68,7 @@ import {
   withSystemAttribute,
 } from '../helpers'
 import { buildTenantScope, getOrderBys } from '../helpers/rds'
+import { MASTER_SYSTEM_ATTRIBUTE } from '../helpers/system-attribute'
 import { IMasterSettingService } from '../interfaces'
 import {
   MasterModuleOptions,
@@ -761,6 +763,64 @@ export class MasterSettingService implements IMasterSettingService {
     )
 
     return taskItem
+  }
+
+  /**
+   * Give existing untagged rows of a setting code an owning system.
+   * Group and user settings are left alone; they follow their base setting.
+   */
+  async assignSystem(
+    input: { code: string; systemId: string; tenantCode?: string },
+    options: MasterWriteOptions,
+  ): Promise<{ updated: number }> {
+    const { code, tenantCode } = input
+    const systemId = input.systemId?.trim()
+    if (!systemId) {
+      throw new BadRequestException('systemId is required')
+    }
+    if (!this.access?.isEnabled()) {
+      throw new BadRequestException(
+        'assignSystem requires a master access resolver',
+      )
+    }
+    if (tenantCode) {
+      await this.access.assertTenant(tenantCode, 'write', options)
+    } else {
+      this.access.assertCrossTenant(options)
+    }
+    const checkTenant = tenantCode ?? this.access.callerTenant(options)
+    for (const owner of [systemId, 'shared']) {
+      await this.access.assertAccess(
+        { tenantCode: checkTenant, systemId: owner, settingCode: code },
+        'write',
+        options,
+      )
+    }
+
+    // Ownership survives deletion, so deleted rows are tagged too.
+    const scope = { systemId: null, ...(tenantCode ? { tenantCode } : {}) }
+    const settings = await this.prismaService.master.findMany({
+      where: { masterType: SETTING_SK_PREFIX, masterCode: code, ...scope },
+    })
+    const data = await this.prismaService.master.findMany({
+      where: { masterType: DATA_SK_PREFIX, masterTypeCode: code, ...scope },
+    })
+
+    let updated = 0
+    // ponytail: sequential loop, ceiling is the Lambda timeout; split the work per tenantCode.
+    for (const row of [...settings, ...data]) {
+      await this.commandService.publishPartialUpdateAsync(
+        {
+          pk: row.pk,
+          sk: row.sk,
+          version: row.version,
+          attributes: { [MASTER_SYSTEM_ATTRIBUTE]: systemId },
+        },
+        { invokeContext: options.invokeContext },
+      )
+      updated++
+    }
+    return { updated }
   }
 
   private getUserTenantCode(userContext: UserContext): string {
