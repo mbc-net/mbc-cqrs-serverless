@@ -25,11 +25,7 @@ import {
   MasterWriteOptions,
 } from '../access/master-access.interface'
 import { MasterAccessService } from '../access/master-access.service'
-import {
-  DATA_SK_PREFIX,
-  MASTER_PK_PREFIX,
-  SETTING_SK_PREFIX,
-} from '../constants'
+import { DATA_SK_PREFIX, MASTER_PK_PREFIX } from '../constants'
 import {
   CreateMasterDataDto,
   CustomMasterDataSearchDto,
@@ -102,42 +98,16 @@ export class MasterDataService implements IMasterDataService {
     if (enabled) {
       await this.access.assertTenant(tenantCode, 'read', context)
     }
-    const commonTenantCode = this.commonTenantCode
-    const withCommon =
-      !!searchDto.includeCommon &&
-      tenantCode?.toLowerCase() !== commonTenantCode?.toLowerCase()
-    const deletedSettingData = await this.prismaService.master.findMany({
-      where: {
-        tenantCode: withCommon
-          ? { in: [tenantCode, commonTenantCode] }
-          : tenantCode,
-        isDeleted: true,
-        masterType: SETTING_SK_PREFIX,
-      },
-      select: {
-        masterCode: true,
-      },
-    })
-
-    const deletedSettingCode = deletedSettingData.map(
-      (setting) => setting.masterCode,
-    )
-
     const where: any = {
       ...(await buildTenantScope(this.prismaService, {
         tenantCode,
-        commonTenantCode,
+        commonTenantCode: this.commonTenantCode,
         masterType: DATA_SK_PREFIX,
         masterTypeCode: searchDto.settingCode?.trim() || undefined,
         includeCommon: searchDto.includeCommon,
+        hideDeletedSettings: true,
       })),
       masterType: DATA_SK_PREFIX,
-    }
-
-    if (deletedSettingCode.length > 0) {
-      where.masterTypeCode = {
-        notIn: deletedSettingCode,
-      }
     }
 
     if (searchDto.isDeleted === false || searchDto.isDeleted === undefined) {

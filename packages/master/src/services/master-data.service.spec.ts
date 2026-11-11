@@ -162,15 +162,54 @@ describe('MasterDataService', () => {
       ).toBe('COMMON')
     })
 
-    it('hides rows of a setting deleted in the common tenant', async () => {
+    it('hides common rows, not tenant rows, of a setting deleted in common', async () => {
       prismaService.master.findMany
-        .mockResolvedValueOnce([{ masterCode: 'GONE' }])
+        .mockResolvedValueOnce([{ masterCode: 'GONE', tenantCode: 'common' }])
         .mockResolvedValue([])
       await list({ includeCommon: true })
       expect(
         prismaService.master.findMany.mock.calls[0][0].where.tenantCode,
       ).toEqual({ in: ['TEST_TENANT', 'common'] })
-      expect(countWhere().masterTypeCode).toEqual({ notIn: ['GONE'] })
+      expect(countWhere().masterTypeCode).toBeUndefined()
+      expect(countWhere().OR).toEqual([
+        { tenantCode: 'TEST_TENANT' },
+        {
+          tenantCode: 'common',
+          code: { notIn: [] },
+          masterTypeCode: { notIn: ['GONE'] },
+        },
+      ])
+    })
+
+    it('hides tenant rows of a setting deleted in the tenant', async () => {
+      prismaService.master.findMany
+        .mockResolvedValueOnce([
+          { masterCode: 'MINE', tenantCode: 'TEST_TENANT' },
+        ])
+        .mockResolvedValue([])
+      await list({ includeCommon: true })
+      expect(countWhere().OR).toEqual([
+        { tenantCode: 'TEST_TENANT', masterTypeCode: { notIn: ['MINE'] } },
+        { tenantCode: 'common', code: { notIn: [] } },
+      ])
+    })
+
+    it('keeps the where clause as before without includeCommon', async () => {
+      prismaService.master.findMany
+        .mockResolvedValueOnce([{ masterCode: 'GONE' }])
+        .mockResolvedValue([])
+      await list()
+      expect(prismaService.master.findMany.mock.calls[0][0].where).toEqual({
+        tenantCode: 'TEST_TENANT',
+        isDeleted: true,
+        masterType: 'MASTER_SETTING',
+      })
+      expect(countWhere()).toEqual({
+        tenantCode: 'TEST_TENANT',
+        masterType: 'MASTER_DATA',
+        masterTypeCode: { notIn: ['GONE'] },
+        isDeleted: false,
+      })
     })
   })
 
