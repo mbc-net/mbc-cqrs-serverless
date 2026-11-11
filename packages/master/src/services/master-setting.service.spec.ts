@@ -2922,3 +2922,70 @@ describe('MasterSettingService assignSystem', () => {
     expect(findMany).not.toHaveBeenCalled()
   })
 })
+
+describe('MasterSettingService search filters per database', () => {
+  const search = async (activeProvider: string, override?: string) => {
+    const prisma = {
+      _activeProvider: activeProvider,
+      master: {
+        count: jest.fn().mockResolvedValue(0),
+        findMany: jest.fn().mockResolvedValue([]),
+      },
+    }
+    const module = await Test.createTestingModule({
+      providers: [
+        MasterSettingService,
+        { provide: TaskService, useValue: {} },
+        { provide: PRISMA_SERVICE, useValue: prisma },
+        { provide: CommandService, useValue: {} },
+        { provide: DataService, useValue: {} },
+        {
+          provide: DynamoDbService,
+          useValue: { getItem: jest.fn(), getTableName: jest.fn() },
+        },
+        ...(override
+          ? [
+              {
+                provide: MODULE_OPTIONS_TOKEN,
+                useValue: { databaseProvider: override },
+              },
+            ]
+          : []),
+      ],
+    }).compile()
+    await module
+      .get(MasterSettingService)
+      .list(
+        { name: 'Area', code: 'Ar', keyword: 'desc' } as any,
+        optionsMock.invokeContext,
+      )
+    return JSON.stringify(prisma.master.findMany.mock.calls)
+  }
+
+  it('uses mode insensitive and an array JSON path on postgresql', async () => {
+    const calls = await search('postgresql')
+    expect(calls).toContain('{"name":{"contains":"Area","mode":"insensitive"}}')
+    expect(calls).toContain(
+      '{"masterCode":{"contains":"Ar","mode":"insensitive"}}',
+    )
+    expect(calls).toContain(
+      '{"attributes":{"path":["description"],"string_contains":"desc"}}',
+    )
+  })
+
+  it('drops mode and uses a $. JSON path on mysql', async () => {
+    const calls = await search('mysql')
+    expect(calls).toContain('{"name":{"contains":"Area"}}')
+    expect(calls).toContain('{"masterCode":{"contains":"Ar"}}')
+    expect(calls).toContain(
+      '{"attributes":{"path":"$.description","string_contains":"desc"}}',
+    )
+    expect(calls).not.toContain('insensitive')
+  })
+
+  it('lets the databaseProvider option override detection', async () => {
+    const calls = await search('postgresql', 'mysql')
+    expect(calls).toContain('"path":"$.description"')
+    expect(calls).not.toContain('insensitive')
+  })
+})

@@ -23,6 +23,11 @@ See [Conventional Commits](https://conventionalcommits.org) for commit guideline
 - **master (resolver):** with a resolver registered, read methods called without `invokeContext`
   are denied. Server-side code must pass `{ invokeContext }`, or `skipAccessCheck: true` for
   trusted internal work. See `docs/development/master-access-and-sync.md`.
+- **master, survey-template (MySQL):** list searches now work on MySQL, so applications that
+  patched `mode: 'insensitive'` out of the 1.x dist files (for example with `patch-package`) can
+  drop the patch. The database is detected from the Prisma client; set `databaseProvider` in
+  `MasterModule.register` / `SurveyTemplateModule.register` (or their `registerAsync`) if a
+  warning says it could not be detected.
 
 ### Features
 
@@ -33,11 +38,18 @@ See [Conventional Commits](https://conventionalcommits.org) for commit guideline
 - **master:** `commonTenantCode` and `enableCopyTask` module options.
 - **master:** `system_id` RDS column and `systemId` on API responses.
 - **master (docs):** guide for access control and per-system SNS sync.
+- **master, survey-template:** `databaseProvider` module option (`'postgresql' | 'mysql'`),
+  detected from the Prisma client by default.
 
 ### Bug Fixes
 
 - **master:** master copy reads data from the source setting's tenant (was `meltec`).
 - **master:** master copy compares and copies sequences with separate source and target keys.
+- **master, survey-template:** name, code and keyword searches failed on MySQL (the default
+  database of `mbc new`) because they always sent PostgreSQL-only `mode: 'insensitive'`. The
+  setting description search used `path: 'description'`, which is neither the PostgreSQL form
+  (an array) nor the MySQL form (a `$.` path); it now uses `['description']` on PostgreSQL and
+  `'$.description'` on MySQL.
 
 ## [1.7.0](https://github.com/mbc-net/mbc-cqrs-serverless/releases/tag/v1.7.0) (2026-11-09)
 

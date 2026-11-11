@@ -67,6 +67,12 @@ import {
   toPublicRow,
   withSystemAttribute,
 } from '../helpers'
+import {
+  containsInsensitive,
+  DatabaseProvider,
+  jsonPath,
+  resolveDatabaseProvider,
+} from '../helpers/database-provider'
 import { buildTenantScope, getOrderBys } from '../helpers/rds'
 import { MASTER_SYSTEM_ATTRIBUTE } from '../helpers/system-attribute'
 import { IMasterSettingService } from '../interfaces'
@@ -90,6 +96,15 @@ export class MasterSettingService implements IMasterSettingService {
 
   private get commonTenantCode(): string {
     return this.moduleOptions?.commonTenantCode ?? SettingTypeEnum.TENANT_COMMON
+  }
+
+  private resolvedProvider?: DatabaseProvider
+
+  private get databaseProvider(): DatabaseProvider {
+    return (this.resolvedProvider ??= resolveDatabaseProvider(
+      this.prismaService,
+      this.moduleOptions?.databaseProvider,
+    ))
   }
 
   constructor(
@@ -658,16 +673,17 @@ export class MasterSettingService implements IMasterSettingService {
 
     const andConditions = []
 
+    const provider = this.databaseProvider
     if (searchDto.name?.trim()) {
       andConditions.push({
-        name: { contains: searchDto.name.trim(), mode: 'insensitive' },
+        name: containsInsensitive(searchDto.name.trim(), provider),
       })
     }
 
     if (searchDto.keyword?.trim()) {
       andConditions.push({
         attributes: {
-          path: 'description',
+          path: jsonPath('description', provider),
           string_contains: searchDto.keyword.trim(),
         },
       })
@@ -675,7 +691,7 @@ export class MasterSettingService implements IMasterSettingService {
 
     if (searchDto.code?.trim()) {
       andConditions.push({
-        masterCode: { contains: searchDto.code.trim(), mode: 'insensitive' },
+        masterCode: containsInsensitive(searchDto.code.trim(), provider),
       })
     }
 

@@ -1,6 +1,8 @@
 import { IDataSyncHandler } from '@mbc-cqrs-serverless/core'
 import { ConfigurableModuleBuilder, ModuleMetadata, Type } from '@nestjs/common'
 
+import { DatabaseProvider } from './helpers/database-provider'
+
 export const PRISMA_SERVICE = 'PrismaServiceInjectToken'
 
 export interface MasterModuleOptions {
@@ -19,6 +21,11 @@ export interface MasterModuleOptions {
   controllerAuth?: { read?: string[]; write?: string[] }
   /** Register the copy-task handler. Default: the value of `enableController`. */
   enableCopyTask?: boolean
+  /**
+   * Database the Prisma client talks to, which decides the search-filter syntax.
+   * Default: detected from the Prisma client, falling back to 'postgresql'.
+   */
+  databaseProvider?: DatabaseProvider
 }
 
 export interface MasterModuleAsyncOptions
@@ -29,6 +36,7 @@ export interface MasterModuleAsyncOptions
   commonTenantCode?: string
   controllerAuth?: { read?: string[]; write?: string[] }
   enableCopyTask?: boolean
+  databaseProvider?: DatabaseProvider
   inject?: any[]
   /**
    * Resolves the runtime module options. Must return the resolved PrismaService

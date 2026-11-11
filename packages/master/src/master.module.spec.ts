@@ -177,6 +177,23 @@ describe('MasterModule', () => {
       await moduleRef.close()
     })
 
+    it('passes databaseProvider through to the resolved module options', async () => {
+      const moduleRef = await Test.createTestingModule({
+        imports: [
+          SupportModule,
+          MasterModule.registerAsync({
+            inject: [MockPrismaService],
+            useFactory: (prisma: MockPrismaService) => ({
+              prismaService: prisma,
+            }),
+            databaseProvider: 'mysql',
+          }),
+        ],
+      }).compile()
+      expect(moduleRef.get(MODULE_OPTIONS_TOKEN).databaseProvider).toBe('mysql')
+      await moduleRef.close()
+    })
+
     it('forwards a custom table name via registerAsync', () => {
       const spy = jest.spyOn(CommandModule, 'register')
       MasterModule.registerAsync({

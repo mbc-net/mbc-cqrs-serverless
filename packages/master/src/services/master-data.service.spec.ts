@@ -60,6 +60,7 @@ describe('MasterDataService', () => {
 
   beforeEach(async () => {
     const mockPrismaService = {
+      _activeProvider: 'postgresql',
       master: {
         findMany: jest.fn(),
         count: jest.fn(),
@@ -102,6 +103,36 @@ describe('MasterDataService', () => {
 
   it('should be defined', () => {
     expect(service).toBeDefined()
+  })
+
+  describe('listByRds search filters per database', () => {
+    const search = async () => {
+      prismaService.master.findMany.mockResolvedValue([])
+      prismaService.master.count.mockResolvedValue(0)
+      await service.listByRds(
+        { keyword: 'Area', code: 'Ar', pageSize: 10, page: 1 },
+        { invokeContext: mockInvokeContext },
+      )
+      return JSON.stringify(prismaService.master.findMany.mock.calls)
+    }
+
+    it('matches case-insensitively with mode on postgresql', async () => {
+      const calls = await search()
+      expect(calls).toContain(
+        '{"name":{"contains":"Area","mode":"insensitive"}}',
+      )
+      expect(calls).toContain(
+        '{"masterCode":{"contains":"Ar","mode":"insensitive"}}',
+      )
+    })
+
+    it('drops mode on mysql', async () => {
+      prismaService._activeProvider = 'mysql'
+      const calls = await search()
+      expect(calls).toContain('{"name":{"contains":"Area"}}')
+      expect(calls).toContain('{"masterCode":{"contains":"Ar"}}')
+      expect(calls).not.toContain('insensitive')
+    })
   })
 
   describe('listByRds includeCommon', () => {

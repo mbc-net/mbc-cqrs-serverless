@@ -48,6 +48,11 @@ import {
   toPublicRow,
   withSystemAttribute,
 } from '../helpers'
+import {
+  containsInsensitive,
+  DatabaseProvider,
+  resolveDatabaseProvider,
+} from '../helpers/database-provider'
 import { buildTenantScope, getOrderBys } from '../helpers/rds'
 import { IMasterDataService } from '../interfaces'
 import {
@@ -70,6 +75,15 @@ export class MasterDataService implements IMasterDataService {
 
   private get commonTenantCode(): string {
     return this.moduleOptions?.commonTenantCode ?? SettingTypeEnum.TENANT_COMMON
+  }
+
+  private resolvedProvider?: DatabaseProvider
+
+  private get databaseProvider(): DatabaseProvider {
+    return (this.resolvedProvider ??= resolveDatabaseProvider(
+      this.prismaService,
+      this.moduleOptions?.databaseProvider,
+    ))
   }
 
   constructor(
@@ -116,15 +130,16 @@ export class MasterDataService implements IMasterDataService {
 
     const andConditions: any[] = []
 
+    const provider = this.databaseProvider
     if (searchDto.keyword?.trim()) {
       andConditions.push({
-        name: { contains: searchDto.keyword.trim(), mode: 'insensitive' },
+        name: containsInsensitive(searchDto.keyword.trim(), provider),
       })
     }
 
     if (searchDto.code?.trim()) {
       andConditions.push({
-        masterCode: { contains: searchDto.code.trim(), mode: 'insensitive' },
+        masterCode: containsInsensitive(searchDto.code.trim(), provider),
       })
     }
 

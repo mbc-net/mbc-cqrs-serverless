@@ -157,6 +157,7 @@ export class MasterModule extends ConfigurableModuleClass {
           commonTenantCode: options.commonTenantCode,
           controllerAuth: options.controllerAuth,
           enableCopyTask: options.enableCopyTask,
+          databaseProvider: options.databaseProvider,
           dataSyncHandlers: options.dataSyncHandlers,
           tableName: options.tableName ?? TABLE_NAME,
         }
