@@ -189,7 +189,7 @@ export class MasterAccessService {
   /**
    * Prisma condition limiting a list to the rows the caller may read, or undefined when nothing
    * needs limiting. The search value and scope.systemId narrow it; both set and different match
-   * nothing.
+   * nothing. System ids are compared in lower case.
    */
   async buildListFilter(
     kind: 'setting' | 'data',
@@ -205,7 +205,7 @@ export class MasterAccessService {
     if (search && scoped && search.toLowerCase() !== scoped.toLowerCase()) {
       return none
     }
-    const narrow = scoped ?? search
+    const narrow = (scoped ?? search)?.toLowerCase()
 
     const grants = await this.loadGrants(
       options.invokeContext,
@@ -215,16 +215,13 @@ export class MasterAccessService {
     const conditions: Record<string, unknown>[] = []
     for (const g of grants) {
       if (!(g.read || g.write)) continue
-      if (
-        narrow &&
-        g.systemId !== '*' &&
-        g.systemId.toLowerCase() !== narrow.toLowerCase()
-      ) {
+      const granted = g.systemId.toLowerCase()
+      if (narrow && granted !== '*' && granted !== narrow) {
         continue
       }
-      const system = narrow ?? g.systemId
+      const system = narrow ?? granted
       const condition: Record<string, unknown> = {}
-      if (system.toLowerCase() === MASTER_SYSTEM_SHARED) {
+      if (system === MASTER_SYSTEM_SHARED) {
         condition.OR = [{ systemId: MASTER_SYSTEM_SHARED }, { systemId: null }]
       } else if (system !== '*') {
         condition.systemId = system
@@ -258,8 +255,11 @@ export class MasterAccessService {
       return undefined
     }
     const { tenantCode, code, existing } = input
-    // A blank systemId ('' or null) counts as absent.
-    const requested = input.requested || undefined
+    // A blank systemId ('' or null) counts as absent. Owners are stored in lower case.
+    const requested = input.requested?.toLowerCase() || undefined
+    if (requested === '*') {
+      throw new BadRequestException(`systemId of setting ${code} cannot be '*'`)
+    }
     const conflict = () =>
       new BadRequestException(
         `systemId of setting ${code} cannot be changed or set to a different value`,
@@ -267,7 +267,9 @@ export class MasterAccessService {
     let owner: string | undefined
     if (existing) {
       owner = getSystemId(existing)
-      if (requested !== undefined && requested !== owner) throw conflict()
+      if (requested !== undefined && requested !== owner?.toLowerCase()) {
+        throw conflict()
+      }
     } else {
       const inherited = getSystemId(
         await this.getEffectiveSetting(tenantCode, code),
@@ -275,7 +277,7 @@ export class MasterAccessService {
       if (
         inherited !== undefined &&
         requested !== undefined &&
-        requested !== inherited
+        requested !== inherited.toLowerCase()
       ) {
         throw conflict()
       }

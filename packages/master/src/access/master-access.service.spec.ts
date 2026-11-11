@@ -465,8 +465,24 @@ describe('prepareSettingOwner', () => {
     const { service, commandService } = build(all)
     commandService.getLatestItem.mockResolvedValue(null)
     expect(
-      await service.prepareSettingOwner(input({ requested: 'A' }), opts()),
-    ).toBe('A')
+      await service.prepareSettingOwner(input({ requested: 'a' }), opts()),
+    ).toBe('a')
+  })
+
+  it('stores a requested systemId in lower case', async () => {
+    const { service, commandService } = build(all)
+    commandService.getLatestItem.mockResolvedValue(null)
+    expect(
+      await service.prepareSettingOwner(input({ requested: 'APP-A' }), opts()),
+    ).toBe('app-a')
+  })
+
+  it('rejects * as a requested systemId', async () => {
+    const { service, commandService } = build(all)
+    commandService.getLatestItem.mockResolvedValue(null)
+    await expect(
+      service.prepareSettingOwner(input({ requested: '*' }), opts()),
+    ).rejects.toThrow(BadRequestException)
   })
 
   it('leaves systemId unset when none is requested', async () => {
@@ -522,14 +538,14 @@ describe('prepareSettingOwner', () => {
   })
 
   it('checks write access against the final owner', async () => {
-    const { service, commandService } = build([grant('B', '*', true, true)])
+    const { service, commandService } = build([grant('b', '*', true, true)])
     commandService.getLatestItem.mockResolvedValue(null)
     await expect(
-      service.prepareSettingOwner(input({ requested: 'A' }), opts()),
+      service.prepareSettingOwner(input({ requested: 'a' }), opts()),
     ).rejects.toThrow(ForbiddenException)
     await expect(
-      service.prepareSettingOwner(input({ requested: 'B' }), opts()),
-    ).resolves.toBe('B')
+      service.prepareSettingOwner(input({ requested: 'b' }), opts()),
+    ).resolves.toBe('b')
   })
 
   it('treats a blank requested systemId as absent on a new row', async () => {
@@ -724,6 +740,20 @@ describe('buildListFilter', () => {
     expect(await service.buildListFilter('setting', opts())).toEqual({
       systemId: 'app-a',
       masterCode: 'S1',
+    })
+  })
+
+  it('lowercases a grant systemId', async () => {
+    const { service } = build([grant('APP-A', '*', true)])
+    expect(await service.buildListFilter('data', opts())).toEqual({
+      systemId: 'app-a',
+    })
+  })
+
+  it('lowercases the search systemId it narrows to', async () => {
+    const { service } = build([grant('*', '*', true)])
+    expect(await service.buildListFilter('data', opts(), 'APP-A')).toEqual({
+      systemId: 'app-a',
     })
   })
 

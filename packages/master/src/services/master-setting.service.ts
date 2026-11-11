@@ -774,9 +774,12 @@ export class MasterSettingService implements IMasterSettingService {
     options: MasterWriteOptions,
   ): Promise<{ updated: number }> {
     const { code, tenantCode } = input
-    const systemId = input.systemId?.trim()
+    const systemId = input.systemId?.trim().toLowerCase()
     if (!systemId) {
       throw new BadRequestException('systemId is required')
+    }
+    if (systemId === '*') {
+      throw new BadRequestException(`systemId cannot be '*'`)
     }
     if (!this.access?.isEnabled()) {
       throw new BadRequestException(

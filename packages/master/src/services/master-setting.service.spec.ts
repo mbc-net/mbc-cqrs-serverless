@@ -2259,28 +2259,36 @@ describe('MasterSettingService ownership', () => {
     expect(commandService.getLatestItem).not.toHaveBeenCalled()
   })
 
-  it('stores the requested systemId and hides it in the response', async () => {
+  it('stores the requested systemId in lower case and hides it in the response', async () => {
     const { service, commandService } = await build(all)
     commandService.publishAsync.mockImplementation(async (c) => c)
     const res: any = await service.createTenantSetting(
-      dto({ systemId: 'A' }),
+      dto({ systemId: 'APP-A' }),
       opts,
     )
     expect(published(commandService.publishAsync).attributes).toEqual({
       a: 1,
-      __systemId: 'A',
+      __systemId: 'app-a',
     })
-    expect(res).toMatchObject({ systemId: 'A', attributes: { a: 1 } })
+    expect(res).toMatchObject({ systemId: 'app-a', attributes: { a: 1 } })
+  })
+
+  it('rejects * as a requested systemId', async () => {
+    const { service, commandService } = await build(all)
+    await expect(
+      service.createTenantSetting(dto({ systemId: '*' }), opts),
+    ).rejects.toThrow(BadRequestException)
+    expect(commandService.publishAsync).not.toHaveBeenCalled()
   })
 
   it('stores the owner on createCommonTenantSetting', async () => {
     const { service, commandService } = await build(all)
     await service.createCommonTenantSetting(
-      { code: 'S1', name: 'n', settingValue: {}, systemId: 'A' } as any,
+      { code: 'S1', name: 'n', settingValue: {}, systemId: 'a' } as any,
       { invokeContext: ctx, skipAccessCheck: true },
     )
     expect(published(commandService.publishAsync).attributes).toEqual({
-      __systemId: 'A',
+      __systemId: 'a',
     })
   })
 
@@ -2731,6 +2739,26 @@ describe('MasterSettingService assignSystem', () => {
         { invokeContext: admin },
       ),
     ).rejects.toThrow(BadRequestException)
+  })
+
+  it('throws on a * systemId', async () => {
+    const { service, findMany } = await build()
+    await expect(
+      service.assignSystem(
+        { code: 'S1', systemId: '*', tenantCode: 'ta' },
+        { invokeContext: admin },
+      ),
+    ).rejects.toThrow(BadRequestException)
+    expect(findMany).not.toHaveBeenCalled()
+  })
+
+  it('stores the systemId in lower case', async () => {
+    const { service, publish } = await build()
+    await service.assignSystem(
+      { code: 'S1', systemId: 'APP-A', tenantCode: 'ta' },
+      { invokeContext: admin },
+    )
+    expect(publish.mock.calls[0][0].attributes).toEqual({ __systemId: 'app-a' })
   })
 
   it('tags setting and data rows with the reserved key', async () => {
