@@ -2466,6 +2466,10 @@ describe('MasterSettingService read access', () => {
     const registry = new MasterAccessResolverRegistry()
     if (grants) registry.set({ resolveGrants: async () => grants })
     const access = new MasterAccessService(registry, commandService as any)
+    const dynamo = {
+      getItem: jest.fn().mockResolvedValue(null),
+      getTableName: jest.fn(),
+    }
     const module = await Test.createTestingModule({
       providers: [
         MasterSettingService,
@@ -2473,17 +2477,16 @@ describe('MasterSettingService read access', () => {
         { provide: PRISMA_SERVICE, useValue: prisma },
         { provide: CommandService, useValue: commandService },
         { provide: DataService, useValue: dataService },
-        {
-          provide: DynamoDbService,
-          useValue: {
-            getItem: jest.fn().mockResolvedValue(null),
-            getTableName: jest.fn(),
-          },
-        },
+        { provide: DynamoDbService, useValue: dynamo },
         { provide: MasterAccessService, useValue: access },
       ],
     }).compile()
-    return { service: module.get(MasterSettingService), dataService, prisma }
+    return {
+      service: module.get(MasterSettingService),
+      dataService,
+      prisma,
+      dynamo,
+    }
   }
   const personalRows = [
     { sk: { startsWith: 'MASTER_SETTING#GROUP#' } },
@@ -2577,6 +2580,25 @@ describe('MasterSettingService read access', () => {
     dataService.getItem.mockResolvedValue(
       row({ sk: 'MASTER_SETTING#USER#u1#S1', attributes: { v: 1 } }),
     )
+    await expect(
+      service.getSetting({ code: 'S1' } as any, opts),
+    ).rejects.toThrow(ForbiddenException)
+  })
+
+  it('throws Forbidden for a group row instead of falling through', async () => {
+    const { service, dataService, dynamo } = await build(appA)
+    dynamo.getItem.mockResolvedValue({
+      attributes: {
+        setting: [{ tenantRole: 'user', setting_groups: ['g1'] }],
+      },
+    })
+    // user row: none; group row: owned via its base setting "other"; tenant row: granted
+    dataService.getItem
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce(
+        row({ sk: 'MASTER_SETTING#GROUP#g1#S1', attributes: { v: 2 } }),
+      )
+      .mockResolvedValue(row())
     await expect(
       service.getSetting({ code: 'S1' } as any, opts),
     ).rejects.toThrow(ForbiddenException)

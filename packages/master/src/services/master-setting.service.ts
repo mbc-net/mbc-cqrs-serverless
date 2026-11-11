@@ -225,13 +225,14 @@ export class MasterSettingService implements IMasterSettingService {
             tenantCode,
             code,
           )
-          if (setting) {
-            return this.toReadableSetting(setting, tenantCode, code, options)
-          }
         }
       }
     } catch (error) {
       this.logger.error(`Error fetching group setting: ${error}`)
+    }
+    // Outside the try, so its catch cannot swallow a 403 on a group row.
+    if (setting) {
+      return this.toReadableSetting(setting, tenantCode, code, options)
     }
 
     // Fallback to common tenant-level settings
