@@ -8,6 +8,7 @@ import {
   getUserContext,
   GroupRoleResolverRegistry,
   IInvoke,
+  KEY_SEPARATOR,
 } from '@mbc-cqrs-serverless/core'
 import {
   BadRequestException,
@@ -17,6 +18,8 @@ import {
   Optional,
 } from '@nestjs/common'
 
+import { SETTING_SK_PREFIX } from '../constants'
+import { SettingTypeEnum } from '../enums'
 import {
   generateMasterPk,
   generateMasterSettingSk,
@@ -37,6 +40,16 @@ import {
   MasterAccessTarget,
 } from './master-access.interface'
 import { MasterAccessResolverRegistry } from './master-access-resolver.registry'
+
+/** Group and user setting rows carry no owner, so only an unrestricted setting list shows them. */
+const PERSONAL_SETTING_ROWS = [
+  SettingTypeEnum.TENANT_GROUP,
+  SettingTypeEnum.TENANT_USER,
+].map((type) => ({
+  sk: {
+    startsWith: `${SETTING_SK_PREFIX}${KEY_SEPARATOR}${type}${KEY_SEPARATOR}`,
+  },
+}))
 
 @Injectable()
 export class MasterAccessService {
@@ -189,7 +202,8 @@ export class MasterAccessService {
   /**
    * Prisma condition limiting a list to the rows the caller may read, or undefined when nothing
    * needs limiting. The search value and scope.systemId narrow it; both set and different match
-   * nothing. System ids are compared in lower case.
+   * nothing. System ids are compared in lower case. A limited setting list leaves out group and
+   * user setting rows.
    */
   async buildListFilter(
     kind: 'setting' | 'data',
@@ -231,6 +245,9 @@ export class MasterAccessService {
       }
       if (!Object.keys(condition).length) {
         return undefined
+      }
+      if (kind === 'setting') {
+        condition.NOT = PERSONAL_SETTING_ROWS
       }
       conditions.push(condition)
     }

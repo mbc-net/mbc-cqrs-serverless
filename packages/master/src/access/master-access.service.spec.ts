@@ -735,12 +735,34 @@ describe('buildListFilter', () => {
     })
   })
 
+  const personalRows = [
+    { sk: { startsWith: 'MASTER_SETTING#GROUP#' } },
+    { sk: { startsWith: 'MASTER_SETTING#USER#' } },
+  ]
+
   it('uses masterCode for settings', async () => {
     const { service } = build([grant('app-a', 'S1', true)])
     expect(await service.buildListFilter('setting', opts())).toEqual({
       systemId: 'app-a',
       masterCode: 'S1',
+      NOT: personalRows,
     })
+  })
+
+  it('hides group and user setting rows from a restricted setting list', async () => {
+    const { service } = build([grant('shared', '*', true)])
+    expect(await service.buildListFilter('setting', opts())).toEqual({
+      OR: [{ systemId: 'shared' }, { systemId: null }],
+      NOT: personalRows,
+    })
+    expect(await service.buildListFilter('data', opts())).toEqual({
+      OR: [{ systemId: 'shared' }, { systemId: null }],
+    })
+  })
+
+  it('shows group and user setting rows to an unrestricted caller', async () => {
+    const { service } = build([grant('*', '*', true)])
+    expect(await service.buildListFilter('setting', opts())).toBeUndefined()
   })
 
   it('lowercases a grant systemId', async () => {

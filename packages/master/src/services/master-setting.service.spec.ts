@@ -2485,6 +2485,10 @@ describe('MasterSettingService read access', () => {
     }).compile()
     return { service: module.get(MasterSettingService), dataService, prisma }
   }
+  const personalRows = [
+    { sk: { startsWith: 'MASTER_SETTING#GROUP#' } },
+    { sk: { startsWith: 'MASTER_SETTING#USER#' } },
+  ]
   const countWhere = (prisma: any) => prisma.master.count.mock.calls[0][0].where
   const row = (extra: object = {}) => ({
     id: 'i',
@@ -2497,7 +2501,9 @@ describe('MasterSettingService read access', () => {
   it('adds the filter to list', async () => {
     const { service, prisma } = await build(appA)
     await service.list({} as any, ctx, opts)
-    expect(countWhere(prisma).AND).toEqual([{ systemId: 'app-a' }])
+    expect(countWhere(prisma).AND).toEqual([
+      { systemId: 'app-a', NOT: personalRows },
+    ])
   })
 
   it('narrows list to the search systemId', async () => {
@@ -2505,7 +2511,9 @@ describe('MasterSettingService read access', () => {
       { systemId: '*', settingCode: '*', read: true, write: false },
     ])
     await service.list({ systemId: 'app-a' } as any, ctx, opts)
-    expect(countWhere(prisma).AND).toEqual([{ systemId: 'app-a' }])
+    expect(countWhere(prisma).AND).toEqual([
+      { systemId: 'app-a', NOT: personalRows },
+    ])
   })
 
   it('does not reference systemId in where without a resolver', async () => {
@@ -2520,7 +2528,7 @@ describe('MasterSettingService read access', () => {
     ])
     await service.list({} as any, ctx, opts)
     expect(countWhere(prisma).AND).toEqual([
-      { systemId: 'app-a', masterCode: 'S1' },
+      { systemId: 'app-a', masterCode: 'S1', NOT: personalRows },
     ])
   })
 
