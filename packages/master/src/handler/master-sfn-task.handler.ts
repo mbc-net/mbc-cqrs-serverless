@@ -17,6 +17,7 @@ import { CopyType, DataCopyMode, DataCopyOptionDto } from '../dto'
 import {
   generateMasterPk,
   genSequenceSk,
+  getSystemId,
   parseId,
   sequencePk,
 } from '../helpers'
@@ -142,6 +143,7 @@ export class MasterSfnTaskEventHandler
         },
         {
           invokeContext,
+          skipAccessCheck: true,
         },
       )
     } else {
@@ -157,7 +159,11 @@ export class MasterSfnTaskEventHandler
           settingValue: setting.attributes,
           tenantCode,
         },
-        { invokeContext },
+        {
+          invokeContext,
+          skipAccessCheck: true,
+          systemId: getSystemId(setting),
+        },
       )
     }
   }
@@ -196,6 +202,7 @@ export class MasterSfnTaskEventHandler
               },
               {
                 invokeContext,
+                skipAccessCheck: true,
               },
             )
           }
@@ -213,7 +220,11 @@ export class MasterSfnTaskEventHandler
               attributes: data.attributes as object,
               seq: data.seq,
             },
-            { invokeContext },
+            {
+              invokeContext,
+              skipAccessCheck: true,
+              systemId: getSystemId(data),
+            },
           )
         }),
       )

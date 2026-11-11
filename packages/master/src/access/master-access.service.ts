@@ -309,7 +309,8 @@ export class MasterAccessService {
     let owner = getSystemId(existing) ?? (options.systemId || undefined)
     if (owner === undefined) {
       const setting = await this.getEffectiveSetting(tenantCode, settingCode)
-      if (!setting && !existing) {
+      // A background copy of an untagged source can have no setting in the target tenant.
+      if (!setting && !existing && !options.skipAccessCheck) {
         throw new BadRequestException(`Setting not found: ${settingCode}`)
       }
       owner = getSystemId(setting)

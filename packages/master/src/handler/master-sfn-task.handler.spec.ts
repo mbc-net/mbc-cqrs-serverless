@@ -22,12 +22,15 @@ describe('MasterSfnTaskEventHandler', () => {
   let prisma: { master: { findMany: jest.Mock } }
   let sequences: jest.Mocked<SequencesService>
   let dynamoDb: jest.Mocked<DynamoDbService>
+  let settingService: jest.Mocked<MasterSettingService>
+  let dataSvc: jest.Mocked<MasterDataService>
 
   const setting = {
     pk: 'MASTER#common',
     sk: 'MASTER_SETTING#X',
     tenantCode: 'common',
     attributes: {
+      __systemId: 'app-a',
       fields: [
         { physicalName: 'code', dataType: 'auto_number', formatCode: 'F' },
       ],
@@ -50,6 +53,8 @@ describe('MasterSfnTaskEventHandler', () => {
     dynamoDb.getTableName.mockReturnValue('sequences')
     sequences = createMock<SequencesService>()
     sequences.getCurrentSequence.mockResolvedValue(null)
+    settingService = createMock<MasterSettingService>()
+    dataSvc = createMock<MasterDataService>()
     const dataService = createMock<DataService>()
     dataService.getItem.mockResolvedValue(setting as any)
 
@@ -58,8 +63,8 @@ describe('MasterSfnTaskEventHandler', () => {
         MasterSfnTaskEventHandler,
         { provide: DynamoDbService, useValue: dynamoDb },
         { provide: PRISMA_SERVICE, useValue: prisma },
-        { provide: MasterSettingService, useValue: createMock() },
-        { provide: MasterDataService, useValue: createMock() },
+        { provide: MasterSettingService, useValue: settingService },
+        { provide: MasterDataService, useValue: dataSvc },
         { provide: DataService, useValue: dataService },
         { provide: SequencesService, useValue: sequences },
       ],
@@ -91,5 +96,65 @@ describe('MasterSfnTaskEventHandler', () => {
     )
     await handler.execute(event)
     expect(dynamoDb.putItem).not.toHaveBeenCalled()
+  })
+
+  it('passes skipAccessCheck and the source systemId when copying', async () => {
+    prisma.master.findMany.mockResolvedValue([
+      {
+        sk: 'MASTER_DATA#X#1',
+        masterCode: '1',
+        masterTypeCode: 'X',
+        attributes: {
+          __systemId: 'app-a',
+        },
+      },
+    ])
+    const dataService = (handler as any).dataService
+    dataService.getItem
+      .mockResolvedValueOnce(setting) // source setting
+      .mockResolvedValue(null) // no tenant rows
+    await handler.execute({
+      input: {
+        input: { ...event.input.input, copyType: CopyType.BOTH },
+      },
+    } as any)
+    const expected = expect.objectContaining({
+      skipAccessCheck: true,
+      systemId: 'app-a',
+    })
+    expect(settingService.createTenantSetting).toHaveBeenCalledWith(
+      expect.anything(),
+      expected,
+    )
+    expect(dataSvc.create).toHaveBeenCalledWith(expect.anything(), expected)
+  })
+
+  it('passes skipAccessCheck to updates of existing rows', async () => {
+    prisma.master.findMany.mockResolvedValue([
+      {
+        sk: 'MASTER_DATA#X#1',
+        masterCode: '1',
+        masterTypeCode: 'X',
+        attributes: {},
+      },
+    ])
+    const existing = { ...setting, isDeleted: false }
+    ;(handler as any).dataService.getItem.mockResolvedValue(existing)
+    await handler.execute({
+      input: {
+        input: { ...event.input.input, copyType: CopyType.BOTH },
+      },
+    } as any)
+    const expected = expect.objectContaining({ skipAccessCheck: true })
+    expect(settingService.updateSetting).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.anything(),
+      expected,
+    )
+    expect(dataSvc.update).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.anything(),
+      expected,
+    )
   })
 })

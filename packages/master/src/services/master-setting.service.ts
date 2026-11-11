@@ -729,6 +729,23 @@ export class MasterSettingService implements IMasterSettingService {
       throw new BadRequestException('Master setting does not exist')
     }
 
+    if (this.access?.isEnabled()) {
+      // Check everything before the task is created so a forbidden copy leaves nothing behind.
+      await this.access.assertTenant(setting.tenantCode, 'read', opts)
+      for (const tenant of targetTenants) {
+        await this.access.assertTenant(tenant, 'write', opts)
+      }
+      await this.access.assertAccess(
+        {
+          tenantCode: this.access.callerTenant(opts),
+          systemId: getSystemId(setting),
+          settingCode: getSettingCodeFromSk(setting.sk),
+        },
+        'write',
+        opts,
+      )
+    }
+
     const item = targetTenants.map((tenant) => ({
       ...masterCopyDto,
       targetTenants: [tenant],

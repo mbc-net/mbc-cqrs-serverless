@@ -602,6 +602,17 @@ describe('prepareDataOwner', () => {
     )
   })
 
+  it('leaves the owner undefined for a missing setting when skipAccessCheck is set', async () => {
+    const { service, commandService } = build(all)
+    commandService.getLatestItem.mockResolvedValue(null)
+    expect(
+      await service.prepareDataOwner(input(), {
+        ...opts(),
+        skipAccessCheck: true,
+      }),
+    ).toBeUndefined()
+  })
+
   it('keeps the stored owner of an existing row without a lookup', async () => {
     const { service, commandService } = build(all)
     const existing = { attributes: { __systemId: 'A' } } as any

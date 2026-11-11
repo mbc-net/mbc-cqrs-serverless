@@ -2571,3 +2571,92 @@ describe('MasterSettingService read access', () => {
     expect(await service.checkExistCode('S1', ctx, opts)).toBe(true)
   })
 })
+
+describe('MasterSettingService copy access', () => {
+  const ctx = {
+    event: {
+      headers: { 'x-tenant-code': 'ta' },
+      requestContext: {
+        authorizer: {
+          jwt: {
+            claims: {
+              sub: 'u1',
+              'custom:tenant': 'ta',
+              'custom:roles': JSON.stringify([{ tenant: 'ta', role: 'user' }]),
+            },
+          },
+        },
+      },
+    },
+  } as any
+  const opts = { invokeContext: ctx }
+  const dto = (targetTenants: string[]) =>
+    ({
+      masterSettingId: 'MASTER#common#MASTER_SETTING#S1',
+      targetTenants,
+    }) as any
+
+  const build = async (grants?: any[]) => {
+    const dataService = {
+      getItem: jest.fn().mockResolvedValue({
+        pk: 'MASTER#common',
+        sk: 'MASTER_SETTING#S1',
+        tenantCode: 'common',
+        isDeleted: false,
+        attributes: { __systemId: 'app-a' },
+      }),
+    }
+    const taskService = { createStepFunctionTask: jest.fn() }
+    const registry = new MasterAccessResolverRegistry()
+    if (grants) registry.set({ resolveGrants: async () => grants })
+    const access = new MasterAccessService(registry, {} as any)
+    const module = await Test.createTestingModule({
+      providers: [
+        MasterSettingService,
+        { provide: TaskService, useValue: taskService },
+        { provide: PRISMA_SERVICE, useValue: {} },
+        { provide: CommandService, useValue: {} },
+        { provide: DataService, useValue: dataService },
+        {
+          provide: DynamoDbService,
+          useValue: { getTableName: jest.fn() },
+        },
+        { provide: MasterAccessService, useValue: access },
+      ],
+    }).compile()
+    return { service: module.get(MasterSettingService), taskService }
+  }
+  const write = [
+    { systemId: 'app-a', settingCode: '*', read: true, write: true },
+  ]
+
+  it('allows copying from common as a read at the tenant gate', async () => {
+    const { service, taskService } = await build(write)
+    await service.copy(dto(['ta']), opts)
+    expect(taskService.createStepFunctionTask).toHaveBeenCalled()
+  })
+
+  it('requires a write grant on the source system', async () => {
+    const { service, taskService } = await build([
+      { systemId: 'app-a', settingCode: '*', read: true, write: false },
+    ])
+    await expect(service.copy(dto(['ta']), opts)).rejects.toThrow(
+      ForbiddenException,
+    )
+    expect(taskService.createStepFunctionTask).not.toHaveBeenCalled()
+  })
+
+  it('rejects a target tenant the caller cannot write', async () => {
+    const { service, taskService } = await build(write)
+    await expect(service.copy(dto(['ta', 'tb']), opts)).rejects.toThrow(
+      ForbiddenException,
+    )
+    expect(taskService.createStepFunctionTask).not.toHaveBeenCalled()
+  })
+
+  it('copies without checks when no resolver is registered', async () => {
+    const { service, taskService } = await build()
+    await service.copy(dto(['tb']), opts)
+    expect(taskService.createStepFunctionTask).toHaveBeenCalled()
+  })
+})
