@@ -6,6 +6,7 @@ import { Test } from '@nestjs/testing'
 
 import { MasterSfnTaskEventHandler } from './handler/master-sfn-task.handler'
 import { MasterModule } from './master.module'
+import { MODULE_OPTIONS_TOKEN } from './master.module-definition'
 import { MasterDataService } from './services'
 
 class MockPrismaService {
@@ -154,6 +155,25 @@ describe('MasterModule', () => {
       // not null (async Prisma) and not the class reference.
       expect((svc as any).prismaService).toBeInstanceOf(MockPrismaService)
       expect((svc as any).prismaService.kind).toBe('instance')
+      await moduleRef.close()
+    })
+
+    it('passes controllerAuth through to the resolved module options', async () => {
+      const moduleRef = await Test.createTestingModule({
+        imports: [
+          SupportModule,
+          MasterModule.registerAsync({
+            inject: [MockPrismaService],
+            useFactory: (prisma: MockPrismaService) => ({
+              prismaService: prisma,
+            }),
+            controllerAuth: { write: ['editor'] },
+          }),
+        ],
+      }).compile()
+      expect(moduleRef.get(MODULE_OPTIONS_TOKEN).controllerAuth).toEqual({
+        write: ['editor'],
+      })
       await moduleRef.close()
     })
 
