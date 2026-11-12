@@ -30,7 +30,9 @@ See [Conventional Commits](https://conventionalcommits.org) for commit guideline
   settings before data instead of both at once.
 - **master (RDS):** applications generated earlier must add a nullable `system_id` column and
   write `systemId: getSystemId(cmd)` in their own RDS handler, because `update-scheme.ts` does
-  not change an existing schema or handler. Needed only when a resolver is registered.
+  not change an existing schema or handler. Needed only when a resolver is registered. With a
+  resolver registered, the application now refuses to start if the Prisma `Master` model has no
+  `systemId` field.
 - **master (resolver):** with a resolver registered, read methods called without `invokeContext`
   are denied. Server-side code must pass `{ invokeContext }`, or `skipAccessCheck: true` for
   trusted internal work. See `docs/development/master-access-and-sync.md`.

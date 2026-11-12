@@ -251,8 +251,21 @@ create: { /* ... */ systemId: getSystemId(cmd) },
 New projects get both from the template. **Applications generated earlier must
 add the `system_id` column and write `systemId: getSystemId(cmd)` in their own
 RDS handler, because `update-scheme.ts` does not change an existing schema or
-handler.** Until then the column stays `NULL` and every row counts as `shared`
-in list filters. The column is needed only when a resolver is registered.
+handler.** The column is needed only when a resolver is registered.
+
+Do it in this order: add the column, update the RDS handler to write
+`systemId: getSystemId(cmd)`, deploy, then register the resolver. With a resolver
+registered and no `systemId` field on the Prisma `Master` model, the application
+refuses to start. A handler that does not write the column cannot be detected:
+rows it syncs keep `NULL` (they count as `shared` in list filters) and there is
+no repair tool.
+
+To pin the handler in a test, assert that both lines are present:
+
+```ts
+const src = readFileSync('src/master/handler/master-rds.handler.ts', 'utf8')
+expect(src.match(/systemId: getSystemId\(cmd\)/g)).toHaveLength(2)
+```
 
 ## Publish changes to SNS
 
