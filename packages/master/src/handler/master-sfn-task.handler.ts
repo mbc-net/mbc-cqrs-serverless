@@ -287,37 +287,29 @@ export class MasterSfnTaskEventHandler
       (await this.sequencesService.getCurrentSequence(sourceSeqKey)) ?? {}
 
     const tenantSeqKey = this.generateSequenceKey(tenantCode, setting)
-    const { seq: tenantSeq = 0 } =
-      (await this.sequencesService.getCurrentSequence(tenantSeqKey)) ?? {}
+    this.logger.debug('Copying sequence', { sourceSeq, tenantCode })
 
-    const distance = sourceSeq - tenantSeq
-    this.logger.debug('Copying sequence gap:', {
-      sourceSeq,
-      tenantSeq,
-      distance,
-    })
-
-    this.logger.debug('putItem', {
-      pk: tenantSeqKey.pk,
-      sk: tenantSeqKey.sk,
-      code: tenantSeqKey.sk,
-      name: tenantSeqKey.sk.split(KEY_SEPARATOR).at(-1),
-      seq: sourceSeq,
-      tenantCode,
-      type: typeCode,
-    })
-
-    this.logger.debug('this.sequenceTableName', this.sequenceTableName)
-
-    await this.dynamoDbService.putItem(this.sequenceTableName, {
-      pk: tenantSeqKey.pk,
-      sk: tenantSeqKey.sk,
-      code: tenantSeqKey.sk,
-      name: tenantSeqKey.sk.split(KEY_SEPARATOR).at(-1),
-      seq: sourceSeq,
-      tenantCode,
-      type: typeCode,
-    })
+    try {
+      // Conditional write: never move a counter the target has already advanced past.
+      await this.dynamoDbService.updateItem(
+        this.sequenceTableName,
+        { pk: tenantSeqKey.pk, sk: tenantSeqKey.sk },
+        {
+          set: {
+            seq: sourceSeq,
+            code: tenantSeqKey.sk,
+            name: tenantSeqKey.sk.split(KEY_SEPARATOR).at(-1),
+            tenantCode,
+            type: typeCode,
+          },
+        },
+        'attribute_not_exists(#seq) OR #seq < :seq',
+      )
+    } catch (error) {
+      if ((error as Error)?.name !== 'ConditionalCheckFailedException')
+        throw error
+      this.logger.debug('Tenant sequence already ahead: copy skipped')
+    }
   }
 
   private generateSequenceKey(tenantCode: string, setting: DataModel) {

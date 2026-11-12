@@ -84,10 +84,33 @@ describe('MasterSfnTaskEventHandler', () => {
       key.pk === 'SEQ#common' ? ({ seq: 5 } as any) : ({ seq: 2 } as any),
     )
     await handler.execute(event)
-    expect(dynamoDb.putItem).toHaveBeenCalledWith(
+    expect(dynamoDb.updateItem).toHaveBeenCalledWith(
       'sequences',
-      expect.objectContaining({ pk: 'SEQ#ta', seq: 5 }),
+      { pk: 'SEQ#ta', sk: expect.any(String) },
+      { set: expect.objectContaining({ seq: 5, tenantCode: 'ta' }) },
+      'attribute_not_exists(#seq) OR #seq < :seq',
     )
+    expect(dynamoDb.putItem).not.toHaveBeenCalled()
+  })
+
+  it('treats a failed condition as no copy needed', async () => {
+    sequences.getCurrentSequence.mockImplementation(async (key: any) =>
+      key.pk === 'SEQ#common' ? ({ seq: 5 } as any) : ({ seq: 2 } as any),
+    )
+    dynamoDb.updateItem.mockRejectedValue(
+      Object.assign(new Error('x'), {
+        name: 'ConditionalCheckFailedException',
+      }),
+    )
+    await expect(handler.execute(event)).resolves.not.toThrow()
+  })
+
+  it('rethrows other errors from the sequence write', async () => {
+    sequences.getCurrentSequence.mockImplementation(async (key: any) =>
+      key.pk === 'SEQ#common' ? ({ seq: 5 } as any) : ({ seq: 2 } as any),
+    )
+    dynamoDb.updateItem.mockRejectedValue(new Error('boom'))
+    await expect(handler.execute(event)).rejects.toThrow('boom')
   })
 
   it('does not copy the sequence when the target is ahead', async () => {
@@ -95,7 +118,7 @@ describe('MasterSfnTaskEventHandler', () => {
       key.pk === 'SEQ#common' ? ({ seq: 2 } as any) : ({ seq: 5 } as any),
     )
     await handler.execute(event)
-    expect(dynamoDb.putItem).not.toHaveBeenCalled()
+    expect(dynamoDb.updateItem).not.toHaveBeenCalled()
   })
 
   it('passes skipAccessCheck and the source systemId when copying', async () => {
