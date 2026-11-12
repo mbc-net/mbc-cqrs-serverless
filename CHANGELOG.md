@@ -41,6 +41,11 @@ See [Conventional Commits](https://conventionalcommits.org) for commit guideline
   drop the patch. The database is detected from the Prisma client; set `databaseProvider` in
   `MasterModule.register` / `SurveyTemplateModule.register` (or their `registerAsync`) if a
   warning says it could not be detected.
+- **master (scaffold):** new projects get `controllerAuth: {}` in `src/master/master.module.ts`, so
+  master writes need `system_admin` until roles are configured.
+- **master (`registerAsync`):** the static `commonTenantCode`, `databaseProvider` and
+  `controllerAuth` options override the values the factory returns, even when the static value is
+  `undefined`; pass them statically.
 
 ### Features
 
