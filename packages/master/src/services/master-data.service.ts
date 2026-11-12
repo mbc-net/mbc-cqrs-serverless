@@ -12,6 +12,7 @@ import {
 } from '@mbc-cqrs-serverless/core'
 import {
   BadRequestException,
+  ForbiddenException,
   Inject,
   Injectable,
   Logger,
@@ -25,7 +26,11 @@ import {
   MasterWriteOptions,
 } from '../access/master-access.interface'
 import { MasterAccessService } from '../access/master-access.service'
-import { DATA_SK_PREFIX, MASTER_PK_PREFIX } from '../constants'
+import {
+  DATA_SK_PREFIX,
+  MASTER_PK_PREFIX,
+  SETTING_SK_PREFIX,
+} from '../constants'
 import {
   CreateMasterDataDto,
   CustomMasterDataSearchDto,
@@ -186,6 +191,12 @@ export class MasterDataService implements IMasterDataService {
 
   async list(searchDto: MasterDataSearchDto, options?: MasterAccessOptions) {
     const { tenantCode, settingCode } = searchDto
+    if (
+      settingCode === SETTING_SK_PREFIX ||
+      settingCode.includes(KEY_SEPARATOR)
+    ) {
+      throw new BadRequestException(`Invalid settingCode: ${settingCode}`)
+    }
     const pkTenant = tenantCode || this.commonTenantCode
     const pk = generateMasterPk(pkTenant)
     if (this.access?.isEnabled()) {
@@ -208,9 +219,16 @@ export class MasterDataService implements IMasterDataService {
       },
     }
     const res = await this.dataService.listItemsByPk(pk, query)
+    let rows = res.items
+    if (rows && this.access?.isEnabled()) {
+      const readable = await Promise.all(
+        rows.map((row) => this.canReadRow(row, options)),
+      )
+      rows = rows.filter((_, i) => readable[i])
+    }
     return new MasterDataListEntity({
       ...res,
-      items: res.items?.map((item) => new MasterDataEntity(toPublicRow(item))),
+      items: rows?.map((item) => new MasterDataEntity(toPublicRow(item))),
     })
   }
 
@@ -405,6 +423,19 @@ export class MasterDataService implements IMasterDataService {
       'read',
       options ?? {},
     )
+  }
+
+  private async canReadRow(
+    row: DataModel,
+    options?: MasterAccessOptions,
+  ): Promise<boolean> {
+    try {
+      await this.assertRowRead(row, options)
+      return true
+    } catch (e) {
+      if (e instanceof ForbiddenException) return false
+      throw e
+    }
   }
 
   async getDetail(key: DetailDto, options?: MasterAccessOptions) {

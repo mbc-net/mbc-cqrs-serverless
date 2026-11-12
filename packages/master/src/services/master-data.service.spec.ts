@@ -2813,3 +2813,113 @@ describe('MasterDataService read access', () => {
     ).rejects.toThrow(ForbiddenException)
   })
 })
+
+describe('MasterDataService list access', () => {
+  const invoke = {
+    context: { awsRequestId: 'r' },
+    event: {
+      requestContext: {
+        authorizer: {
+          jwt: {
+            claims: {
+              sub: 'u1',
+              'custom:tenant': 'ta',
+              'custom:roles': JSON.stringify([{ tenant: 'ta', role: 'user' }]),
+            },
+          },
+        },
+      },
+    },
+  } as any
+  const opts = { invokeContext: invoke }
+  const rows = [
+    { tenantCode: 'ta', sk: 'S1#1', attributes: { __systemId: 'app-y' } },
+    { tenantCode: 'ta', sk: 'S1#2', attributes: { __systemId: 'app-z' } },
+  ]
+  const build = async (withResolver: boolean) => {
+    ;(getUserContext as jest.Mock).mockReturnValue({
+      tenantCode: 'ta',
+      tenantRole: 'user',
+      tenantRoles: ['user'],
+      tenantGroupIds: [],
+      userId: 'u1',
+    })
+    const dataService = createMock<DataService>()
+    dataService.listItemsByPk.mockResolvedValue({
+      items: rows,
+      lastSk: 'S1#2',
+    } as any)
+    const commandService = createMock<CommandService>()
+    commandService.getLatestItem.mockResolvedValue({
+      pk: 'MASTER#ta',
+      sk: 'MASTER_SETTING#S1',
+      attributes: { __systemId: 'app-y' },
+    } as any)
+    const resolveGrants = jest
+      .fn()
+      .mockResolvedValue([
+        { systemId: 'app-y', settingCode: '*', read: true, write: false },
+      ])
+    const registry = new MasterAccessResolverRegistry()
+    if (withResolver) registry.set({ resolveGrants })
+    const access = new MasterAccessService(registry, commandService as any)
+    const module = await Test.createTestingModule({
+      providers: [
+        MasterDataService,
+        { provide: PRISMA_SERVICE, useValue: {} },
+        { provide: CommandService, useValue: commandService },
+        { provide: DataService, useValue: dataService },
+        { provide: MasterAccessService, useValue: access },
+      ],
+    }).compile()
+    return {
+      service: module.get(MasterDataService),
+      dataService,
+      resolveGrants,
+    }
+  }
+
+  it('rejects MASTER_SETTING as settingCode, with or without a resolver', async () => {
+    for (const withResolver of [true, false]) {
+      const { service, dataService } = await build(withResolver)
+      await expect(
+        service.list(
+          { tenantCode: 'ta', settingCode: 'MASTER_SETTING' } as any,
+          opts,
+        ),
+      ).rejects.toThrow(BadRequestException)
+      expect(dataService.listItemsByPk).not.toHaveBeenCalled()
+    }
+  })
+
+  it('rejects a settingCode containing #', async () => {
+    const { service } = await build(true)
+    await expect(
+      service.list({ tenantCode: 'ta', settingCode: 'S1#X' } as any, opts),
+    ).rejects.toThrow(BadRequestException)
+  })
+
+  it('drops rows owned by a system the caller cannot read', async () => {
+    const { service } = await build(true)
+    const res = await service.list(
+      { tenantCode: 'ta', settingCode: 'S1' } as any,
+      opts,
+    )
+    expect(res.items.map((i) => i.sk)).toEqual(['S1#1'])
+  })
+
+  it('keeps lastSk when rows are dropped', async () => {
+    const { service } = await build(true)
+    const res = await service.list(
+      { tenantCode: 'ta', settingCode: 'S1' } as any,
+      opts,
+    )
+    expect(res.lastSk).toBe('S1#2')
+  })
+
+  it('resolves grants once per call, not per row', async () => {
+    const { service, resolveGrants } = await build(true)
+    await service.list({ tenantCode: 'ta', settingCode: 'S1' } as any, opts)
+    expect(resolveGrants).toHaveBeenCalledTimes(1)
+  })
+})

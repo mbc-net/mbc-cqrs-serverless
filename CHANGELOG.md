@@ -11,6 +11,9 @@ See [Conventional Commits](https://conventionalcommits.org) for commit guideline
   copy now reads data from the source setting's tenant instead of a hard-coded `meltec` tenant,
   and it now copies sequences, which it never did because both keys were built from the target
   tenant. A target sequence behind the source jumps to the source's value.
+- **master:** `MasterDataService.list` (and `GET /api/master-data`) now rejects a `settingCode`
+  equal to `MASTER_SETTING` or containing `#` with 400, for every application. With a resolver
+  registered, it also leaves out rows the caller may not read.
 - **master:** for an application that sets neither `controllerAuth` nor a resolver, the other
   changes are: a `__systemId` key sent by a client in `attributes` is now always removed;
   responses go through `toPublicRow`, so a row stored earlier with a client-planted `__systemId`
