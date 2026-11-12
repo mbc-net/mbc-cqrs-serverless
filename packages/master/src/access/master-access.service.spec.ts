@@ -559,6 +559,35 @@ describe('prepareSettingOwner', () => {
     ).rejects.toThrow(BadRequestException)
   })
 
+  it('rejects a requested systemId when the effective setting is untagged', async () => {
+    const { service, commandService } = build(all)
+    commandService.getLatestItem.mockResolvedValue({ attributes: {} })
+    await expect(
+      service.prepareSettingOwner(input({ requested: 'app-z' }), opts()),
+    ).rejects.toThrow(BadRequestException)
+  })
+
+  it('requires write on shared to override an untagged common setting', async () => {
+    const { service, commandService } = build([
+      grant('app-z', '*', true, true),
+      grant('shared', '*', true),
+    ])
+    commandService.getLatestItem.mockResolvedValue({ attributes: {} })
+    await expect(service.prepareSettingOwner(input(), opts())).rejects.toThrow(
+      ForbiddenException,
+    )
+  })
+
+  it('stores nothing when overriding an untagged setting with shared write', async () => {
+    const { service, commandService } = build([
+      grant('shared', '*', true, true),
+    ])
+    commandService.getLatestItem.mockResolvedValue({ attributes: {} })
+    expect(
+      await service.prepareSettingOwner(input({ requested: 'shared' }), opts()),
+    ).toBeUndefined()
+  })
+
   it('checks write access against the final owner', async () => {
     const { service, commandService } = build([grant('b', '*', true, true)])
     commandService.getLatestItem.mockResolvedValue(null)

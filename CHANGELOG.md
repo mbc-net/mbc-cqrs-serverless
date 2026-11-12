@@ -11,6 +11,9 @@ See [Conventional Commits](https://conventionalcommits.org) for commit guideline
   copy now reads data from the source setting's tenant instead of a hard-coded `meltec` tenant,
   and it now copies sequences, which it never did because both keys were built from the target
   tenant. A target sequence behind the source jumps to the source's value.
+- **master:** creating a tenant-level override of a common setting that has no `systemId` now
+  treats that common setting as `shared`: a requested `systemId` other than `shared` is rejected
+  with 400, write access to `shared` is required, and the override stores no `systemId`.
 - **master:** `MasterDataService.list` (and `GET /api/master-data`) now rejects a `settingCode`
   equal to `MASTER_SETTING` or containing `#` with 400, for every application. With a resolver
   registered, it also leaves out rows the caller may not read.

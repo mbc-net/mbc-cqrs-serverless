@@ -282,26 +282,32 @@ export class MasterAccessService {
         `systemId of setting ${code} cannot be changed or set to a different value`,
       )
     let owner: string | undefined
+    // Owner the write is checked against; an untagged inherited setting counts as shared.
+    let checkOwner: string | undefined
     if (existing) {
-      owner = getSystemId(existing)
+      owner = checkOwner = getSystemId(existing)
       if (requested !== undefined && requested !== owner?.toLowerCase()) {
         throw conflict()
       }
     } else {
-      const inherited = getSystemId(
-        await this.getEffectiveSetting(tenantCode, code),
-      )
-      if (
-        inherited !== undefined &&
-        requested !== undefined &&
-        requested !== inherited.toLowerCase()
-      ) {
-        throw conflict()
+      const effective = await this.getEffectiveSetting(tenantCode, code)
+      if (effective) {
+        const inherited = getSystemId(effective)
+        const inheritedOwner = inherited ?? MASTER_SYSTEM_SHARED
+        if (
+          requested !== undefined &&
+          requested !== inheritedOwner.toLowerCase()
+        ) {
+          throw conflict()
+        }
+        owner = inherited
+        checkOwner = inheritedOwner
+      } else {
+        owner = checkOwner = requested ?? options.systemId
       }
-      owner = inherited ?? requested ?? options.systemId
     }
     await this.assertAccess(
-      { tenantCode, systemId: owner, settingCode: code },
+      { tenantCode, systemId: checkOwner, settingCode: code },
       'write',
       options,
     )
