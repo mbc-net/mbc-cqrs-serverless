@@ -66,7 +66,8 @@ MasterModule.register({
 - The requested tenant must equal the caller's tenant, unless the request reads
   the common tenant or the caller holds a cross-tenant role. Otherwise the
   guard answers `BadRequestException('Invalid tenant code')`. `POST /copy`
-  checks the source as a read and each target as a write.
+  checks the source as a read and each target as a write, and needs
+  `system_admin` whatever `controllerAuth.write` says.
 - Without `controllerAuth` the routes stay unguarded and `MasterModule` logs a
   startup warning.
 
@@ -195,8 +196,12 @@ common rows by the settings deleted in the common tenant.
 
 ### Master copy
 
-`MasterSettingService.copy` needs a write grant on the source setting's
-`systemId`. The background step (`MasterSfnTaskEventHandler`) runs with
+`MasterSettingService.copy` requires the `system_admin` role and a
+`{ systemId: '*', settingCode: '*', write: true }` grant from the resolver. With
+`controllerAuth`, the route also requires `system_admin` regardless of `write`.
+Copying to other tenants relies on `system_admin` being a cross-tenant role
+(`DEFAULT_CROSS_TENANT_ROLES`, from the `CROSS_TENANT_ROLES` env value, default
+`system_admin`). The background step (`MasterSfnTaskEventHandler`) runs with
 `skipAccessCheck` and carries the source owner through the internal `systemId`
 option, so it works with no user claims.
 

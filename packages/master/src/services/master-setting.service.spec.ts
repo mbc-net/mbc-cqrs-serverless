@@ -2658,23 +2658,24 @@ describe('MasterSettingService read access', () => {
 })
 
 describe('MasterSettingService copy access', () => {
-  const ctx = {
-    event: {
-      headers: { 'x-tenant-code': 'ta' },
-      requestContext: {
-        authorizer: {
-          jwt: {
-            claims: {
-              sub: 'u1',
-              'custom:tenant': 'ta',
-              'custom:roles': JSON.stringify([{ tenant: 'ta', role: 'user' }]),
+  const ctx = (role: string) =>
+    ({
+      event: {
+        headers: { 'x-tenant-code': 'ta' },
+        requestContext: {
+          authorizer: {
+            jwt: {
+              claims: {
+                sub: 'u1',
+                'custom:tenant': 'ta',
+                'custom:roles': JSON.stringify([{ tenant: 'ta', role }]),
+              },
             },
           },
         },
       },
-    },
-  } as any
-  const opts = { invokeContext: ctx }
+    }) as any
+  const opts = (role = 'user') => ({ invokeContext: ctx(role) })
   const dto = (targetTenants: string[]) =>
     ({
       masterSettingId: 'MASTER#common#MASTER_SETTING#S1',
@@ -2711,37 +2712,35 @@ describe('MasterSettingService copy access', () => {
     }).compile()
     return { service: module.get(MasterSettingService), taskService }
   }
-  const write = [
-    { systemId: 'app-a', settingCode: '*', read: true, write: true },
-  ]
+  const full = [{ systemId: '*', settingCode: '*', read: true, write: true }]
 
-  it('allows copying from common as a read at the tenant gate', async () => {
-    const { service, taskService } = await build(write)
-    await service.copy(dto(['ta']), opts)
-    expect(taskService.createStepFunctionTask).toHaveBeenCalled()
+  it('rejects a caller who is not system_admin', async () => {
+    const { service, taskService } = await build(full)
+    await expect(service.copy(dto(['ta']), opts('user'))).rejects.toThrow(
+      ForbiddenException,
+    )
+    expect(taskService.createStepFunctionTask).not.toHaveBeenCalled()
   })
 
-  it('requires a write grant on the source system', async () => {
+  it('rejects system_admin with grants narrower than full write', async () => {
     const { service, taskService } = await build([
-      { systemId: 'app-a', settingCode: '*', read: true, write: false },
+      { systemId: 'app-a', settingCode: '*', read: true, write: true },
     ])
-    await expect(service.copy(dto(['ta']), opts)).rejects.toThrow(
-      ForbiddenException,
-    )
+    await expect(
+      service.copy(dto(['ta']), opts('system_admin')),
+    ).rejects.toThrow(ForbiddenException)
     expect(taskService.createStepFunctionTask).not.toHaveBeenCalled()
   })
 
-  it('rejects a target tenant the caller cannot write', async () => {
-    const { service, taskService } = await build(write)
-    await expect(service.copy(dto(['ta', 'tb']), opts)).rejects.toThrow(
-      ForbiddenException,
-    )
-    expect(taskService.createStepFunctionTask).not.toHaveBeenCalled()
+  it('copies for system_admin with full write to another tenant', async () => {
+    const { service, taskService } = await build(full)
+    await service.copy(dto(['tb']), opts('system_admin'))
+    expect(taskService.createStepFunctionTask).toHaveBeenCalled()
   })
 
   it('copies without checks when no resolver is registered', async () => {
     const { service, taskService } = await build()
-    await service.copy(dto(['tb']), opts)
+    await service.copy(dto(['tb']), opts())
     expect(taskService.createStepFunctionTask).toHaveBeenCalled()
   })
 })

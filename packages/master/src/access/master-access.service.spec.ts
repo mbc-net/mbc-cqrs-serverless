@@ -75,6 +75,50 @@ const target = (tenantCode = 'ta', systemId?: string, settingCode = 'S1') => ({
 })
 
 describe('MasterAccessService', () => {
+  describe('assertFullWriteAdmin', () => {
+    const admin = () => ctx({ role: 'system_admin' })
+    it('passes for system_admin with a full write grant', async () => {
+      const { service } = build([grant('*', '*', true, true)])
+      await expect(
+        service.assertFullWriteAdmin({ invokeContext: admin() }),
+      ).resolves.toBeUndefined()
+    })
+    it('rejects a non system_admin with a full write grant', async () => {
+      const { service } = build([grant('*', '*', true, true)])
+      await expect(
+        service.assertFullWriteAdmin({ invokeContext: ctx() }),
+      ).rejects.toThrow(ForbiddenException)
+    })
+    it('rejects system_admin with narrower grants', async () => {
+      const { service } = build([
+        grant('app-y', '*', true, true),
+        grant('app-z', '*', true, true),
+      ])
+      await expect(
+        service.assertFullWriteAdmin({ invokeContext: admin() }),
+      ).rejects.toThrow(ForbiddenException)
+    })
+    it('rejects a read-only full grant', async () => {
+      const { service } = build([grant('*', '*', true, false)])
+      await expect(
+        service.assertFullWriteAdmin({ invokeContext: admin() }),
+      ).rejects.toThrow(ForbiddenException)
+    })
+    it('rejects an anonymous caller and a missing context', async () => {
+      const { service } = build([grant('*', '*', true, true)])
+      await expect(
+        service.assertFullWriteAdmin({ invokeContext: ctx({ sub: '' }) }),
+      ).rejects.toThrow(ForbiddenException)
+      await expect(service.assertFullWriteAdmin({})).rejects.toThrow(
+        ForbiddenException,
+      )
+    })
+    it('does nothing without a resolver', async () => {
+      const { service } = build()
+      await expect(service.assertFullWriteAdmin({})).resolves.toBeUndefined()
+    })
+  })
+
   describe('getAccess', () => {
     it('is disabled with no resolver', async () => {
       const { service } = build()

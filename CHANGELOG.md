@@ -11,6 +11,7 @@ See [Conventional Commits](https://conventionalcommits.org) for commit guideline
   copy now reads data from the source setting's tenant instead of a hard-coded `meltec` tenant,
   and it now copies sequences, which it never did because both keys were built from the target
   tenant. A target sequence behind the source jumps to the source's value.
+- **master (copy):** with `controllerAuth` set, `POST /api/master-setting/copy` requires `system_admin`; roles in `controllerAuth.write` no longer allow it. With a resolver registered, `MasterSettingService.copy` requires `system_admin` and a `'*'`/`'*'` write grant; a resolver that gives `system_admin` narrower grants blocks copy.
 - **master:** creating a tenant-level override of a common setting that has no `systemId` now
   treats that common setting as `shared`: a requested `systemId` other than `shared` is rejected
   with 400, write access to `shared` is required, and the override stores no `systemId`.

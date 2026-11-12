@@ -9,6 +9,7 @@ import {
   GroupRoleResolverRegistry,
   IInvoke,
   KEY_SEPARATOR,
+  ROLE_SYSTEM_ADMIN,
 } from '@mbc-cqrs-serverless/core'
 import {
   BadRequestException,
@@ -154,6 +155,32 @@ export class MasterAccessService {
       return
     }
     if (!options.invokeContext || !this.isCrossTenant(options.invokeContext)) {
+      this.deny()
+    }
+  }
+
+  /** Copy: a logged-in system_admin (custom:roles claim) whose grants include full write. */
+  async assertFullWriteAdmin(options: MasterAccessOptions): Promise<void> {
+    if (!this.isEnabled() || options.skipAccessCheck) {
+      return
+    }
+    const { invokeContext } = options
+    if (!invokeContext) {
+      this.deny()
+    }
+    const user = getUserContext(invokeContext)
+    if (!user.userId || !user.tenantRoles.includes(ROLE_SYSTEM_ADMIN)) {
+      this.deny()
+    }
+    const grants = await this.loadGrants(
+      invokeContext,
+      options.scope?.tenantCode,
+    )
+    if (
+      !grants.some(
+        (g) => g.systemId === '*' && g.settingCode === '*' && g.write,
+      )
+    ) {
       this.deny()
     }
   }
