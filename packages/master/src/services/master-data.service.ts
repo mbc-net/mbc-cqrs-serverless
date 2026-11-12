@@ -192,6 +192,7 @@ export class MasterDataService implements IMasterDataService {
   async list(searchDto: MasterDataSearchDto, options?: MasterAccessOptions) {
     const { tenantCode, settingCode } = searchDto
     if (
+      !settingCode ||
       settingCode === SETTING_SK_PREFIX ||
       settingCode.includes(KEY_SEPARATOR)
     ) {

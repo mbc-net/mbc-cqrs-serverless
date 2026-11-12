@@ -113,6 +113,22 @@ describe('MasterAccessService', () => {
         ForbiddenException,
       )
     })
+    it('rejects a system_admin claim without sub', async () => {
+      const { service } = build([grant('*', '*', true, true)])
+      await expect(
+        service.assertFullWriteAdmin({
+          invokeContext: ctx({ sub: '', role: 'system_admin' }),
+        }),
+      ).rejects.toThrow(ForbiddenException)
+    })
+    it('ignores a group-derived system_admin', async () => {
+      const { service } = build([grant('*', '*', true, true)], ['system_admin'])
+      await expect(
+        service.assertFullWriteAdmin({
+          invokeContext: ctx({ role: 'user', groups: ['g'] }),
+        }),
+      ).rejects.toThrow(ForbiddenException)
+    })
     it('does nothing without a resolver', async () => {
       const { service } = build()
       await expect(service.assertFullWriteAdmin({})).resolves.toBeUndefined()

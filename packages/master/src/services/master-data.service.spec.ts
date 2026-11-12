@@ -2922,6 +2922,16 @@ describe('MasterDataService list access', () => {
     }
   })
 
+  it('rejects an empty or missing settingCode', async () => {
+    const { service, dataService } = await build(true)
+    for (const settingCode of ['', undefined]) {
+      await expect(
+        service.list({ tenantCode: 'ta', settingCode } as any, opts),
+      ).rejects.toThrow(BadRequestException)
+    }
+    expect(dataService.listItemsByPk).not.toHaveBeenCalled()
+  })
+
   it('rejects a settingCode containing #', async () => {
     const { service } = await build(true)
     await expect(

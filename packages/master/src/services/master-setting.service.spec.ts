@@ -2658,7 +2658,7 @@ describe('MasterSettingService read access', () => {
 })
 
 describe('MasterSettingService copy access', () => {
-  const ctx = (role: string) =>
+  const ctx = (role: string, roles?: any[]) =>
     ({
       event: {
         headers: { 'x-tenant-code': 'ta' },
@@ -2668,7 +2668,9 @@ describe('MasterSettingService copy access', () => {
               claims: {
                 sub: 'u1',
                 'custom:tenant': 'ta',
-                'custom:roles': JSON.stringify([{ tenant: 'ta', role }]),
+                'custom:roles': JSON.stringify(
+                  roles ?? [{ tenant: 'ta', role }],
+                ),
               },
             },
           },
@@ -2735,6 +2737,38 @@ describe('MasterSettingService copy access', () => {
   it('copies for system_admin with full write to another tenant', async () => {
     const { service, taskService } = await build(full)
     await service.copy(dto(['tb']), opts('system_admin'))
+    expect(taskService.createStepFunctionTask).toHaveBeenCalled()
+  })
+
+  it('checks the target tenant gate for a multi-role caller', async () => {
+    const { service, taskService } = await build(full)
+    const invokeContext = ctx('user', [
+      { tenant: 'ta', role: 'user' },
+      { tenant: 'ta', role: 'system_admin' },
+    ])
+    await expect(service.copy(dto(['tb']), { invokeContext })).rejects.toThrow(
+      ForbiddenException,
+    )
+    expect(taskService.createStepFunctionTask).not.toHaveBeenCalled()
+  })
+
+  it('rejects a scope systemId that differs from the source owner', async () => {
+    const { service, taskService } = await build(full)
+    await expect(
+      service.copy(dto(['ta']), {
+        ...opts('system_admin'),
+        scope: { systemId: 'app-y' },
+      }),
+    ).rejects.toThrow(ForbiddenException)
+    expect(taskService.createStepFunctionTask).not.toHaveBeenCalled()
+  })
+
+  it('allows a scope systemId matching the source owner, ignoring case', async () => {
+    const { service, taskService } = await build(full)
+    await service.copy(dto(['ta']), {
+      ...opts('system_admin'),
+      scope: { systemId: 'APP-A' },
+    })
     expect(taskService.createStepFunctionTask).toHaveBeenCalled()
   })
 

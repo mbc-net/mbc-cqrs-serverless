@@ -19,6 +19,7 @@ import {
 import { TaskService } from '@mbc-cqrs-serverless/task'
 import {
   BadRequestException,
+  ForbiddenException,
   Inject,
   Injectable,
   Logger,
@@ -27,6 +28,7 @@ import {
 } from '@nestjs/common'
 
 import {
+  MASTER_SYSTEM_SHARED,
   MasterAccessOptions,
   MasterWriteOptions,
 } from '../access/master-access.interface'
@@ -727,7 +729,7 @@ export class MasterSettingService implements IMasterSettingService {
 
   async copy(
     masterCopyDto: MasterCopyDto,
-    opts: { invokeContext: IInvoke },
+    opts: MasterWriteOptions,
   ): Promise<any> {
     this.logger.debug('cmd:', JSON.stringify(masterCopyDto))
 
@@ -751,6 +753,12 @@ export class MasterSettingService implements IMasterSettingService {
       // Check everything before the task is created so a forbidden copy leaves nothing behind.
       await this.access.assertFullWriteAdmin(opts)
       await this.access.assertTenant(setting.tenantCode, 'read', opts)
+      const owner = (getSystemId(setting) ?? MASTER_SYSTEM_SHARED).toLowerCase()
+      if (opts.scope?.systemId && opts.scope.systemId.toLowerCase() !== owner) {
+        throw new ForbiddenException(
+          'Access to this master data is not allowed',
+        )
+      }
       for (const tenant of targetTenants) {
         await this.access.assertTenant(tenant, 'write', opts)
       }
