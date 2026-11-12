@@ -22,6 +22,9 @@ class Routes {
 
   @MasterRoute({ targetsCommon: true })
   createCommon() {}
+
+  @MasterRoute({ systemAdminOnly: true })
+  copy() {}
 }
 
 const claims = (
@@ -296,6 +299,37 @@ describe('MasterControllerGuard', () => {
       as('ta')
       const c = ctx('PUT', { params: { pk: 'MASTER#tb' } })
       expect(await buildGuard().canActivate(c)).toBe(true)
+    })
+  })
+
+  describe('systemAdminOnly route', () => {
+    it('requires system_admin on the copy route whatever write lists', async () => {
+      const guard = buildGuard({ write: ['org_admin'] })
+      mockJwtDecode.mockReturnValue(claims([{ role: 'org_admin' }]))
+      expect(
+        await guard.canActivate(buildContext('POST', Routes.prototype.copy)),
+      ).toBe(false)
+      mockJwtDecode.mockReturnValue(claims([{ role: 'system_admin' }]))
+      expect(
+        await guard.canActivate(buildContext('POST', Routes.prototype.copy)),
+      ).toBe(true)
+    })
+
+    it('ignores a group-derived system_admin on the copy route', async () => {
+      const guard = buildGuard({ write: ['org_admin'] }, ['system_admin'])
+      mockJwtDecode.mockReturnValue(claims([{ role: 'user' }]))
+      expect(
+        await guard.canActivate(buildContext('POST', Routes.prototype.copy)),
+      ).toBe(false)
+    })
+
+    it('still lets the copy route through without controllerAuth', async () => {
+      mockJwtDecode.mockReturnValue(claims([{ role: 'user' }]))
+      expect(
+        await buildGuard().canActivate(
+          buildContext('POST', Routes.prototype.copy),
+        ),
+      ).toBe(true)
     })
   })
 })

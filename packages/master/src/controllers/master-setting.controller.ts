@@ -193,6 +193,7 @@ export class MasterSettingController {
     })
   }
 
+  @MasterRoute({ systemAdminOnly: true })
   @Post('/copy')
   async copyMaster(
     @INVOKE_CONTEXT() invokeContext: IInvoke,

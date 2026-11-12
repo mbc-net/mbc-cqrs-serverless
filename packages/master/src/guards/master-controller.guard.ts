@@ -49,6 +49,9 @@ export class MasterControllerGuard extends RolesGuard {
   }
 
   protected async verifyRole(context: ExecutionContext): Promise<boolean> {
+    if (this.getRoute(context)?.systemAdminOnly) {
+      return getUserContext(context).tenantRoles.includes(ROLE_SYSTEM_ADMIN)
+    }
     const { read, write } = this.options?.controllerAuth ?? {}
     const requiredRoles = this.isRead(context)
       ? (read ?? [])

@@ -2,6 +2,7 @@ import { Test, TestingModule } from '@nestjs/testing'
 import { BadRequestException } from '@nestjs/common'
 import { DetailDto, IInvoke } from '@mbc-cqrs-serverless/core'
 
+import { MASTER_ROUTE_METADATA } from '../guards/master-route.decorator'
 import { MasterSettingController } from './master-setting.controller'
 import { MasterSettingService } from '../services/master-setting.service'
 
@@ -290,5 +291,14 @@ describe('MasterSettingController', () => {
         { invokeContext: mockInvokeContext },
       )
     })
+  })
+
+  it('marks copyMaster as systemAdminOnly', () => {
+    expect(
+      Reflect.getMetadata(
+        MASTER_ROUTE_METADATA,
+        MasterSettingController.prototype.copyMaster,
+      ),
+    ).toEqual({ systemAdminOnly: true })
   })
 })
