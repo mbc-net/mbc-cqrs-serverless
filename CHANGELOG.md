@@ -50,6 +50,9 @@ See [Conventional Commits](https://conventionalcommits.org) for commit guideline
 - **master (`registerAsync`):** the static `commonTenantCode`, `databaseProvider` and
   `controllerAuth` options override the values the factory returns, even when the static value is
   `undefined`; pass them statically.
+- **master (tasks):** `GET /api/tasks/sfn-task-parent` now resolves the tenant like the rest of the
+  framework: the `custom:tenant` claim wins over `x-tenant-code`. It used to read a
+  `custom:tenant_code` claim nobody sets, so it always took the tenant from the header.
 
 ### Features
 

@@ -4,10 +4,7 @@ import { BadRequestException } from '@nestjs/common'
 
 import { MyTaskService } from './my-task.service'
 import { TaskService, TaskEntity } from '@mbc-cqrs-serverless/task'
-import {
-  DetailKey,
-  IInvoke,
-} from '@mbc-cqrs-serverless/core'
+import { DetailKey, IInvoke } from '@mbc-cqrs-serverless/core'
 
 describe('MyTaskService', () => {
   let service: MyTaskService
@@ -35,7 +32,16 @@ describe('MyTaskService', () => {
   })
 
   describe('getSfnTaskParentBySettingCode', () => {
-    const mockInvokeContext = createMock<IInvoke>()
+    const mockInvokeContext = {
+      event: {
+        headers: {},
+        requestContext: {
+          authorizer: {
+            jwt: { claims: { sub: 'u1', 'custom:tenant': 'test-tenant' } },
+          },
+        },
+      },
+    } as unknown as IInvoke
 
     it('should return parent tasks for valid setting code', async () => {
       const masterSettingCode = 'TEST_SETTING'
@@ -58,14 +64,6 @@ describe('MyTaskService', () => {
         } as TaskEntity,
       ]
 
-      jest.spyOn(service, 'getUserContext').mockReturnValue({
-        userId: 'test-user-id',
-        tenantCode: 'test-tenant',
-        tenantRole: 'admin',
-        tenantRoles: ['admin'],
-        tenantGroupIds: [],
-      })
-
       taskService.listItemsByPk.mockResolvedValue({
         items: mockTasks,
         lastSk: undefined,
@@ -73,7 +71,7 @@ describe('MyTaskService', () => {
 
       const result = await service.getSfnTaskParentBySettingCode(
         masterSettingCode,
-        mockInvokeContext
+        mockInvokeContext,
       )
 
       expect(result).toHaveLength(1)
@@ -82,17 +80,39 @@ describe('MyTaskService', () => {
 
     it('should throw BadRequestException when masterSettingCode is empty', async () => {
       await expect(
-        service.getSfnTaskParentBySettingCode('', mockInvokeContext)
+        service.getSfnTaskParentBySettingCode('', mockInvokeContext),
       ).rejects.toThrow(BadRequestException)
 
       await expect(
-        service.getSfnTaskParentBySettingCode('', mockInvokeContext)
+        service.getSfnTaskParentBySettingCode('', mockInvokeContext),
       ).rejects.toThrow('Must provide master setting code')
+    })
+
+    it('lists the claim tenant, not the x-tenant-code header', async () => {
+      const ctx = {
+        event: {
+          headers: { 'x-tenant-code': 'tb' },
+          requestContext: {
+            authorizer: {
+              jwt: { claims: { sub: 'u1', 'custom:tenant': 'ta' } },
+            },
+          },
+        },
+      } as unknown as IInvoke
+      taskService.listItemsByPk.mockResolvedValue({ items: [] } as any)
+
+      await service.getSfnTaskParentBySettingCode('S1', ctx)
+
+      expect(taskService.listItemsByPk).toHaveBeenCalledWith(
+        'ta',
+        'SFN_TASK',
+        expect.anything(),
+      )
     })
 
     it('should throw BadRequestException when masterSettingCode is null', async () => {
       await expect(
-        service.getSfnTaskParentBySettingCode(null as any, mockInvokeContext)
+        service.getSfnTaskParentBySettingCode(null as any, mockInvokeContext),
       ).rejects.toThrow(BadRequestException)
     })
   })
@@ -134,18 +154,6 @@ describe('MyTaskService', () => {
       const result = await service.getSfnChildTask(key)
 
       expect(result).toEqual([])
-    })
-  })
-
-
-  describe('getUserContext', () => {
-    it('should extract user context from IInvoke', () => {
-      const mockInvokeContext = createMock<IInvoke>()
-      
-      const result = service.getUserContext(mockInvokeContext)
-
-      expect(result).toBeDefined()
-      expect(typeof result).toBe('object')
     })
   })
 })
