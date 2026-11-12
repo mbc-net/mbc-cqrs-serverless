@@ -59,6 +59,7 @@ import { CommonSettingBulkDto } from '../dto/master-setting/common-setting-creat
 import { MasterSettingEntity } from '../entities'
 import { SettingTypeEnum } from '../enums'
 import {
+  assertValidSettingCode,
   generateMasterPk,
   generateMasterSettingSk,
   getSettingCodeFromSk,
@@ -280,6 +281,7 @@ export class MasterSettingService implements IMasterSettingService {
     options: MasterWriteOptions,
   ): Promise<CommandModel> {
     const { name, settingValue, code } = dto
+    assertValidSettingCode(code)
 
     const pk = generateMasterPk(this.commonTenantCode)
     const sk = generateMasterSettingSk(code)
@@ -327,6 +329,7 @@ export class MasterSettingService implements IMasterSettingService {
     options: MasterWriteOptions,
   ): Promise<CommandModel> {
     const { name, tenantCode, settingValue, code, groupId } = dto
+    assertValidSettingCode(code)
 
     const pk = generateMasterPk(tenantCode)
 
@@ -357,6 +360,7 @@ export class MasterSettingService implements IMasterSettingService {
     options: MasterWriteOptions,
   ): Promise<CommandModel> {
     const { name, tenantCode, settingValue, code, userId } = dto
+    assertValidSettingCode(code)
 
     const pk = generateMasterPk(tenantCode)
 
@@ -510,6 +514,7 @@ export class MasterSettingService implements IMasterSettingService {
     { throwIfExists }: { throwIfExists: boolean },
   ): Promise<CommandModel> {
     const { name, tenantCode, settingValue, code } = dto
+    assertValidSettingCode(code)
 
     const pk = generateMasterPk(tenantCode)
     const sk = generateMasterSettingSk(code)
@@ -568,6 +573,7 @@ export class MasterSettingService implements IMasterSettingService {
   }
 
   async upsertBulk(createDto: CommonSettingBulkDto, invokeContext: IInvoke) {
+    createDto.items.forEach((item) => assertValidSettingCode(item.code))
     if (this.access?.isEnabled()) {
       // Check every item first so a forbidden one leaves nothing half-written.
       const { tenantCode } = getUserContext(invokeContext)

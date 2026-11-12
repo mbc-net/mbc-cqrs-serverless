@@ -1524,7 +1524,7 @@ describe('MasterDataService', () => {
    */
   describe('Edge Cases and Boundary Conditions', () => {
     describe('create - Edge Cases', () => {
-      it('should handle empty string values in create data', async () => {
+      it('should reject an empty settingCode in create data', async () => {
         const createDto: CreateMasterDataDto = {
           settingCode: '',
           code: '',
@@ -1534,31 +1534,10 @@ describe('MasterDataService', () => {
           attributes: {},
         }
 
-        dataService.getItem.mockResolvedValue(null)
-        const mockCommandResult: CommandModel = {
-          id: 'MASTER#TEST_TENANT##',
-          pk: 'MASTER#TEST_TENANT',
-          sk: '#',
-          version: 1,
-          type: 'MASTER',
-          tenantCode: 'TEST_TENANT',
-          name: '',
-          code: '',
-          seq: 0,
-          attributes: {},
-          isDeleted: false,
-          createdAt: new Date(),
-          updatedAt: new Date(),
-        }
-        commandService.publishAsync.mockResolvedValue(mockCommandResult)
-
-        const result = await service.create(createDto, {
-          invokeContext: mockInvokeContext,
-        })
-
-        expect(result).toBeInstanceOf(MasterDataEntity)
-        expect(result.name).toBe('')
-        expect(result.code).toBe('')
+        await expect(
+          service.create(createDto, { invokeContext: mockInvokeContext }),
+        ).rejects.toThrow(BadRequestException)
+        expect(commandService.publishAsync).not.toHaveBeenCalled()
       })
 
       it('should handle special characters in master data fields', async () => {
@@ -2628,6 +2607,52 @@ describe('MasterDataService ownership and access', () => {
     ).rejects.toThrow(ForbiddenException)
     expect(commandService.publishAsync).not.toHaveBeenCalled()
   })
+
+  it('rejects a bulk settingCode that addresses setting rows', async () => {
+    const { service, dataService, commandService } = await build([
+      { systemId: 'shared', settingCode: '*', read: true, write: true },
+    ])
+    // MASTER_SETTING#USER#victim#S1 is the victim's personal setting row, and no setting is
+    // called MASTER_SETTING, so before the fix the write was checked as shared and allowed.
+    commandService.getLatestItem.mockResolvedValue(null)
+    dataService.getItem.mockResolvedValue({
+      version: 1,
+      tenantCode: 'ta',
+      attributes: {},
+    } as any)
+    await expect(
+      service.upsertBulk(
+        {
+          items: [
+            dto({ code: 'C1' }),
+            dto({ settingCode: 'MASTER_SETTING', code: 'USER#victim#S1' }),
+          ],
+        } as any,
+        invoke,
+      ),
+    ).rejects.toThrow(BadRequestException)
+    expect(commandService.publishAsync).not.toHaveBeenCalled()
+  })
+
+  it.each(['MASTER_SETTING', 'S1#X', ''])(
+    'rejects settingCode %p on create, upsert and createBulk, with or without a resolver',
+    async (settingCode) => {
+      for (const grants of [undefined, all]) {
+        const { service, commandService } = await build(grants)
+        const d = dto({ settingCode }) as any
+        await expect(service.create(d, opts)).rejects.toThrow(
+          BadRequestException,
+        )
+        await expect(service.upsert(d, opts)).rejects.toThrow(
+          BadRequestException,
+        )
+        await expect(
+          service.createBulk({ items: [dto(), d] } as any, invoke),
+        ).rejects.toThrow(BadRequestException)
+        expect(commandService.publishAsync).not.toHaveBeenCalled()
+      }
+    },
+  )
 })
 
 describe('MasterDataService read access', () => {

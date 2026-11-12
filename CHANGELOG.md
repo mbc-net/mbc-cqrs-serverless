@@ -21,9 +21,12 @@ See [Conventional Commits](https://conventionalcommits.org) for commit guideline
 - **master:** creating a tenant-level override of a common setting that has no `systemId` now
   treats that common setting as `shared`: a requested `systemId` other than `shared` is rejected
   with 400, write access to `shared` is required, and the override stores no `systemId`.
-- **master:** `MasterDataService.list` (and `GET /api/master-data`) now rejects a `settingCode`
-  equal to `MASTER_SETTING` or containing `#` with 400, for every application. With a resolver
-  registered, it also leaves out rows the caller may not read.
+- **master:** a setting code that is empty, equals `MASTER_SETTING` or contains `#` is now rejected
+  with 400, for every application: as the `code` of every setting create and upsert (common,
+  tenant, group, user and bulk), and as the `settingCode` of data create, upsert, both bulk
+  endpoints and `MasterDataService.list` (`GET /api/master-data`). Such a code built the key of
+  another row, such as a user's personal setting. A bulk request is checked before anything is
+  written. With a resolver registered, `list` also leaves out rows the caller may not read.
 - **master:** a setting update that omits `settingValue` no longer clears the setting's `attributes`
   (and its owner), one that omits `name` keeps the name, and a data update that omits `seq` keeps it.
 - **master:** for an application that sets neither `controllerAuth` nor a resolver, the other

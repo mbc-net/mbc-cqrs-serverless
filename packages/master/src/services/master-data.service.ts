@@ -26,11 +26,7 @@ import {
   MasterWriteOptions,
 } from '../access/master-access.interface'
 import { MasterAccessService } from '../access/master-access.service'
-import {
-  DATA_SK_PREFIX,
-  MASTER_PK_PREFIX,
-  SETTING_SK_PREFIX,
-} from '../constants'
+import { DATA_SK_PREFIX, MASTER_PK_PREFIX } from '../constants'
 import {
   CreateMasterDataDto,
   CustomMasterDataSearchDto,
@@ -45,6 +41,7 @@ import { MasterDataCreateBulkDto } from '../dto/master-copy/master-data-create-b
 import { MasterDataEntity, MasterDataListEntity } from '../entities'
 import { SettingTypeEnum } from '../enums'
 import {
+  assertValidSettingCode,
   generateMasterDataSk,
   generateMasterPk,
   getSettingCodeFromSk,
@@ -191,13 +188,7 @@ export class MasterDataService implements IMasterDataService {
 
   async list(searchDto: MasterDataSearchDto, options?: MasterAccessOptions) {
     const { tenantCode, settingCode } = searchDto
-    if (
-      !settingCode ||
-      settingCode === SETTING_SK_PREFIX ||
-      settingCode.includes(KEY_SEPARATOR)
-    ) {
-      throw new BadRequestException(`Invalid settingCode: ${settingCode}`)
-    }
+    assertValidSettingCode(settingCode)
     const pkTenant = tenantCode || this.commonTenantCode
     const pk = generateMasterPk(pkTenant)
     if (this.access?.isEnabled()) {
@@ -258,6 +249,7 @@ export class MasterDataService implements IMasterDataService {
         systemId?: unknown
       }
     const { settingCode, code, tenantCode } = dto
+    assertValidSettingCode(settingCode)
     const pk = generateMasterPk(tenantCode)
     const sk = generateMasterDataSk(settingCode, code)
     const id = generateId(pk, sk)
@@ -454,6 +446,8 @@ export class MasterDataService implements IMasterDataService {
   }
 
   async createBulk(createDto: MasterDataCreateBulkDto, invokeContext: IInvoke) {
+    // Before any item runs: Promise.all would let valid items write next to a rejected one.
+    createDto.items.forEach((item) => assertValidSettingCode(item.settingCode))
     return Promise.all(
       createDto.items.map((item) => this.createSetting(item, invokeContext)),
     )
@@ -497,6 +491,7 @@ export class MasterDataService implements IMasterDataService {
   }
 
   async upsertBulk(createDto: MasterDataCreateBulkDto, invokeContext: IInvoke) {
+    createDto.items.forEach((item) => assertValidSettingCode(item.settingCode))
     if (this.access?.isEnabled()) {
       // Check every item first so a forbidden one leaves nothing half-written.
       const { tenantCode } = getUserContext(invokeContext)

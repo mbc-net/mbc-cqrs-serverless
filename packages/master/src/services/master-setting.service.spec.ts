@@ -2472,6 +2472,56 @@ describe('MasterSettingService ownership', () => {
     ).rejects.toThrow(ForbiddenException)
     expect(commandService.publishAsync).not.toHaveBeenCalled()
   })
+
+  it('rejects a bulk code that addresses a personal setting row', async () => {
+    const { service, dataService, commandService } = await build([
+      { systemId: 'shared', settingCode: '*', read: true, write: true },
+    ])
+    // The victim's personal row for S1: no __systemId of its own.
+    dataService.getItem.mockResolvedValue({
+      version: 1,
+      tenantCode: 'ta',
+      attributes: {},
+    })
+    await expect(
+      service.upsertBulk(
+        {
+          items: [
+            { code: 'S2', name: 'n', settingValue: {} },
+            { code: 'USER#victim#S1', name: 'n', settingValue: {} },
+          ],
+        } as any,
+        ctx,
+      ),
+    ).rejects.toThrow(BadRequestException)
+    expect(commandService.publishAsync).not.toHaveBeenCalled()
+  })
+
+  it.each(['A#B', 'MASTER_SETTING', ''])(
+    'rejects setting code %p on every create route, with or without a resolver',
+    async (code) => {
+      for (const grants of [undefined, all]) {
+        const { service, commandService } = await build(grants)
+        const d = dto({ code })
+        await expect(service.createTenantSetting(d, opts)).rejects.toThrow(
+          BadRequestException,
+        )
+        await expect(service.upsertTenantSetting(d, opts)).rejects.toThrow(
+          BadRequestException,
+        )
+        await expect(
+          service.createCommonTenantSetting(d, opts),
+        ).rejects.toThrow(BadRequestException)
+        await expect(
+          service.createGroupSetting({ ...d, groupId: 'g' }, opts),
+        ).rejects.toThrow(BadRequestException)
+        await expect(
+          service.createUserSetting({ ...d, userId: 'u' }, opts),
+        ).rejects.toThrow(BadRequestException)
+        expect(commandService.publishAsync).not.toHaveBeenCalled()
+      }
+    },
+  )
 })
 
 describe('MasterSettingService read access', () => {

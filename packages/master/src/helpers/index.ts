@@ -1,10 +1,22 @@
 import { KEY_SEPARATOR, removeSortKeyVersion } from '@mbc-cqrs-serverless/core'
 import { RotateByEnum } from '@mbc-cqrs-serverless/sequence/dist'
+import { BadRequestException } from '@nestjs/common'
 
 import { MASTER_PK_PREFIX, SETTING_SK_PREFIX } from '../constants'
 
 export function generateMasterPk(tenantCode: string) {
   return `${MASTER_PK_PREFIX}${KEY_SEPARATOR}${tenantCode}`
+}
+
+/**
+ * A setting code must be one key segment and not the setting prefix. Otherwise it builds the
+ * key of another row: `USER#u1#S1` as a setting code is a user's personal row, and
+ * `MASTER_SETTING` as a data settingCode is the setting rows themselves.
+ */
+export function assertValidSettingCode(code: string): void {
+  if (!code || code === SETTING_SK_PREFIX || code.includes(KEY_SEPARATOR)) {
+    throw new BadRequestException(`Invalid settingCode: ${code}`)
+  }
 }
 
 export function generateMasterDataSk(settingCode: string, code: string) {
