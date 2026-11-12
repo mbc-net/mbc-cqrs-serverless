@@ -17,6 +17,7 @@ import {
   CommandModel,
   DataListEntity,
   DataEntity,
+  mergeDeep,
 } from '@mbc-cqrs-serverless/core'
 import {
   MODULE_OPTIONS_TOKEN,
@@ -560,6 +561,35 @@ describe('MasterDataService', () => {
   })
 
   describe('update', () => {
+    it('keeps seq when the update omits it', async () => {
+      const key = { pk: 'MASTER#TEST_TENANT', sk: 'SETTING#DATA1' }
+      const stored = {
+        id: 'test-id',
+        ...key,
+        version: 1,
+        code: 'DATA1',
+        name: 'Original Name',
+        seq: 7,
+        type: 'MASTER',
+        tenantCode: 'TEST_TENANT',
+        isDeleted: false,
+        attributes: {},
+      }
+      dataService.getItem.mockResolvedValue(stored as any)
+      commandService.publishPartialUpdateAsync.mockImplementation(
+        async (input: any) => mergeDeep({}, stored, input) as any,
+      )
+
+      await service.update(key, { name: 'N' } as any, {
+        invokeContext: mockInvokeContext,
+      })
+
+      const merged = await (
+        commandService.publishPartialUpdateAsync as jest.Mock
+      ).mock.results[0].value
+      expect(merged.seq).toBe(7)
+    })
+
     it('should update existing master data', async () => {
       const key = { pk: 'MASTER#TEST_TENANT', sk: 'SETTING#DATA1' }
       const updateDto: UpdateDataSettingDto = {

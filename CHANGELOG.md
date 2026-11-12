@@ -17,6 +17,8 @@ See [Conventional Commits](https://conventionalcommits.org) for commit guideline
 - **master:** `MasterDataService.list` (and `GET /api/master-data`) now rejects a `settingCode`
   equal to `MASTER_SETTING` or containing `#` with 400, for every application. With a resolver
   registered, it also leaves out rows the caller may not read.
+- **master:** a setting update that omits `settingValue` no longer clears the setting's `attributes`
+  (and its owner), one that omits `name` keeps the name, and a data update that omits `seq` keeps it.
 - **master:** for an application that sets neither `controllerAuth` nor a resolver, the other
   changes are: a `__systemId` key sent by a client in `attributes` is now always removed;
   responses go through `toPublicRow`, so a row stored earlier with a client-planted `__systemId`

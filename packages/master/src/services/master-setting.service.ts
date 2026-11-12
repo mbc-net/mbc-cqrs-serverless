@@ -397,14 +397,13 @@ export class MasterSettingService implements IMasterSettingService {
       {
         pk,
         sk,
-        name: dto.name,
-        attributes:
-          dto.settingValue === undefined
-            ? undefined
-            : withSystemAttribute(
-                stripSystemAttribute(dto.settingValue),
-                owner,
-              ),
+        ...(dto.name !== undefined && { name: dto.name }),
+        ...(dto.settingValue !== undefined && {
+          attributes: withSystemAttribute(
+            stripSystemAttribute(dto.settingValue),
+            owner,
+          ),
+        }),
         version: data.version,
       },
       context,

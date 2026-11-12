@@ -33,7 +33,12 @@ import {
 import { MasterAccessService } from '../access/master-access.service'
 import { MasterAccessResolverRegistry } from '../access/master-access-resolver.registry'
 import { createMock } from '@golevelup/ts-jest'
-import { DataModel, CommandModel, DetailKey } from '@mbc-cqrs-serverless/core'
+import {
+  DataModel,
+  CommandModel,
+  DetailKey,
+  mergeDeep,
+} from '@mbc-cqrs-serverless/core'
 import { MasterDataEntity } from '../entities'
 
 const mockInvokeContext = {
@@ -753,6 +758,48 @@ describe('SettingService', () => {
     })
   })
   describe('updateSetting', () => {
+    describe('partial updates', () => {
+      const stored = {
+        pk: 'MASTER#ta',
+        sk: 'MASTER_SETTING#S1',
+        name: 'Old',
+        version: 2,
+        attributes: { fields: [], __systemId: 'app-y' },
+      }
+      const mergedResult = async () =>
+        (commandService.publishPartialUpdateAsync as jest.Mock).mock.results[0]
+          .value
+
+      beforeEach(() => {
+        dataService.getItem.mockResolvedValue(stored as any)
+        commandService.publishPartialUpdateAsync.mockImplementation(
+          async (input: any) => mergeDeep({}, stored, input) as any,
+        )
+      })
+
+      it('keeps attributes and owner on a name-only update', async () => {
+        await service.updateSetting(
+          { pk: stored.pk, sk: stored.sk },
+          { name: 'New' } as any,
+          optionsMock,
+        )
+        const merged = await mergedResult()
+        expect(merged.attributes).toEqual({ fields: [], __systemId: 'app-y' })
+        expect(merged.name).toBe('New')
+      })
+
+      it('keeps the name on a settingValue-only update', async () => {
+        await service.updateSetting(
+          { pk: stored.pk, sk: stored.sk },
+          { settingValue: { fields: [1] } } as any,
+          optionsMock,
+        )
+        const merged = await mergedResult()
+        expect(merged.name).toBe('Old')
+        expect(merged.attributes.__systemId).toBe('app-y')
+      })
+    })
+
     it('should call updateSetting with correct parameters and return the result', async () => {
       const settingCode = ' UserListSetting'
       const settingValue = {}
