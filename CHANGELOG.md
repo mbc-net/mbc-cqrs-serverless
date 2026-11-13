@@ -30,9 +30,11 @@ See [Conventional Commits](https://conventionalcommits.org) for commit guideline
   `MasterDataService.update` and `delete` (`PUT`/`DELETE /api/master-data/:pk/:sk`) now reject a
   `MASTER_SETTING#...` key: setting rows are changed through `/api/master-setting` only.
   Conversely, `MasterSettingService.updateSetting` and `deleteSetting` (`PATCH`/`DELETE
-  /api/master-setting/:pk/:sk`) reject a key that is not `MASTER_SETTING#<code>`: data rows are
-  changed through `/api/master-data` only. The setting-code rule also applies to `getSetting` (`GET /api/master-setting/:code`), so a code such as
-  `USER#u1#S1` no longer reads another user's personal row, and a master data `code` must be
+  /api/master-setting/:pk/:sk`) reject a key that does not start with `MASTER_SETTING#` and a
+  code (group and user keys such as `MASTER_SETTING#USER#u1#S1` are still accepted): data rows
+  are changed through `/api/master-data` only. The setting-code rule also applies to
+  `getSetting` (`GET /api/master-setting/:code`), so a code such as `USER#u1#S1` no longer reads
+  another user's personal row, and a master data `code` must be
   non-empty and contain no `#`. Stored rows are not changed or migrated: a master data row already
   stored with `#` in its `code` stays readable and can still be updated or deleted by key through
   `/api/master-data/:pk/:sk`, but a create or upsert that sends such a code is rejected. Check
@@ -66,9 +68,12 @@ See [Conventional Commits](https://conventionalcommits.org) for commit guideline
 - **master (tasks):** `GET /api/tasks/sfn-task-parent` now resolves the tenant like the rest of the
   framework: the `custom:tenant` claim wins over `x-tenant-code`. It used to read a
   `custom:tenant_code` claim nobody sets, so it always took the tenant from the header.
-- **master (`includeCommon`):** a master data list with `includeCommon` now requires `settingCode`,
-  merges at most 10,000 of the tenant's rows (more is a 400 instead of a database error), and
-  never merges the common tenant's personal setting rows.
+- **master (`includeCommon`):** `includeCommon` hides common rows by the codes the tenant already
+  holds, so it is bounded. A master data list (`GET /api/master-data/list`) with `includeCommon`
+  requires `settingCode` unless the caller is in the common tenant, and on either list a tenant
+  holding more than 10,000 matching rows (soft-deleted included) gets a 400 instead of a database
+  error; results are not truncated. A settings list with `includeCommon` does not merge the
+  common tenant's group and user setting rows.
 
 ### Features
 
