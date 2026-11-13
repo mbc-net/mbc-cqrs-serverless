@@ -824,8 +824,14 @@ export class MasterSettingService implements IMasterSettingService {
 
     // Ownership survives deletion, so deleted rows are tagged too.
     const scope = { systemId: null, ...(tenantCode ? { tenantCode } : {}) }
+    // Match the exact key: group and user rows store their type (USER, GROUP) in masterCode, so
+    // filtering on masterCode alone would tag every personal row when the code is USER or GROUP.
     const settings = await this.prismaService.master.findMany({
-      where: { masterType: SETTING_SK_PREFIX, masterCode: code, ...scope },
+      where: {
+        masterType: SETTING_SK_PREFIX,
+        sk: generateMasterSettingSk(code),
+        ...scope,
+      },
     })
     const data = await this.prismaService.master.findMany({
       where: { masterType: DATA_SK_PREFIX, masterTypeCode: code, ...scope },

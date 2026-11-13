@@ -63,6 +63,11 @@ import {
   PRISMA_SERVICE,
 } from '../master.module-definition'
 
+/** The data API only writes data rows; setting rows (MASTER_SETTING#...) go through MasterSettingService. */
+function assertDataKey(key: DetailDto): void {
+  assertValidSettingCode(key.sk.split(KEY_SEPARATOR)[0])
+}
+
 @Injectable()
 export class MasterDataService implements IMasterDataService {
   private readonly logger = new Logger(MasterDataService.name)
@@ -303,6 +308,7 @@ export class MasterDataService implements IMasterDataService {
     updateDto: UpdateDataSettingDto,
     opts: MasterWriteOptions,
   ) {
+    assertDataKey(key)
     const data = (await this.dataService.getItem(key)) as MasterDataEntity
 
     if (!data) {
@@ -346,6 +352,7 @@ export class MasterDataService implements IMasterDataService {
   }
 
   async delete(key: DetailDto, opts: MasterWriteOptions) {
+    assertDataKey(key)
     const data = (await this.dataService.getItem(key)) as MasterDataEntity
 
     if (!data) {

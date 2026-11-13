@@ -2935,6 +2935,35 @@ describe('MasterSettingService assignSystem', () => {
     expect(publish.mock.calls[0][0].attributes).toEqual({ __systemId: 'app-a' })
   })
 
+  it('leaves personal rows alone when the setting code is USER', async () => {
+    const { service, findMany, publish } = await build()
+    // RDS rows as the template handler stores them: masterCode is the second key segment.
+    const rows = [
+      {
+        masterType: 'MASTER_SETTING',
+        masterCode: 'USER',
+        sk: 'MASTER_SETTING#USER',
+      },
+      {
+        masterType: 'MASTER_SETTING',
+        masterCode: 'USER',
+        sk: 'MASTER_SETTING#USER#victim#SECRET',
+      },
+      { masterType: 'MASTER_DATA', masterTypeCode: 'USER', sk: 'USER#a' },
+    ].map((r) => ({ pk: 'MASTER#ta', tenantCode: 'ta', systemId: null, ...r }))
+    findMany.mockImplementation(async ({ where }: any) =>
+      rows.filter((r) => Object.entries(where).every(([k, v]) => r[k] === v)),
+    )
+    await service.assignSystem(
+      { code: 'USER', systemId: 'app-a', tenantCode: 'ta' },
+      { invokeContext: admin },
+    )
+    expect(publish.mock.calls.map((c) => c[0].sk).sort()).toEqual([
+      'MASTER_SETTING#USER',
+      'USER#a',
+    ])
+  })
+
   it('skips a row whose latest command already has an owner', async () => {
     const { service, publish, getLatestItem } = await build()
     getLatestItem.mockImplementationOnce(async ({ pk, sk }: any) => ({
@@ -3002,7 +3031,7 @@ describe('MasterSettingService assignSystem', () => {
     expect(findMany).toHaveBeenNthCalledWith(1, {
       where: {
         masterType: 'MASTER_SETTING',
-        masterCode: 'S1',
+        sk: 'MASTER_SETTING#S1',
         systemId: null,
         tenantCode: 'ta',
       },

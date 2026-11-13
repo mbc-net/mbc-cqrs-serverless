@@ -2634,6 +2634,28 @@ describe('MasterDataService ownership and access', () => {
     expect(commandService.publishAsync).not.toHaveBeenCalled()
   })
 
+  it('refuses to update or delete a setting row, with or without a resolver', async () => {
+    for (const grants of [undefined, all]) {
+      const { service, dataService, commandService } = await build(grants)
+      // A personal row wrongly tagged with an owner the caller can write.
+      dataService.getItem.mockResolvedValue({
+        pk: 'MASTER#ta',
+        sk: 'MASTER_SETTING#USER#victim#SECRET',
+        version: 1,
+        tenantCode: 'ta',
+        attributes: { __systemId: 'A' },
+      } as any)
+      const key = { pk: 'MASTER#ta', sk: 'MASTER_SETTING#USER#victim#SECRET' }
+      await expect(
+        service.update(key, { name: 'x' } as any, opts),
+      ).rejects.toThrow(BadRequestException)
+      await expect(service.delete(key, opts)).rejects.toThrow(
+        BadRequestException,
+      )
+      expect(commandService.publishPartialUpdateAsync).not.toHaveBeenCalled()
+    }
+  })
+
   it.each(['MASTER_SETTING', 'S1#X', ''])(
     'rejects settingCode %p on create, upsert and createBulk, with or without a resolver',
     async (settingCode) => {
