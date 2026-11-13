@@ -2791,7 +2791,7 @@ describe('MasterDataService read access', () => {
     )
     const where = countWhere(prisma)
     expect(where.OR).toBeDefined()
-    expect(where.AND).toContainEqual({ systemId: 'lobo' })
+    expect(where.AND).toContainEqual({ systemId: 'app-a' })
   })
 
   it('rejects listByRds for another tenant header', async () => {
