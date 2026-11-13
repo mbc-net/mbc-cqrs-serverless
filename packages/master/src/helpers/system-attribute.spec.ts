@@ -42,7 +42,10 @@ describe('system attribute helpers', () => {
   })
   it('keeps a value already on the row from the RDS column', () => {
     const row = { systemId: 'app-a', attributes: { a: 1 } }
-    expect(toPublicRow(row)).toEqual({ systemId: 'app-a', attributes: { a: 1 } })
+    expect(toPublicRow(row)).toEqual({
+      systemId: 'app-a',
+      attributes: { a: 1 },
+    })
   })
   it('returns a row with no owner unchanged', () => {
     const row = { attributes: { a: 1 } }
