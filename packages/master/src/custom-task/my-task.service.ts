@@ -1,18 +1,11 @@
 import {
   DetailKey,
-  extractInvokeContext,
-  getAuthorizerClaims,
-  HEADER_TENANT_CODE,
+  getUserContext,
   IInvoke,
   KEY_SEPARATOR,
-  UserContext,
 } from '@mbc-cqrs-serverless/core'
 import { TaskEntity, TaskService } from '@mbc-cqrs-serverless/task'
-import {
-  BadRequestException,
-  ExecutionContext,
-  Injectable,
-} from '@nestjs/common'
+import { BadRequestException, Injectable } from '@nestjs/common'
 
 @Injectable()
 export class MyTaskService {
@@ -22,7 +15,8 @@ export class MyTaskService {
     masterSettingCode: string,
     invokeContext: IInvoke,
   ) {
-    const userContext = this.getUserContext(invokeContext)
+    // Same tenant resolution as the guard: the custom:tenant claim wins over x-tenant-code.
+    const userContext = getUserContext(invokeContext)
     if (!masterSettingCode) {
       throw new BadRequestException('Must provide master setting code')
     }
@@ -77,25 +71,5 @@ export class MyTaskService {
 
   private isParentTask(sk: string) {
     return sk.split(KEY_SEPARATOR).length === 2
-  }
-
-  getUserContext = (ctx: IInvoke | ExecutionContext): UserContext => {
-    if ('getHandler' in ctx) {
-      ctx = extractInvokeContext(ctx)
-    }
-    const claims = getAuthorizerClaims(ctx)
-
-    const userId = claims.sub
-    const tenantCode =
-      claims['custom:tenant_code'] ||
-      (ctx?.event?.headers || {})[HEADER_TENANT_CODE]
-    const tenantRole = claims['custom:user_type']
-    return {
-      userId,
-      tenantRole,
-      tenantCode,
-      tenantRoles: tenantRole ? [tenantRole] : [],
-      tenantGroupIds: [],
-    }
   }
 }

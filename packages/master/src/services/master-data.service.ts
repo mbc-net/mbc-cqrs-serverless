@@ -1,5 +1,6 @@
 import {
   CommandService,
+  DataModel,
   DataService,
   DetailDto,
   generateId,
@@ -11,18 +12,21 @@ import {
 } from '@mbc-cqrs-serverless/core'
 import {
   BadRequestException,
+  ForbiddenException,
   Inject,
   Injectable,
   Logger,
   NotFoundException,
+  Optional,
 } from '@nestjs/common'
 import { ulid } from 'ulid'
 
 import {
-  DATA_SK_PREFIX,
-  MASTER_PK_PREFIX,
-  SETTING_SK_PREFIX,
-} from '../constants'
+  MasterAccessOptions,
+  MasterWriteOptions,
+} from '../access/master-access.interface'
+import { MasterAccessService } from '../access/master-access.service'
+import { DATA_SK_PREFIX, MASTER_PK_PREFIX } from '../constants'
 import {
   CreateMasterDataDto,
   CustomMasterDataSearchDto,
@@ -35,14 +39,66 @@ import {
 } from '../dto'
 import { MasterDataCreateBulkDto } from '../dto/master-copy/master-data-create-bulk.dto'
 import { MasterDataEntity, MasterDataListEntity } from '../entities'
-import { generateMasterDataSk, generateMasterPk } from '../helpers'
-import { getOrderBys } from '../helpers/rds'
+import { SettingTypeEnum } from '../enums'
+import {
+  assertValidDataCode,
+  assertValidSettingCode,
+  generateMasterDataSk,
+  generateMasterPk,
+  getSettingCodeFromSk,
+  getSystemId,
+  stripSystemAttribute,
+  toPublicRow,
+  withSystemAttribute,
+} from '../helpers'
+import {
+  containsInsensitive,
+  DatabaseProvider,
+  resolveDatabaseProvider,
+} from '../helpers/database-provider'
+import { buildTenantScope, getOrderBys } from '../helpers/rds'
 import { IMasterDataService } from '../interfaces'
-import { PRISMA_SERVICE } from '../master.module-definition'
+import {
+  MasterModuleOptions,
+  MODULE_OPTIONS_TOKEN,
+  PRISMA_SERVICE,
+} from '../master.module-definition'
+
+/** A missing code is generated later; a given one must be a single key segment. */
+function assertBulkItemKey(item: { settingCode: string; code?: string }): void {
+  assertValidSettingCode(item.settingCode)
+  if (item.code !== undefined) assertValidDataCode(item.code)
+}
+
+/** The data API only writes data rows; setting rows (MASTER_SETTING#...) go through MasterSettingService. */
+function assertDataKey(key: DetailDto): void {
+  assertValidSettingCode(key.sk.split(KEY_SEPARATOR)[0])
+}
 
 @Injectable()
 export class MasterDataService implements IMasterDataService {
   private readonly logger = new Logger(MasterDataService.name)
+
+  @Optional()
+  @Inject(MODULE_OPTIONS_TOKEN)
+  private readonly moduleOptions?: MasterModuleOptions
+
+  @Optional()
+  @Inject(MasterAccessService)
+  private readonly access?: MasterAccessService
+
+  private get commonTenantCode(): string {
+    return this.moduleOptions?.commonTenantCode ?? SettingTypeEnum.TENANT_COMMON
+  }
+
+  private resolvedProvider?: DatabaseProvider
+
+  private get databaseProvider(): DatabaseProvider {
+    return (this.resolvedProvider ??= resolveDatabaseProvider(
+      this.prismaService,
+      this.moduleOptions?.databaseProvider,
+    ))
+  }
 
   constructor(
     @Inject(PRISMA_SERVICE)
@@ -59,34 +115,27 @@ export class MasterDataService implements IMasterDataService {
    */
   async listByRds(
     searchDto: CustomMasterDataSearchDto,
-    context: { invokeContext: IInvoke },
+    context: MasterWriteOptions,
   ) {
     const { invokeContext } = context
     const userContext = getUserContext(invokeContext)
-    const deletedSettingData = await this.prismaService.master.findMany({
-      where: {
-        tenantCode: this.getTenantCode(userContext),
-        isDeleted: true,
-        masterType: SETTING_SK_PREFIX,
-      },
-      select: {
-        masterCode: true,
-      },
-    })
-
-    const deletedSettingCode = deletedSettingData.map(
-      (setting) => setting.masterCode,
-    )
-
-    const where: any = {
-      tenantCode: this.getTenantCode(userContext),
-      masterType: DATA_SK_PREFIX,
+    const enabled = !!this.access?.isEnabled()
+    const tenantCode = enabled
+      ? this.access.callerTenant(context)
+      : this.getTenantCode(userContext)
+    if (enabled) {
+      await this.access.assertTenant(tenantCode, 'read', context)
     }
-
-    if (deletedSettingCode.length > 0) {
-      where.masterTypeCode = {
-        notIn: deletedSettingCode,
-      }
+    const where: any = {
+      ...(await buildTenantScope(this.prismaService, {
+        tenantCode,
+        commonTenantCode: this.commonTenantCode,
+        masterType: DATA_SK_PREFIX,
+        masterTypeCode: searchDto.settingCode?.trim() || undefined,
+        includeCommon: searchDto.includeCommon,
+        hideDeletedSettings: true,
+      })),
+      masterType: DATA_SK_PREFIX,
     }
 
     if (searchDto.isDeleted === false || searchDto.isDeleted === undefined) {
@@ -95,15 +144,16 @@ export class MasterDataService implements IMasterDataService {
 
     const andConditions: any[] = []
 
+    const provider = this.databaseProvider
     if (searchDto.keyword?.trim()) {
       andConditions.push({
-        name: { contains: searchDto.keyword.trim(), mode: 'insensitive' },
+        name: containsInsensitive(searchDto.keyword.trim(), provider),
       })
     }
 
     if (searchDto.code?.trim()) {
       andConditions.push({
-        masterCode: { contains: searchDto.code.trim(), mode: 'insensitive' },
+        masterCode: containsInsensitive(searchDto.code.trim(), provider),
       })
     }
 
@@ -111,6 +161,15 @@ export class MasterDataService implements IMasterDataService {
       andConditions.push({
         masterTypeCode: searchDto.settingCode.trim(),
       })
+    }
+
+    const accessFilter = await this.access?.buildListFilter(
+      'data',
+      context,
+      searchDto.systemId,
+    )
+    if (accessFilter) {
+      andConditions.push(accessFilter)
     }
 
     if (andConditions.length) {
@@ -135,17 +194,25 @@ export class MasterDataService implements IMasterDataService {
 
     return new MasterRdsListEntity({
       total,
-      items: items.map((item) => new MasterRdsEntity(item)),
+      items: items.map((item) => new MasterRdsEntity(toPublicRow(item))),
     })
   }
 
-  async list(searchDto: MasterDataSearchDto) {
+  async list(searchDto: MasterDataSearchDto, options?: MasterAccessOptions) {
     const { tenantCode, settingCode } = searchDto
-    let pk
-    if (tenantCode) {
-      pk = generateMasterPk(tenantCode)
-    } else {
-      pk = generateMasterPk('common')
+    assertValidSettingCode(settingCode)
+    const pkTenant = tenantCode || this.commonTenantCode
+    const pk = generateMasterPk(pkTenant)
+    if (this.access?.isEnabled()) {
+      const setting = await this.access.getEffectiveSetting(
+        pkTenant,
+        settingCode,
+      )
+      await this.access.assertAccess(
+        { tenantCode: pkTenant, systemId: getSystemId(setting), settingCode },
+        'read',
+        options ?? {},
+      )
     }
     const query = { sk: undefined }
 
@@ -156,34 +223,46 @@ export class MasterDataService implements IMasterDataService {
       },
     }
     const res = await this.dataService.listItemsByPk(pk, query)
-    return new MasterDataListEntity(res)
+    let rows = res.items
+    if (rows && this.access?.isEnabled()) {
+      const readable = await Promise.all(
+        rows.map((row) => this.canReadRow(row, options)),
+      )
+      rows = rows.filter((_, i) => readable[i])
+    }
+    return new MasterDataListEntity({
+      ...res,
+      items: rows?.map((item) => new MasterDataEntity(toPublicRow(item))),
+    })
   }
 
-  async get(key: DetailDto) {
+  async get(key: DetailDto, options?: MasterAccessOptions) {
     const res = await this.dataService.getItem(key)
-    return new MasterDataEntity(res)
+    await this.assertRowRead(res, options)
+    return new MasterDataEntity(toPublicRow(res))
   }
 
-  async create(
-    createDto: CreateMasterDataDto,
-    opts: { invokeContext: IInvoke },
-  ) {
+  async create(createDto: CreateMasterDataDto, opts: MasterWriteOptions) {
     return this.createOrUpsert(createDto, opts, { throwIfExists: true })
   }
 
-  async upsert(
-    createDto: CreateMasterDataDto,
-    opts: { invokeContext: IInvoke },
-  ) {
+  async upsert(createDto: CreateMasterDataDto, opts: MasterWriteOptions) {
     return this.createOrUpsert(createDto, opts, { throwIfExists: false })
   }
 
   private async createOrUpsert(
     createDto: CreateMasterDataDto,
-    opts: { invokeContext: IInvoke },
+    opts: MasterWriteOptions,
     { throwIfExists }: { throwIfExists: boolean },
   ): Promise<MasterDataEntity> {
-    const { settingCode, code, tenantCode } = createDto
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    const { systemId: _clientSystemId, ...dto } =
+      createDto as CreateMasterDataDto & {
+        systemId?: unknown
+      }
+    const { settingCode, code, tenantCode } = dto
+    assertValidSettingCode(settingCode)
+    assertValidDataCode(code)
     const pk = generateMasterPk(tenantCode)
     const sk = generateMasterDataSk(settingCode, code)
     const id = generateId(pk, sk)
@@ -194,6 +273,11 @@ export class MasterDataService implements IMasterDataService {
       throw new BadRequestException('Master data already exists')
     }
 
+    const systemId = await this.access?.prepareDataOwner(
+      { tenantCode, settingCode, existing: existingData },
+      opts,
+    )
+
     const createCmd = {
       id,
       pk,
@@ -202,7 +286,11 @@ export class MasterDataService implements IMasterDataService {
       type: MASTER_PK_PREFIX,
       tenantCode,
       isDeleted: false,
-      ...createDto,
+      ...dto,
+      attributes: withSystemAttribute(
+        stripSystemAttribute(dto.attributes),
+        systemId,
+      ),
     }
 
     const item = await this.commandService.publishAsync(createCmd, {
@@ -217,22 +305,32 @@ export class MasterDataService implements IMasterDataService {
       }
       // eslint-disable-next-line @typescript-eslint/no-unused-vars
       const { requestId, ...rest } = existingData
-      return new MasterDataEntity(rest)
+      return new MasterDataEntity(toPublicRow(rest))
     }
 
-    return new MasterDataEntity(item)
+    return new MasterDataEntity(toPublicRow(item))
   }
 
   async update(
     key: DetailDto,
     updateDto: UpdateDataSettingDto,
-    opts: { invokeContext: IInvoke },
+    opts: MasterWriteOptions,
   ) {
+    assertDataKey(key)
     const data = (await this.dataService.getItem(key)) as MasterDataEntity
 
     if (!data) {
       throw new NotFoundException('Master data not found')
     }
+
+    const systemId = await this.access?.prepareDataOwner(
+      {
+        tenantCode: data.tenantCode,
+        settingCode: getSettingCodeFromSk(data.sk),
+        existing: data,
+      },
+      opts,
+    )
 
     const updateCmd = {
       id: data.id,
@@ -241,11 +339,14 @@ export class MasterDataService implements IMasterDataService {
       version: data.version,
       code: data.code,
       name: updateDto.name ?? data.name,
-      seq: updateDto.seq,
+      ...(updateDto.seq !== undefined && { seq: updateDto.seq }),
       type: data.type,
       tenantCode: data.tenantCode,
       isDeleted: updateDto.isDeleted ?? data.isDeleted,
-      attributes: updateDto.attributes ?? data.attributes,
+      attributes: withSystemAttribute(
+        stripSystemAttribute(updateDto.attributes) ?? data.attributes,
+        systemId,
+      ),
     }
 
     const item = await this.commandService.publishPartialUpdateAsync(
@@ -255,10 +356,11 @@ export class MasterDataService implements IMasterDataService {
       },
     )
 
-    return new MasterDataEntity(item)
+    return new MasterDataEntity(toPublicRow(item))
   }
 
-  async delete(key: DetailDto, opts: { invokeContext: IInvoke }) {
+  async delete(key: DetailDto, opts: MasterWriteOptions) {
+    assertDataKey(key)
     const data = (await this.dataService.getItem(key)) as MasterDataEntity
 
     if (!data) {
@@ -268,6 +370,15 @@ export class MasterDataService implements IMasterDataService {
     if (data.isDeleted) {
       throw new BadRequestException('This master data is already deleted')
     }
+
+    await this.access?.prepareDataOwner(
+      {
+        tenantCode: data.tenantCode,
+        settingCode: getSettingCodeFromSk(data.sk),
+        existing: data,
+      },
+      opts,
+    )
 
     const deleteCmd = {
       ...data,
@@ -281,10 +392,16 @@ export class MasterDataService implements IMasterDataService {
       },
     )
 
-    return new MasterDataEntity(item)
+    return new MasterDataEntity(toPublicRow(item))
   }
 
-  async checkExistCode(tenantCode: string, type: string, code: string) {
+  async checkExistCode(
+    tenantCode: string,
+    type: string,
+    code: string,
+    options?: MasterAccessOptions,
+  ) {
+    await this.access?.assertTenant(tenantCode, 'read', options ?? {})
     const pk = generateMasterPk(tenantCode)
     const sk = generateMasterDataSk(type, code)
     const item = (await this.dataService.getItem({
@@ -299,12 +416,43 @@ export class MasterDataService implements IMasterDataService {
     return userContext.tenantCode
   }
 
-  async getDetail(key: DetailDto) {
+  /** Read access to a found row; a setting key works too, as the frontend loads settings here. */
+  private async assertRowRead(
+    row: DataModel | null | undefined,
+    options?: MasterAccessOptions,
+  ): Promise<void> {
+    if (!row || !this.access?.isEnabled()) return
+    await this.access.assertAccess(
+      {
+        tenantCode: row.tenantCode,
+        systemId: await this.access.resolveRowOwner(row, row.tenantCode),
+        settingCode: getSettingCodeFromSk(row.sk),
+      },
+      'read',
+      options ?? {},
+    )
+  }
+
+  private async canReadRow(
+    row: DataModel,
+    options?: MasterAccessOptions,
+  ): Promise<boolean> {
+    try {
+      await this.assertRowRead(row, options)
+      return true
+    } catch (e) {
+      if (e instanceof ForbiddenException) return false
+      throw e
+    }
+  }
+
+  async getDetail(key: DetailDto, options?: MasterAccessOptions) {
     const data = await this.dataService.getItem(key)
 
     if (!data) throw new NotFoundException('Master data not found')
+    await this.assertRowRead(data, options)
 
-    return new MasterRdsEntity(data)
+    return new MasterRdsEntity(toPublicRow(data))
   }
 
   async createSetting(createDto: MasterDataCreateDto, invokeContext: IInvoke) {
@@ -313,6 +461,8 @@ export class MasterDataService implements IMasterDataService {
   }
 
   async createBulk(createDto: MasterDataCreateBulkDto, invokeContext: IInvoke) {
+    // Before any item runs: Promise.all would let valid items write next to a rejected one.
+    createDto.items.forEach(assertBulkItemKey)
     return Promise.all(
       createDto.items.map((item) => this.createSetting(item, invokeContext)),
     )
@@ -356,6 +506,24 @@ export class MasterDataService implements IMasterDataService {
   }
 
   async upsertBulk(createDto: MasterDataCreateBulkDto, invokeContext: IInvoke) {
+    createDto.items.forEach(assertBulkItemKey)
+    if (this.access?.isEnabled()) {
+      // Check every item first so a forbidden one leaves nothing half-written.
+      const { tenantCode } = getUserContext(invokeContext)
+      for (const item of createDto.items) {
+        const tenant = item.tenantCode ?? tenantCode
+        const existing = item.code
+          ? await this.dataService.getItem({
+              pk: generateMasterPk(tenant),
+              sk: generateMasterDataSk(item.settingCode, item.code),
+            })
+          : null
+        await this.access.prepareDataOwner(
+          { tenantCode: tenant, settingCode: item.settingCode, existing },
+          { invokeContext },
+        )
+      }
+    }
     const results = []
     for (const item of createDto.items) {
       results.push(await this.upsertSetting(item, invokeContext))

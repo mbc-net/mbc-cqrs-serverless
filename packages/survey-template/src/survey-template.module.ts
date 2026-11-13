@@ -76,6 +76,7 @@ export class SurveyTemplateModule extends ConfigurableModuleClass {
           ...resolved,
           enableController: options.enableController,
           dataSyncHandlers: options.dataSyncHandlers,
+          databaseProvider: options.databaseProvider,
           tableName: options.tableName ?? DEFAULT_SURVEY_TABLE_NAME,
         }
       },

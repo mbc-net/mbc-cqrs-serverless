@@ -17,6 +17,7 @@ import { CopyType, DataCopyMode, DataCopyOptionDto } from '../dto'
 import {
   generateMasterPk,
   genSequenceSk,
+  getSystemId,
   parseId,
   sequencePk,
 } from '../helpers'
@@ -70,7 +71,11 @@ export class MasterSfnTaskEventHandler
         await this.copySeqToTenant(setting, targetTenant)
       }
 
-      const dataToCopy = await this.fetchMasterData(masterCode, dataCopyOption)
+      const dataToCopy = await this.fetchMasterData(
+        setting.pk,
+        masterCode,
+        dataCopyOption,
+      )
 
       await this.copyDataToTenant(dataToCopy, targetTenant, invokeContext)
     }
@@ -86,14 +91,14 @@ export class MasterSfnTaskEventHandler
   }
 
   private async fetchMasterData(
+    sourcePk: string,
     masterCode: string,
     dataCopyOption?: DataCopyOptionDto,
-    tenant: string = 'meltec',
   ): Promise<any[]> {
     const where: any = {
       masterType: DATA_SK_PREFIX,
       masterTypeCode: masterCode,
-      pk: `MASTER${KEY_SEPARATOR}${tenant}`,
+      pk: sourcePk,
     }
 
     if (dataCopyOption?.mode === DataCopyMode.PARTIAL) {
@@ -138,6 +143,7 @@ export class MasterSfnTaskEventHandler
         },
         {
           invokeContext,
+          skipAccessCheck: true,
         },
       )
     } else {
@@ -153,7 +159,11 @@ export class MasterSfnTaskEventHandler
           settingValue: setting.attributes,
           tenantCode,
         },
-        { invokeContext },
+        {
+          invokeContext,
+          skipAccessCheck: true,
+          systemId: getSystemId(setting),
+        },
       )
     }
   }
@@ -192,6 +202,7 @@ export class MasterSfnTaskEventHandler
               },
               {
                 invokeContext,
+                skipAccessCheck: true,
               },
             )
           }
@@ -209,7 +220,11 @@ export class MasterSfnTaskEventHandler
               attributes: data.attributes as object,
               seq: data.seq,
             },
-            { invokeContext },
+            {
+              invokeContext,
+              skipAccessCheck: true,
+              systemId: getSystemId(data),
+            },
           )
         }),
       )
@@ -227,16 +242,16 @@ export class MasterSfnTaskEventHandler
       return false
     }
 
-    const jcciSeqKey = this.generateSequenceKey(tenantCode, setting)
-    const { seq: jcciSeq = 0 } =
-      (await this.sequencesService.getCurrentSequence(jcciSeqKey)) ?? {}
-    this.logger.debug('sfn-event-shouldCopySequence-jcciSeq', {
-      jcciSeqKey,
-      jcciSeq,
+    const sourceSeqKey = this.generateSequenceKey(setting.tenantCode, setting)
+    const { seq: sourceSeq = 0 } =
+      (await this.sequencesService.getCurrentSequence(sourceSeqKey)) ?? {}
+    this.logger.debug('sfn-event-shouldCopySequence-sourceSeq', {
+      sourceSeqKey,
+      sourceSeq,
     })
 
-    if (jcciSeq === 0) {
-      this.logger.debug('Skipping sequence copy: JCCI sequence is 0')
+    if (sourceSeq === 0) {
+      this.logger.debug('Skipping sequence copy: source sequence is 0')
       return false
     }
 
@@ -253,7 +268,7 @@ export class MasterSfnTaskEventHandler
       return true
     }
 
-    if (jcciSeq > tenantSeq) {
+    if (sourceSeq > tenantSeq) {
       this.logger.debug('Tenant sequence is behind: copying required')
       return true
     }
@@ -267,42 +282,34 @@ export class MasterSfnTaskEventHandler
     const codeField = fields.find((f) => f.physicalName === 'code')
     const typeCode = codeField.formatCode ?? codeField.dataFormat
 
-    const jcciSeqKey = this.generateSequenceKey(tenantCode, setting)
-    const { seq: jcciSeq = 0 } =
-      (await this.sequencesService.getCurrentSequence(jcciSeqKey)) ?? {}
+    const sourceSeqKey = this.generateSequenceKey(setting.tenantCode, setting)
+    const { seq: sourceSeq = 0 } =
+      (await this.sequencesService.getCurrentSequence(sourceSeqKey)) ?? {}
 
     const tenantSeqKey = this.generateSequenceKey(tenantCode, setting)
-    const { seq: tenantSeq = 0 } =
-      (await this.sequencesService.getCurrentSequence(tenantSeqKey)) ?? {}
+    this.logger.debug('Copying sequence', { sourceSeq, tenantCode })
 
-    const distance = jcciSeq - tenantSeq
-    this.logger.debug('Copying sequence gap:', {
-      jcciSeq,
-      tenantSeq,
-      distance,
-    })
-
-    this.logger.debug('putItem', {
-      pk: tenantSeqKey.pk,
-      sk: tenantSeqKey.sk,
-      code: tenantSeqKey.sk,
-      name: tenantSeqKey.sk.split(KEY_SEPARATOR).at(-1),
-      seq: jcciSeq,
-      tenantCode,
-      type: typeCode,
-    })
-
-    this.logger.debug('this.sequenceTableName', this.sequenceTableName)
-
-    await this.dynamoDbService.putItem(this.sequenceTableName, {
-      pk: tenantSeqKey.pk,
-      sk: tenantSeqKey.sk,
-      code: tenantSeqKey.sk,
-      name: tenantSeqKey.sk.split(KEY_SEPARATOR).at(-1),
-      seq: jcciSeq,
-      tenantCode,
-      type: typeCode,
-    })
+    try {
+      // Conditional write: never move a counter the target has already advanced past.
+      await this.dynamoDbService.updateItem(
+        this.sequenceTableName,
+        { pk: tenantSeqKey.pk, sk: tenantSeqKey.sk },
+        {
+          set: {
+            seq: sourceSeq,
+            code: tenantSeqKey.sk,
+            name: tenantSeqKey.sk.split(KEY_SEPARATOR).at(-1),
+            tenantCode,
+            type: typeCode,
+          },
+        },
+        'attribute_not_exists(#seq) OR #seq < :seq',
+      )
+    } catch (error) {
+      if ((error as Error)?.name !== 'ConditionalCheckFailedException')
+        throw error
+      this.logger.debug('Tenant sequence already ahead: copy skipped')
+    }
   }
 
   private generateSequenceKey(tenantCode: string, setting: DataModel) {

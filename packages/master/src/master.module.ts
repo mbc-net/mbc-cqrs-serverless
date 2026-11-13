@@ -3,13 +3,20 @@ import {
   buildPrismaProviderAsync,
   buildPrismaProviderSync,
   DataStoreModule,
+  ExplorerService,
   QueueModule,
 } from '@mbc-cqrs-serverless/core'
 import { SequencesModule } from '@mbc-cqrs-serverless/sequence'
-import { DynamicModule, Logger, Module } from '@nestjs/common'
+import { DynamicModule, Logger, Module, Provider, Type } from '@nestjs/common'
 
+import {
+  MasterAccessBootstrapService,
+  MasterAccessResolverRegistry,
+  MasterAccessService,
+} from './access'
 import { TABLE_NAME } from './constants'
 import {
+  MasterAccessController,
   MasterBulkController,
   MasterDataController,
   MasterSettingController,
@@ -19,6 +26,7 @@ import { MasterSfnTaskEventHandler } from './handler/master-sfn-task.handler'
 import {
   ConfigurableModuleClass,
   MasterModuleAsyncOptions,
+  MasterModuleOptions,
   MODULE_OPTIONS_TOKEN,
   OPTIONS_TYPE,
   PRISMA_SERVICE,
@@ -27,8 +35,15 @@ import { MasterDataService, MasterSettingService } from './services'
 
 @Module({
   imports: [DataStoreModule, QueueModule],
-  providers: [MasterDataService, MasterSettingService],
-  exports: [MasterDataService, MasterSettingService],
+  providers: [
+    MasterDataService,
+    MasterSettingService,
+    ExplorerService,
+    MasterAccessResolverRegistry,
+    MasterAccessBootstrapService,
+    MasterAccessService,
+  ],
+  exports: [MasterDataService, MasterSettingService, MasterAccessService],
 })
 export class MasterModule extends ConfigurableModuleClass {
   private static readonly logger = new Logger(MasterModule.name)
@@ -52,8 +67,55 @@ export class MasterModule extends ConfigurableModuleClass {
     }
   }
 
+  private static warnIfUnguarded(options: {
+    enableController?: boolean
+    controllerAuth?: unknown
+  }): void {
+    if (options.enableController && !options.controllerAuth) {
+      MasterModule.logger.warn(
+        `The master controllers are enabled without controllerAuth, so their routes ` +
+          `are open to any caller that passes the application's own guards. Set ` +
+          `controllerAuth (for example {}) to require a login for reads and the ` +
+          `system_admin role for writes.`,
+      )
+    }
+  }
+
+  /** Wires the controllers and the copy task; shared by register and registerAsync. */
+  private static wireFeatures(
+    options: {
+      enableController?: boolean
+      enableCopyTask?: boolean
+      controllerAuth?: MasterModuleOptions['controllerAuth']
+      commonTenantCode?: string
+    },
+    providers: Provider[],
+    controllers: Type<any>[],
+    imports: NonNullable<DynamicModule['imports']>,
+  ): void {
+    if (options.enableController) {
+      controllers.push(
+        MasterAccessController,
+        MasterBulkController,
+        MasterDataController,
+        MasterSettingController,
+      )
+      imports.push(
+        CustomTaskModule.register({
+          controllerAuth: options.controllerAuth,
+          commonTenantCode: options.commonTenantCode,
+        }),
+      )
+    }
+    if (options.enableCopyTask ?? options.enableController) {
+      providers.push(MasterSfnTaskEventHandler)
+      imports.push(SequencesModule)
+    }
+  }
+
   static register(options: typeof OPTIONS_TYPE): DynamicModule {
     MasterModule.warnIfCustomTable(options.tableName)
+    MasterModule.warnIfUnguarded(options)
     const base = super.register(options)
     const providers = [...(base.providers ?? [])]
     const controllers = [...(base.controllers ?? [])]
@@ -69,15 +131,7 @@ export class MasterModule extends ConfigurableModuleClass {
     const handlers = options.dataSyncHandlers ?? []
     providers.push(...handlers)
 
-    if (options.enableController) {
-      controllers.push(
-        MasterBulkController,
-        MasterDataController,
-        MasterSettingController,
-      )
-      providers.push(MasterSfnTaskEventHandler)
-      imports.push(CustomTaskModule, SequencesModule)
-    }
+    MasterModule.wireFeatures(options, providers, controllers, imports)
 
     imports.push(
       buildDomainCommandModule(TABLE_NAME, {
@@ -91,6 +145,7 @@ export class MasterModule extends ConfigurableModuleClass {
 
   static registerAsync(options: MasterModuleAsyncOptions): DynamicModule {
     MasterModule.warnIfCustomTable(options.tableName)
+    MasterModule.warnIfUnguarded(options)
     const base = super.registerAsync({
       imports: options.imports,
       inject: options.inject ?? [],
@@ -99,6 +154,10 @@ export class MasterModule extends ConfigurableModuleClass {
         return {
           ...resolved,
           enableController: options.enableController,
+          commonTenantCode: options.commonTenantCode,
+          controllerAuth: options.controllerAuth,
+          enableCopyTask: options.enableCopyTask,
+          databaseProvider: options.databaseProvider,
           dataSyncHandlers: options.dataSyncHandlers,
           tableName: options.tableName ?? TABLE_NAME,
         }
@@ -115,15 +174,7 @@ export class MasterModule extends ConfigurableModuleClass {
     const handlers = options.dataSyncHandlers ?? []
     providers.push(...handlers)
 
-    if (options.enableController) {
-      controllers.push(
-        MasterBulkController,
-        MasterDataController,
-        MasterSettingController,
-      )
-      providers.push(MasterSfnTaskEventHandler)
-      imports.push(CustomTaskModule, SequencesModule)
-    }
+    MasterModule.wireFeatures(options, providers, controllers, imports)
 
     imports.push(
       buildDomainCommandModule(TABLE_NAME, {

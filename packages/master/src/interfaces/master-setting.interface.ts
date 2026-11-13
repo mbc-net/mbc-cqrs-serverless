@@ -5,6 +5,7 @@ import {
   SearchDto,
 } from '@mbc-cqrs-serverless/core'
 
+import { MasterAccessOptions } from '../access/master-access.interface'
 import {
   CommonSettingDto,
   GetSettingDto,
@@ -30,7 +31,7 @@ export interface IMasterSettingService {
    */
   getSetting(
     key: GetSettingDto,
-    context: { invokeContext: IInvoke },
+    context: MasterAccessOptions & { invokeContext: IInvoke },
   ): Promise<MasterSettingEntity>
 
   /**

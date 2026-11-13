@@ -4,6 +4,7 @@ import {
   KEY_SEPARATOR,
   removeSortKeyVersion,
 } from '@mbc-cqrs-serverless/core'
+import { getSystemId } from '@mbc-cqrs-serverless/master'
 import { Injectable, Logger } from '@nestjs/common'
 import { DATA_SK_PREFIX, SETTING_SK_PREFIX } from 'src/helpers/id'
 import { PrismaService } from 'src/prisma'
@@ -38,6 +39,7 @@ export class MasterDataSyncRdsHandler implements IDataSyncHandler {
         isDeleted: cmd.isDeleted || false,
 
         attributes: cmd.attributes as object,
+        systemId: getSystemId(cmd),
       },
       create: {
         id: cmd.id,
@@ -62,6 +64,7 @@ export class MasterDataSyncRdsHandler implements IDataSyncHandler {
         isDeleted: cmd.isDeleted || false,
 
         attributes: cmd.attributes as object,
+        systemId: getSystemId(cmd),
       },
     })
   }

@@ -16,6 +16,7 @@ import {
   Post,
   Put,
   Query,
+  UseGuards,
 } from '@nestjs/common'
 import { ApiTags } from '@nestjs/swagger'
 
@@ -32,11 +33,13 @@ import { GetSettingDto } from '../dto/master-setting/setting-get.dto'
 import { TenantSettingDto } from '../dto/master-setting/tenant-setting-create.dto'
 import { UpdateSettingDto } from '../dto/master-setting/update.setting.dto'
 import { UserSettingDto } from '../dto/master-setting/user-setting-create.dto'
+import { MasterControllerGuard, MasterRoute } from '../guards'
 import { parsePk } from '../helpers'
 import { MasterSettingService } from '../services/master-setting.service'
 
 @Controller('api/master-setting')
 @ApiTags('master-settings')
+@UseGuards(MasterControllerGuard)
 export class MasterSettingController {
   private readonly logger = new Logger(MasterSettingController.name)
 
@@ -47,7 +50,9 @@ export class MasterSettingController {
     @Query() searchDto: MasterSettingSearchDto,
     @INVOKE_CONTEXT() invokeContext: IInvoke,
   ) {
-    return this.masterSettingService.list(searchDto, invokeContext)
+    return this.masterSettingService.list(searchDto, invokeContext, {
+      invokeContext,
+    })
   }
 
   @Get('/:code')
@@ -58,6 +63,7 @@ export class MasterSettingController {
     return await this.masterSettingService.getSetting(dto, { invokeContext })
   }
 
+  @MasterRoute({ targetsCommon: true })
   @Post('common')
   async createCommonTenantSetting(
     @INVOKE_CONTEXT() invokeContext: IInvoke,
@@ -116,8 +122,11 @@ export class MasterSettingController {
   }
 
   @Get('/detail/:id')
-  async getDetailById(@DetailKeys() key: DetailDto) {
-    return this.masterSettingService.getDetail(key)
+  async getDetailById(
+    @DetailKeys() key: DetailDto,
+    @INVOKE_CONTEXT() invokeContext: IInvoke,
+  ) {
+    return this.masterSettingService.getDetail(key, { invokeContext })
   }
 
   @Post('/')
@@ -173,14 +182,18 @@ export class MasterSettingController {
     return this.masterSettingService.delete(key, invokeContext)
   }
 
+  @MasterRoute({ read: true })
   @Post('/check-exist/:code')
   async checkExistCode(
     @Param('code') code: string,
     @INVOKE_CONTEXT() invokeContext: IInvoke,
   ) {
-    return this.masterSettingService.checkExistCode(code, invokeContext)
+    return this.masterSettingService.checkExistCode(code, invokeContext, {
+      invokeContext,
+    })
   }
 
+  @MasterRoute({ systemAdminOnly: true })
   @Post('/copy')
   async copyMaster(
     @INVOKE_CONTEXT() invokeContext: IInvoke,

@@ -3,6 +3,100 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## Unreleased
+
+### Upgrade Notes
+
+- **master (behaviour changes):** two copy fixes change behaviour for every application. Master
+  copy now reads data from the source setting's tenant instead of a hard-coded `meltec` tenant,
+  and it now copies sequences, which it never did because both keys were built from the target
+  tenant. A target sequence behind the source jumps to the source's
+  value; the write is conditional, so a target that issued numbers in the meantime is never moved
+  back.
+- **master (copy):** with `controllerAuth` set, `POST /api/master-setting/copy` requires
+  `system_admin`; roles in `controllerAuth.write` no longer allow it. With a resolver registered,
+  `MasterSettingService.copy` requires `system_admin` and a `'*'`/`'*'` write grant; a resolver
+  that gives `system_admin` narrower grants blocks copy. For copy, `system_admin` must come from
+  the `custom:roles` claim; group-derived roles do not count.
+- **master:** creating a tenant-level override of a common setting that has no `systemId` now
+  treats that common setting as `shared`: a requested `systemId` other than `shared` is rejected
+  with 400, write access to `shared` is required, and the override stores no `systemId`.
+- **master:** a setting code that is empty, equals `MASTER_SETTING` or contains `#` is now rejected
+  with 400, for every application: as the `code` of every setting create and upsert (common,
+  tenant, group, user and bulk), and as the `settingCode` of data create, upsert, both bulk
+  endpoints and `MasterDataService.list` (`GET /api/master-data`). Such a code built the key of
+  another row, such as a user's personal setting. A bulk request is checked before anything is
+  written. With a resolver registered, `list` also leaves out rows the caller may not read.
+  `MasterDataService.update` and `delete` (`PUT`/`DELETE /api/master-data/:pk/:sk`) now reject a
+  `MASTER_SETTING#...` key: setting rows are changed through `/api/master-setting` only.
+  Conversely, `MasterSettingService.updateSetting` and `deleteSetting` (`PATCH`/`DELETE
+  /api/master-setting/:pk/:sk`) reject a key that does not start with `MASTER_SETTING#` and a
+  code (group and user keys such as `MASTER_SETTING#USER#u1#S1` are still accepted): data rows
+  are changed through `/api/master-data` only. The setting-code rule also applies to
+  `getSetting` (`GET /api/master-setting/:code`), so a code such as `USER#u1#S1` no longer reads
+  another user's personal row, and a master data `code` must be
+  non-empty and contain no `#`. Stored rows are not changed or migrated: a master data row already
+  stored with `#` in its `code` stays readable and can still be updated or deleted by key through
+  `/api/master-data/:pk/:sk`, but a create or upsert that sends such a code is rejected. Check
+  integrations that generate codes with `#` before upgrading.
+- **master:** a setting update that omits `settingValue` no longer clears the setting's `attributes`
+  (and its owner), one that omits `name` keeps the name, and a data update that omits `seq` keeps it.
+- **master:** for an application that sets neither `controllerAuth` nor a resolver, the other
+  changes are: a `__systemId` key sent by a client in `attributes` is now always removed;
+  responses go through `toPublicRow`, so a row stored earlier with a client-planted `__systemId`
+  returns it as a top-level `systemId`; `GET /api/master-access` is added when the controllers
+  are enabled; the DTOs accept `systemId` and `includeCommon`; and `POST /api/master-bulk` upserts
+  settings before data instead of both at once.
+- **master (RDS):** applications generated earlier must add a nullable `system_id` column and
+  write `systemId: getSystemId(cmd)` in their own RDS handler, because `update-scheme.ts` does
+  not change an existing schema or handler. Needed only when a resolver is registered. With a
+  resolver registered, the application now refuses to start if the Prisma `Master` model has no
+  `systemId` field.
+- **master (resolver):** with a resolver registered, read methods called without `invokeContext`
+  are denied. Server-side code must pass `{ invokeContext }`, or `skipAccessCheck: true` for
+  trusted internal work. See `docs/development/master-access-and-sync.md`.
+- **master, survey-template (MySQL):** list searches now work on MySQL, so applications that
+  patched `mode: 'insensitive'` out of the 1.x dist files (for example with `patch-package`) can
+  drop the patch. The database is detected from the Prisma client; set `databaseProvider` in
+  `MasterModule.register` / `SurveyTemplateModule.register` (or their `registerAsync`) if a
+  warning says it could not be detected.
+- **master (scaffold):** new projects get `controllerAuth: {}` in `src/master/master.module.ts`, so
+  master writes need `system_admin` until roles are configured.
+- **master (`registerAsync`):** the static `commonTenantCode`, `databaseProvider` and
+  `controllerAuth` options override the values the factory returns, even when the static value is
+  `undefined`; pass them statically.
+- **master (tasks):** `GET /api/tasks/sfn-task-parent` now resolves the tenant like the rest of the
+  framework: the `custom:tenant` claim wins over `x-tenant-code`. It used to read a
+  `custom:tenant_code` claim nobody sets, so it always took the tenant from the header.
+- **master (`includeCommon`):** `includeCommon` hides common rows by the codes the tenant already
+  holds, so it is bounded. A master data list (`GET /api/master-data/list`) with `includeCommon`
+  requires `settingCode` unless the caller is in the common tenant, and on either list a tenant
+  holding more than 10,000 matching rows (soft-deleted included) gets a 400 instead of a database
+  error; results are not truncated. A settings list with `includeCommon` does not merge the
+  common tenant's group and user setting rows.
+
+### Features
+
+- **master:** opt-in `controllerAuth` guard for the built-in routes, with tenant checks.
+- **master:** `systemId` per master setting, an optional `@MasterAccessResolver()` with grants
+  per system and setting, `GET /api/master-access`, `assignSystem` for tagging existing data,
+  and `includeCommon` on the list endpoints.
+- **master:** `commonTenantCode` and `enableCopyTask` module options.
+- **master:** `system_id` RDS column and `systemId` on API responses.
+- **master (docs):** guide for access control and per-system SNS sync.
+- **master, survey-template:** `databaseProvider` module option (`'postgresql' | 'mysql'`),
+  detected from the Prisma client by default.
+
+### Bug Fixes
+
+- **master:** master copy reads data from the source setting's tenant (was `meltec`).
+- **master:** master copy compares and copies sequences with separate source and target keys.
+- **master, survey-template:** name, code and keyword searches failed on MySQL (the default
+  database of `mbc new`) because they always sent PostgreSQL-only `mode: 'insensitive'`. The
+  setting description search used `path: 'description'`, which is neither the PostgreSQL form
+  (an array) nor the MySQL form (a `$.` path); it now uses `['description']` on PostgreSQL and
+  `'$.description'` on MySQL.
+
 ## [1.7.0](https://github.com/mbc-net/mbc-cqrs-serverless/releases/tag/v1.7.0) (2026-11-09)
 
 ### Upgrade Notes

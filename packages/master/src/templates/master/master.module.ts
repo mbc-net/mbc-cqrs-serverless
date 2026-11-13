@@ -8,6 +8,7 @@ import { MasterDataSyncRdsHandler } from './handler/master-rds.handler'
   imports: [
     CoreMasterModule.register({
       enableController: true,
+      controllerAuth: {},
       prismaService: PrismaService,
       dataSyncHandlers: [MasterDataSyncRdsHandler],
     }),

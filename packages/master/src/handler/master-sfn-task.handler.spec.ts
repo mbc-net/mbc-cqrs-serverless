@@ -1,0 +1,183 @@
+import { createMock } from '@golevelup/ts-jest'
+import {
+  DataService,
+  DynamoDbService,
+  extractInvokeContext,
+} from '@mbc-cqrs-serverless/core'
+import { SequencesService } from '@mbc-cqrs-serverless/sequence'
+import { Test } from '@nestjs/testing'
+
+import { CopyType } from '../dto'
+import { PRISMA_SERVICE } from '../master.module-definition'
+import { MasterDataService, MasterSettingService } from '../services'
+import { MasterSfnTaskEventHandler } from './master-sfn-task.handler'
+
+jest.mock('@mbc-cqrs-serverless/core', () => ({
+  ...jest.requireActual('@mbc-cqrs-serverless/core'),
+  extractInvokeContext: jest.fn(),
+}))
+
+describe('MasterSfnTaskEventHandler', () => {
+  let handler: MasterSfnTaskEventHandler
+  let prisma: { master: { findMany: jest.Mock } }
+  let sequences: jest.Mocked<SequencesService>
+  let dynamoDb: jest.Mocked<DynamoDbService>
+  let settingService: jest.Mocked<MasterSettingService>
+  let dataSvc: jest.Mocked<MasterDataService>
+
+  const setting = {
+    pk: 'MASTER#common',
+    sk: 'MASTER_SETTING#X',
+    tenantCode: 'common',
+    attributes: {
+      __systemId: 'app-a',
+      fields: [
+        { physicalName: 'code', dataType: 'auto_number', formatCode: 'F' },
+      ],
+    },
+  }
+  const event: any = {
+    input: {
+      input: {
+        masterSettingId: 'MASTER#common#MASTER_SETTING#X',
+        targetTenants: ['ta'],
+        copyType: CopyType.DATA_ONLY,
+      },
+    },
+  }
+
+  beforeEach(async () => {
+    ;(extractInvokeContext as jest.Mock).mockReturnValue({})
+    prisma = { master: { findMany: jest.fn().mockResolvedValue([]) } }
+    dynamoDb = createMock<DynamoDbService>()
+    dynamoDb.getTableName.mockReturnValue('sequences')
+    sequences = createMock<SequencesService>()
+    sequences.getCurrentSequence.mockResolvedValue(null)
+    settingService = createMock<MasterSettingService>()
+    dataSvc = createMock<MasterDataService>()
+    const dataService = createMock<DataService>()
+    dataService.getItem.mockResolvedValue(setting as any)
+
+    const module = await Test.createTestingModule({
+      providers: [
+        MasterSfnTaskEventHandler,
+        { provide: DynamoDbService, useValue: dynamoDb },
+        { provide: PRISMA_SERVICE, useValue: prisma },
+        { provide: MasterSettingService, useValue: settingService },
+        { provide: MasterDataService, useValue: dataSvc },
+        { provide: DataService, useValue: dataService },
+        { provide: SequencesService, useValue: sequences },
+      ],
+    }).compile()
+    handler = module.get(MasterSfnTaskEventHandler)
+  })
+
+  it('reads source data from the source setting tenant', async () => {
+    await handler.execute(event)
+    expect(prisma.master.findMany).toHaveBeenCalledWith({
+      where: expect.objectContaining({ pk: 'MASTER#common' }),
+    })
+  })
+
+  it('copies the sequence when the target is behind the source', async () => {
+    sequences.getCurrentSequence.mockImplementation(async (key: any) =>
+      key.pk === 'SEQ#common' ? ({ seq: 5 } as any) : ({ seq: 2 } as any),
+    )
+    await handler.execute(event)
+    expect(dynamoDb.updateItem).toHaveBeenCalledWith(
+      'sequences',
+      { pk: 'SEQ#ta', sk: expect.any(String) },
+      { set: expect.objectContaining({ seq: 5, tenantCode: 'ta' }) },
+      'attribute_not_exists(#seq) OR #seq < :seq',
+    )
+    expect(dynamoDb.putItem).not.toHaveBeenCalled()
+  })
+
+  it('treats a failed condition as no copy needed', async () => {
+    sequences.getCurrentSequence.mockImplementation(async (key: any) =>
+      key.pk === 'SEQ#common' ? ({ seq: 5 } as any) : ({ seq: 2 } as any),
+    )
+    dynamoDb.updateItem.mockRejectedValue(
+      Object.assign(new Error('x'), {
+        name: 'ConditionalCheckFailedException',
+      }),
+    )
+    await expect(handler.execute(event)).resolves.not.toThrow()
+  })
+
+  it('rethrows other errors from the sequence write', async () => {
+    sequences.getCurrentSequence.mockImplementation(async (key: any) =>
+      key.pk === 'SEQ#common' ? ({ seq: 5 } as any) : ({ seq: 2 } as any),
+    )
+    dynamoDb.updateItem.mockRejectedValue(new Error('boom'))
+    await expect(handler.execute(event)).rejects.toThrow('boom')
+  })
+
+  it('does not copy the sequence when the target is ahead', async () => {
+    sequences.getCurrentSequence.mockImplementation(async (key: any) =>
+      key.pk === 'SEQ#common' ? ({ seq: 2 } as any) : ({ seq: 5 } as any),
+    )
+    await handler.execute(event)
+    expect(dynamoDb.updateItem).not.toHaveBeenCalled()
+  })
+
+  it('passes skipAccessCheck and the source systemId when copying', async () => {
+    prisma.master.findMany.mockResolvedValue([
+      {
+        sk: 'MASTER_DATA#X#1',
+        masterCode: '1',
+        masterTypeCode: 'X',
+        attributes: {
+          __systemId: 'app-a',
+        },
+      },
+    ])
+    const dataService = (handler as any).dataService
+    dataService.getItem
+      .mockResolvedValueOnce(setting) // source setting
+      .mockResolvedValue(null) // no tenant rows
+    await handler.execute({
+      input: {
+        input: { ...event.input.input, copyType: CopyType.BOTH },
+      },
+    } as any)
+    const expected = expect.objectContaining({
+      skipAccessCheck: true,
+      systemId: 'app-a',
+    })
+    expect(settingService.createTenantSetting).toHaveBeenCalledWith(
+      expect.anything(),
+      expected,
+    )
+    expect(dataSvc.create).toHaveBeenCalledWith(expect.anything(), expected)
+  })
+
+  it('passes skipAccessCheck to updates of existing rows', async () => {
+    prisma.master.findMany.mockResolvedValue([
+      {
+        sk: 'MASTER_DATA#X#1',
+        masterCode: '1',
+        masterTypeCode: 'X',
+        attributes: {},
+      },
+    ])
+    const existing = { ...setting, isDeleted: false }
+    ;(handler as any).dataService.getItem.mockResolvedValue(existing)
+    await handler.execute({
+      input: {
+        input: { ...event.input.input, copyType: CopyType.BOTH },
+      },
+    } as any)
+    const expected = expect.objectContaining({ skipAccessCheck: true })
+    expect(settingService.updateSetting).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.anything(),
+      expected,
+    )
+    expect(dataSvc.update).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.anything(),
+      expected,
+    )
+  })
+})

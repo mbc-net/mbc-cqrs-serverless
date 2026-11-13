@@ -20,11 +20,25 @@ import {
   TenantSettingDto,
   UserSettingDto,
 } from '../dto'
-import { PRISMA_SERVICE } from '../master.module-definition'
+import {
+  MODULE_OPTIONS_TOKEN,
+  PRISMA_SERVICE,
+} from '../master.module-definition'
 import { TaskService } from '@mbc-cqrs-serverless/task'
-import { BadRequestException, NotFoundException } from '@nestjs/common'
+import {
+  BadRequestException,
+  ForbiddenException,
+  NotFoundException,
+} from '@nestjs/common'
+import { MasterAccessService } from '../access/master-access.service'
+import { MasterAccessResolverRegistry } from '../access/master-access-resolver.registry'
 import { createMock } from '@golevelup/ts-jest'
-import { DataModel, CommandModel, DetailKey } from '@mbc-cqrs-serverless/core'
+import {
+  DataModel,
+  CommandModel,
+  DetailKey,
+  mergeDeep,
+} from '@mbc-cqrs-serverless/core'
 import { MasterDataEntity } from '../entities'
 
 const mockInvokeContext = {
@@ -744,6 +758,48 @@ describe('SettingService', () => {
     })
   })
   describe('updateSetting', () => {
+    describe('partial updates', () => {
+      const stored = {
+        pk: 'MASTER#ta',
+        sk: 'MASTER_SETTING#S1',
+        name: 'Old',
+        version: 2,
+        attributes: { fields: [], __systemId: 'app-y' },
+      }
+      const mergedResult = async () =>
+        (commandService.publishPartialUpdateAsync as jest.Mock).mock.results[0]
+          .value
+
+      beforeEach(() => {
+        dataService.getItem.mockResolvedValue(stored as any)
+        commandService.publishPartialUpdateAsync.mockImplementation(
+          async (input: any) => mergeDeep({}, stored, input) as any,
+        )
+      })
+
+      it('keeps attributes and owner on a name-only update', async () => {
+        await service.updateSetting(
+          { pk: stored.pk, sk: stored.sk },
+          { name: 'New' } as any,
+          optionsMock,
+        )
+        const merged = await mergedResult()
+        expect(merged.attributes).toEqual({ fields: [], __systemId: 'app-y' })
+        expect(merged.name).toBe('New')
+      })
+
+      it('keeps the name on a settingValue-only update', async () => {
+        await service.updateSetting(
+          { pk: stored.pk, sk: stored.sk },
+          { settingValue: { fields: [1] } } as any,
+          optionsMock,
+        )
+        const merged = await mergedResult()
+        expect(merged.name).toBe('Old')
+        expect(merged.attributes.__systemId).toBe('app-y')
+      })
+    })
+
     it('should call updateSetting with correct parameters and return the result', async () => {
       const settingCode = ' UserListSetting'
       const settingValue = {}
@@ -1016,11 +1072,11 @@ describe('SettingService', () => {
      * Details: Verifies that settings are marked as deleted rather than physically removed
      */
     it('should soft delete existing setting', async () => {
-      const key = { pk: 'MASTER#TEST_TENANT', sk: 'SETTING#TEST_CODE' }
+      const key = { pk: 'MASTER#TEST_TENANT', sk: 'MASTER_SETTING#TEST_CODE' }
       const existingData: DataModel = {
         id: 'test-id',
         pk: 'MASTER#TEST_TENANT',
-        sk: 'SETTING#TEST_CODE',
+        sk: 'MASTER_SETTING#TEST_CODE',
         code: 'TEST_CODE',
         name: 'Test Setting',
         version: 1,
@@ -1160,11 +1216,11 @@ describe('SettingService', () => {
 
     describe('updateSetting - Error Handling', () => {
       it('should handle version conflict errors during update', async () => {
-        const key = { pk: 'MASTER#TEST_TENANT', sk: 'SETTING#TEST_CODE' }
+        const key = { pk: 'MASTER#TEST_TENANT', sk: 'MASTER_SETTING#TEST_CODE' }
         const existingData: DataModel = {
           id: 'test-id',
           pk: 'MASTER#TEST_TENANT',
-          sk: 'SETTING#TEST_CODE',
+          sk: 'MASTER_SETTING#TEST_CODE',
           code: 'TEST_CODE',
           name: 'Test Setting',
           version: 1,
@@ -1190,11 +1246,11 @@ describe('SettingService', () => {
       })
 
       it('should handle concurrent update attempts', async () => {
-        const key = { pk: 'MASTER#TEST_TENANT', sk: 'SETTING#TEST_CODE' }
+        const key = { pk: 'MASTER#TEST_TENANT', sk: 'MASTER_SETTING#TEST_CODE' }
         const existingData: DataModel = {
           id: 'test-id',
           pk: 'MASTER#TEST_TENANT',
-          sk: 'SETTING#TEST_CODE',
+          sk: 'MASTER_SETTING#TEST_CODE',
           code: 'TEST_CODE',
           name: 'Test Setting',
           version: 1,
@@ -1247,7 +1303,8 @@ describe('SettingService', () => {
     })
 
     it('should handle special characters in setting codes', async () => {
-      const specialCode = 'SETTING_特殊文字@#$%'
+      // `#` is the key separator and is rejected; other special characters are fine.
+      const specialCode = 'SETTING_特殊文字@$%'
 
       const mockCommonSetting = {
         id: 'test-id',
@@ -1884,11 +1941,14 @@ describe('SettingService', () => {
 
     describe('updateSetting - Concurrent Operations', () => {
       it('should handle concurrent setting updates with proper version control', async () => {
-        const key = { pk: 'SETTING#TEST_TENANT', sk: 'SETTING#UPDATE_TEST' }
+        const key = {
+          pk: 'SETTING#TEST_TENANT',
+          sk: 'MASTER_SETTING#UPDATE_TEST',
+        }
         const existingData: DataModel = {
           id: 'test-id',
           pk: 'SETTING#TEST_TENANT',
-          sk: 'SETTING#UPDATE_TEST',
+          sk: 'MASTER_SETTING#UPDATE_TEST',
           code: 'UPDATE_TEST',
           name: 'Update Test',
           version: 1,
@@ -1931,5 +1991,1265 @@ describe('SettingService', () => {
         expect(result1.version).toBe(2)
       })
     })
+  })
+})
+
+describe('MasterSettingService commonTenantCode option', () => {
+  const build = async (moduleOptions?: any) => {
+    const dataService = { getItem: jest.fn(), listItemsByPk: jest.fn() }
+    const commandService = { publishAsync: jest.fn() }
+    const providers: any[] = [
+      MasterSettingService,
+      { provide: TaskService, useValue: {} },
+      { provide: PRISMA_SERVICE, useValue: {} },
+      { provide: CommandService, useValue: commandService },
+      { provide: DataService, useValue: dataService },
+      {
+        provide: DynamoDbService,
+        useValue: { getItem: jest.fn(), getTableName: jest.fn() },
+      },
+    ]
+    if (moduleOptions) {
+      providers.push({ provide: MODULE_OPTIONS_TOKEN, useValue: moduleOptions })
+    }
+    const module = await Test.createTestingModule({ providers }).compile()
+    return {
+      service: module.get(MasterSettingService),
+      dataService,
+      commandService,
+    }
+  }
+
+  it('creates common settings in the configured tenant', async () => {
+    const { service, dataService, commandService } = await build({
+      commonTenantCode: 'shared-tenant',
+    })
+    dataService.getItem.mockResolvedValue(null)
+    await service.createCommonTenantSetting(
+      { code: 'C', name: 'N', settingValue: {} } as any,
+      optionsMock,
+    )
+    expect(commandService.publishAsync).toHaveBeenCalledWith(
+      expect.objectContaining({
+        pk: 'MASTER#shared-tenant',
+        tenantCode: 'shared-tenant',
+      }),
+      optionsMock,
+    )
+  })
+
+  it('falls back to the configured tenant in getSetting', async () => {
+    const { service, dataService } = await build({
+      commonTenantCode: 'shared-tenant',
+    })
+    dataService.getItem.mockImplementation(async ({ pk }: any) =>
+      pk === 'MASTER#shared-tenant'
+        ? { id: 'shared-id', attributes: { a: 1 } }
+        : null,
+    )
+    const res = await service.getSetting({ code: 'X' }, optionsMock)
+    expect(res.id).toBe('shared-id')
+  })
+
+  it('keeps common when the option is unset', async () => {
+    process.env.COMMON_TENANT_CODES = 'other'
+    try {
+      const { service, commandService, dataService } = await build()
+      dataService.getItem.mockResolvedValue(null)
+      await service.createCommonTenantSetting(
+        { code: 'C', name: 'N', settingValue: {} } as any,
+        optionsMock,
+      )
+      expect(commandService.publishAsync).toHaveBeenCalledWith(
+        expect.objectContaining({ pk: 'MASTER#common', tenantCode: 'common' }),
+        optionsMock,
+      )
+    } finally {
+      delete process.env.COMMON_TENANT_CODES
+    }
+  })
+})
+
+describe('MasterSettingService reserved system attribute', () => {
+  const build = async () => {
+    const dataService = { getItem: jest.fn(), listItemsByPk: jest.fn() }
+    const commandService = {
+      publishAsync: jest.fn(),
+      publishPartialUpdateAsync: jest.fn(),
+    }
+    const prisma = { master: { count: jest.fn(), findMany: jest.fn() } }
+    const module = await Test.createTestingModule({
+      providers: [
+        MasterSettingService,
+        { provide: TaskService, useValue: {} },
+        { provide: PRISMA_SERVICE, useValue: prisma },
+        { provide: CommandService, useValue: commandService },
+        { provide: DataService, useValue: dataService },
+        {
+          provide: DynamoDbService,
+          useValue: { getItem: jest.fn(), getTableName: jest.fn() },
+        },
+      ],
+    }).compile()
+    return {
+      service: module.get(MasterSettingService),
+      dataService,
+      commandService,
+      prisma,
+    }
+  }
+  const bad = { a: 1, __systemId: 'evil' }
+  const attrsOf = (fn: jest.Mock) => fn.mock.calls[0][0].attributes
+
+  it.each([
+    ['createCommonTenantSetting', { code: 'C', name: 'n', settingValue: bad }],
+    [
+      'createTenantSetting',
+      { code: 'C', name: 'n', tenantCode: 'T', settingValue: bad },
+    ],
+    [
+      'upsertTenantSetting',
+      { code: 'C', name: 'n', tenantCode: 'T', settingValue: bad },
+    ],
+    [
+      'createGroupSetting',
+      {
+        code: 'C',
+        name: 'n',
+        tenantCode: 'T',
+        groupId: 'g',
+        settingValue: bad,
+      },
+    ],
+    [
+      'createUserSetting',
+      { code: 'C', name: 'n', tenantCode: 'T', userId: 'u', settingValue: bad },
+    ],
+  ])('removes a client __systemId on %s', async (method, dto) => {
+    const { service, dataService, commandService } = await build()
+    dataService.getItem.mockResolvedValue(null)
+    commandService.publishAsync.mockResolvedValue({ id: 'i' })
+    await (service as any)[method](dto, optionsMock)
+    expect(attrsOf(commandService.publishAsync)).toEqual({ a: 1 })
+  })
+
+  it('removes a client __systemId on updateSetting', async () => {
+    const { service, dataService, commandService } = await build()
+    dataService.getItem.mockResolvedValue({ version: 1 })
+    await service.updateSetting(
+      { pk: 'p', sk: 'MASTER_SETTING#s' },
+      { settingValue: bad } as any,
+      optionsMock,
+    )
+    expect(attrsOf(commandService.publishPartialUpdateAsync)).toEqual({ a: 1 })
+  })
+
+  it('returns systemId at the top level from getDetail', async () => {
+    const { service, dataService } = await build()
+    dataService.getItem.mockResolvedValue({
+      id: 'i',
+      attributes: { a: 1, __systemId: 'S1' },
+    })
+    const res: any = await service.getDetail({ pk: 'p', sk: 's' })
+    expect(res).toMatchObject({ systemId: 'S1', attributes: { a: 1 } })
+  })
+
+  it('hides the key from getSetting settingValue', async () => {
+    const { service, dataService } = await build()
+    dataService.getItem.mockResolvedValue({
+      id: 'i',
+      attributes: { a: 1, __systemId: 'S1' },
+    })
+    const res = await service.getSetting({ code: 'X' }, optionsMock)
+    expect(res.settingValue).toEqual({ a: 1 })
+  })
+
+  it('maps list items', async () => {
+    const { service, prisma } = await build()
+    prisma.master.count.mockResolvedValue(1)
+    prisma.master.findMany.mockResolvedValue([
+      { id: 'i', attributes: { a: 1, __systemId: 'S1' } },
+    ])
+    const res = await service.list({} as any, optionsMock.invokeContext)
+    expect(res.items[0]).toMatchObject({ systemId: 'S1', attributes: { a: 1 } })
+  })
+
+  it('leaves rows with no owner unchanged', async () => {
+    const { service, dataService } = await build()
+    dataService.getItem.mockResolvedValue({ id: 'i', attributes: { a: 1 } })
+    const res: any = await service.getDetail({ pk: 'p', sk: 's' })
+    expect(res).not.toHaveProperty('systemId')
+  })
+})
+
+describe('MasterSettingService list includeCommon', () => {
+  const build = async () => {
+    const prisma = { master: { count: jest.fn(), findMany: jest.fn() } }
+    const module = await Test.createTestingModule({
+      providers: [
+        MasterSettingService,
+        { provide: TaskService, useValue: {} },
+        { provide: PRISMA_SERVICE, useValue: prisma },
+        { provide: CommandService, useValue: {} },
+        { provide: DataService, useValue: {} },
+        {
+          provide: DynamoDbService,
+          useValue: { getItem: jest.fn(), getTableName: jest.fn() },
+        },
+      ],
+    }).compile()
+    prisma.master.count.mockResolvedValue(0)
+    return { service: module.get(MasterSettingService), prisma }
+  }
+  const ctxFor = (tenant: string) => {
+    const ctx = JSON.parse(JSON.stringify(optionsMock.invokeContext))
+    ctx.event.requestContext.authorizer.jwt.claims['custom:tenant'] = tenant
+    return ctx
+  }
+  const whereOf = (prisma: any) => prisma.master.count.mock.calls[0][0].where
+
+  it('returns only the caller tenant by default', async () => {
+    const { service, prisma } = await build()
+    prisma.master.findMany.mockResolvedValue([])
+    await service.list({} as any, ctxFor('MBC'))
+    expect(whereOf(prisma).tenantCode).toBe('mbc')
+    expect(whereOf(prisma).OR).toBeUndefined()
+    expect(prisma.master.findMany).toHaveBeenCalledTimes(1)
+  })
+
+  it('merges common rows and excludes codes the tenant has, soft-deleted included', async () => {
+    const { service, prisma } = await build()
+    prisma.master.findMany
+      .mockResolvedValueOnce([{ code: 'SETTING#A' }])
+      .mockResolvedValueOnce([])
+    await service.list({ includeCommon: true } as any, ctxFor('MBC'))
+    const exclusion = prisma.master.findMany.mock.calls[0][0]
+    // Personal rows are neither counted as own codes nor merged from common.
+    const personal = [
+      { sk: { startsWith: 'MASTER_SETTING#GROUP#' } },
+      { sk: { startsWith: 'MASTER_SETTING#USER#' } },
+    ]
+    expect(exclusion.where).toEqual({
+      tenantCode: 'mbc',
+      masterType: 'MASTER_SETTING',
+      NOT: personal,
+    })
+    expect(whereOf(prisma).OR).toEqual([
+      { tenantCode: 'mbc' },
+      { tenantCode: 'common', code: { notIn: ['SETTING#A'] }, NOT: personal },
+    ])
+    expect(whereOf(prisma).tenantCode).toBeUndefined()
+  })
+
+  it('does not query exclusions when the caller is in the common tenant', async () => {
+    const { service, prisma } = await build()
+    prisma.master.findMany.mockResolvedValue([])
+    await service.list({ includeCommon: true } as any, ctxFor('Common'))
+    expect(prisma.master.findMany).toHaveBeenCalledTimes(1)
+    expect(whereOf(prisma).tenantCode).toBe('common')
+  })
+})
+
+describe('MasterSettingService ownership', () => {
+  const ctx = {
+    event: {
+      headers: { 'x-tenant-code': 'ta' },
+      requestContext: {
+        authorizer: {
+          jwt: {
+            claims: {
+              sub: 'u1',
+              'custom:tenant': 'ta',
+              'custom:roles': JSON.stringify([{ tenant: 'ta', role: 'user' }]),
+            },
+          },
+        },
+      },
+    },
+  } as any
+  const opts = { invokeContext: ctx }
+
+  const build = async (grants?: any[]) => {
+    const dataService = { getItem: jest.fn().mockResolvedValue(null) }
+    const commandService = {
+      publishAsync: jest.fn().mockResolvedValue({ id: 'i' }),
+      publishPartialUpdateAsync: jest.fn().mockResolvedValue({ id: 'i' }),
+      getLatestItem: jest.fn().mockResolvedValue(null),
+    }
+    const registry = new MasterAccessResolverRegistry()
+    if (grants) registry.set({ resolveGrants: async () => grants })
+    const access = new MasterAccessService(registry, commandService as any)
+    const module = await Test.createTestingModule({
+      providers: [
+        MasterSettingService,
+        { provide: TaskService, useValue: {} },
+        { provide: PRISMA_SERVICE, useValue: {} },
+        { provide: CommandService, useValue: commandService },
+        { provide: DataService, useValue: dataService },
+        {
+          provide: DynamoDbService,
+          useValue: { getItem: jest.fn(), getTableName: jest.fn() },
+        },
+        { provide: MasterAccessService, useValue: access },
+      ],
+    }).compile()
+    return {
+      service: module.get(MasterSettingService),
+      dataService,
+      commandService,
+    }
+  }
+  const all = [{ systemId: '*', settingCode: '*', read: true, write: true }]
+  const dto = (extra: object = {}) => ({
+    code: 'S1',
+    name: 'n',
+    tenantCode: 'ta',
+    settingValue: { a: 1 },
+    ...extra,
+  })
+  const published = (fn: jest.Mock) => fn.mock.calls[0][0]
+
+  it('stores nothing and does no lookup without a resolver', async () => {
+    const { service, commandService } = await build()
+    await service.createTenantSetting(dto({ systemId: 'A' }), opts)
+    expect(published(commandService.publishAsync).attributes).toEqual({ a: 1 })
+    expect(commandService.getLatestItem).not.toHaveBeenCalled()
+  })
+
+  it('stores the requested systemId in lower case and hides it in the response', async () => {
+    const { service, commandService } = await build(all)
+    commandService.publishAsync.mockImplementation(async (c) => c)
+    const res: any = await service.createTenantSetting(
+      dto({ systemId: 'APP-A' }),
+      opts,
+    )
+    expect(published(commandService.publishAsync).attributes).toEqual({
+      a: 1,
+      __systemId: 'app-a',
+    })
+    expect(res).toMatchObject({ systemId: 'app-a', attributes: { a: 1 } })
+  })
+
+  it('rejects * as a requested systemId', async () => {
+    const { service, commandService } = await build(all)
+    await expect(
+      service.createTenantSetting(dto({ systemId: '*' }), opts),
+    ).rejects.toThrow(BadRequestException)
+    expect(commandService.publishAsync).not.toHaveBeenCalled()
+  })
+
+  it('stores the owner on createCommonTenantSetting', async () => {
+    const { service, commandService } = await build(all)
+    await service.createCommonTenantSetting(
+      { code: 'S1', name: 'n', settingValue: {}, systemId: 'a' } as any,
+      { invokeContext: ctx, skipAccessCheck: true },
+    )
+    expect(published(commandService.publishAsync).attributes).toEqual({
+      __systemId: 'a',
+    })
+  })
+
+  it('keeps the owner across delete and recreate', async () => {
+    const { service, dataService, commandService } = await build(all)
+    dataService.getItem.mockResolvedValue({
+      isDeleted: true,
+      version: 2,
+      attributes: { __systemId: 'A' },
+    })
+    await service.upsertTenantSetting(dto(), opts)
+    expect(published(commandService.publishAsync).attributes).toEqual({
+      a: 1,
+      __systemId: 'A',
+    })
+  })
+
+  it('rejects a different systemId on upsert', async () => {
+    const { service, dataService } = await build(all)
+    dataService.getItem.mockResolvedValue({ attributes: { __systemId: 'A' } })
+    await expect(
+      service.upsertTenantSetting(dto({ systemId: 'B' }), opts),
+    ).rejects.toThrow(BadRequestException)
+  })
+
+  it('rejects a requested systemId on an untagged existing row', async () => {
+    const { service, dataService } = await build(all)
+    dataService.getItem.mockResolvedValue({ attributes: {} })
+    await expect(
+      service.upsertTenantSetting(dto({ systemId: 'B' }), opts),
+    ).rejects.toThrow(BadRequestException)
+  })
+
+  it('checks write access against the final owner', async () => {
+    const { service, commandService } = await build([
+      { systemId: 'B', settingCode: '*', read: true, write: true },
+    ])
+    await expect(
+      service.createTenantSetting(dto({ systemId: 'A' }), opts),
+    ).rejects.toThrow(ForbiddenException)
+    expect(commandService.publishAsync).not.toHaveBeenCalled()
+  })
+
+  it('uses options.systemId from internal callers', async () => {
+    const { service, commandService } = await build(all)
+    await service.createTenantSetting(dto(), { ...opts, systemId: 'Z' })
+    expect(published(commandService.publishAsync).attributes).toEqual({
+      a: 1,
+      __systemId: 'Z',
+    })
+  })
+
+  it('stores no systemId on group and user settings', async () => {
+    const { service, commandService } = await build(all)
+    await service.createGroupSetting(
+      dto({ groupId: 'g', systemId: 'A' }) as any,
+      opts,
+    )
+    await service.createUserSetting(
+      dto({ userId: 'u', systemId: 'A' }) as any,
+      opts,
+    )
+    for (const [c] of commandService.publishAsync.mock.calls) {
+      expect(c.attributes).toEqual({ a: 1 })
+    }
+  })
+
+  it('checks group settings against the base setting owner', async () => {
+    const { service, commandService } = await build([
+      { systemId: 'B', settingCode: '*', read: true, write: true },
+    ])
+    commandService.getLatestItem.mockResolvedValue({
+      attributes: { __systemId: 'A' },
+    })
+    await expect(
+      service.createGroupSetting(dto({ groupId: 'g' }) as any, opts),
+    ).rejects.toThrow(ForbiddenException)
+    expect(commandService.getLatestItem).toHaveBeenCalledWith({
+      pk: 'MASTER#ta',
+      sk: 'MASTER_SETTING#S1',
+    })
+  })
+
+  it('carries systemId through updateSetting', async () => {
+    const { service, dataService, commandService } = await build(all)
+    dataService.getItem.mockResolvedValue({
+      version: 1,
+      tenantCode: 'ta',
+      attributes: { __systemId: 'A' },
+    })
+    await service.updateSetting(
+      { pk: 'MASTER#ta', sk: 'MASTER_SETTING#S1' },
+      { settingValue: { b: 2, __systemId: 'evil' } } as any,
+      opts,
+    )
+    expect(
+      published(commandService.publishPartialUpdateAsync).attributes,
+    ).toEqual({ b: 2, __systemId: 'A' })
+  })
+
+  it('rejects updateSetting and deleteSetting without write access', async () => {
+    const { service, dataService, commandService } = await build([
+      { systemId: 'B', settingCode: '*', read: true, write: true },
+    ])
+    dataService.getItem.mockResolvedValue({
+      version: 1,
+      tenantCode: 'ta',
+      attributes: { __systemId: 'A' },
+    })
+    const key = { pk: 'MASTER#ta', sk: 'MASTER_SETTING#S1' }
+    await expect(
+      service.updateSetting(key, { settingValue: {} } as any, opts),
+    ).rejects.toThrow(ForbiddenException)
+    await expect(service.deleteSetting(key, opts)).rejects.toThrow(
+      ForbiddenException,
+    )
+    expect(commandService.publishPartialUpdateAsync).not.toHaveBeenCalled()
+  })
+
+  it('writes nothing when one bulk item is forbidden', async () => {
+    const { service, commandService } = await build([
+      { systemId: 'A', settingCode: '*', read: true, write: true },
+    ])
+    await expect(
+      service.upsertBulk(
+        {
+          items: [
+            { code: 'S1', name: 'n', settingValue: {}, systemId: 'A' },
+            { code: 'S2', name: 'n', settingValue: {}, systemId: 'B' },
+          ],
+        } as any,
+        ctx,
+      ),
+    ).rejects.toThrow(ForbiddenException)
+    expect(commandService.publishAsync).not.toHaveBeenCalled()
+  })
+
+  it('rejects a bulk code that addresses a personal setting row', async () => {
+    const { service, dataService, commandService } = await build([
+      { systemId: 'shared', settingCode: '*', read: true, write: true },
+    ])
+    // The victim's personal row for S1: no __systemId of its own.
+    dataService.getItem.mockResolvedValue({
+      version: 1,
+      tenantCode: 'ta',
+      attributes: {},
+    })
+    await expect(
+      service.upsertBulk(
+        {
+          items: [
+            { code: 'S2', name: 'n', settingValue: {} },
+            { code: 'USER#victim#S1', name: 'n', settingValue: {} },
+          ],
+        } as any,
+        ctx,
+      ),
+    ).rejects.toThrow(BadRequestException)
+    expect(commandService.publishAsync).not.toHaveBeenCalled()
+  })
+
+  it.each(['A#B', 'MASTER_SETTING', ''])(
+    'rejects setting code %p on every create route, with or without a resolver',
+    async (code) => {
+      for (const grants of [undefined, all]) {
+        const { service, commandService } = await build(grants)
+        const d = dto({ code })
+        await expect(service.createTenantSetting(d, opts)).rejects.toThrow(
+          BadRequestException,
+        )
+        await expect(service.upsertTenantSetting(d, opts)).rejects.toThrow(
+          BadRequestException,
+        )
+        await expect(
+          service.createCommonTenantSetting(d, opts),
+        ).rejects.toThrow(BadRequestException)
+        await expect(
+          service.createGroupSetting({ ...d, groupId: 'g' }, opts),
+        ).rejects.toThrow(BadRequestException)
+        await expect(
+          service.createUserSetting({ ...d, userId: 'u' }, opts),
+        ).rejects.toThrow(BadRequestException)
+        expect(commandService.publishAsync).not.toHaveBeenCalled()
+      }
+    },
+  )
+
+  it('rejects a getSetting code that addresses another user’s personal row', async () => {
+    for (const grants of [undefined, all]) {
+      const { service, dataService } = await build(grants)
+      await expect(
+        service.getSetting({ code: 'USER#victim#S1' }, opts),
+      ).rejects.toThrow(BadRequestException)
+      expect(dataService.getItem).not.toHaveBeenCalled()
+    }
+  })
+
+  it('rejects a data key on updateSetting, deleteSetting, update and delete', async () => {
+    // Reviewer scenario: shared write only; S1 owned by app-a; data row S1#C1 untagged.
+    const shared = [
+      { systemId: 'shared', settingCode: '*', read: true, write: true },
+    ]
+    for (const grants of [undefined, shared]) {
+      const { service, dataService, commandService } = await build(grants)
+      commandService.getLatestItem.mockResolvedValue({
+        attributes: { __systemId: 'app-a' },
+      })
+      dataService.getItem.mockResolvedValue({
+        pk: 'MASTER#ta',
+        sk: 'S1#C1',
+        version: 1,
+        tenantCode: 'ta',
+        attributes: {},
+      })
+      const key = { pk: 'MASTER#ta', sk: 'S1#C1' }
+      await expect(
+        service.updateSetting(key, { name: 'x' } as any, opts),
+      ).rejects.toThrow(BadRequestException)
+      await expect(service.deleteSetting(key, opts)).rejects.toThrow(
+        BadRequestException,
+      )
+      await expect(
+        service.update(key, { name: 'x' } as any, ctx),
+      ).rejects.toThrow(BadRequestException)
+      await expect(service.delete(key, ctx)).rejects.toThrow(
+        BadRequestException,
+      )
+      expect(dataService.getItem).not.toHaveBeenCalled()
+      expect(commandService.publishPartialUpdateAsync).not.toHaveBeenCalled()
+    }
+  })
+
+  it.each(['MASTER_SETTING', 'master_setting#S1', 'MASTER_SETTING#'])(
+    'rejects a key without the MASTER_SETTING# prefix and a code: %p',
+    async (sk) => {
+      const { service, dataService } = await build()
+      dataService.getItem.mockResolvedValue({ version: 1, tenantCode: 'ta' })
+      await expect(
+        service.deleteSetting({ pk: 'MASTER#ta', sk }, opts),
+      ).rejects.toThrow(BadRequestException)
+      expect(dataService.getItem).not.toHaveBeenCalled()
+    },
+  )
+})
+
+describe('MasterSettingService read access', () => {
+  const ctx = {
+    event: {
+      headers: { 'x-tenant-code': 'ta' },
+      requestContext: {
+        authorizer: {
+          jwt: {
+            claims: {
+              sub: 'u1',
+              'custom:tenant': 'ta',
+              'custom:roles': JSON.stringify([{ tenant: 'ta', role: 'user' }]),
+            },
+          },
+        },
+      },
+    },
+  } as any
+  const opts = { invokeContext: ctx }
+  const appA = [
+    { systemId: 'app-a', settingCode: '*', read: true, write: false },
+  ]
+
+  const build = async (grants?: any[]) => {
+    const dataService = { getItem: jest.fn().mockResolvedValue(null) }
+    const commandService = {
+      getLatestItem: jest.fn().mockResolvedValue({
+        attributes: { __systemId: 'other' },
+      }),
+    }
+    const prisma = {
+      master: {
+        findMany: jest.fn().mockResolvedValue([]),
+        count: jest.fn().mockResolvedValue(0),
+        findFirst: jest.fn().mockResolvedValue({ isDeleted: false }),
+      },
+    }
+    const registry = new MasterAccessResolverRegistry()
+    if (grants) registry.set({ resolveGrants: async () => grants })
+    const access = new MasterAccessService(registry, commandService as any)
+    const dynamo = {
+      getItem: jest.fn().mockResolvedValue(null),
+      getTableName: jest.fn(),
+    }
+    const module = await Test.createTestingModule({
+      providers: [
+        MasterSettingService,
+        { provide: TaskService, useValue: {} },
+        { provide: PRISMA_SERVICE, useValue: prisma },
+        { provide: CommandService, useValue: commandService },
+        { provide: DataService, useValue: dataService },
+        { provide: DynamoDbService, useValue: dynamo },
+        { provide: MasterAccessService, useValue: access },
+      ],
+    }).compile()
+    return {
+      service: module.get(MasterSettingService),
+      dataService,
+      prisma,
+      dynamo,
+    }
+  }
+  const personalRows = [
+    { sk: { startsWith: 'MASTER_SETTING#GROUP#' } },
+    { sk: { startsWith: 'MASTER_SETTING#USER#' } },
+  ]
+  const countWhere = (prisma: any) => prisma.master.count.mock.calls[0][0].where
+  const row = (extra: object = {}) => ({
+    id: 'i',
+    tenantCode: 'ta',
+    sk: 'MASTER_SETTING#S1',
+    attributes: { v: 1, __systemId: 'app-a' },
+    ...extra,
+  })
+
+  it('adds the filter to list', async () => {
+    const { service, prisma } = await build(appA)
+    await service.list({} as any, ctx, opts)
+    expect(countWhere(prisma).AND).toEqual([
+      { systemId: 'app-a', NOT: personalRows },
+    ])
+  })
+
+  it('narrows list to the search systemId', async () => {
+    const { service, prisma } = await build([
+      { systemId: '*', settingCode: '*', read: true, write: false },
+    ])
+    await service.list({ systemId: 'app-a' } as any, ctx, opts)
+    expect(countWhere(prisma).AND).toEqual([
+      { systemId: 'app-a', NOT: personalRows },
+    ])
+  })
+
+  it('does not reference systemId in where without a resolver', async () => {
+    const { service, prisma } = await build()
+    await service.list({ systemId: 'app-a' } as any, ctx, opts)
+    expect(JSON.stringify(countWhere(prisma))).not.toContain('systemId')
+  })
+
+  it('uses masterCode for the setting list filter', async () => {
+    const { service, prisma } = await build([
+      { systemId: 'app-a', settingCode: 'S1', read: true, write: false },
+    ])
+    await service.list({} as any, ctx, opts)
+    expect(countWhere(prisma).AND).toEqual([
+      { systemId: 'app-a', masterCode: 'S1', NOT: personalRows },
+    ])
+  })
+
+  it('denies get for a system with no grant', async () => {
+    const { service, dataService } = await build(appA)
+    dataService.getItem.mockResolvedValue(
+      row({ attributes: { __systemId: 'x' } }),
+    )
+    await expect(
+      service.getDetail({ pk: 'MASTER#ta', sk: 'MASTER_SETTING#S1' }, opts),
+    ).rejects.toThrow(ForbiddenException)
+  })
+
+  it('returns a granted row from getDetail', async () => {
+    const { service, dataService } = await build(appA)
+    dataService.getItem.mockResolvedValue(row())
+    await expect(
+      service.getDetail({ pk: 'MASTER#ta', sk: 'MASTER_SETTING#S1' }, opts),
+    ).resolves.toBeDefined()
+  })
+
+  it('denies getSetting when the resolved row is not granted', async () => {
+    const { service, dataService } = await build(appA)
+    dataService.getItem.mockResolvedValue(
+      row({ attributes: { __systemId: 'x' } }),
+    )
+    await expect(
+      service.getSetting({ code: 'S1' } as any, opts),
+    ).rejects.toThrow(ForbiddenException)
+  })
+
+  it('returns getSetting for a granted row', async () => {
+    const { service, dataService } = await build(appA)
+    dataService.getItem.mockResolvedValue(row())
+    expect(await service.getSetting({ code: 'S1' } as any, opts)).toMatchObject(
+      {
+        id: 'i',
+        settingValue: { v: 1 },
+      },
+    )
+  })
+
+  it('checks a personal row against its base setting owner', async () => {
+    const { service, dataService } = await build(appA)
+    // base setting owner is "other" (getLatestItem), the personal row carries none
+    dataService.getItem.mockResolvedValue(
+      row({ sk: 'MASTER_SETTING#USER#u1#S1', attributes: { v: 1 } }),
+    )
+    await expect(
+      service.getSetting({ code: 'S1' } as any, opts),
+    ).rejects.toThrow(ForbiddenException)
+  })
+
+  it('throws Forbidden for a group row instead of falling through', async () => {
+    const { service, dataService, dynamo } = await build(appA)
+    dynamo.getItem.mockResolvedValue({
+      attributes: {
+        setting: [{ tenantRole: 'user', setting_groups: ['g1'] }],
+      },
+    })
+    // user row: none; group row: owned via its base setting "other"; tenant row: granted
+    dataService.getItem
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce(
+        row({ sk: 'MASTER_SETTING#GROUP#g1#S1', attributes: { v: 2 } }),
+      )
+      .mockResolvedValue(row())
+    await expect(
+      service.getSetting({ code: 'S1' } as any, opts),
+    ).rejects.toThrow(ForbiddenException)
+  })
+
+  it('reports an existing code owned by another system', async () => {
+    const { service } = await build(appA)
+    expect(await service.checkExistCode('S1', ctx, opts)).toBe(true)
+  })
+})
+
+describe('MasterSettingService copy access', () => {
+  const ctx = (role: string, roles?: any[]) =>
+    ({
+      event: {
+        headers: { 'x-tenant-code': 'ta' },
+        requestContext: {
+          authorizer: {
+            jwt: {
+              claims: {
+                sub: 'u1',
+                'custom:tenant': 'ta',
+                'custom:roles': JSON.stringify(
+                  roles ?? [{ tenant: 'ta', role }],
+                ),
+              },
+            },
+          },
+        },
+      },
+    }) as any
+  const opts = (role = 'user') => ({ invokeContext: ctx(role) })
+  const dto = (targetTenants: string[]) =>
+    ({
+      masterSettingId: 'MASTER#common#MASTER_SETTING#S1',
+      targetTenants,
+    }) as any
+
+  const build = async (grants?: any[]) => {
+    const dataService = {
+      getItem: jest.fn().mockResolvedValue({
+        pk: 'MASTER#common',
+        sk: 'MASTER_SETTING#S1',
+        tenantCode: 'common',
+        isDeleted: false,
+        attributes: { __systemId: 'app-a' },
+      }),
+    }
+    const taskService = { createStepFunctionTask: jest.fn() }
+    const registry = new MasterAccessResolverRegistry()
+    if (grants) registry.set({ resolveGrants: async () => grants })
+    const access = new MasterAccessService(registry, {} as any)
+    const module = await Test.createTestingModule({
+      providers: [
+        MasterSettingService,
+        { provide: TaskService, useValue: taskService },
+        { provide: PRISMA_SERVICE, useValue: {} },
+        { provide: CommandService, useValue: {} },
+        { provide: DataService, useValue: dataService },
+        {
+          provide: DynamoDbService,
+          useValue: { getTableName: jest.fn() },
+        },
+        { provide: MasterAccessService, useValue: access },
+      ],
+    }).compile()
+    return { service: module.get(MasterSettingService), taskService }
+  }
+  const full = [{ systemId: '*', settingCode: '*', read: true, write: true }]
+
+  it('rejects a caller who is not system_admin', async () => {
+    const { service, taskService } = await build(full)
+    await expect(service.copy(dto(['ta']), opts('user'))).rejects.toThrow(
+      ForbiddenException,
+    )
+    expect(taskService.createStepFunctionTask).not.toHaveBeenCalled()
+  })
+
+  it('rejects system_admin with grants narrower than full write', async () => {
+    const { service, taskService } = await build([
+      { systemId: 'app-a', settingCode: '*', read: true, write: true },
+    ])
+    await expect(
+      service.copy(dto(['ta']), opts('system_admin')),
+    ).rejects.toThrow(ForbiddenException)
+    expect(taskService.createStepFunctionTask).not.toHaveBeenCalled()
+  })
+
+  it('copies for system_admin with full write to another tenant', async () => {
+    const { service, taskService } = await build(full)
+    await service.copy(dto(['tb']), opts('system_admin'))
+    expect(taskService.createStepFunctionTask).toHaveBeenCalled()
+  })
+
+  it('checks the target tenant gate for a multi-role caller', async () => {
+    const { service, taskService } = await build(full)
+    const invokeContext = ctx('user', [
+      { tenant: 'ta', role: 'user' },
+      { tenant: 'ta', role: 'system_admin' },
+    ])
+    await expect(service.copy(dto(['tb']), { invokeContext })).rejects.toThrow(
+      ForbiddenException,
+    )
+    expect(taskService.createStepFunctionTask).not.toHaveBeenCalled()
+  })
+
+  it('rejects a scope systemId that differs from the source owner', async () => {
+    const { service, taskService } = await build(full)
+    await expect(
+      service.copy(dto(['ta']), {
+        ...opts('system_admin'),
+        scope: { systemId: 'app-y' },
+      }),
+    ).rejects.toThrow(ForbiddenException)
+    expect(taskService.createStepFunctionTask).not.toHaveBeenCalled()
+  })
+
+  it('allows a scope systemId matching the source owner, ignoring case', async () => {
+    const { service, taskService } = await build(full)
+    await service.copy(dto(['ta']), {
+      ...opts('system_admin'),
+      scope: { systemId: 'APP-A' },
+    })
+    expect(taskService.createStepFunctionTask).toHaveBeenCalled()
+  })
+
+  it('copies without checks when no resolver is registered', async () => {
+    const { service, taskService } = await build()
+    await service.copy(dto(['tb']), opts())
+    expect(taskService.createStepFunctionTask).toHaveBeenCalled()
+  })
+})
+
+describe('MasterSettingService assignSystem', () => {
+  const ctx = (roles: any[]) =>
+    ({
+      event: {
+        headers: { 'x-tenant-code': 'ta' },
+        requestContext: {
+          authorizer: {
+            jwt: {
+              claims: {
+                sub: 'u1',
+                'custom:tenant': 'ta',
+                'custom:roles': JSON.stringify(roles),
+              },
+            },
+          },
+        },
+      },
+    }) as any
+  const admin = ctx([{ tenant: 'ta', role: 'system_admin' }])
+  const userCtx = ctx([{ tenant: 'ta', role: 'user' }])
+  const grants = [{ systemId: '*', settingCode: '*', read: true, write: true }]
+
+  const build = async (withResolver = true, rowGrants: any[] = grants) => {
+    const findMany = jest
+      .fn()
+      .mockImplementation(async ({ where }: any) =>
+        where.masterType === 'MASTER_SETTING'
+          ? [{ pk: 'MASTER#ta', sk: 'MASTER_SETTING#S1', version: 3 }]
+          : [{ pk: 'MASTER#ta', sk: 'MASTER_DATA#S1#a', version: 5 }],
+      )
+    const publish = jest.fn().mockResolvedValue({})
+    // The command table is ahead of RDS: its versions differ from the RDS rows'.
+    const getLatestItem = jest
+      .fn()
+      .mockImplementation(async ({ pk, sk }: any) => ({
+        pk,
+        sk,
+        version: sk.startsWith('MASTER_SETTING') ? 4 : 6,
+        attributes: { a: 1 },
+      }))
+    const registry = new MasterAccessResolverRegistry()
+    if (withResolver) registry.set({ resolveGrants: async () => rowGrants })
+    const access = new MasterAccessService(registry, {} as any)
+    const module = await Test.createTestingModule({
+      providers: [
+        MasterSettingService,
+        { provide: TaskService, useValue: {} },
+        { provide: PRISMA_SERVICE, useValue: { master: { findMany } } },
+        {
+          provide: CommandService,
+          useValue: { publishPartialUpdateAsync: publish, getLatestItem },
+        },
+        { provide: DataService, useValue: {} },
+        { provide: DynamoDbService, useValue: { getTableName: jest.fn() } },
+        { provide: MasterAccessService, useValue: access },
+      ],
+    }).compile()
+    return {
+      service: module.get(MasterSettingService),
+      findMany,
+      publish,
+      getLatestItem,
+    }
+  }
+
+  it('throws when no resolver is registered', async () => {
+    const { service, findMany } = await build(false)
+    await expect(
+      service.assignSystem(
+        { code: 'S1', systemId: 'app-a', tenantCode: 'ta' },
+        { invokeContext: admin },
+      ),
+    ).rejects.toThrow(BadRequestException)
+    expect(findMany).not.toHaveBeenCalled()
+  })
+
+  it('throws on a blank systemId', async () => {
+    const { service } = await build()
+    await expect(
+      service.assignSystem(
+        { code: 'S1', systemId: ' ', tenantCode: 'ta' },
+        { invokeContext: admin },
+      ),
+    ).rejects.toThrow(BadRequestException)
+  })
+
+  it('throws on a * systemId', async () => {
+    const { service, findMany } = await build()
+    await expect(
+      service.assignSystem(
+        { code: 'S1', systemId: '*', tenantCode: 'ta' },
+        { invokeContext: admin },
+      ),
+    ).rejects.toThrow(BadRequestException)
+    expect(findMany).not.toHaveBeenCalled()
+  })
+
+  it('stores the systemId in lower case', async () => {
+    const { service, publish } = await build()
+    await service.assignSystem(
+      { code: 'S1', systemId: 'APP-A', tenantCode: 'ta' },
+      { invokeContext: admin },
+    )
+    expect(publish.mock.calls[0][0].attributes).toEqual({ __systemId: 'app-a' })
+  })
+
+  it('limits a cross-tenant run to scope.tenantCode', async () => {
+    const { service, findMany } = await build()
+    await service.assignSystem(
+      { code: 'S1', systemId: 'app-a' },
+      { invokeContext: admin, scope: { tenantCode: 'ta' } },
+    )
+    for (const [arg] of findMany.mock.calls) {
+      expect(arg.where.tenantCode).toBe('ta')
+    }
+    expect(findMany).toHaveBeenCalledTimes(2)
+  })
+
+  it.each(['USER#victim#SECRET', 'MASTER_SETTING', ''])(
+    'rejects code %p',
+    async (code) => {
+      const { service, findMany, publish } = await build()
+      await expect(
+        service.assignSystem(
+          { code, systemId: 'app-a', tenantCode: 'ta' },
+          { invokeContext: admin },
+        ),
+      ).rejects.toThrow(BadRequestException)
+      expect(findMany).not.toHaveBeenCalled()
+      expect(publish).not.toHaveBeenCalled()
+    },
+  )
+
+  it('denies an input tenantCode outside scope.tenantCode', async () => {
+    const { service, findMany } = await build()
+    await expect(
+      service.assignSystem(
+        { code: 'S1', systemId: 'app-a', tenantCode: 'tb' },
+        { invokeContext: admin, scope: { tenantCode: 'ta' } },
+      ),
+    ).rejects.toThrow(ForbiddenException)
+    expect(findMany).not.toHaveBeenCalled()
+  })
+
+  it('leaves personal rows alone when the setting code is USER', async () => {
+    const { service, findMany, publish } = await build()
+    // RDS rows as the template handler stores them: masterCode is the second key segment.
+    const rows = [
+      {
+        masterType: 'MASTER_SETTING',
+        masterCode: 'USER',
+        sk: 'MASTER_SETTING#USER',
+      },
+      {
+        masterType: 'MASTER_SETTING',
+        masterCode: 'USER',
+        sk: 'MASTER_SETTING#USER#victim#SECRET',
+      },
+      { masterType: 'MASTER_DATA', masterTypeCode: 'USER', sk: 'USER#a' },
+    ].map((r) => ({ pk: 'MASTER#ta', tenantCode: 'ta', systemId: null, ...r }))
+    findMany.mockImplementation(async ({ where }: any) =>
+      rows.filter((r) => Object.entries(where).every(([k, v]) => r[k] === v)),
+    )
+    await service.assignSystem(
+      { code: 'USER', systemId: 'app-a', tenantCode: 'ta' },
+      { invokeContext: admin },
+    )
+    expect(publish.mock.calls.map((c) => c[0].sk).sort()).toEqual([
+      'MASTER_SETTING#USER',
+      'USER#a',
+    ])
+  })
+
+  it('skips a row whose latest command already has an owner', async () => {
+    const { service, publish, getLatestItem } = await build()
+    getLatestItem.mockImplementationOnce(async ({ pk, sk }: any) => ({
+      pk,
+      sk,
+      version: 4,
+      attributes: { __systemId: 'other' },
+    }))
+    const res = await service.assignSystem(
+      { code: 'S1', systemId: 'app-a', tenantCode: 'ta' },
+      { invokeContext: admin },
+    )
+    expect(res).toEqual({ updated: 1 })
+    expect(publish).toHaveBeenCalledTimes(1)
+    expect(publish.mock.calls[0][0].sk).toBe('MASTER_DATA#S1#a')
+  })
+
+  it('skips a row with no command', async () => {
+    const { service, publish, getLatestItem } = await build()
+    getLatestItem.mockResolvedValue(null)
+    const res = await service.assignSystem(
+      { code: 'S1', systemId: 'app-a', tenantCode: 'ta' },
+      { invokeContext: admin },
+    )
+    expect(res).toEqual({ updated: 0 })
+    expect(publish).not.toHaveBeenCalled()
+  })
+
+  it('tags setting and data rows with the reserved key', async () => {
+    const { service, publish } = await build()
+    const opts = { invokeContext: admin }
+    const res = await service.assignSystem(
+      { code: 'S1', systemId: 'app-a', tenantCode: 'ta' },
+      opts,
+    )
+    expect(res).toEqual({ updated: 2 })
+    expect(publish).toHaveBeenNthCalledWith(
+      1,
+      {
+        pk: 'MASTER#ta',
+        sk: 'MASTER_SETTING#S1',
+        version: 4,
+        attributes: { __systemId: 'app-a' },
+      },
+      { invokeContext: admin },
+    )
+    expect(publish).toHaveBeenNthCalledWith(
+      2,
+      {
+        pk: 'MASTER#ta',
+        sk: 'MASTER_DATA#S1#a',
+        version: 6,
+        attributes: { __systemId: 'app-a' },
+      },
+      { invokeContext: admin },
+    )
+  })
+
+  it('only selects untagged rows, settings and data, limited to tenantCode', async () => {
+    const { service, findMany } = await build()
+    await service.assignSystem(
+      { code: 'S1', systemId: 'app-a', tenantCode: 'ta' },
+      { invokeContext: admin },
+    )
+    expect(findMany).toHaveBeenNthCalledWith(1, {
+      where: {
+        masterType: 'MASTER_SETTING',
+        sk: 'MASTER_SETTING#S1',
+        systemId: null,
+        tenantCode: 'ta',
+      },
+    })
+    expect(findMany).toHaveBeenNthCalledWith(2, {
+      where: {
+        masterType: 'MASTER_DATA',
+        masterTypeCode: 'S1',
+        systemId: null,
+        tenantCode: 'ta',
+      },
+    })
+  })
+
+  it('does not touch group and user settings', async () => {
+    const { service, findMany } = await build()
+    await service.assignSystem(
+      { code: 'S1', systemId: 'app-a', tenantCode: 'ta' },
+      { invokeContext: admin },
+    )
+    const types = findMany.mock.calls.map((c) => c[0].where.masterType)
+    expect(types).toEqual(['MASTER_SETTING', 'MASTER_DATA'])
+  })
+
+  it('requires write on the target and on shared', async () => {
+    const { service, findMany, publish } = await build(true, [
+      { systemId: 'app-a', settingCode: '*', read: true, write: true },
+    ])
+    await expect(
+      service.assignSystem(
+        { code: 'S1', systemId: 'app-a', tenantCode: 'ta' },
+        { invokeContext: admin },
+      ),
+    ).rejects.toThrow(ForbiddenException)
+    expect(findMany).not.toHaveBeenCalled()
+    expect(publish).not.toHaveBeenCalled()
+  })
+
+  it('requires a cross-tenant role without tenantCode', async () => {
+    const { service, findMany } = await build()
+    await expect(
+      service.assignSystem(
+        { code: 'S1', systemId: 'app-a' },
+        { invokeContext: userCtx },
+      ),
+    ).rejects.toThrow(ForbiddenException)
+    expect(findMany).not.toHaveBeenCalled()
+  })
+})
+
+describe('MasterSettingService search filters per database', () => {
+  const search = async (activeProvider: string, override?: string) => {
+    const prisma = {
+      _activeProvider: activeProvider,
+      master: {
+        count: jest.fn().mockResolvedValue(0),
+        findMany: jest.fn().mockResolvedValue([]),
+      },
+    }
+    const module = await Test.createTestingModule({
+      providers: [
+        MasterSettingService,
+        { provide: TaskService, useValue: {} },
+        { provide: PRISMA_SERVICE, useValue: prisma },
+        { provide: CommandService, useValue: {} },
+        { provide: DataService, useValue: {} },
+        {
+          provide: DynamoDbService,
+          useValue: { getItem: jest.fn(), getTableName: jest.fn() },
+        },
+        ...(override
+          ? [
+              {
+                provide: MODULE_OPTIONS_TOKEN,
+                useValue: { databaseProvider: override },
+              },
+            ]
+          : []),
+      ],
+    }).compile()
+    await module
+      .get(MasterSettingService)
+      .list(
+        { name: 'Area', code: 'Ar', keyword: 'desc' } as any,
+        optionsMock.invokeContext,
+      )
+    return JSON.stringify(prisma.master.findMany.mock.calls)
+  }
+
+  it('uses mode insensitive and an array JSON path on postgresql', async () => {
+    const calls = await search('postgresql')
+    expect(calls).toContain('{"name":{"contains":"Area","mode":"insensitive"}}')
+    expect(calls).toContain(
+      '{"masterCode":{"contains":"Ar","mode":"insensitive"}}',
+    )
+    expect(calls).toContain(
+      '{"attributes":{"path":["description"],"string_contains":"desc"}}',
+    )
+  })
+
+  it('drops mode and uses a $. JSON path on mysql', async () => {
+    const calls = await search('mysql')
+    expect(calls).toContain('{"name":{"contains":"Area"}}')
+    expect(calls).toContain('{"masterCode":{"contains":"Ar"}}')
+    expect(calls).toContain(
+      '{"attributes":{"path":"$.description","string_contains":"desc"}}',
+    )
+    expect(calls).not.toContain('insensitive')
+  })
+
+  it('lets the databaseProvider option override detection', async () => {
+    const calls = await search('postgresql', 'mysql')
+    expect(calls).toContain('"path":"$.description"')
+    expect(calls).not.toContain('insensitive')
   })
 })
