@@ -195,6 +195,12 @@ and only adds rows. In `listByRds`, data rows of a soft-deleted setting are
 hidden per tenant: the tenant's rows by the settings deleted in the tenant, the
 common rows by the settings deleted in the common tenant.
 
+The merge hides common rows by the tenant's own codes, so it is bounded:
+`listByRds` with `includeCommon` requires `settingCode`, and the tenant may hold
+at most 10,000 matching rows (`MAX_INCLUDE_COMMON_CODES`); more is a 400. Group
+and user (personal) setting rows are never merged and do not count toward that
+limit.
+
 ### Master copy
 
 `MasterSettingService.copy` requires the `system_admin` role and a

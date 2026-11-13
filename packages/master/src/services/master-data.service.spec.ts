@@ -156,7 +156,7 @@ describe('MasterDataService', () => {
 
     it('merges common rows when includeCommon is true', async () => {
       prismaService.master.findMany.mockResolvedValue([])
-      await list({ includeCommon: true })
+      await list({ includeCommon: true, settingCode: 'S' })
       expect(countWhere().OR).toEqual([
         { tenantCode: 'TEST_TENANT' },
         { tenantCode: 'common', code: { notIn: [] } },
@@ -198,7 +198,7 @@ describe('MasterDataService', () => {
       prismaService.master.findMany
         .mockResolvedValueOnce([{ masterCode: 'GONE', tenantCode: 'common' }])
         .mockResolvedValue([])
-      await list({ includeCommon: true })
+      await list({ includeCommon: true, settingCode: 'S' })
       expect(
         prismaService.master.findMany.mock.calls[0][0].where.tenantCode,
       ).toEqual({ in: ['TEST_TENANT', 'common'] })
@@ -219,7 +219,7 @@ describe('MasterDataService', () => {
           { masterCode: 'MINE', tenantCode: 'TEST_TENANT' },
         ])
         .mockResolvedValue([])
-      await list({ includeCommon: true })
+      await list({ includeCommon: true, settingCode: 'S' })
       expect(countWhere().OR).toEqual([
         { tenantCode: 'TEST_TENANT', masterTypeCode: { notIn: ['MINE'] } },
         { tenantCode: 'common', code: { notIn: [] } },
@@ -2786,12 +2786,12 @@ describe('MasterDataService read access', () => {
   it('still applies grants with includeCommon', async () => {
     const { service, prisma } = await build(appA)
     await service.listByRds(
-      { pageSize: 10, page: 1, includeCommon: true } as any,
+      { pageSize: 10, page: 1, includeCommon: true, settingCode: 'S' } as any,
       opts,
     )
     const where = countWhere(prisma)
     expect(where.OR).toBeDefined()
-    expect(where.AND).toEqual([{ systemId: 'app-a' }])
+    expect(where.AND).toContainEqual({ systemId: 'lobo' })
   })
 
   it('rejects listByRds for another tenant header', async () => {

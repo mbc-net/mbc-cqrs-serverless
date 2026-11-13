@@ -8,7 +8,6 @@ import {
   getUserContext,
   GroupRoleResolverRegistry,
   IInvoke,
-  KEY_SEPARATOR,
   ROLE_SYSTEM_ADMIN,
 } from '@mbc-cqrs-serverless/core'
 import {
@@ -19,14 +18,13 @@ import {
   Optional,
 } from '@nestjs/common'
 
-import { SETTING_SK_PREFIX } from '../constants'
-import { SettingTypeEnum } from '../enums'
 import {
   generateMasterPk,
   generateMasterSettingSk,
   getSettingCodeFromSk,
   getSystemId,
   isPersonalSettingSk,
+  PERSONAL_SETTING_ROWS,
 } from '../helpers'
 import {
   MasterModuleOptions,
@@ -41,16 +39,6 @@ import {
   MasterAccessTarget,
 } from './master-access.interface'
 import { MasterAccessResolverRegistry } from './master-access-resolver.registry'
-
-/** Group and user setting rows carry no owner, so only an unrestricted setting list shows them. */
-const PERSONAL_SETTING_ROWS = [
-  SettingTypeEnum.TENANT_GROUP,
-  SettingTypeEnum.TENANT_USER,
-].map((type) => ({
-  sk: {
-    startsWith: `${SETTING_SK_PREFIX}${KEY_SEPARATOR}${type}${KEY_SEPARATOR}`,
-  },
-}))
 
 @Injectable()
 export class MasterAccessService {

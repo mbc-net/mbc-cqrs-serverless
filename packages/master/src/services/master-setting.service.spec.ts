@@ -2224,13 +2224,19 @@ describe('MasterSettingService list includeCommon', () => {
       .mockResolvedValueOnce([])
     await service.list({ includeCommon: true } as any, ctxFor('MBC'))
     const exclusion = prisma.master.findMany.mock.calls[0][0]
+    // Personal rows are neither counted as own codes nor merged from common.
+    const personal = [
+      { sk: { startsWith: 'MASTER_SETTING#GROUP#' } },
+      { sk: { startsWith: 'MASTER_SETTING#USER#' } },
+    ]
     expect(exclusion.where).toEqual({
       tenantCode: 'mbc',
       masterType: 'MASTER_SETTING',
+      NOT: personal,
     })
     expect(whereOf(prisma).OR).toEqual([
       { tenantCode: 'mbc' },
-      { tenantCode: 'common', code: { notIn: ['SETTING#A'] } },
+      { tenantCode: 'common', code: { notIn: ['SETTING#A'] }, NOT: personal },
     ])
     expect(whereOf(prisma).tenantCode).toBeUndefined()
   })

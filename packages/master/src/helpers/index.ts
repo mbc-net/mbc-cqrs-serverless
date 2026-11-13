@@ -3,10 +3,21 @@ import { RotateByEnum } from '@mbc-cqrs-serverless/sequence/dist'
 import { BadRequestException } from '@nestjs/common'
 
 import { MASTER_PK_PREFIX, SETTING_SK_PREFIX } from '../constants'
+import { SettingTypeEnum } from '../enums'
 
 export function generateMasterPk(tenantCode: string) {
   return `${MASTER_PK_PREFIX}${KEY_SEPARATOR}${tenantCode}`
 }
+
+/** Prisma `where` entries matching group and user (personal) setting rows by their key. */
+export const PERSONAL_SETTING_ROWS = [
+  SettingTypeEnum.TENANT_GROUP,
+  SettingTypeEnum.TENANT_USER,
+].map((type) => ({
+  sk: {
+    startsWith: `${SETTING_SK_PREFIX}${KEY_SEPARATOR}${type}${KEY_SEPARATOR}`,
+  },
+}))
 
 /**
  * A setting code must be one key segment and not the setting prefix. Otherwise it builds the

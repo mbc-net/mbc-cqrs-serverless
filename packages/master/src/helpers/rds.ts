@@ -1,4 +1,15 @@
-import { SETTING_SK_PREFIX } from '../constants'
+import { BadRequestException } from '@nestjs/common'
+
+import { DATA_SK_PREFIX, SETTING_SK_PREFIX } from '../constants'
+import { PERSONAL_SETTING_ROWS } from './index'
+
+/**
+ * Most own rows the includeCommon merge hides by code. Each one is a bind parameter, and
+ * PostgreSQL allows 32,767 per query, leaving room for the rest of the filter.
+ */
+// ponytail: cap on the in-memory notIn list; ceiling is one setting with more rows than this.
+// Upgrade path: a raw `NOT EXISTS` query for the common branch.
+export const MAX_INCLUDE_COMMON_CODES = 10_000
 
 export function getOrderBy(order: string) {
   let orderValue = 'asc',
@@ -39,6 +50,12 @@ export async function buildTenantScope(
   const withCommon =
     !!input.includeCommon &&
     tenantCode?.toLowerCase() !== commonTenantCode?.toLowerCase()
+  const settings = masterType === SETTING_SK_PREFIX
+  if (withCommon && masterType === DATA_SK_PREFIX && !masterTypeCode) {
+    throw new BadRequestException(
+      'includeCommon requires settingCode for master data lists',
+    )
+  }
 
   const deleted: { masterCode: string; tenantCode?: string }[] =
     input.hideDeletedSettings
@@ -67,14 +84,22 @@ export async function buildTenantScope(
     return { tenantCode, ...hideDeletedIn() }
   }
 
+  // Personal rows are never merged, so they need no hiding (and must not fill the cap).
   const own = await prisma.master.findMany({
     where: {
       tenantCode,
       masterType,
       ...(masterTypeCode && { masterTypeCode }),
+      ...(settings && { NOT: PERSONAL_SETTING_ROWS }),
     },
     select: { code: true },
+    take: MAX_INCLUDE_COMMON_CODES + 1,
   })
+  if (own.length > MAX_INCLUDE_COMMON_CODES) {
+    throw new BadRequestException(
+      `includeCommon supports at most ${MAX_INCLUDE_COMMON_CODES} rows of the tenant; list without includeCommon`,
+    )
+  }
 
   return {
     OR: [
@@ -83,6 +108,8 @@ export async function buildTenantScope(
         tenantCode: commonTenantCode,
         code: { notIn: own.map((row: { code: string }) => row.code) },
         ...hideDeletedIn(commonTenantCode),
+        // The common tenant's personal settings belong to its users, not to shared master data.
+        ...(settings && { NOT: PERSONAL_SETTING_ROWS }),
       },
     ],
   }

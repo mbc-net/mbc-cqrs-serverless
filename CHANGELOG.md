@@ -63,6 +63,9 @@ See [Conventional Commits](https://conventionalcommits.org) for commit guideline
 - **master (tasks):** `GET /api/tasks/sfn-task-parent` now resolves the tenant like the rest of the
   framework: the `custom:tenant` claim wins over `x-tenant-code`. It used to read a
   `custom:tenant_code` claim nobody sets, so it always took the tenant from the header.
+- **master (`includeCommon`):** a master data list with `includeCommon` now requires `settingCode`,
+  merges at most 10,000 of the tenant's rows (more is a 400 instead of a database error), and
+  never merges the common tenant's personal setting rows.
 
 ### Features
 
