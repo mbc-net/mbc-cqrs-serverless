@@ -33,7 +33,10 @@ See [Conventional Commits](https://conventionalcommits.org) for commit guideline
   /api/master-setting/:pk/:sk`) reject a key that is not `MASTER_SETTING#<code>`: data rows are
   changed through `/api/master-data` only. The setting-code rule also applies to `getSetting` (`GET /api/master-setting/:code`), so a code such as
   `USER#u1#S1` no longer reads another user's personal row, and a master data `code` must be
-  non-empty and contain no `#`.
+  non-empty and contain no `#`. Stored rows are not changed or migrated: a master data row already
+  stored with `#` in its `code` stays readable and can still be updated or deleted by key through
+  `/api/master-data/:pk/:sk`, but a create or upsert that sends such a code is rejected. Check
+  integrations that generate codes with `#` before upgrading.
 - **master:** a setting update that omits `settingValue` no longer clears the setting's `attributes`
   (and its owner), one that omits `name` keeps the name, and a data update that omits `seq` keeps it.
 - **master:** for an application that sets neither `controllerAuth` nor a resolver, the other
