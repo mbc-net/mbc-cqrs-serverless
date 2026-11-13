@@ -3008,6 +3008,21 @@ describe('MasterSettingService assignSystem', () => {
     expect(findMany).toHaveBeenCalledTimes(2)
   })
 
+  it.each(['USER#victim#SECRET', 'MASTER_SETTING', ''])(
+    'rejects code %p',
+    async (code) => {
+      const { service, findMany, publish } = await build()
+      await expect(
+        service.assignSystem(
+          { code, systemId: 'app-a', tenantCode: 'ta' },
+          { invokeContext: admin },
+        ),
+      ).rejects.toThrow(BadRequestException)
+      expect(findMany).not.toHaveBeenCalled()
+      expect(publish).not.toHaveBeenCalled()
+    },
+  )
+
   it('denies an input tenantCode outside scope.tenantCode', async () => {
     const { service, findMany } = await build()
     await expect(

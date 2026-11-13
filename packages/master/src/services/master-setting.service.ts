@@ -808,6 +808,7 @@ export class MasterSettingService implements IMasterSettingService {
     options: MasterWriteOptions,
   ): Promise<{ updated: number }> {
     const { code, tenantCode } = input
+    assertValidSettingCode(code)
     const systemId = input.systemId?.trim().toLowerCase()
     if (!systemId) {
       throw new BadRequestException('systemId is required')
