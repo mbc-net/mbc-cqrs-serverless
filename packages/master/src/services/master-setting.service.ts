@@ -84,6 +84,14 @@ import {
   MODULE_OPTIONS_TOKEN,
   PRISMA_SERVICE,
 } from '../master.module-definition'
+/** The setting API only writes setting rows; data rows (<settingCode>#<code>) go through MasterDataService. */
+function assertSettingKey(key: DetailKey): void {
+  const [prefix, code] = key.sk.split(KEY_SEPARATOR)
+  if (prefix !== SETTING_SK_PREFIX || !code) {
+    throw new BadRequestException(`Invalid setting key: ${key.sk}`)
+  }
+}
+
 @Injectable()
 export class MasterSettingService implements IMasterSettingService {
   private readonly logger = new Logger(MasterSettingService.name)
@@ -394,6 +402,7 @@ export class MasterSettingService implements IMasterSettingService {
     dto: UpdateSettingDto,
     context: MasterWriteOptions,
   ): Promise<CommandModel> {
+    assertSettingKey(key)
     const { pk, sk } = key
     const data = await this.dataService.getItem(key)
     if (!data) {
@@ -423,6 +432,7 @@ export class MasterSettingService implements IMasterSettingService {
     key: DetailKey,
     options: MasterWriteOptions,
   ): Promise<CommandModel> {
+    assertSettingKey(key)
     const { pk, sk } = key
     const data = await this.dataService.getItem(key)
     if (!data) {

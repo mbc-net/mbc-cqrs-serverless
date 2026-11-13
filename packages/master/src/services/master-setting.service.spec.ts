@@ -1072,11 +1072,11 @@ describe('SettingService', () => {
      * Details: Verifies that settings are marked as deleted rather than physically removed
      */
     it('should soft delete existing setting', async () => {
-      const key = { pk: 'MASTER#TEST_TENANT', sk: 'SETTING#TEST_CODE' }
+      const key = { pk: 'MASTER#TEST_TENANT', sk: 'MASTER_SETTING#TEST_CODE' }
       const existingData: DataModel = {
         id: 'test-id',
         pk: 'MASTER#TEST_TENANT',
-        sk: 'SETTING#TEST_CODE',
+        sk: 'MASTER_SETTING#TEST_CODE',
         code: 'TEST_CODE',
         name: 'Test Setting',
         version: 1,
@@ -1216,11 +1216,11 @@ describe('SettingService', () => {
 
     describe('updateSetting - Error Handling', () => {
       it('should handle version conflict errors during update', async () => {
-        const key = { pk: 'MASTER#TEST_TENANT', sk: 'SETTING#TEST_CODE' }
+        const key = { pk: 'MASTER#TEST_TENANT', sk: 'MASTER_SETTING#TEST_CODE' }
         const existingData: DataModel = {
           id: 'test-id',
           pk: 'MASTER#TEST_TENANT',
-          sk: 'SETTING#TEST_CODE',
+          sk: 'MASTER_SETTING#TEST_CODE',
           code: 'TEST_CODE',
           name: 'Test Setting',
           version: 1,
@@ -1246,11 +1246,11 @@ describe('SettingService', () => {
       })
 
       it('should handle concurrent update attempts', async () => {
-        const key = { pk: 'MASTER#TEST_TENANT', sk: 'SETTING#TEST_CODE' }
+        const key = { pk: 'MASTER#TEST_TENANT', sk: 'MASTER_SETTING#TEST_CODE' }
         const existingData: DataModel = {
           id: 'test-id',
           pk: 'MASTER#TEST_TENANT',
-          sk: 'SETTING#TEST_CODE',
+          sk: 'MASTER_SETTING#TEST_CODE',
           code: 'TEST_CODE',
           name: 'Test Setting',
           version: 1,
@@ -1941,11 +1941,14 @@ describe('SettingService', () => {
 
     describe('updateSetting - Concurrent Operations', () => {
       it('should handle concurrent setting updates with proper version control', async () => {
-        const key = { pk: 'SETTING#TEST_TENANT', sk: 'SETTING#UPDATE_TEST' }
+        const key = {
+          pk: 'SETTING#TEST_TENANT',
+          sk: 'MASTER_SETTING#UPDATE_TEST',
+        }
         const existingData: DataModel = {
           id: 'test-id',
           pk: 'SETTING#TEST_TENANT',
-          sk: 'SETTING#UPDATE_TEST',
+          sk: 'MASTER_SETTING#UPDATE_TEST',
           code: 'UPDATE_TEST',
           name: 'Update Test',
           version: 1,
@@ -2134,7 +2137,7 @@ describe('MasterSettingService reserved system attribute', () => {
     const { service, dataService, commandService } = await build()
     dataService.getItem.mockResolvedValue({ version: 1 })
     await service.updateSetting(
-      { pk: 'p', sk: 's' },
+      { pk: 'p', sk: 'MASTER_SETTING#s' },
       { settingValue: bad } as any,
       optionsMock,
     )
@@ -2533,6 +2536,53 @@ describe('MasterSettingService ownership', () => {
       expect(dataService.getItem).not.toHaveBeenCalled()
     }
   })
+
+  it('rejects a data key on updateSetting, deleteSetting, update and delete', async () => {
+    // Reviewer scenario: shared write only; S1 owned by app-a; data row S1#C1 untagged.
+    const shared = [
+      { systemId: 'shared', settingCode: '*', read: true, write: true },
+    ]
+    for (const grants of [undefined, shared]) {
+      const { service, dataService, commandService } = await build(grants)
+      commandService.getLatestItem.mockResolvedValue({
+        attributes: { __systemId: 'app-a' },
+      })
+      dataService.getItem.mockResolvedValue({
+        pk: 'MASTER#ta',
+        sk: 'S1#C1',
+        version: 1,
+        tenantCode: 'ta',
+        attributes: {},
+      })
+      const key = { pk: 'MASTER#ta', sk: 'S1#C1' }
+      await expect(
+        service.updateSetting(key, { name: 'x' } as any, opts),
+      ).rejects.toThrow(BadRequestException)
+      await expect(service.deleteSetting(key, opts)).rejects.toThrow(
+        BadRequestException,
+      )
+      await expect(
+        service.update(key, { name: 'x' } as any, ctx),
+      ).rejects.toThrow(BadRequestException)
+      await expect(service.delete(key, ctx)).rejects.toThrow(
+        BadRequestException,
+      )
+      expect(dataService.getItem).not.toHaveBeenCalled()
+      expect(commandService.publishPartialUpdateAsync).not.toHaveBeenCalled()
+    }
+  })
+
+  it.each(['MASTER_SETTING', 'master_setting#S1', 'MASTER_SETTING#'])(
+    'rejects a key without the MASTER_SETTING# prefix and a code: %p',
+    async (sk) => {
+      const { service, dataService } = await build()
+      dataService.getItem.mockResolvedValue({ version: 1, tenantCode: 'ta' })
+      await expect(
+        service.deleteSetting({ pk: 'MASTER#ta', sk }, opts),
+      ).rejects.toThrow(BadRequestException)
+      expect(dataService.getItem).not.toHaveBeenCalled()
+    },
+  )
 })
 
 describe('MasterSettingService read access', () => {
