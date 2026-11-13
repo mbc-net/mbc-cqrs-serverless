@@ -1543,7 +1543,8 @@ describe('MasterDataService', () => {
       it('should handle special characters in master data fields', async () => {
         const createDto: CreateMasterDataDto = {
           settingCode: 'SETTING_CODE',
-          code: 'DATA_CODE_特殊文字@#$%',
+          // `#` is the key separator and is rejected; other special characters are fine.
+          code: 'DATA_CODE_特殊文字@$%',
           tenantCode: 'TEST_TENANT',
           name: 'Test Data with 特殊文字 & symbols!',
           seq: 1,
@@ -1556,9 +1557,9 @@ describe('MasterDataService', () => {
 
         dataService.getItem.mockResolvedValue(null)
         const mockCommandResult: CommandModel = {
-          id: 'MASTER#TEST_TENANT#SETTING_CODE#DATA_CODE_特殊文字@#$%',
+          id: 'MASTER#TEST_TENANT#SETTING_CODE#DATA_CODE_特殊文字@$%',
           pk: 'MASTER#TEST_TENANT',
-          sk: 'SETTING_CODE#DATA_CODE_特殊文字@#$%',
+          sk: 'SETTING_CODE#DATA_CODE_特殊文字@$%',
           version: 1,
           type: 'MASTER',
           tenantCode: 'TEST_TENANT',
@@ -1577,7 +1578,7 @@ describe('MasterDataService', () => {
         })
 
         expect(result).toBeInstanceOf(MasterDataEntity)
-        expect(result.code).toBe('DATA_CODE_特殊文字@#$%')
+        expect(result.code).toBe('DATA_CODE_特殊文字@$%')
         expect(result.name).toBe('Test Data with 特殊文字 & symbols!')
       })
 
@@ -2655,6 +2656,22 @@ describe('MasterDataService ownership and access', () => {
       expect(commandService.publishPartialUpdateAsync).not.toHaveBeenCalled()
     }
   })
+
+  it.each(['X#Y', ''])(
+    'rejects data code %p on create, upsert and both bulk routes',
+    async (code) => {
+      const { service, commandService } = await build()
+      const d = dto({ code }) as any
+      await expect(service.create(d, opts)).rejects.toThrow(BadRequestException)
+      await expect(service.upsert(d, opts)).rejects.toThrow(BadRequestException)
+      for (const bulk of [service.createBulk, service.upsertBulk]) {
+        await expect(
+          bulk.call(service, { items: [dto(), d] } as any, invoke),
+        ).rejects.toThrow(BadRequestException)
+      }
+      expect(commandService.publishAsync).not.toHaveBeenCalled()
+    },
+  )
 
   it.each(['MASTER_SETTING', 'S1#X', ''])(
     'rejects settingCode %p on create, upsert and createBulk, with or without a resolver',

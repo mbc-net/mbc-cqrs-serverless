@@ -41,6 +41,7 @@ import { MasterDataCreateBulkDto } from '../dto/master-copy/master-data-create-b
 import { MasterDataEntity, MasterDataListEntity } from '../entities'
 import { SettingTypeEnum } from '../enums'
 import {
+  assertValidDataCode,
   assertValidSettingCode,
   generateMasterDataSk,
   generateMasterPk,
@@ -62,6 +63,12 @@ import {
   MODULE_OPTIONS_TOKEN,
   PRISMA_SERVICE,
 } from '../master.module-definition'
+
+/** A missing code is generated later; a given one must be a single key segment. */
+function assertBulkItemKey(item: { settingCode: string; code?: string }): void {
+  assertValidSettingCode(item.settingCode)
+  if (item.code !== undefined) assertValidDataCode(item.code)
+}
 
 /** The data API only writes data rows; setting rows (MASTER_SETTING#...) go through MasterSettingService. */
 function assertDataKey(key: DetailDto): void {
@@ -255,6 +262,7 @@ export class MasterDataService implements IMasterDataService {
       }
     const { settingCode, code, tenantCode } = dto
     assertValidSettingCode(settingCode)
+    assertValidDataCode(code)
     const pk = generateMasterPk(tenantCode)
     const sk = generateMasterDataSk(settingCode, code)
     const id = generateId(pk, sk)
@@ -454,7 +462,7 @@ export class MasterDataService implements IMasterDataService {
 
   async createBulk(createDto: MasterDataCreateBulkDto, invokeContext: IInvoke) {
     // Before any item runs: Promise.all would let valid items write next to a rejected one.
-    createDto.items.forEach((item) => assertValidSettingCode(item.settingCode))
+    createDto.items.forEach(assertBulkItemKey)
     return Promise.all(
       createDto.items.map((item) => this.createSetting(item, invokeContext)),
     )
@@ -498,7 +506,7 @@ export class MasterDataService implements IMasterDataService {
   }
 
   async upsertBulk(createDto: MasterDataCreateBulkDto, invokeContext: IInvoke) {
-    createDto.items.forEach((item) => assertValidSettingCode(item.settingCode))
+    createDto.items.forEach(assertBulkItemKey)
     if (this.access?.isEnabled()) {
       // Check every item first so a forbidden one leaves nothing half-written.
       const { tenantCode } = getUserContext(invokeContext)

@@ -211,6 +211,8 @@ export class MasterSettingService implements IMasterSettingService {
       ? this.access.callerTenant(options)
       : userContext.tenantCode
     const { code } = dto
+    // A multi-segment code would read another row, e.g. USER#victim#S1 is a user's personal row.
+    assertValidSettingCode(code)
     const pk = `${SETTING_TENANT_PREFIX}${KEY_SEPARATOR}${tenantCode}`
 
     // Fetch user-level setting
@@ -823,7 +825,12 @@ export class MasterSettingService implements IMasterSettingService {
     }
 
     // Ownership survives deletion, so deleted rows are tagged too.
-    const scope = { systemId: null, ...(tenantCode ? { tenantCode } : {}) }
+    // scope.tenantCode narrows a cross-tenant run; a different input.tenantCode was denied above.
+    const queryTenant = tenantCode ?? options.scope?.tenantCode
+    const scope = {
+      systemId: null,
+      ...(queryTenant ? { tenantCode: queryTenant } : {}),
+    }
     // Match the exact key: group and user rows store their type (USER, GROUP) in masterCode, so
     // filtering on masterCode alone would tag every personal row when the code is USER or GROUP.
     const settings = await this.prismaService.master.findMany({

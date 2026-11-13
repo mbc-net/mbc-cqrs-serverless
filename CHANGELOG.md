@@ -28,7 +28,10 @@ See [Conventional Commits](https://conventionalcommits.org) for commit guideline
   another row, such as a user's personal setting. A bulk request is checked before anything is
   written. With a resolver registered, `list` also leaves out rows the caller may not read.
   `MasterDataService.update` and `delete` (`PUT`/`DELETE /api/master-data/:pk/:sk`) now reject a
-  `MASTER_SETTING#...` key: setting rows are changed through `/api/master-setting` only.
+  `MASTER_SETTING#...` key: setting rows are changed through `/api/master-setting` only. The same
+  rule applies to `getSetting` (`GET /api/master-setting/:code`), so a code such as
+  `USER#u1#S1` no longer reads another user's personal row, and a master data `code` must be
+  non-empty and contain no `#`.
 - **master:** a setting update that omits `settingValue` no longer clears the setting's `attributes`
   (and its owner), one that omits `name` keeps the name, and a data update that omits `seq` keeps it.
 - **master:** for an application that sets neither `controllerAuth` nor a resolver, the other

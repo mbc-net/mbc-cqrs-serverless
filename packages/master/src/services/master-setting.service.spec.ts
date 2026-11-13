@@ -1303,7 +1303,8 @@ describe('SettingService', () => {
     })
 
     it('should handle special characters in setting codes', async () => {
-      const specialCode = 'SETTING_特殊文字@#$%'
+      // `#` is the key separator and is rejected; other special characters are fine.
+      const specialCode = 'SETTING_特殊文字@$%'
 
       const mockCommonSetting = {
         id: 'test-id',
@@ -2522,6 +2523,16 @@ describe('MasterSettingService ownership', () => {
       }
     },
   )
+
+  it('rejects a getSetting code that addresses another user’s personal row', async () => {
+    for (const grants of [undefined, all]) {
+      const { service, dataService } = await build(grants)
+      await expect(
+        service.getSetting({ code: 'USER#victim#S1' }, opts),
+      ).rejects.toThrow(BadRequestException)
+      expect(dataService.getItem).not.toHaveBeenCalled()
+    }
+  })
 })
 
 describe('MasterSettingService read access', () => {
@@ -2933,6 +2944,29 @@ describe('MasterSettingService assignSystem', () => {
       { invokeContext: admin },
     )
     expect(publish.mock.calls[0][0].attributes).toEqual({ __systemId: 'app-a' })
+  })
+
+  it('limits a cross-tenant run to scope.tenantCode', async () => {
+    const { service, findMany } = await build()
+    await service.assignSystem(
+      { code: 'S1', systemId: 'app-a' },
+      { invokeContext: admin, scope: { tenantCode: 'ta' } },
+    )
+    for (const [arg] of findMany.mock.calls) {
+      expect(arg.where.tenantCode).toBe('ta')
+    }
+    expect(findMany).toHaveBeenCalledTimes(2)
+  })
+
+  it('denies an input tenantCode outside scope.tenantCode', async () => {
+    const { service, findMany } = await build()
+    await expect(
+      service.assignSystem(
+        { code: 'S1', systemId: 'app-a', tenantCode: 'tb' },
+        { invokeContext: admin, scope: { tenantCode: 'ta' } },
+      ),
+    ).rejects.toThrow(ForbiddenException)
+    expect(findMany).not.toHaveBeenCalled()
   })
 
   it('leaves personal rows alone when the setting code is USER', async () => {

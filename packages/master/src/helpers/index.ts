@@ -19,6 +19,13 @@ export function assertValidSettingCode(code: string): void {
   }
 }
 
+/** A master data code is the second and last key segment: non-empty, without `#`. */
+export function assertValidDataCode(code: string): void {
+  if (!code || code.includes(KEY_SEPARATOR)) {
+    throw new BadRequestException(`Invalid code: ${code}`)
+  }
+}
+
 export function generateMasterDataSk(settingCode: string, code: string) {
   return `${settingCode}${KEY_SEPARATOR}${code}`
 }
