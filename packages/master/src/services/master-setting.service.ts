@@ -59,6 +59,8 @@ import { CommonSettingBulkDto } from '../dto/master-setting/common-setting-creat
 import { MasterSettingEntity } from '../entities'
 import { SettingTypeEnum } from '../enums'
 import {
+  assertUnversionedSk,
+  assertValidPersonalId,
   assertValidSettingCode,
   generateMasterPk,
   generateMasterSettingSk,
@@ -86,6 +88,7 @@ import {
 } from '../master.module-definition'
 /** The setting API only writes setting rows; data rows (<settingCode>#<code>) go through MasterDataService. */
 function assertSettingKey(key: DetailKey): void {
+  assertUnversionedSk(key.sk)
   const [prefix, code] = key.sk.split(KEY_SEPARATOR)
   if (prefix !== SETTING_SK_PREFIX || !code) {
     throw new BadRequestException(`Invalid setting key: ${key.sk}`)
@@ -340,6 +343,7 @@ export class MasterSettingService implements IMasterSettingService {
   ): Promise<CommandModel> {
     const { name, tenantCode, settingValue, code, groupId } = dto
     assertValidSettingCode(code)
+    assertValidPersonalId(groupId)
 
     const pk = generateMasterPk(tenantCode)
 
@@ -371,6 +375,7 @@ export class MasterSettingService implements IMasterSettingService {
   ): Promise<CommandModel> {
     const { name, tenantCode, settingValue, code, userId } = dto
     assertValidSettingCode(code)
+    assertValidPersonalId(userId)
 
     const pk = generateMasterPk(tenantCode)
 

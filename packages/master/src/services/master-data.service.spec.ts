@@ -1543,8 +1543,8 @@ describe('MasterDataService', () => {
       it('should handle special characters in master data fields', async () => {
         const createDto: CreateMasterDataDto = {
           settingCode: 'SETTING_CODE',
-          // `#` is the key separator and is rejected; other special characters are fine.
-          code: 'DATA_CODE_特殊文字@$%',
+          // `#` and `@` (key and version separators) are rejected; other special characters are fine.
+          code: 'DATA_CODE_特殊文字$%&',
           tenantCode: 'TEST_TENANT',
           name: 'Test Data with 特殊文字 & symbols!',
           seq: 1,
@@ -1557,9 +1557,9 @@ describe('MasterDataService', () => {
 
         dataService.getItem.mockResolvedValue(null)
         const mockCommandResult: CommandModel = {
-          id: 'MASTER#TEST_TENANT#SETTING_CODE#DATA_CODE_特殊文字@$%',
+          id: 'MASTER#TEST_TENANT#SETTING_CODE#DATA_CODE_特殊文字$%&',
           pk: 'MASTER#TEST_TENANT',
-          sk: 'SETTING_CODE#DATA_CODE_特殊文字@$%',
+          sk: 'SETTING_CODE#DATA_CODE_特殊文字$%&',
           version: 1,
           type: 'MASTER',
           tenantCode: 'TEST_TENANT',
@@ -1578,7 +1578,7 @@ describe('MasterDataService', () => {
         })
 
         expect(result).toBeInstanceOf(MasterDataEntity)
-        expect(result.code).toBe('DATA_CODE_特殊文字@$%')
+        expect(result.code).toBe('DATA_CODE_特殊文字$%&')
         expect(result.name).toBe('Test Data with 特殊文字 & symbols!')
       })
 
@@ -2635,6 +2635,21 @@ describe('MasterDataService ownership and access', () => {
     expect(commandService.publishAsync).not.toHaveBeenCalled()
   })
 
+  it('rejects a versioned key on update and delete', async () => {
+    for (const grants of [undefined, all]) {
+      const { service, dataService, commandService } = await build(grants)
+      const key = { pk: 'MASTER#ta', sk: 'S1#C1@x' }
+      await expect(
+        service.update(key, { name: 'x' } as any, opts),
+      ).rejects.toThrow(BadRequestException)
+      await expect(service.delete(key, opts)).rejects.toThrow(
+        BadRequestException,
+      )
+      expect(dataService.getItem).not.toHaveBeenCalled()
+      expect(commandService.publishPartialUpdateAsync).not.toHaveBeenCalled()
+    }
+  })
+
   it('refuses to update or delete a setting row, with or without a resolver', async () => {
     for (const grants of [undefined, all]) {
       const { service, dataService, commandService } = await build(grants)
@@ -2657,7 +2672,7 @@ describe('MasterDataService ownership and access', () => {
     }
   })
 
-  it.each(['X#Y', ''])(
+  it.each(['X#Y', 'X@1', ''])(
     'rejects data code %p on create, upsert and both bulk routes',
     async (code) => {
       const { service, commandService } = await build()
@@ -2673,7 +2688,7 @@ describe('MasterDataService ownership and access', () => {
     },
   )
 
-  it.each(['MASTER_SETTING', 'S1#X', ''])(
+  it.each(['MASTER_SETTING', 'S1#X', 'S1@1', ''])(
     'rejects settingCode %p on create, upsert and createBulk, with or without a resolver',
     async (settingCode) => {
       for (const grants of [undefined, all]) {

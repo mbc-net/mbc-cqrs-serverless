@@ -41,6 +41,7 @@ import { MasterDataCreateBulkDto } from '../dto/master-copy/master-data-create-b
 import { MasterDataEntity, MasterDataListEntity } from '../entities'
 import { SettingTypeEnum } from '../enums'
 import {
+  assertUnversionedSk,
   assertValidDataCode,
   assertValidSettingCode,
   generateMasterDataSk,
@@ -72,6 +73,7 @@ function assertBulkItemKey(item: { settingCode: string; code?: string }): void {
 
 /** The data API only writes data rows; setting rows (MASTER_SETTING#...) go through MasterSettingService. */
 function assertDataKey(key: DetailDto): void {
+  assertUnversionedSk(key.sk)
   assertValidSettingCode(key.sk.split(KEY_SEPARATOR)[0])
 }
 

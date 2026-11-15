@@ -1303,8 +1303,8 @@ describe('SettingService', () => {
     })
 
     it('should handle special characters in setting codes', async () => {
-      // `#` is the key separator and is rejected; other special characters are fine.
-      const specialCode = 'SETTING_特殊文字@$%'
+      // `#` and `@` (key and version separators) are rejected; other special characters are fine.
+      const specialCode = 'SETTING_特殊文字$%&'
 
       const mockCommonSetting = {
         id: 'test-id',
@@ -2507,7 +2507,7 @@ describe('MasterSettingService ownership', () => {
     expect(commandService.publishAsync).not.toHaveBeenCalled()
   })
 
-  it.each(['A#B', 'MASTER_SETTING', ''])(
+  it.each(['A#B', 'A@1', 'MASTER_SETTING', ''])(
     'rejects setting code %p on every create route, with or without a resolver',
     async (code) => {
       for (const grants of [undefined, all]) {
@@ -2532,6 +2532,44 @@ describe('MasterSettingService ownership', () => {
       }
     },
   )
+
+  it.each([
+    ['createUserSetting', 'userId'],
+    ['createGroupSetting', 'groupId'],
+  ])(
+    'rejects a %s id that would cut the key at its version separator',
+    async (method, idField) => {
+      // Reviewer scenario: the stored key would be MASTER_SETTING#USER#sample#OTHER, not ...#SAFE.
+      for (const ownerId of ['sample#OTHER@text', 'u@1', 'a#b', '']) {
+        for (const grants of [undefined, all]) {
+          const { service, dataService, commandService } = await build(grants)
+          await expect(
+            (service as any)[method](
+              { ...dto({ code: 'SAFE' }), [idField]: ownerId },
+              opts,
+            ),
+          ).rejects.toThrow(BadRequestException)
+          expect(dataService.getItem).not.toHaveBeenCalled()
+          expect(commandService.publishAsync).not.toHaveBeenCalled()
+        }
+      }
+    },
+  )
+
+  it('rejects a versioned key on updateSetting and deleteSetting', async () => {
+    for (const grants of [undefined, all]) {
+      const { service, dataService, commandService } = await build(grants)
+      const key = { pk: 'MASTER#ta', sk: 'MASTER_SETTING#USER#u1#S1@x' }
+      await expect(
+        service.updateSetting(key, { name: 'x' } as any, opts),
+      ).rejects.toThrow(BadRequestException)
+      await expect(service.deleteSetting(key, opts)).rejects.toThrow(
+        BadRequestException,
+      )
+      expect(dataService.getItem).not.toHaveBeenCalled()
+      expect(commandService.publishPartialUpdateAsync).not.toHaveBeenCalled()
+    }
+  })
 
   it('rejects a getSetting code that addresses another user’s personal row', async () => {
     for (const grants of [undefined, all]) {

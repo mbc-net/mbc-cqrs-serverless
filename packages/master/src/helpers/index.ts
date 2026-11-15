@@ -1,4 +1,8 @@
-import { KEY_SEPARATOR, removeSortKeyVersion } from '@mbc-cqrs-serverless/core'
+import {
+  KEY_SEPARATOR,
+  removeSortKeyVersion,
+  VER_SEPARATOR,
+} from '@mbc-cqrs-serverless/core'
 import { RotateByEnum } from '@mbc-cqrs-serverless/sequence/dist'
 import { BadRequestException } from '@nestjs/common'
 
@@ -20,20 +24,45 @@ export const PERSONAL_SETTING_ROWS = [
 }))
 
 /**
+ * A key segment is non-empty and holds neither `#` nor `@`. A `#` splits it into two segments,
+ * and the command service cuts a sort key at its last `@` (the version separator), so either
+ * one makes the stored key differ from the one that was checked.
+ */
+export function isValidKeySegment(value: string): boolean {
+  return (
+    !!value && !value.includes(KEY_SEPARATOR) && !value.includes(VER_SEPARATOR)
+  )
+}
+
+/** A sort key the command service stores unchanged: it holds no version separator `@`. */
+export function assertUnversionedSk(sk: string): void {
+  if (sk.includes(VER_SEPARATOR)) {
+    throw new BadRequestException(`Invalid key: ${sk}`)
+  }
+}
+
+/**
  * A setting code must be one key segment and not the setting prefix. Otherwise it builds the
  * key of another row: `USER#u1#S1` as a setting code is a user's personal row, and
  * `MASTER_SETTING` as a data settingCode is the setting rows themselves.
  */
 export function assertValidSettingCode(code: string): void {
-  if (!code || code === SETTING_SK_PREFIX || code.includes(KEY_SEPARATOR)) {
+  if (!isValidKeySegment(code) || code === SETTING_SK_PREFIX) {
     throw new BadRequestException(`Invalid settingCode: ${code}`)
   }
 }
 
-/** A master data code is the second and last key segment: non-empty, without `#`. */
+/** A master data code is the second and last key segment: non-empty, without `#` or `@`. */
 export function assertValidDataCode(code: string): void {
-  if (!code || code.includes(KEY_SEPARATOR)) {
+  if (!isValidKeySegment(code)) {
     throw new BadRequestException(`Invalid code: ${code}`)
+  }
+}
+
+/** The userId or groupId of a personal setting key is one key segment, like the code after it. */
+export function assertValidPersonalId(id: string): void {
+  if (!isValidKeySegment(id)) {
+    throw new BadRequestException(`Invalid user or group id: ${id}`)
   }
 }
 

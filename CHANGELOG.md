@@ -39,6 +39,15 @@ See [Conventional Commits](https://conventionalcommits.org) for commit guideline
   stored with `#` in its `code` stays readable and can still be updated or deleted by key through
   `/api/master-data/:pk/:sk`, but a create or upsert that sends such a code is rejected. Check
   integrations that generate codes with `#` before upgrading.
+- **master:** `@`, the sort-key version separator, is now rejected like `#` in every key segment:
+  setting codes, data `settingCode` and `code`, and the `userId` and `groupId` of group and user
+  settings (`POST /api/master-setting` with a group or user target). The command service cut a
+  sort key at its last `@`, so such a segment stored a different row from the one that was
+  checked: a `userId` of `u1#OTHER@x` wrote the personal setting `OTHER` instead of the requested
+  code. `MasterSettingService.updateSetting`/`deleteSetting` and `MasterDataService.update`/`delete`
+  also reject a key whose sk contains `@`. A row could not be stored with `@` in its key, so no
+  stored row is affected; check integrations that use e-mail addresses or other values with `@`
+  as a `userId`, `groupId` or code.
 - **master:** a setting update that omits `settingValue` no longer clears the setting's `attributes`
   (and its owner), one that omits `name` keeps the name, and a data update that omits `seq` keeps it.
 - **master:** for an application that sets neither `controllerAuth` nor a resolver, the other
