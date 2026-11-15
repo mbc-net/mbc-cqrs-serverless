@@ -331,6 +331,24 @@ describe('Claude Code Skills', () => {
       expect(v170).toContain('dynamodb:ConditionCheckItem')
       expect(v170).toContain('npm ls @mbc-cqrs-serverless/core   # 1.7.0')
     })
+
+    it('should contain v1.8.0 migration guide (master system scope)', () => {
+      expect(content).toContain('### v1.7.0 → v1.8.0')
+      expect(content).toContain('| v1.7.0 | v1.8.0 | **Medium** |')
+      expect(content).toContain('| v1.8.0 | v1.8.0 | 10.x | 22.23.4+ |')
+      const v180 = content.slice(
+        content.indexOf('### v1.7.0 → v1.8.0'),
+        content.indexOf('## Version Compatibility Matrix'),
+      )
+      expect(v180).toContain('controllerAuth')
+      expect(v180).toContain('@MasterAccessResolver()')
+      expect(v180).toContain('systemId: getSystemId(cmd)')
+      expect(v180).toContain('invokeContext')
+      expect(v180).toContain('system_admin')
+      expect(v180).toContain('databaseProvider')
+      expect(v180).toContain("WHERE sk LIKE '%@%'")
+      expect(v180).toContain('npm ls @mbc-cqrs-serverless/master   # 1.8.0')
+    })
   })
 
   describe('mbc-debug skill', () => {

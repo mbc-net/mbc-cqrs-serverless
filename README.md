@@ -179,6 +179,7 @@ export class TodoController {
 - **Multi-tenancy** - Built-in tenant isolation and settings hierarchy
 - **Sequence Generation** - Auto-incrementing IDs with date rotation
 - **Master Data** - Centralized configuration management
+- **Master Data Access Control** - Opt-in route guard and per-system scoping (`systemId`) with read/write grants per system and setting, plus list search on PostgreSQL and MySQL ([guide](docs/development/master-access-and-sync.md))
 - **Async Tasks** - Background job processing with retries
 
 ### Developer Experience
