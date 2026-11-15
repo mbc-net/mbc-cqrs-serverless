@@ -2533,6 +2533,21 @@ describe('MasterSettingService ownership', () => {
     },
   )
 
+  it.each(['A#B', 'A@1', 'MASTER_SETTING', ''])(
+    'createBulk writes no item when setting code %p is invalid, with or without a resolver',
+    async (code) => {
+      for (const grants of [undefined, all]) {
+        const { service, commandService } = await build(grants)
+        await expect(
+          service.createBulk({ items: [dto(), dto({ code })] } as any, ctx),
+        ).rejects.toThrow(BadRequestException)
+        // Let a valid item that already started finish its lookup and publish.
+        await new Promise((resolve) => setImmediate(resolve))
+        expect(commandService.publishAsync).not.toHaveBeenCalled()
+      }
+    },
+  )
+
   it.each([
     ['createUserSetting', 'userId'],
     ['createGroupSetting', 'groupId'],
