@@ -66,6 +66,7 @@ describe('SurveyTemplateService', () => {
   }
 
   const mockPrismaService = {
+    _activeProvider: 'postgresql',
     surveyTemplate: {
       count: jest.fn(),
       findMany: jest.fn(),
@@ -156,6 +157,37 @@ describe('SurveyTemplateService', () => {
           OR: [
             { name: { contains: 'test', mode: 'insensitive' } },
             { description: { contains: 'test', mode: 'insensitive' } },
+          ],
+        },
+      })
+    })
+
+    it('drops mode on mysql, whose default collation ignores case', async () => {
+      const module = await Test.createTestingModule({
+        providers: [
+          SurveyTemplateService,
+          { provide: CommandService, useValue: mockCommandService },
+          { provide: DataService, useValue: mockDataService },
+          {
+            provide: PRISMA_SERVICE,
+            useValue: { ...mockPrismaService, _activeProvider: 'mysql' },
+          },
+        ],
+      }).compile()
+      mockPrismaService.surveyTemplate.count.mockResolvedValue(0)
+      mockPrismaService.surveyTemplate.findMany.mockResolvedValue([])
+
+      await module
+        .get(SurveyTemplateService)
+        .searchData('test-tenant', { keyword: 'test' })
+
+      expect(prismaService.surveyTemplate.count).toHaveBeenCalledWith({
+        where: {
+          isDeleted: false,
+          tenantCode: 'test-tenant',
+          OR: [
+            { name: { contains: 'test' } },
+            { description: { contains: 'test' } },
           ],
         },
       })
@@ -333,7 +365,9 @@ describe('SurveyTemplateService', () => {
 
       mockDataService.getItem.mockResolvedValue(null)
 
-      await expect(service.findOne(detailDto)).rejects.toThrow(NotFoundException)
+      await expect(service.findOne(detailDto)).rejects.toThrow(
+        NotFoundException,
+      )
       await expect(service.findOne(detailDto)).rejects.toThrow(
         'Survey template not found!',
       )

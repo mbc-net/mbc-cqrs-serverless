@@ -301,12 +301,14 @@ const masterSchema = `model Master {
   updatedAt      DateTime @updatedAt @map("updated_at") @db.Timestamp(0)
 
   attributes Json? @map("attributes")
+  systemId   String? @map("system_id")
 
   @@unique([cpk, csk])
   @@unique([pk, sk])
   @@unique([tenantCode, code])
   @@unique([tenantCode, masterTypeCode, masterCode])
   @@index([tenantCode, name])
+  @@index([tenantCode, systemId])
   @@map("masters")
 }`
 

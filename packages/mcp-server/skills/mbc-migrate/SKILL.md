@@ -48,6 +48,7 @@ This skill helps migrate MBC CQRS Serverless projects between versions.
 | v1.4.0 | v1.5.0 | Low | Local dev only: LocalStack → Floci as the local S3 emulator; bucket CORS must be applied locally for presigned URLs (no application code changes) |
 | v1.5.0 | v1.6.0 | **Medium** | **Node.js 22.23.4+ required** (Node2Shell, CVE-2026-111497): runtime, Lambda (`nodejs22.x`), Docker and CI; nodemailer 10 types (only if you import `nodemailer` directly) |
 | v1.6.0 | v1.7.0 | Low | Opt-in atomic command admission (`getCommandAdmissionConditions`, `CommandAdmissionRejectedException` / `CommandAdmissionContentionException`); unit-test mocks of `DynamoDbService` used with the real `CommandService` need `putItemWithConditions`; `dynamodb:ConditionCheckItem` only if you adopt the hook |
+| v1.7.0 | v1.8.0 | **Medium** | master only, behaviour changes for every app using master: setting/data codes and user/group ids reject `#` and `@` (400), rows stored with `@` in their key can no longer be updated, deleted or read by `getSetting`; master copy fixes; `POST /api/master-bulk` upserts settings before data; opt-in `controllerAuth`, `systemId` + `@MasterAccessResolver()` (RDS `system_id` column + handler change, `invokeContext` required), MySQL search (`databaseProvider`) |
 
 ## Migration Guides
 
@@ -972,10 +973,121 @@ npm test                           # no "putItemWithConditions is not a function
 
 ---
 
+### v1.7.0 → v1.8.0 (master: per-system scope, stricter keys, MySQL search)
+
+v1.8.0 changes only `@mbc-cqrs-serverless/master` and `@mbc-cqrs-serverless/survey-template`. It adds opt-in access control for master data: a `controllerAuth` guard for the built-in routes, a `systemId` per master setting with an optional `@MasterAccessResolver()` that grants read and write per system and setting, `GET /api/master-access`, `assignSystem` and `includeCommon`. See `docs/development/master-access-and-sync.md` in the framework repository. **Some changes apply to every application that uses master**, with or without the new options: stricter key rules, the copy fixes, and the bulk ordering.
+
+**Step 1 — Update packages.**
+
+```bash
+npm install @mbc-cqrs-serverless/core@^1.8.0 @mbc-cqrs-serverless/master@^1.8.0 @mbc-cqrs-serverless/cli@^1.8.0
+# also update any other @mbc-cqrs-serverless/* packages you use (e.g. survey-template) to the same version
+```
+
+**Step 2 — Check the key rules (every application).** A key segment must be non-empty and contain neither `#` nor `@` (`@` is the sort-key version separator). Requests that break the rule now get a 400:
+
+| Value | Rejected when it is |
+|---|---|
+| Setting `code` | empty, `MASTER_SETTING`, or contains `#` or `@` (every setting create/upsert, bulk, and `GET /api/master-setting/:code`) |
+| Data `settingCode` | the same rule (data create/upsert, both bulk routes, `GET /api/master-data`) |
+| Data `code` | empty or contains `#` or `@` |
+| `userId` / `groupId` of user and group settings | empty or contains `#` or `@` |
+| `sk` on update/delete | contains `@`; `/api/master-data` also rejects `MASTER_SETTING#...` keys and `/api/master-setting` rejects data keys |
+
+Every bulk route checks the keys of all items before the first write. Fix integrations that send e-mail addresses or other values with `@` (or `#`) as a code, `userId` or `groupId`.
+
+**Stored rows can be affected.** In v1.7.0 the command service cut a sort key at its last `@`: a single `@` silently stored a different, shorter key (setting code `a@b` → `MASTER_SETTING#a`, data code `a@b` → `S1#a`, user `u@example.com` → `MASTER_SETTING#USER#u`), and two or more `@` stored a key that still holds `@` (setting code `X@Y@Z` → `MASTER_SETTING#X@Y`, data code `a@b@c` → `S1#a@b`). In v1.8.0 such a row is still listed and readable by its key, but `getSetting`, update and delete reject it with 400. Find them:
+
+```bash
+# DynamoDB master data table
+aws dynamodb scan --table-name <prefix>master-data \
+  --filter-expression "contains(sk, :at)" \
+  --expression-attribute-values '{":at":{"S":"@"}}' \
+  --projection-expression "pk, sk, code"
+```
+
+```sql
+-- RDS
+SELECT id, pk, sk, code FROM masters WHERE sk LIKE '%@%';
+```
+
+A key cut at a single `@` has no `@` left; look in your source systems for codes and user or group ids containing `@`. To make an affected row reachable through the API again, re-create it under a valid key and remove the old row from DynamoDB and RDS directly (the API can no longer change it).
+
+**Step 3 — RDS `system_id` column (only if you register a resolver).** `update-scheme.ts` does not change an existing schema or handler. In projects generated before v1.8.0, add the column to the Prisma `Master` model and write it in your own `src/master/handler/master-rds.handler.ts`:
+
+```prisma
+systemId String? @map("system_id")
+@@index([tenantCode, systemId])
+```
+
+```typescript
+import { getSystemId } from '@mbc-cqrs-serverless/master'
+
+// in both the update and create blocks of prismaService.master.upsert(...)
+systemId: getSystemId(cmd),
+```
+
+Order: add the column (migration), update the handler, deploy, then register the resolver. With a resolver registered and no `systemId` field on the Prisma `Master` model, the application refuses to start. Then tag existing data with `MasterSettingService.assignSystem` (untagged rows count as `shared`).
+
+**Step 4 — Protect the built-in routes with `controllerAuth` (recommended).** Without it the routes stay unguarded and `MasterModule` logs a startup warning. New projects get `controllerAuth: {}`, which means any logged-in user may read and only `system_admin` may write:
+
+```typescript
+MasterModule.register({
+  enableController: true,
+  controllerAuth: { read: [], write: ['master_editor'] },
+  prismaService: PrismaService,
+})
+```
+
+If you set `commonTenantCode` to a value other than `common`, also add it to the `COMMON_TENANT_CODES` environment variable: the guard first runs the core `RolesGuard` tenant check, which does not know `commonTenantCode`, so a caller without a `custom:tenant` claim who names the common tenant in `x-tenant-code` (and holds no cross-tenant role) otherwise gets 403.
+
+**Step 5 — Pass `invokeContext` from server-side code (only with a resolver).** With a resolver registered, master service methods, including reads, called without `invokeContext` are denied (403). Pass `{ invokeContext }`, or `{ skipAccessCheck: true }` for trusted internal work.
+
+**Step 6 — Master copy needs `system_admin`.** With `controllerAuth`, `POST /api/master-setting/copy` requires `system_admin` from the `custom:roles` claim (roles in `controllerAuth.write` and group-derived roles do not count). With a resolver, `MasterSettingService.copy` also needs a `'*'`/`'*'` write grant. Copy now reads data from the source setting's tenant (it used to read `meltec`) and now copies sequences (a target behind the source jumps forward).
+
+**Step 7 — MySQL (`databaseProvider`).** Name, code and keyword searches now work on MySQL. Remove any `patch-package` patch that stripped `mode: 'insensitive'` from the dist files. The provider is detected from the Prisma client; if a warning says it could not be detected, set it explicitly:
+
+```typescript
+MasterModule.register({ /* ... */ databaseProvider: 'mysql' })
+SurveyTemplateModule.register({ /* ... */ databaseProvider: 'mysql' })
+```
+
+**Step 8 — `registerAsync`: pass these options statically.** In `MasterModule.registerAsync`, the static `commonTenantCode`, `databaseProvider` and `controllerAuth` options override what `useFactory` returns, even when the static value is `undefined`. Move them out of the factory:
+
+```typescript
+MasterModule.registerAsync({
+  controllerAuth: {},
+  commonTenantCode: 'common',
+  databaseProvider: 'mysql',
+  prismaService: PrismaService,
+  useFactory: () => ({ /* other options */ }),
+})
+```
+
+**Other behaviour changes to be aware of:**
+- `POST /api/master-bulk` upserts settings first, then data. It is not a transaction: with a resolver, a data item that fails its access check (403) or has no setting (400) fails the request after the settings were written.
+- A setting update that omits `settingValue` no longer clears `attributes`; one that omits `name` keeps it; a data update that omits `seq` keeps it.
+- A client-sent `__systemId` in `attributes` is always removed; responses expose `systemId` at the top level.
+- `GET /api/tasks/sfn-task-parent` takes the tenant from the `custom:tenant` claim before `x-tenant-code`.
+- `includeCommon` lists are bounded: the data list needs `settingCode` (outside the common tenant), and a tenant with more than 10,000 matching rows gets a 400.
+
+**Verify:**
+
+```bash
+npm ls @mbc-cqrs-serverless/master   # 1.8.0
+npm ls @mbc-cqrs-serverless/core     # 1.8.0
+npm test                             # no 400s from codes or ids containing # or @
+```
+
+**Action required:** Steps 1 and 2 for every project that uses master. Step 3 and Step 5 only if you register a resolver. Step 4 recommended for every project with `enableController`. Step 6 if you use master copy. Step 7 on MySQL. Step 8 if you use `MasterModule.registerAsync`.
+
+---
+
 ## Version Compatibility Matrix
 
 | Core Version | CLI Version | NestJS | Node.js | TypeScript |
 |--------------|-------------|--------|---------|------------|
+| v1.8.0 | v1.8.0 | 10.x | 22.23.4+ | 5.x |
 | v1.7.0 | v1.7.0 | 10.x | 22.23.4+ | 5.x |
 | v1.6.0 | v1.6.0 | 10.x | 22.23.4+ | 5.x |
 | v1.5.0 | v1.5.0 | 10.x | 18+ | 5.x |

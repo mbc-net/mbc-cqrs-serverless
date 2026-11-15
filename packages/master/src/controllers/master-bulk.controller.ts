@@ -3,7 +3,13 @@ import {
   IInvoke,
   INVOKE_CONTEXT,
 } from '@mbc-cqrs-serverless/core'
-import { BadRequestException, Body, Controller, Post } from '@nestjs/common'
+import {
+  BadRequestException,
+  Body,
+  Controller,
+  Post,
+  UseGuards,
+} from '@nestjs/common'
 import { ApiTags } from '@nestjs/swagger'
 
 import { MasterBulkDto } from '../dto/master-bulk'
@@ -11,11 +17,14 @@ import { MasterDataCreateDto } from '../dto/master-copy/master-data-create.dto'
 import { MasterDataCreateBulkDto } from '../dto/master-copy/master-data-create-bulk.dto'
 import { CommonSettingDto } from '../dto/master-setting/common-setting-create.dto'
 import { CommonSettingBulkDto } from '../dto/master-setting/common-setting-create-bulk.dto'
+import { MasterControllerGuard } from '../guards'
+import { assertValidDataItemKey, assertValidSettingCode } from '../helpers'
 import { MasterDataService } from '../services/master-data.service'
 import { MasterSettingService } from '../services/master-setting.service'
 
 @Controller('api/master-bulk')
 @ApiTags('master-bulk')
+@UseGuards(MasterControllerGuard)
 export class MasterBulkController {
   constructor(
     private readonly masterSettingService: MasterSettingService,
@@ -60,6 +69,7 @@ export class MasterBulkController {
             name: item.name,
             code: item.code,
             tenantCode: item.tenantCode,
+            systemId: item.systemId,
             settingValue: item.attributes,
           },
         })
@@ -72,14 +82,20 @@ export class MasterBulkController {
     const dataBulkDto = new MasterDataCreateBulkDto()
     dataBulkDto.items = dataItems.map((d) => d.item)
 
-    const [settingResults, dataResults] = await Promise.all([
-      settingItems.length > 0
-        ? this.masterSettingService.upsertBulk(settingBulkDto, invokeContext)
-        : Promise.resolve([]),
-      dataItems.length > 0
-        ? this.masterDataService.upsertBulk(dataBulkDto, invokeContext)
-        : Promise.resolve([]),
-    ])
+    // Every key is checked before the first write: settings are written before data is checked.
+    settingItems.forEach((s) => assertValidSettingCode(s.item.code))
+    dataItems.forEach((d) => assertValidDataItemKey(d.item))
+
+    // Settings first, so data rows can find a setting created in the same request.
+    const settingResults = settingItems.length
+      ? await this.masterSettingService.upsertBulk(
+          settingBulkDto,
+          invokeContext,
+        )
+      : []
+    const dataResults = dataItems.length
+      ? await this.masterDataService.upsertBulk(dataBulkDto, invokeContext)
+      : []
 
     // Restore original input order
     const results = new Array(bulkDto.items.length)

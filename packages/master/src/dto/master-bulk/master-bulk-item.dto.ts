@@ -42,6 +42,15 @@ export class MasterBulkItemDto {
   settingCode?: string
 
   @ApiProperty({
+    type: String,
+    required: false,
+    description: 'The system that owns the setting (used for master settings).',
+  })
+  @IsString()
+  @IsOptional()
+  systemId?: string
+
+  @ApiProperty({
     type: Number,
     example: 0,
     required: false,
