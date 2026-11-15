@@ -70,6 +70,9 @@ export class MasterRdsEntity {
   @ApiProperty({ type: 'object', required: false })
   attributes?: Record<string, any>
 
+  @ApiProperty({ required: false })
+  systemId?: string
+
   constructor(data) {
     Object.assign(this, data)
   }

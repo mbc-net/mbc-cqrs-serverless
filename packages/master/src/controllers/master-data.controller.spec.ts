@@ -89,7 +89,9 @@ describe('MasterDataController', () => {
 
       const result = await controller.listData(mockInvokeContext, searchDto)
 
-      expect(service.list).toHaveBeenCalledWith(searchDto)
+      expect(service.list).toHaveBeenCalledWith(searchDto, {
+        invokeContext: mockInvokeContext,
+      })
       expect(result).toEqual(expectedResult)
     })
   })
@@ -122,9 +124,11 @@ describe('MasterDataController', () => {
 
       jest.spyOn(service, 'getDetail').mockResolvedValue(expectedResult)
 
-      const result = await controller.getDetailById(key)
+      const result = await controller.getDetailById(key, mockInvokeContext)
 
-      expect(service.getDetail).toHaveBeenCalledWith(key)
+      expect(service.getDetail).toHaveBeenCalledWith(key, {
+        invokeContext: mockInvokeContext,
+      })
       expect(result).toEqual(expectedResult)
     })
   })
@@ -154,7 +158,9 @@ describe('MasterDataController', () => {
 
       const result = await controller.getDetail(mockInvokeContext, key)
 
-      expect(service.get).toHaveBeenCalledWith(key)
+      expect(service.get).toHaveBeenCalledWith(key, {
+        invokeContext: mockInvokeContext,
+      })
       expect(result).toEqual(expectedResult)
     })
   })
@@ -286,6 +292,7 @@ describe('MasterDataController', () => {
         'test-tenant',
         settingCode,
         code,
+        { invokeContext: mockInvokeContext },
       )
       expect(result).toBe(true)
     })
