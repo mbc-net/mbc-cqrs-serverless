@@ -2,6 +2,7 @@ import { Test, TestingModule } from '@nestjs/testing'
 import { BadRequestException } from '@nestjs/common'
 import { IInvoke } from '@mbc-cqrs-serverless/core'
 
+import { assertValidDataCode, assertValidSettingCode } from '../helpers'
 import { MasterBulkController } from './master-bulk.controller'
 import { MasterDataService } from '../services/master-data.service'
 import { MasterSettingService } from '../services/master-setting.service'
@@ -364,6 +365,59 @@ describe('MasterBulkController', () => {
       )
       expect(result).toHaveLength(1)
     })
+
+    it.each([
+      ['a setting code with #', { name: 'S', code: 'S2#X', attributes: {} }],
+      ['a setting code with @', { name: 'S', code: 'S2@1', attributes: {} }],
+      [
+        'a data code with @',
+        { name: 'D', code: 'A@1', settingCode: 'S1', attributes: {} },
+      ],
+      [
+        'a data code with #',
+        { name: 'D', code: 'A#1', settingCode: 'S1', attributes: {} },
+      ],
+      [
+        'a data settingCode with @',
+        { name: 'D', code: 'A', settingCode: 'S1@1', attributes: {} },
+      ],
+      [
+        'a data settingCode MASTER_SETTING',
+        { name: 'D', code: 'A', settingCode: 'MASTER_SETTING', attributes: {} },
+      ],
+    ])(
+      'writes nothing when one item has %s',
+      async (_label, invalid) => {
+        // Like the real services: each one checks its own items, then writes them.
+        jest
+          .spyOn(settingService, 'upsertBulk')
+          .mockImplementation(async (dto) => {
+            dto.items.forEach((i) => assertValidSettingCode(i.code))
+            return dto.items as any
+          })
+        jest.spyOn(dataService, 'upsertBulk').mockImplementation(async (dto) => {
+          dto.items.forEach((i) => {
+            assertValidSettingCode(i.settingCode)
+            assertValidDataCode(i.code)
+          })
+          return dto.items as any
+        })
+        await expect(
+          controller.upsertBulk(
+            {
+              items: [
+                { name: 'S', code: 'S1', attributes: {} },
+                { name: 'D', code: 'C1', settingCode: 'S1', attributes: {} },
+                invalid,
+              ],
+            } as any,
+            mockInvokeContext,
+          ),
+        ).rejects.toThrow(BadRequestException)
+        expect(settingService.upsertBulk).not.toHaveBeenCalled()
+        expect(dataService.upsertBulk).not.toHaveBeenCalled()
+      },
+    )
 
     it('should propagate service errors', async () => {
       const bulkDto = {

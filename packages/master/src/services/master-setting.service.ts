@@ -511,6 +511,8 @@ export class MasterSettingService implements IMasterSettingService {
   }
 
   async createBulk(createDto: CommonSettingBulkDto, invokeContext: IInvoke) {
+    // Before any item runs: Promise.all would let valid items write next to a rejected one.
+    createDto.items.forEach((item) => assertValidSettingCode(item.code))
     return Promise.all(
       createDto.items.map((item) => this.create(item, invokeContext)),
     )

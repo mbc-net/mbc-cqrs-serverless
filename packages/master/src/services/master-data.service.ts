@@ -43,6 +43,7 @@ import { SettingTypeEnum } from '../enums'
 import {
   assertUnversionedSk,
   assertValidDataCode,
+  assertValidDataItemKey,
   assertValidSettingCode,
   generateMasterDataSk,
   generateMasterPk,
@@ -64,12 +65,6 @@ import {
   MODULE_OPTIONS_TOKEN,
   PRISMA_SERVICE,
 } from '../master.module-definition'
-
-/** A missing code is generated later; a given one must be a single key segment. */
-function assertBulkItemKey(item: { settingCode: string; code?: string }): void {
-  assertValidSettingCode(item.settingCode)
-  if (item.code !== undefined) assertValidDataCode(item.code)
-}
 
 /** The data API only writes data rows; setting rows (MASTER_SETTING#...) go through MasterSettingService. */
 function assertDataKey(key: DetailDto): void {
@@ -464,7 +459,7 @@ export class MasterDataService implements IMasterDataService {
 
   async createBulk(createDto: MasterDataCreateBulkDto, invokeContext: IInvoke) {
     // Before any item runs: Promise.all would let valid items write next to a rejected one.
-    createDto.items.forEach(assertBulkItemKey)
+    createDto.items.forEach(assertValidDataItemKey)
     return Promise.all(
       createDto.items.map((item) => this.createSetting(item, invokeContext)),
     )
@@ -508,7 +503,7 @@ export class MasterDataService implements IMasterDataService {
   }
 
   async upsertBulk(createDto: MasterDataCreateBulkDto, invokeContext: IInvoke) {
-    createDto.items.forEach(assertBulkItemKey)
+    createDto.items.forEach(assertValidDataItemKey)
     if (this.access?.isEnabled()) {
       // Check every item first so a forbidden one leaves nothing half-written.
       const { tenantCode } = getUserContext(invokeContext)

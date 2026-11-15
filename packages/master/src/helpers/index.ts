@@ -59,6 +59,15 @@ export function assertValidDataCode(code: string): void {
   }
 }
 
+/** A bulk data item: a missing code is generated later; a given one must be a single key segment. */
+export function assertValidDataItemKey(item: {
+  settingCode: string
+  code?: string
+}): void {
+  assertValidSettingCode(item.settingCode)
+  if (item.code !== undefined) assertValidDataCode(item.code)
+}
+
 /** The userId or groupId of a personal setting key is one key segment, like the code after it. */
 export function assertValidPersonalId(id: string): void {
   if (!isValidKeySegment(id)) {

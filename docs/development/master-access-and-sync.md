@@ -26,7 +26,10 @@ behaviour, apart from these differences:
 - The DTOs accept `systemId` (setting create and bulk items, list searches) and
   `includeCommon` (list searches). Without a resolver `systemId` is ignored.
 - `POST /api/master-bulk` upserts the settings first and the data rows after,
-  instead of both at once.
+  instead of both at once. The keys of all items are checked before the first
+  write, but the request is not a transaction: with a resolver registered, a
+  data item that fails its access check fails the request after the settings
+  were written. Send settings and data separately if that matters.
 
 ## Terms
 
@@ -71,6 +74,13 @@ MasterModule.register({
   must come from the `custom:roles` claim; group-derived roles do not count.
 - Without `controllerAuth` the routes stay unguarded and `MasterModule` logs a
   startup warning.
+- Before these checks the guard runs the core `RolesGuard` tenant check. For a
+  caller without a `custom:tenant` claim, that check accepts a header-named
+  tenant (`x-tenant-code`) only if it is listed in `COMMON_TENANT_CODES`
+  (default `common`) or the caller holds a cross-tenant role; it does not know
+  `commonTenantCode`. If you set `commonTenantCode` to another value, add it to
+  `COMMON_TENANT_CODES`, or such callers get 403 when they read the common
+  tenant.
 
 `enableCopyTask` registers the master copy handler. It defaults to the value of
 `enableController`, so an application that turns the controllers off to write

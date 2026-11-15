@@ -3,7 +3,7 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
-## Unreleased
+## [1.8.0](https://github.com/mbc-net/mbc-cqrs-serverless/releases/tag/v1.8.0) (2026-11-15)
 
 ### Upgrade Notes
 
@@ -12,21 +12,24 @@ See [Conventional Commits](https://conventionalcommits.org) for commit guideline
   and it now copies sequences, which it never did because both keys were built from the target
   tenant. A target sequence behind the source jumps to the source's
   value; the write is conditional, so a target that issued numbers in the meantime is never moved
-  back.
+  back. ([#518](https://github.com/mbc-net/mbc-cqrs-serverless/pull/518))
 - **master (copy):** with `controllerAuth` set, `POST /api/master-setting/copy` requires
   `system_admin`; roles in `controllerAuth.write` no longer allow it. With a resolver registered,
   `MasterSettingService.copy` requires `system_admin` and a `'*'`/`'*'` write grant; a resolver
   that gives `system_admin` narrower grants blocks copy. For copy, `system_admin` must come from
   the `custom:roles` claim; group-derived roles do not count.
+  ([#518](https://github.com/mbc-net/mbc-cqrs-serverless/pull/518))
 - **master:** creating a tenant-level override of a common setting that has no `systemId` now
   treats that common setting as `shared`: a requested `systemId` other than `shared` is rejected
   with 400, write access to `shared` is required, and the override stores no `systemId`.
+  ([#518](https://github.com/mbc-net/mbc-cqrs-serverless/pull/518))
 - **master:** a setting code that is empty, equals `MASTER_SETTING` or contains `#` is now rejected
   with 400, for every application: as the `code` of every setting create and upsert (common,
   tenant, group, user and bulk), and as the `settingCode` of data create, upsert, both bulk
   endpoints and `MasterDataService.list` (`GET /api/master-data`). Such a code built the key of
-  another row, such as a user's personal setting. A bulk request is checked before anything is
-  written. With a resolver registered, `list` also leaves out rows the caller may not read.
+  another row, such as a user's personal setting. Every bulk route checks the keys of all its
+  items before the first write. With a resolver registered, `list` also leaves out rows the
+  caller may not read.
   `MasterDataService.update` and `delete` (`PUT`/`DELETE /api/master-data/:pk/:sk`) now reject a
   `MASTER_SETTING#...` key: setting rows are changed through `/api/master-setting` only.
   Conversely, `MasterSettingService.updateSetting` and `deleteSetting` (`PATCH`/`DELETE
@@ -39,72 +42,126 @@ See [Conventional Commits](https://conventionalcommits.org) for commit guideline
   stored with `#` in its `code` stays readable and can still be updated or deleted by key through
   `/api/master-data/:pk/:sk`, but a create or upsert that sends such a code is rejected. Check
   integrations that generate codes with `#` before upgrading.
+  ([#518](https://github.com/mbc-net/mbc-cqrs-serverless/pull/518))
 - **master:** `@`, the sort-key version separator, is now rejected like `#` in every key segment:
   setting codes, data `settingCode` and `code`, and the `userId` and `groupId` of group and user
-  settings (`POST /api/master-setting` with a group or user target). The command service cut a
+  settings (`POST /api/master-setting` with a group or user target). The command service cuts a
   sort key at its last `@`, so such a segment stored a different row from the one that was
   checked: a `userId` of `u1#OTHER@x` wrote the personal setting `OTHER` instead of the requested
   code. `MasterSettingService.updateSetting`/`deleteSetting` and `MasterDataService.update`/`delete`
-  also reject a key whose sk contains `@`. A row could not be stored with `@` in its key, so no
-  stored row is affected; check integrations that use e-mail addresses or other values with `@`
-  as a `userId`, `groupId` or code.
+  also reject a key whose sk contains `@`. **Stored rows can be affected.** In 1.7.0 a single `@`
+  silently cut the key there: the setting code `a@b` wrote `MASTER_SETTING#a`, the data code `a@b`
+  wrote `S1#a`, and the personal setting `S1` of the user `u@example.com` wrote
+  `MASTER_SETTING#USER#u`, possibly over another row. Two or more `@` stored a row whose key still
+  holds `@`: the setting code `X@Y@Z` was stored as `MASTER_SETTING#X@Y` and the data code `a@b@c`
+  as `S1#a@b`. In 1.8.0 such a row still appears in lists and can be read by its key, but
+  `getSetting` (`GET /api/master-setting/:code`) rejects its code and every update and delete
+  rejects its key, all with 400. Find these rows by an `sk` containing `@` in the master data
+  table in DynamoDB (`<prefix>master-data`) or in the RDS `masters` table (for example
+  `WHERE sk LIKE '%@%'`). A key cut at a single `@` has no `@` left, so look in the source systems
+  for codes and user or group ids that contain `@`. To make such a row reachable through the API
+  again, re-create it under a valid key and remove the old row from DynamoDB and RDS directly (the
+  API can no longer change it). Check integrations that use e-mail addresses or other values with
+  `@` as a `userId`, `groupId` or code before upgrading.
+  ([#518](https://github.com/mbc-net/mbc-cqrs-serverless/pull/518))
 - **master:** a setting update that omits `settingValue` no longer clears the setting's `attributes`
   (and its owner), one that omits `name` keeps the name, and a data update that omits `seq` keeps it.
+  ([#518](https://github.com/mbc-net/mbc-cqrs-serverless/pull/518))
 - **master:** for an application that sets neither `controllerAuth` nor a resolver, the other
   changes are: a `__systemId` key sent by a client in `attributes` is now always removed;
   responses go through `toPublicRow`, so a row stored earlier with a client-planted `__systemId`
   returns it as a top-level `systemId`; `GET /api/master-access` is added when the controllers
   are enabled; the DTOs accept `systemId` and `includeCommon`; and `POST /api/master-bulk` upserts
   settings before data instead of both at once.
+  ([#518](https://github.com/mbc-net/mbc-cqrs-serverless/pull/518))
+- **master (bulk):** bulk writes are not transactional. `POST /api/master-bulk` writes its settings
+  before it runs the access (resolver and grant) checks of its data items, so with a resolver
+  registered a request whose data item is forbidden (403) or has no setting (400) fails after its
+  settings were written.
+  `POST /api/master-setting/bulk` and `POST /api/master-data/bulk` check access for all of their
+  items before writing any of them, and every bulk route and bulk service method checks the keys
+  of all items first. Send settings and data in separate requests if a partial write is a
+  problem.
+  ([#518](https://github.com/mbc-net/mbc-cqrs-serverless/pull/518))
+- **master (`controllerAuth`):** the guard first runs the core `RolesGuard` tenant check, which
+  knows only the `COMMON_TENANT_CODES` environment variable (default `common`), not the module's
+  `commonTenantCode`. A caller without a `custom:tenant` claim who names the common tenant in
+  `x-tenant-code` and holds no cross-tenant role is therefore rejected with 403 when
+  `commonTenantCode` is not listed in `COMMON_TENANT_CODES`. Add it there if such callers read the
+  common tenant. ([#518](https://github.com/mbc-net/mbc-cqrs-serverless/pull/518))
 - **master (RDS):** applications generated earlier must add a nullable `system_id` column and
   write `systemId: getSystemId(cmd)` in their own RDS handler, because `update-scheme.ts` does
   not change an existing schema or handler. Needed only when a resolver is registered. With a
   resolver registered, the application now refuses to start if the Prisma `Master` model has no
-  `systemId` field.
+  `systemId` field. ([#518](https://github.com/mbc-net/mbc-cqrs-serverless/pull/518))
 - **master (resolver):** with a resolver registered, read methods called without `invokeContext`
   are denied. Server-side code must pass `{ invokeContext }`, or `skipAccessCheck: true` for
   trusted internal work. See `docs/development/master-access-and-sync.md`.
+  ([#518](https://github.com/mbc-net/mbc-cqrs-serverless/pull/518))
 - **master, survey-template (MySQL):** list searches now work on MySQL, so applications that
   patched `mode: 'insensitive'` out of the 1.x dist files (for example with `patch-package`) can
   drop the patch. The database is detected from the Prisma client; set `databaseProvider` in
   `MasterModule.register` / `SurveyTemplateModule.register` (or their `registerAsync`) if a
   warning says it could not be detected.
+  ([#518](https://github.com/mbc-net/mbc-cqrs-serverless/pull/518))
 - **master (scaffold):** new projects get `controllerAuth: {}` in `src/master/master.module.ts`, so
   master writes need `system_admin` until roles are configured.
+  ([#518](https://github.com/mbc-net/mbc-cqrs-serverless/pull/518))
 - **master (`registerAsync`):** the static `commonTenantCode`, `databaseProvider` and
   `controllerAuth` options override the values the factory returns, even when the static value is
   `undefined`; pass them statically.
+  ([#518](https://github.com/mbc-net/mbc-cqrs-serverless/pull/518))
 - **master (tasks):** `GET /api/tasks/sfn-task-parent` now resolves the tenant like the rest of the
   framework: the `custom:tenant` claim wins over `x-tenant-code`. It used to read a
   `custom:tenant_code` claim nobody sets, so it always took the tenant from the header.
+  ([#518](https://github.com/mbc-net/mbc-cqrs-serverless/pull/518))
 - **master (`includeCommon`):** `includeCommon` hides common rows by the codes the tenant already
   holds, so it is bounded. A master data list (`GET /api/master-data/list`) with `includeCommon`
   requires `settingCode` unless the caller is in the common tenant, and on either list a tenant
   holding more than 10,000 matching rows (soft-deleted included) gets a 400 instead of a database
   error; results are not truncated. A settings list with `includeCommon` does not merge the
   common tenant's group and user setting rows.
+  ([#518](https://github.com/mbc-net/mbc-cqrs-serverless/pull/518))
 
 ### Features
 
 - **master:** opt-in `controllerAuth` guard for the built-in routes, with tenant checks.
+  ([#518](https://github.com/mbc-net/mbc-cqrs-serverless/pull/518))
 - **master:** `systemId` per master setting, an optional `@MasterAccessResolver()` with grants
   per system and setting, `GET /api/master-access`, `assignSystem` for tagging existing data,
   and `includeCommon` on the list endpoints.
+  ([#518](https://github.com/mbc-net/mbc-cqrs-serverless/pull/518))
 - **master:** `commonTenantCode` and `enableCopyTask` module options.
+  ([#518](https://github.com/mbc-net/mbc-cqrs-serverless/pull/518))
 - **master:** `system_id` RDS column and `systemId` on API responses.
-- **master (docs):** guide for access control and per-system SNS sync.
+  ([#518](https://github.com/mbc-net/mbc-cqrs-serverless/pull/518))
 - **master, survey-template:** `databaseProvider` module option (`'postgresql' | 'mysql'`),
   detected from the Prisma client by default.
+  ([#518](https://github.com/mbc-net/mbc-cqrs-serverless/pull/518))
 
 ### Bug Fixes
 
+- **master:** every bulk route now checks the keys of all items before the first write.
+  `MasterSettingService.createBulk` wrote its valid items while it rejected an invalid code, and
+  `POST /api/master-bulk` wrote its settings before it rejected an invalid data `settingCode` or
+  `code`; both now write nothing. ([#518](https://github.com/mbc-net/mbc-cqrs-serverless/pull/518))
 - **master:** master copy reads data from the source setting's tenant (was `meltec`).
+  ([#518](https://github.com/mbc-net/mbc-cqrs-serverless/pull/518))
 - **master:** master copy compares and copies sequences with separate source and target keys.
+  ([#518](https://github.com/mbc-net/mbc-cqrs-serverless/pull/518))
 - **master, survey-template:** name, code and keyword searches failed on MySQL (the default
   database of `mbc new`) because they always sent PostgreSQL-only `mode: 'insensitive'`. The
   setting description search used `path: 'description'`, which is neither the PostgreSQL form
   (an array) nor the MySQL form (a `$.` path); it now uses `['description']` on PostgreSQL and
-  `'$.description'` on MySQL.
+  `'$.description'` on MySQL. ([#518](https://github.com/mbc-net/mbc-cqrs-serverless/pull/518))
+
+### Documentation
+
+- **master:** Add the access control and per-system sync guide
+  ([docs/development/master-access-and-sync.md](docs/development/master-access-and-sync.md))
+  ([#518](https://github.com/mbc-net/mbc-cqrs-serverless/pull/518))
+- **mcp-server:** Add the v1.7.0 → v1.8.0 migration guide to the `mbc-migrate` skill and v1.8.0
+  to its compatibility matrix.
 
 ## [1.7.0](https://github.com/mbc-net/mbc-cqrs-serverless/releases/tag/v1.7.0) (2026-11-09)
 

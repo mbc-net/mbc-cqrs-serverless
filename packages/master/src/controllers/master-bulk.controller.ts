@@ -18,6 +18,7 @@ import { MasterDataCreateBulkDto } from '../dto/master-copy/master-data-create-b
 import { CommonSettingDto } from '../dto/master-setting/common-setting-create.dto'
 import { CommonSettingBulkDto } from '../dto/master-setting/common-setting-create-bulk.dto'
 import { MasterControllerGuard } from '../guards'
+import { assertValidDataItemKey, assertValidSettingCode } from '../helpers'
 import { MasterDataService } from '../services/master-data.service'
 import { MasterSettingService } from '../services/master-setting.service'
 
@@ -80,6 +81,10 @@ export class MasterBulkController {
 
     const dataBulkDto = new MasterDataCreateBulkDto()
     dataBulkDto.items = dataItems.map((d) => d.item)
+
+    // Every key is checked before the first write: settings are written before data is checked.
+    settingItems.forEach((s) => assertValidSettingCode(s.item.code))
+    dataItems.forEach((d) => assertValidDataItemKey(d.item))
 
     // Settings first, so data rows can find a setting created in the same request.
     const settingResults = settingItems.length
