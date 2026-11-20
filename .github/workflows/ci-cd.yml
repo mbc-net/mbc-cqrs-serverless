@@ -137,7 +137,7 @@ jobs:
           verbose: true
 
       - name: Unit Test Report
-        uses: dorny/test-reporter@v1
+        uses: dorny/test-reporter@v3
         if: (success() || failure()) && github.event.pull_request.head.repo.full_name == github.repository
         with:
           name: Unit Tests Reporter-${{ matrix.node-version }}
@@ -181,7 +181,7 @@ jobs:
           path: ./packages/core/test/scripts/*.out.txt
 
       - name: E2E Test Report
-        uses: dorny/test-reporter@v1
+        uses: dorny/test-reporter@v3
         if: (success() || failure()) && github.event.pull_request.head.repo.full_name == github.repository
         with:
           name: E2E Core Tests Reporter-${{ matrix.node-version }}
