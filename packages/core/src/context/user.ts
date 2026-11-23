@@ -1,7 +1,11 @@
 import { ExecutionContext } from '@nestjs/common'
 
 import { TenantGroupMembership } from '../auth/group-role-resolver.interface'
-import { HEADER_TENANT_CODE } from '../constants'
+import {
+  getExplicitTenantSelectionCodes,
+  HEADER_TENANT_CODE,
+  ROLE_SYSTEM_ADMIN,
+} from '../constants'
 import { extractInvokeContext, getAuthorizerClaims, IInvoke } from './invoke'
 
 export interface CustomRole {
@@ -26,6 +30,7 @@ export class UserContext {
 function parseTenantGroups(
   raw: string | undefined,
   tenantCode: string | undefined,
+  explicitSelection = false,
 ): string[] {
   if (!tenantCode) {
     return []
@@ -44,7 +49,9 @@ function parseTenantGroups(
 
   const memberships = (parsed as TenantGroupMembership[]).map((membership) => ({
     ...membership,
-    tenant: (membership.tenant || '').toLowerCase(),
+    tenant: explicitSelection
+      ? (membership.tenant || '').trim().toLowerCase()
+      : (membership.tenant || '').toLowerCase(),
   }))
 
   const match = memberships.find(
@@ -86,11 +93,12 @@ function collectTenantRoles(
  * Extract user context from JWT claims and request headers.
  *
  * Tenant code determination:
- * 1. If `custom:tenant` exists in JWT claims, use it (user bound to specific tenant)
- * 2. Otherwise, use `x-tenant-code` header (for cross-tenant operations)
+ * 1. An opted-in header with direct membership or system_admin selects that tenant.
+ * 2. Otherwise use the JWT home tenant, falling back to legacy header selection.
+ * An unauthorized opted-in header without a home tenant resolves no tenant.
  *
- * Note: Security validation for header-based tenant override is handled by RolesGuard,
- * not by this function. This allows for flexible security policies at the application level.
+ * Explicit selection eligibility is validated here so guards and services agree.
+ * RolesGuard validates legacy header access and route permissions.
  */
 export function getUserContext(ctx: IInvoke | ExecutionContext): UserContext {
   if ('getHandler' in ctx) {
@@ -105,20 +113,51 @@ export function getUserContext(ctx: IInvoke | ExecutionContext): UserContext {
     JSON.parse(claims['custom:roles'] || '[]') as CustomRole[]
   ).map((role) => ({ ...role, tenant: (role.tenant || '').toLowerCase() }))
 
-  // Determine tenant code
-  // 1. Cognito custom:tenant attribute takes priority
-  // 2. Otherwise, use header value (security check delegated to RolesGuard)
-  // Note: tenantCode is normalized to lowercase for case-insensitive matching with role.tenant
-  const tenantCode = (
-    claims['custom:tenant'] || (ctx?.event?.headers || {})[HEADER_TENANT_CODE]
-  )?.toLowerCase()
+  const rawHeader = (ctx?.event?.headers || {})[HEADER_TENANT_CODE]
+  const headerTenantCode =
+    typeof rawHeader === 'string' ? rawHeader.trim().toLowerCase() : undefined
+  const optedHeader =
+    getExplicitTenantSelectionCodes().includes(headerTenantCode)
+  const isSystemAdmin = roles.some(({ role }) => role === ROLE_SYSTEM_ADMIN)
+  const explicitSelection =
+    optedHeader &&
+    (isSystemAdmin ||
+      roles.some(
+        ({ tenant, role }) =>
+          tenant.trim() === headerTenantCode &&
+          typeof role === 'string' &&
+          role.length > 0,
+      ))
+  // Preserve legacy precedence outside opted-in headers. Unauthorized selection
+  // falls back to home, never to public header access when there is no home.
+  const tenantCode = explicitSelection
+    ? headerTenantCode
+    : optedHeader
+      ? claims['custom:tenant']?.toLowerCase() || undefined
+      : (claims['custom:tenant'] || rawHeader)?.toLowerCase()
 
-  const tenantGroupIds = parseTenantGroups(claims['custom:groups'], tenantCode)
-  const tenantRoles = collectTenantRoles(roles, tenantCode)
+  const tenantGroupIds = parseTenantGroups(
+    claims['custom:groups'],
+    tenantCode,
+    explicitSelection,
+  )
+  const selectedRoles = explicitSelection
+    ? roles
+        .filter(({ tenant }) => tenant.trim() === tenantCode)
+        .map((role) => ({ ...role, tenant: role.tenant.trim() }))
+    : roles
+  const tenantRoles = collectTenantRoles(selectedRoles, tenantCode)
+  if (
+    explicitSelection &&
+    isSystemAdmin &&
+    !tenantRoles.includes(ROLE_SYSTEM_ADMIN)
+  ) {
+    tenantRoles.push(ROLE_SYSTEM_ADMIN)
+  }
 
   // Find tenantRole (case-insensitive matching - both tenantCode and role.tenant are lowercase)
   let tenantRole = ''
-  for (const { tenant, role } of roles) {
+  for (const { tenant, role } of selectedRoles) {
     if (tenant === '' || tenant === tenantCode) {
       tenantRole = role
       if (tenant !== '') {
@@ -126,6 +165,8 @@ export function getUserContext(ctx: IInvoke | ExecutionContext): UserContext {
       }
     }
   }
+
+  if (explicitSelection && isSystemAdmin) tenantRole = ROLE_SYSTEM_ADMIN
 
   return {
     userId,

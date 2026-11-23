@@ -1,6 +1,9 @@
 import generateAction from './generate.action'
-import * as fs from 'fs'
-import * as path from 'path'
+import { SchematicRunner } from '../runners/schematic.runner'
+
+jest.mock('../runners/schematic.runner')
+
+const run = jest.mocked(SchematicRunner.prototype.run)
 
 describe('Generate Action', () => {
   // Use dryRun: true by default to avoid creating actual files during tests
@@ -10,60 +13,61 @@ describe('Generate Action', () => {
     opts: () => ({
       dryRun: true,
       mode: 'async',
-      schema: true
-    })
+      schema: true,
+    }),
   } as any
 
   const mockOptions = {
     dryRun: true,
     mode: 'async',
-    schema: true
+    schema: true,
   }
-
-  // Directories that may be created by tests
-  // テストで作成される可能性があるディレクトリ
-  const testDirs = ['src', 'test']
 
   beforeEach(() => {
     jest.clearAllMocks()
+    run.mockReset().mockResolvedValue(null)
   })
 
-  afterAll(() => {
-    // Clean up any directories created during tests
-    // テスト中に作成されたディレクトリを削除
-    // The monorepo root is determined by finding package.json with "workspaces"
-    let rootDir = process.cwd()
+  it('passes the generated command and dry-run flag to the runner', async () => {
+    await generateAction('service', 'test-service', mockOptions, mockCommand)
+    expect(run).toHaveBeenCalledTimes(1)
+    expect(run).toHaveBeenCalledWith(
+      '@mbc-cqrs-serverless/cli:service --dry-run --mode="async" --schema --name=test-service',
+    )
+  })
 
-    // Walk up to find monorepo root (has workspaces in package.json)
-    let current = rootDir
-    for (let i = 0; i < 10; i++) {
-      const pkgPath = path.join(current, 'package.json')
-      if (fs.existsSync(pkgPath)) {
-        try {
-          const pkg = JSON.parse(fs.readFileSync(pkgPath, 'utf-8'))
-          if (pkg.workspaces) {
-            rootDir = current
-            break
-          }
-        } catch {
-          // ignore
-        }
-      }
-      const parent = path.dirname(current)
-      if (parent === current) break
-      current = parent
-    }
+  it('waits for schematic completion before resolving', async () => {
+    let finish!: () => void
+    run.mockReturnValue(
+      new Promise((resolve) => {
+        finish = () => resolve(null)
+      }),
+    )
+    let finished = false
+    const action = generateAction(
+      'service',
+      'test-service',
+      mockOptions,
+      mockCommand,
+    ).then(() => {
+      finished = true
+    })
+    await Promise.resolve()
+    expect(finished).toBe(false)
+    finish()
+    await action
+    expect(finished).toBe(true)
+  })
 
-    for (const dir of testDirs) {
-      const dirPath = path.join(rootDir, dir)
-      if (fs.existsSync(dirPath)) {
-        try {
-          fs.rmSync(dirPath, { recursive: true, force: true })
-        } catch (error) {
-          console.warn(`Failed to clean up directory: ${dirPath}`)
-        }
-      }
-    }
+  it('propagates schematic execution failures to the caller', async () => {
+    const failure = new Error('Schematic execution failed')
+    // Mark the mock promise handled even on the broken, unawaited implementation.
+    const execution = Promise.reject(failure)
+    execution.catch(() => undefined)
+    run.mockReturnValue(execution)
+    await expect(
+      generateAction('invalid-type', 'test-name', mockOptions, mockCommand),
+    ).rejects.toBe(failure)
   })
 
   describe('Overview: Schematic generation functionality', () => {
