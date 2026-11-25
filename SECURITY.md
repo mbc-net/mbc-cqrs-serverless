@@ -1,5 +1,11 @@
 # Security Policy
 
+## Cognito app-client security update — v1.8.1 (2026-11-25)
+
+Projects scaffolded before v1.8.1 allowed signed-in users to write authorization-related Cognito attributes with their own access token. Restrict every affected app client to writing only `name` and deploy the infrastructure change. Updating packages alone does not remediate deployed clients. Keep edits to other attributes behind an authorized server-side endpoint using `AdminUpdateUserAttributes`; ECS task roles also need the pool-scoped Cognito admin permissions.
+
+Audit every user's `custom:roles`, `custom:tenant`, and `custom:groups` against your source of truth. Correct unauthorized changes and globally sign out affected users; existing JWT claims can remain usable until expiration. See the [v1.8.1 migration guide](packages/mcp-server/skills/mbc-migrate/SKILL.md#v180--v181-cli-app-client-write-attributes-security) for exact remediation and audit steps. This policy is also exposed through the MCP `mbc://docs/security` resource.
+
 ## Supported Versions
 
 | Version | Supported          |

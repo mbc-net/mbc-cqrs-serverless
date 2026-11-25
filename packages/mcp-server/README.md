@@ -81,7 +81,7 @@ Get guided assistance:
 |--------|-------------|
 | `cqrs_implementation_guide` | Step-by-step CQRS implementation (module, entity, command, query, event) |
 | `debug_command_error` | Debug command-related errors |
-| `migration_guide` | Version migration guidance including v1.1.x and v1.2.x breaking changes |
+| `migration_guide` | Version migration guidance through v1.8.1, including security remediation for existing Cognito app clients |
 
 #### `migration_guide` coverage
 
@@ -93,6 +93,9 @@ Get guided assistance:
 | v1.2.0 | `publishSync`/`publishPartialUpdateSync` return `null` on no-op; `genNewSequence()` removed; RYW `Repository` added |
 | v1.2.2 | `CsvBatchProcessor` Smart Retry (Poison Pill fix); `ImportQueueEventHandler` payload fix |
 | v1.2.4 | `TaskModule.register()` is now global — must be called once in host `AppModule` |
+| v1.8.1 | Restrict the Cognito app client to writing only `name`; grant ECS task-role Cognito admin actions; audit authorization attributes in existing deployments |
+
+**v1.8.1 security upgrade:** Updating packages alone does not fix deployed app clients. The `migration_guide` prompt and [`mbc-migrate` skill](skills/mbc-migrate/SKILL.md#v180--v181-cli-app-client-write-attributes-security) explain the required infrastructure edit, frontend changes, and audit of `custom:roles`, `custom:tenant`, and `custom:groups`.
 
 ## Installation
 
