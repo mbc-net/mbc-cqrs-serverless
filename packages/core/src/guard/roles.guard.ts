@@ -11,6 +11,7 @@ import { GroupRoleResolverRegistry } from '../auth/group-role-resolver.registry'
 import {
   DEFAULT_COMMON_TENANT_CODES,
   DEFAULT_CROSS_TENANT_ROLES,
+  getExplicitTenantSelectionCodes,
   ROLE_SYSTEM_ADMIN,
 } from '../constants'
 import {
@@ -64,7 +65,7 @@ export class RolesGuard implements CanActivate {
   }
 
   /**
-   * Check if tenant code was provided via header override (no custom:tenant in JWT).
+   * Check whether the resolved tenant differs from the JWT home tenant.
    * Override this method to customize header override detection logic.
    */
   protected isHeaderOverride(
@@ -72,8 +73,10 @@ export class RolesGuard implements CanActivate {
     userContext: UserContext,
   ): boolean {
     const claims = this.getAuthorizerClaims(context)
-    // If custom:tenant exists in JWT, it's not a header override
-    return !claims['custom:tenant'] && !!userContext.tenantCode
+    return (
+      !!userContext.tenantCode &&
+      claims['custom:tenant']?.toLowerCase() !== userContext.tenantCode
+    )
   }
 
   /**
@@ -88,6 +91,17 @@ export class RolesGuard implements CanActivate {
     context: ExecutionContext,
     userContext: UserContext,
   ): boolean {
+    // getUserContext only resolves an opted-in header without a matching home
+    // after validating direct membership or system_admin authority.
+    const explicitCodes = getExplicitTenantSelectionCodes()
+    if (
+      userContext.tenantCode !== '*' &&
+      (explicitCodes.includes(userContext.tenantCode) ||
+        explicitCodes.includes('*'))
+    ) {
+      return true
+    }
+
     // Allow access to common tenant
     if (this.getCommonTenantCodes().includes(userContext.tenantCode)) {
       return true

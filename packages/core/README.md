@@ -252,10 +252,63 @@ Register the class in your NestJS module `providers`. `AuthModule` is imported a
 
 `RolesGuard` evaluates `tenantRoles` from the JWT (not `getUserRole()`). The protected `getUserRole()` method is **deprecated** and not called by the default guard. Subclasses should override `verifyRole` or `resolveGroupRoles` for custom logic.
 
+### Explicit tenant selection (opt-in)
+
+By default, `getUserContext()` gives the JWT `custom:tenant` priority over
+`x-tenant-code`. To allow explicit selection of designated tenants, configure:
+
+```bash
+EXPLICIT_TENANT_SELECTION_CODES=common
+```
+
+This comma-separated setting is read at runtime, trims configuration entries,
+ignores empty entries, and matches tenant codes case-insensitively. The default
+is empty, so existing applications keep their tenant resolution behavior.
+For opted-in selection, header values and matching role/group tenant codes are
+also trimmed. Values outside the opt-in list retain legacy normalization.
+Add `*` to enable selection of all other nonempty tenant codes:
+
+```bash
+EXPLICIT_TENANT_SELECTION_CODES=common,*
+```
+
+For an opted-in header value, a nonempty direct `custom:roles` entry for that
+tenant, or `system_admin` in any tenant/global entry, selects the header tenant
+before the home tenant. `tenantRole`, `tenantRoles`, and `tenantGroupIds` then
+refer to the selected tenant. Only its direct roles are included; global roles
+such as `admin` are not inherited during explicit selection. A `system_admin`
+entry from any scope is preserved in `tenantRoles` and takes priority in
+`tenantRole`. Group roles are resolved for the selected tenant and its group IDs;
+group membership alone does not qualify a caller to select an opted-in tenant.
+
+For example, a home `admin` who is a `common` `user` remains a user when selecting
+`common`; a home `user` who is a `common` `admin` receives the common admin role.
+`RolesGuard` and services calling `getUserContext()` use the same selection.
+
+A caller without a qualifying membership for a **named code** keeps their home
+tenant, supporting older clients that always sent a default `common` header.
+Named codes take precedence over `*`, regardless of configuration order.
+Without a home tenant, an unauthorized named header produces no resolved tenant.
+For a **wildcard-selected code**, an unauthorized request always produces no
+resolved tenant; it never silently falls back to the home tenant. `RolesGuard`
+denies unresolved access, including routes without role metadata. A literal `*`
+header is rejected while the opt-in is enabled, even for a system administrator.
+Missing or empty headers retain home selection. Header values outside the
+opt-in list keep the existing behavior. This setting is independent of
+`COMMON_TENANT_CODES` (legacy public header access) and `CROSS_TENANT_ROLES`;
+application-specific guards and package-specific policies still apply. In
+particular, the master package's optional access policy can independently reject
+no-home access to a non-common tenant even if core accepts its explicit selection.
+
+Deploy clients that omit `x-tenant-code` when no tenant is selected before enabling
+this setting on the server. An opted-in header from an eligible caller is always
+an explicit choice, including when their home tenant differs.
+
 ## Environment Variables
 
 | Variable | Description | Default |
 |----------|-------------|---------|
+| `EXPLICIT_TENANT_SELECTION_CODES` | Named tenant codes and optional `*` allowing authorized header selection before JWT home tenant | Empty (disabled) |
 | `DYNAMODB_ENDPOINT` | DynamoDB endpoint URL | AWS default |
 | `DYNAMODB_REGION` | DynamoDB region | AWS default |
 | `SFN_ENDPOINT` | Step Functions endpoint | AWS default |

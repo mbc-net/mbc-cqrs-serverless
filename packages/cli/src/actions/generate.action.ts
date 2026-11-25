@@ -38,7 +38,7 @@ export default async function generateAction(
   const runner = new SchematicRunner()
   const fullCommand = buildCommandLine(schematic, schematicOptions)
 
-  runner.run(fullCommand)
+  await runner.run(fullCommand)
 }
 
 function buildCommandLine(name: string, options: any[]) {
