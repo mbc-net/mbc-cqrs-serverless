@@ -207,6 +207,9 @@ exports[`snapshot test for InfraStack 1`] = `
         "UserPoolId": {
           "Ref": "devuserpool23B1805F",
         },
+        "WriteAttributes": [
+          "name",
+        ],
       },
       "Type": "AWS::Cognito::UserPoolClient",
     },

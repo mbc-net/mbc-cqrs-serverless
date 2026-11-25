@@ -4,7 +4,7 @@
 
 import * as cdk from 'aws-cdk-lib'
 import { Match, Template } from 'aws-cdk-lib/assertions'
-import { getConfig } from '../config'
+import { Config, getConfig } from '../config'
 import { InfraStack } from '../libs/infra-stack'
 import { PipelineStack } from '../libs/pipeline-stack'
 
@@ -166,4 +166,66 @@ test('pipeline CodeBuild projects pin the Node.js 22 runtime', () => {
       nodejs: '22',
     })
   }
+})
+
+const env: cdk.Environment = {
+  account: '101010101010',
+  region: 'ap-northeast-1',
+}
+
+test('app client lets users write only name', () => {
+  // Without WriteAttributes, Cognito lets a user rewrite custom:roles with
+  // their own access token (UpdateUserAttributes) and escalate privileges.
+  const cases: Array<[string, Config]> = [
+    ['TestClientNew', getConfig('dev')],
+    [
+      'TestClientImported',
+      { ...getConfig('dev'), userPoolId: 'ap-northeast-1_abcdefghi' },
+    ],
+  ]
+  for (const [id, config] of cases) {
+    const clients = Template.fromStack(
+      new InfraStack(new cdk.App(), id, { env, config }),
+    ).findResources('AWS::Cognito::UserPoolClient')
+    expect(
+      Object.values(clients).map((c: any) => c.Properties.WriteAttributes),
+    ).toEqual([['name']])
+  }
+})
+
+test('ECS task role gets the Cognito admin actions', () => {
+  // ECS mode needs appName (ECR repo name) and an RDS SSM key to synthesize.
+  const config: Config = {
+    ...getConfig('dev'),
+    appName: 'demo',
+    rds: { accountSsmKey: '/demo/db', endpoint: 'db.local', dbName: 'demo' },
+    ecs: { maxInstances: 1, minInstances: 1, cpu: 256, memory: 512 },
+  }
+  const template = Template.fromStack(
+    new InfraStack(new cdk.App(), 'TestEcsCognito', { env, config }),
+  )
+  template.hasResourceProperties('AWS::IAM::Policy', {
+    Roles: Match.arrayWith([{ Ref: Match.stringLikeRegexp('^ecsrole') }]),
+    PolicyDocument: {
+      Statement: Match.arrayWith([
+        Match.objectLike({
+          Effect: 'Allow',
+          Action: Match.arrayWith([
+            'cognito-idp:AdminGetUser',
+            'cognito-idp:AdminAddUserToGroup',
+            'cognito-idp:AdminCreateUser',
+            'cognito-idp:AdminDeleteUser',
+            'cognito-idp:AdminDisableUser',
+            'cognito-idp:AdminEnableUser',
+            'cognito-idp:AdminSetUserPassword',
+            'cognito-idp:AdminResetUserPassword',
+            'cognito-idp:AdminUpdateUserAttributes',
+          ]),
+          Resource: {
+            'Fn::GetAtt': [Match.stringLikeRegexp('userpool'), 'Arn'],
+          },
+        }),
+      ]),
+    },
+  })
 })

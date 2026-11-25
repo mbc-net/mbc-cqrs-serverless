@@ -3,6 +3,32 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.8.1](https://github.com/mbc-net/mbc-cqrs-serverless/releases/tag/v1.8.1) (2026-11-25)
+
+### Upgrade Notes
+
+- **cli (security, every project):** add
+  an explicit `writeAttributes` allowlist containing only `name` using
+  `ClientAttributes.withStandardAttributes` with `fullname` enabled
+  to `apigw-client` in your own `infra/libs/infra-stack.ts` and, in ECS mode, grant the task role
+  the Cognito admin actions; then deploy. The client is updated in place (same client ID, existing
+  sessions stay valid). Frontends that update any attribute other than `name` themselves must move
+  that to an API endpoint. The `mbc-migrate` skill's v1.8.0 → v1.8.1 guide has the exact lines, a
+  CLI stopgap for projects that cannot deploy right away, and how to check whether the hole was
+  already used.
+
+### Security
+
+- **cli:** The scaffolded Cognito app client (`apigw-client` in `infra/libs/infra-stack.ts`) set
+  no write attributes, so Cognito let every signed-in user call `UpdateUserAttributes` with their
+  own access token on every writable attribute, including `custom:roles`, `custom:tenant` and
+  `custom:groups`. Any user could grant themselves `system_admin`, join a privileged group or move
+  to another tenant. New projects now allow users to write only `name`; other attributes are
+  updated server-side through
+  `AdminUpdateUserAttributes`. The ECS task role now gets the same Cognito admin actions as the
+  Lambda, so that path works in ECS mode too. **Every project scaffolded before this release is
+  affected and must apply the upgrade note above.** ([#523](https://github.com/mbc-net/mbc-cqrs-serverless/pull/523))
+
 ## [1.8.0](https://github.com/mbc-net/mbc-cqrs-serverless/releases/tag/v1.8.0) (2026-11-15)
 
 ### Upgrade Notes
