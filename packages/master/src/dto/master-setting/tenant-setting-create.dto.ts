@@ -1,5 +1,5 @@
 import { ApiProperty } from '@nestjs/swagger'
-import { IsObject, IsString } from 'class-validator'
+import { IsObject, IsOptional, IsString } from 'class-validator'
 
 export class TenantSettingDto {
   /**
@@ -34,6 +34,15 @@ export class TenantSettingDto {
   })
   @IsString()
   tenantCode: string
+  @ApiProperty({
+    type: String,
+    required: false,
+    description: 'The system that owns the setting.',
+  })
+  @IsString()
+  @IsOptional()
+  systemId?: string
+
   /**
    * Additional attributes for the tenant (required).
    */

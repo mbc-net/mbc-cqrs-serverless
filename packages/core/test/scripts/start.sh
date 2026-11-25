@@ -28,7 +28,8 @@ while true; do
 
     echo "${last_lines}" >> start.out.txt 2>&1
 
-    if echo "$last_lines" | grep -q -E 'Started$|Running$'; then
+    # Newer docker compose pads status lines with trailing spaces
+    if echo "$last_lines" | grep -q -E '(Started|Running)[[:space:]]*$'; then
         break
     else
         sleep 5

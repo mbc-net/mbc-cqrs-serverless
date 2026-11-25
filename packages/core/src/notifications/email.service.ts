@@ -5,7 +5,7 @@ import {
 } from '@aws-sdk/client-sesv2'
 import { Injectable, Logger } from '@nestjs/common'
 import { ConfigService } from '@nestjs/config'
-import nodemailer from 'nodemailer'
+import nodemailer, { SendMailOptions } from 'nodemailer'
 
 import { EmailNotification, TemplatedEmailNotification } from '../interfaces'
 
@@ -66,7 +66,7 @@ export class EmailService {
         newline: 'unix',
         buffer: true,
       })
-      const mailOptions: nodemailer.SendMailOptions = {
+      const mailOptions: SendMailOptions = {
         from: fromAddress,
         to: msg.toAddrs,
         cc: msg.ccAddrs,
@@ -74,8 +74,7 @@ export class EmailService {
         replyTo: msg.replyToAddrs,
         subject: msg.subject,
         html: msg.body,
-        attachments:
-          msg.attachments as nodemailer.SendMailOptions['attachments'],
+        attachments: msg.attachments as SendMailOptions['attachments'],
       }
 
       const emailBuffer = await new Promise<Buffer>((resolve, reject) => {

@@ -44,7 +44,7 @@ import { AppTaskQueueEventFactory } from './task/app-task-queue-event.factory';
     }),
     MasterModule.register({
       enableController: true, // Optional: enable REST endpoints
-      prismaService: PrismaService, // Required when enableController is true
+      prismaService: PrismaService, // Required (MasterDataService/MasterSettingService inject it)
       dataSyncHandlers: [MasterDataSyncHandler], // Optional: custom sync handlers
     }),
   ],
@@ -293,6 +293,50 @@ sk: SETTING#[code]                           (tenant/common)
 Full documentation available at [https://mbc-cqrs-serverless.mbc-net.com/](https://mbc-cqrs-serverless.mbc-net.com/)
 
 - [Master Service Guide](https://mbc-cqrs-serverless.mbc-net.com/docs/master-service)
+
+## Configurable table name
+
+`MasterModule` uses the `master` DynamoDB table by default. Pass `tableName` to
+override it (backward compatible — omitting it keeps `master`). Both
+`register` and `registerAsync` accept it:
+
+> **⚠️ Renaming the master table is not fully supported.** The `master` table is a
+> framework-wide **central config store** — `TtlService` (TTL config) and the
+> `@mbc-cqrs-serverless/sequence` package (numbering formats) read a fixed
+> `master-data` table name. If you override the master `tableName`, those readers
+> keep looking at `master-data`, so TTLs are not applied and sequence formats
+> silently fall back to defaults. `MasterModule.register`/`registerAsync` logs a
+> warning when a custom `tableName` is set. Prefer keeping the default `master`;
+> only override it if you have separately addressed those readers. (Customizing
+> the directory / survey-template / ui-setting table names has no such caveat.)
+
+```ts
+MasterModule.register({
+  enableController: true,
+  prismaService: PrismaService,
+  tableName: 'catalog', // default: 'master' — see the caveat above
+})
+
+MasterModule.registerAsync({
+  tableName: 'catalog',
+  imports: [PrismaModule],
+  inject: [PrismaService], // resolve and return the PrismaService INSTANCE
+  useFactory: (prisma) => ({ prismaService: prisma }),
+})
+```
+
+> **Provisioning:** Add **only the raw base name** (e.g. `"catalog"`) to
+> `prisma/dynamodbs/cqrs.json`; the CLI creates the `-command` / `-data` /
+> `-history` physical tables, and your IaC must define the same three. Note that
+> `@mbc-cqrs-serverless/master`'s postinstall auto-adds only the default `master`
+> name — a custom name must be added manually.
+>
+> **Shared table:** If you also use `@mbc-cqrs-serverless/ui-setting`
+> (`SettingModule`), both modules must use the **same** `tableName`, because they
+> share the same physical table. `MasterModule` should own the data-sync
+> pipeline — register `SettingModule` with `registerEventHandlerAlias: false`.
+> If both modules own the `<tableName>_CommandEventHandler` alias, the app boots
+> but logs a warning and the effective owner becomes import-order dependent.
 
 ## License
 

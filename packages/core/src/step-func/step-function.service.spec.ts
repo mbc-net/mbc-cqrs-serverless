@@ -8,6 +8,7 @@ jest.mock('@aws-sdk/client-sfn', () => ({
     send: jest.fn(),
   })),
   StartExecutionCommand: jest.fn().mockImplementation((params) => params),
+  SendTaskSuccessCommand: jest.fn().mockImplementation((params) => params),
 }))
 
 describe('StepFunctionService', () => {
@@ -58,12 +59,14 @@ describe('StepFunctionService', () => {
 
   describe('startExecution', () => {
     it('should start step function execution with name', async () => {
-      const arn = 'arn:aws:states:us-east-1:123456789012:stateMachine:test-state-machine'
+      const arn =
+        'arn:aws:states:us-east-1:123456789012:stateMachine:test-state-machine'
       const input = { key: 'value', data: 'test' }
       const name = 'test-execution'
 
       mockClient.send.mockResolvedValue({
-        executionArn: 'arn:aws:states:us-east-1:123456789012:execution:test-state-machine:test-execution',
+        executionArn:
+          'arn:aws:states:us-east-1:123456789012:execution:test-state-machine:test-execution',
         startDate: new Date(),
       })
 
@@ -74,7 +77,7 @@ describe('StepFunctionService', () => {
           stateMachineArn: arn,
           name: name,
           input: JSON.stringify(input),
-        })
+        }),
       )
       expect(result).toEqual({
         executionArn: expect.any(String),
@@ -83,11 +86,13 @@ describe('StepFunctionService', () => {
     })
 
     it('should start execution without name', async () => {
-      const arn = 'arn:aws:states:us-east-1:123456789012:stateMachine:test-state-machine'
+      const arn =
+        'arn:aws:states:us-east-1:123456789012:stateMachine:test-state-machine'
       const input = { key: 'value' }
 
       mockClient.send.mockResolvedValue({
-        executionArn: 'arn:aws:states:us-east-1:123456789012:execution:test-state-machine:auto-generated',
+        executionArn:
+          'arn:aws:states:us-east-1:123456789012:execution:test-state-machine:auto-generated',
         startDate: new Date(),
       })
 
@@ -98,17 +103,19 @@ describe('StepFunctionService', () => {
           stateMachineArn: arn,
           name: undefined,
           input: JSON.stringify(input),
-        })
+        }),
       )
     })
 
     it('should handle long execution names by setting to undefined', async () => {
-      const arn = 'arn:aws:states:us-east-1:123456789012:stateMachine:test-state-machine'
+      const arn =
+        'arn:aws:states:us-east-1:123456789012:stateMachine:test-state-machine'
       const input = { key: 'value' }
       const longName = 'a'.repeat(85)
 
       mockClient.send.mockResolvedValue({
-        executionArn: 'arn:aws:states:us-east-1:123456789012:execution:test-state-machine:auto-generated',
+        executionArn:
+          'arn:aws:states:us-east-1:123456789012:execution:test-state-machine:auto-generated',
         startDate: new Date(),
       })
 
@@ -119,17 +126,20 @@ describe('StepFunctionService', () => {
           stateMachineArn: arn,
           name: undefined,
           input: JSON.stringify(input),
-        })
+        }),
       )
     })
 
     it('should use name when length is exactly 80 characters', async () => {
-      const arn = 'arn:aws:states:us-east-1:123456789012:stateMachine:test-state-machine'
+      const arn =
+        'arn:aws:states:us-east-1:123456789012:stateMachine:test-state-machine'
       const input = { key: 'value' }
       const exactLengthName = 'a'.repeat(80)
 
       mockClient.send.mockResolvedValue({
-        executionArn: 'arn:aws:states:us-east-1:123456789012:execution:test-state-machine:' + exactLengthName,
+        executionArn:
+          'arn:aws:states:us-east-1:123456789012:execution:test-state-machine:' +
+          exactLengthName,
         startDate: new Date(),
       })
 
@@ -140,12 +150,13 @@ describe('StepFunctionService', () => {
           stateMachineArn: arn,
           name: exactLengthName,
           input: JSON.stringify(input),
-        })
+        }),
       )
     })
 
     it('should serialize complex input objects', async () => {
-      const arn = 'arn:aws:states:us-east-1:123456789012:stateMachine:test-state-machine'
+      const arn =
+        'arn:aws:states:us-east-1:123456789012:stateMachine:test-state-machine'
       const input = {
         nested: {
           object: {
@@ -158,7 +169,8 @@ describe('StepFunctionService', () => {
       }
 
       mockClient.send.mockResolvedValue({
-        executionArn: 'arn:aws:states:us-east-1:123456789012:execution:test-state-machine:test',
+        executionArn:
+          'arn:aws:states:us-east-1:123456789012:execution:test-state-machine:test',
         startDate: new Date(),
       })
 
@@ -167,27 +179,32 @@ describe('StepFunctionService', () => {
       expect(mockClient.send).toHaveBeenCalledWith(
         expect.objectContaining({
           input: JSON.stringify(input),
-        })
+        }),
       )
     })
 
     it('should handle start execution errors', async () => {
-      const arn = 'arn:aws:states:us-east-1:123456789012:stateMachine:test-state-machine'
+      const arn =
+        'arn:aws:states:us-east-1:123456789012:stateMachine:test-state-machine'
       const input = { key: 'value' }
       const error = new Error('Step Function execution failed')
 
       mockClient.send.mockRejectedValue(error)
 
-      await expect(service.startExecution(arn, input)).rejects.toThrow('Step Function execution failed')
+      await expect(service.startExecution(arn, input)).rejects.toThrow(
+        'Step Function execution failed',
+      )
     })
 
     it('should handle empty name string as undefined', async () => {
-      const arn = 'arn:aws:states:us-east-1:123456789012:stateMachine:test-state-machine'
+      const arn =
+        'arn:aws:states:us-east-1:123456789012:stateMachine:test-state-machine'
       const input = { key: 'value' }
       const emptyName = ''
 
       mockClient.send.mockResolvedValue({
-        executionArn: 'arn:aws:states:us-east-1:123456789012:execution:test-state-machine:auto',
+        executionArn:
+          'arn:aws:states:us-east-1:123456789012:execution:test-state-machine:auto',
         startDate: new Date(),
       })
 
@@ -196,7 +213,42 @@ describe('StepFunctionService', () => {
       expect(mockClient.send).toHaveBeenCalledWith(
         expect.objectContaining({
           name: undefined,
-        })
+        }),
+      )
+    })
+  })
+
+  describe('resumeExecution', () => {
+    it('should send SendTaskSuccess with the wrapped payload', async () => {
+      mockClient.send.mockResolvedValue({})
+
+      await service.resumeExecution('task-token', { result: 'ok' })
+
+      expect(mockClient.send).toHaveBeenCalledWith({
+        taskToken: 'task-token',
+        output: JSON.stringify({ Payload: [[{ result: 'ok' }]] }),
+      })
+    })
+
+    it('should rethrow without logging at error level so the caller owns the level', async () => {
+      // A duplicate resume (TaskDoesNotExist / TaskTimedOut) is by design on
+      // the bidirectional handshake — logging ERROR here would page on an
+      // expected outcome and cancel out the caller's benign classification.
+      const errorSpy = jest.fn()
+      const debugSpy = jest.fn()
+      ;(service as any).logger = { error: errorSpy, debug: debugSpy }
+
+      const duplicate = new Error('Task Does Not Exist')
+      duplicate.name = 'TaskDoesNotExist'
+      mockClient.send.mockRejectedValue(duplicate)
+
+      await expect(service.resumeExecution('stale-token')).rejects.toThrow(
+        duplicate,
+      )
+
+      expect(errorSpy).not.toHaveBeenCalled()
+      expect(debugSpy).toHaveBeenCalledWith(
+        expect.stringContaining('Failed to resume execution'),
       )
     })
   })

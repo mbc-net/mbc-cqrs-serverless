@@ -21,6 +21,7 @@ export interface JwtClaims {
   name: string
   'custom:tenant'?: string // tenant code
   'custom:roles'?: string
+  'custom:groups'?: string
   exp: number
   email: string
   email_verified?: boolean
@@ -100,7 +101,7 @@ export function extractInvokeContext(ctx?: ExecutionContext): IInvoke {
           scopes: claims?.scope?.split(','),
         },
       }
-    } catch (error) {
+    } catch {
       throw new UnauthorizedException(
         'Invalid or malformed authorization token',
       )

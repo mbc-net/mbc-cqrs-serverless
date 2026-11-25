@@ -28,6 +28,9 @@
     "@aws-amplify/amplify-appsync-simulator": "^2.16.10"
   },
   "overrides": {
-    "graphql": "^14.7.0"
+    "graphql": "^14.7.0",
+    "uuid": "^11.1.1",
+    "tmp": "^0.2.6",
+    "aws-cdk-lib": "^2.258.1"
   }
 }

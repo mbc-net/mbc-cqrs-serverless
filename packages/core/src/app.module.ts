@@ -5,6 +5,7 @@ import { RouterModule, Routes } from '@nestjs/core'
 import { AppController } from './app.controller'
 import { ConfigurableModuleClass, OPTIONS_TYPE } from './app.module-definition'
 import { AppService } from './app.service'
+import { AuthModule } from './auth'
 import { DataSyncModule } from './command-events/data-sync.module'
 import { DataStoreModule } from './data-store/data-store.module'
 import { getValidateConfig } from './env.validation'
@@ -16,6 +17,7 @@ import { StepFunctionModule } from './step-func/step-function.module'
 
 @Module({
   imports: [
+    AuthModule,
     NotificationModule,
     DataStoreModule,
     DataSyncModule,

@@ -1,3 +1,4 @@
+import { ConditionCheck } from '@aws-sdk/client-dynamodb'
 import {
   BadRequestException,
   Inject,
@@ -79,15 +80,54 @@ export class CommandService implements OnModuleInit, ICommandService {
   }
 
   onModuleInit() {
+    // Detect how many CommandModule instances own this table's
+    // `<tableName>_CommandEventHandler` alias. The Step Functions data-sync
+    // pipeline resolves the alias non-strictly, so a duplicate can shadow one
+    // module's data-sync handlers depending on import order.
+    const aliasCount = this.explorerService.countCommandEventHandlerAliases?.(
+      this.options.tableName,
+    )
+    if (typeof aliasCount === 'number') {
+      if (aliasCount > 1) {
+        // Warn (not throw) to preserve backward compatibility for existing
+        // MasterModule + SettingModule deployments that already share a table.
+        // Set `registerEventHandlerAlias: false` on the non-owning module for
+        // deterministic single-owner behavior.
+        this.logger.warn(
+          `[${this.options.tableName}] ${aliasCount} CommandModule registrations own the ` +
+            `'${this.options.tableName}_CommandEventHandler' alias. The Step Functions data-sync ` +
+            `pipeline resolves it non-strictly, so which module's data-sync handlers run is ` +
+            `import-order dependent. When MasterModule and ui-setting's SettingModule share this ` +
+            `table, set 'registerEventHandlerAlias: false' on SettingModule so MasterModule owns ` +
+            `the alias.`,
+        )
+      }
+      // This module deferred the alias but no other module owns it — the Step
+      // Functions data-sync pipeline would fail at runtime on the first async
+      // command. Fail fast at startup instead.
+      if (
+        aliasCount === 0 &&
+        this.options.registerEventHandlerAlias === false
+      ) {
+        throw new Error(
+          `[${this.options.tableName}] registerEventHandlerAlias:false was set, but no other ` +
+            `CommandModule owns the '${this.options.tableName}_CommandEventHandler' alias for ` +
+            `this table. Import the owning module (e.g. MasterModule) with a matching tableName, ` +
+            `or remove registerEventHandlerAlias:false so this module owns the alias.`,
+        )
+      }
+    }
+
     if (!this.options.disableDefaultHandler) {
       this[DATA_SYNC_HANDLER] = [this.dataSyncDdsHandler]
     }
     if (this.options.dataSyncHandlers?.length) {
-      // this.logger.debug('init data sync handlers')
       this[DATA_SYNC_HANDLER].push(
-        ...this.options.dataSyncHandlers.map((HandlerClass) =>
-          this.moduleRef.get(HandlerClass, { strict: false }),
-        ),
+        ...this.options.dataSyncHandlers
+          .map((HandlerClass) =>
+            this.moduleRef.get(HandlerClass, { strict: false }),
+          )
+          .filter((handler) => !!handler),
       )
     }
     this.logger.debug('find data sync handlers from decorator')
@@ -100,9 +140,27 @@ export class CommandService implements OnModuleInit, ICommandService {
         .map((handler) => this.moduleRef.get(handler, { strict: false }))
         .filter((handler) => !!handler),
     )
-    // this.logger.debug(
-    //   'data sync handlers length: ' + this[DATA_SYNC_HANDLER].length,
-    // )
+
+    const allHandlers = this[DATA_SYNC_HANDLER]
+    const seen = new Map<string, IDataSyncHandler>()
+    const dupNames: string[] = []
+    for (const h of allHandlers) {
+      const name = h.constructor.name
+      if (seen.has(name)) {
+        dupNames.push(name)
+      } else {
+        seen.set(name, h)
+      }
+    }
+    if (dupNames.length > 0) {
+      this.logger.warn(
+        `[${this.options.tableName}] Duplicate DataSyncHandler instances detected ` +
+          `(${allHandlers.length} registered, ${seen.size} unique, ` +
+          `duplicates: ${[...new Set(dupNames)].join(', ')}). ` +
+          `Each @DataSyncHandler class must be registered as a provider in exactly one module.`,
+      )
+    }
+    this[DATA_SYNC_HANDLER] = [...seen.values()]
   }
 
   set tableName(name: string) {
@@ -179,6 +237,32 @@ export class CommandService implements OnModuleInit, ICommandService {
     return await this.publishAsync(fullInput, options)
   }
 
+  /** Override in a server-owned subclass to fence initial command acceptance. */
+  protected async getCommandAdmissionConditions(
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    command: Readonly<CommandModel>,
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    options: ICommandOptions,
+  ): Promise<ConditionCheck[]> {
+    return []
+  }
+
+  private async persistInitialCommand(
+    command: CommandModel,
+    options: ICommandOptions,
+  ): Promise<void> {
+    const conditions = await this.getCommandAdmissionConditions(
+      command,
+      options,
+    )
+    await this.dynamoDbService.putItemWithConditions(
+      this.tableName,
+      command,
+      'attribute_not_exists(pk) AND attribute_not_exists(sk)',
+      conditions,
+    )
+  }
+
   async publishSync(
     input: CommandInputModel,
     options: ICommandOptions,
@@ -230,11 +314,7 @@ export class CommandService implements OnModuleInit, ICommandService {
     this.logger.debug('publishSync::', command)
 
     // 1. Write to Command table first (Immutable Audit Log)
-    await this.dynamoDbService.putItem(
-      this.tableName,
-      { ...command, sk: versionedSk },
-      'attribute_not_exists(pk) AND attribute_not_exists(sk)',
-    )
+    await this.persistInitialCommand({ ...command, sk: versionedSk }, options)
 
     try {
       // 2. SET_TTL_COMMAND: set TTL on the previous command version (matches SFN)
@@ -251,7 +331,10 @@ export class CommandService implements OnModuleInit, ICommandService {
       // 4. Write to Data table (same role as DataSyncDdsHandler in SYNC_DATA)
       await this.dataService.publish(command)
 
-      // 5. Execute custom data sync handlers
+      // 5. Execute custom data sync handlers.
+      //    Set versioned sk on command before calling handlers so they receive
+      //    the same sk that the SFN path provides (sk@version, not raw sk).
+      command.sk = versionedSk
       const targetSyncHandlers = this.dataSyncHandlers?.filter(
         (handler) => handler.type !== 'dynamodb',
       )
@@ -267,15 +350,22 @@ export class CommandService implements OnModuleInit, ICommandService {
       )
 
       command.status = getCommandStatus('finish', CommandStatus.STATUS_FINISHED)
-      command.sk = versionedSk
       return command
     } catch (error) {
-      // Mark as failed if the synchronous pipeline breaks
-      await this.updateStatus(
-        { pk: command.pk, sk: versionedSk },
-        getCommandStatus('publish_sync', CommandStatus.STATUS_FAILED),
-        requestId,
-      )
+      // Mark as failed if the synchronous pipeline breaks.
+      // Wrap updateStatus so its own failure cannot mask the original error.
+      try {
+        await this.updateStatus(
+          { pk: command.pk, sk: versionedSk },
+          getCommandStatus('publish_sync', CommandStatus.STATUS_FAILED),
+          requestId,
+        )
+      } catch (statusErr) {
+        this.logger.warn(
+          `[publishSync] Failed to mark command as FAILED (pk=${command.pk}, sk=${versionedSk}): ` +
+            `${statusErr instanceof Error ? statusErr.message : statusErr}`,
+        )
+      }
       throw error
     }
   }
@@ -334,11 +424,7 @@ export class CommandService implements OnModuleInit, ICommandService {
       updatedIp: sourceIp,
     }
     this.logger.debug('publish::', command)
-    await this.dynamoDbService.putItem(
-      this.tableName,
-      command,
-      'attribute_not_exists(pk) AND attribute_not_exists(sk)',
-    )
+    await this.persistInitialCommand(command, options)
     await this.writeRywSessionIfApplicable(command, options)
     return command
   }
@@ -398,11 +484,7 @@ export class CommandService implements OnModuleInit, ICommandService {
       options.invokeContext?.event?.requestContext?.http?.sourceIp
 
     this.logger.debug('duplicate::', item)
-    await this.dynamoDbService.putItem(
-      this.tableName,
-      item,
-      'attribute_not_exists(pk) AND attribute_not_exists(sk)',
-    )
+    await this.persistInitialCommand(item, options)
 
     return item
   }
@@ -457,11 +539,14 @@ export class CommandService implements OnModuleInit, ICommandService {
     })
   }
 
-  async getItem(key: DetailKey): Promise<CommandModel> {
+  async getItem(
+    key: DetailKey,
+    options?: { consistentRead?: boolean },
+  ): Promise<CommandModel> {
     if (!key.sk.includes(VER_SEPARATOR)) {
       return this.getLatestItem(key)
     }
-    return await this.dynamoDbService.getItem(this.tableName, key)
+    return await this.dynamoDbService.getItem(this.tableName, key, options)
   }
 
   async getLatestItem(key: DetailKey): Promise<CommandModel> {
@@ -565,6 +650,8 @@ export class CommandService implements OnModuleInit, ICommandService {
         getSortKeyVersion(currentKey.sk) + 1,
       ),
     }
-    return await this.dynamoDbService.getItem(this.tableName, nextKey)
+    return await this.dynamoDbService.getItem(this.tableName, nextKey, {
+      consistentRead: true,
+    })
   }
 }

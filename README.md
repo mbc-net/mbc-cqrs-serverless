@@ -165,6 +165,7 @@ export class TodoController {
 - **CQRS Pattern** - Clean separation of commands (writes) and queries (reads)
 - **Event Sourcing** - Complete audit trail with immutable event log
 - **Optimistic Locking** - Automatic conflict resolution for concurrent updates
+- **Atomic Command Admission** - Opt-in DynamoDB condition checks written atomically with each command, e.g. to freeze updates during maintenance ([guide](docs/development/command-admission.md))
 
 ### AWS Integration
 - **Lambda** - Serverless compute with automatic scaling
@@ -178,6 +179,7 @@ export class TodoController {
 - **Multi-tenancy** - Built-in tenant isolation and settings hierarchy
 - **Sequence Generation** - Auto-incrementing IDs with date rotation
 - **Master Data** - Centralized configuration management
+- **Master Data Access Control** - Opt-in route guard and per-system scoping (`systemId`) with read/write grants per system and setting, plus list search on PostgreSQL and MySQL ([guide](docs/development/master-access-and-sync.md))
 - **Async Tasks** - Background job processing with retries
 
 ### Developer Experience
@@ -217,6 +219,10 @@ Visit our [documentation site](https://mbc-cqrs-serverless.mbc-net.com/) for:
 ---
 
 ## Installation
+
+**Requirements:** Node.js 22.23.4 or later (all packages declare `engines.node: ">=22"` since v1.6.0; older Node.js lines do not receive the fix for CVE-2026-111497). See the [v1.6.0 migration guide](https://mbc-cqrs-serverless.mbc-net.com/docs/migration/v1.6.0) for the upgrade steps.
+
+**v1.8.1 security upgrade (2026-11-25):** Existing scaffolded projects must restrict their deployed Cognito app client to writing only `name`; upgrading npm packages alone does not fix the client. ECS deployments also need the task-role Cognito admin permissions. Review frontend attribute updates and audit user authorization attributes. See the [migration guide](packages/mcp-server/skills/mbc-migrate/SKILL.md#v180--v181-cli-app-client-write-attributes-security) for the required steps.
 
 ### Latest Stable Release
 ```bash

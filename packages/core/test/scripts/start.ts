@@ -40,8 +40,9 @@ const readLastLines = (filePath, numLines) => {
 const checkStartedInLastThreeLine = () => {
   const lastLines = readLastLines(filePath, 3)
   console.log('lastLines', lastLines)
-  const allEndWithStarted = lastLines.every(
-    (line) => line.endsWith('Started') || line.endsWith('Running'),
+  // Newer docker compose pads status lines with trailing spaces
+  const allEndWithStarted = lastLines.every((line) =>
+    /(Started|Running)\s*$/.test(line),
   )
   return allEndWithStarted
 }

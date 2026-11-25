@@ -186,6 +186,39 @@ describe('DynamoDbService', () => {
         sk: 'test',
       })
     })
+
+    it('should set ConsistentRead when options.consistentRead is true', async () => {
+      // Arrange
+      dynamoDBMock.on(GetItemCommand).resolves({ Item: {} })
+      const key = { pk: 'master', sk: 'test' }
+
+      // Action
+      await dynamoDbService.getItem('table_name', key, { consistentRead: true })
+
+      // Assert
+      expect(dynamoDBMock).toHaveReceivedCommandWith(GetItemCommand, {
+        TableName: 'table_name',
+        Key: {
+          pk: { S: 'master' },
+          sk: { S: 'test' },
+        },
+        ConsistentRead: true,
+      })
+    })
+
+    it('should omit ConsistentRead when options are not provided', async () => {
+      // Arrange
+      dynamoDBMock.on(GetItemCommand).resolves({ Item: {} })
+      const key = { pk: 'master', sk: 'test' }
+
+      // Action
+      await dynamoDbService.getItem('table_name', key)
+
+      // Assert
+      const calls = dynamoDBMock.commandCalls(GetItemCommand)
+      expect(calls).toHaveLength(1)
+      expect(calls[0].args[0].input.ConsistentRead).toBeUndefined()
+    })
   })
 
   describe('updateItem', () => {

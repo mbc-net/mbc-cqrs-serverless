@@ -1,3 +1,4 @@
+import { execSync } from 'child_process'
 import * as fs from 'fs'
 import * as path from 'path'
 
@@ -280,6 +281,74 @@ describe('Claude Code Skills', () => {
       expect(content).toContain('NestJS')
       expect(content).toContain('Node.js')
     })
+
+    it('should contain v1.3.3 migration guide (ATTRIBUTE_LIMIT_SIZE)', () => {
+      expect(content).toContain('v1.3.3')
+      expect(content).toContain('ATTRIBUTE_LIMIT_SIZE')
+    })
+
+    it('should contain v1.5.0 migration guide (LocalStack → Floci)', () => {
+      expect(content).toContain('### v1.4.0 → v1.5.0')
+      expect(content).toContain('floci/floci:1.6.0')
+      expect(content).toContain('FLOCI_STORAGE_MODE=persistent')
+      expect(content).toContain('put-bucket-cors')
+      expect(content).toContain('| v1.5.0 | v1.5.0 |')
+    })
+
+    it('should contain v1.6.0 migration guide (Node.js 22)', () => {
+      expect(content).toContain('### v1.5.0 → v1.6.0')
+      expect(content).toContain('| v1.5.0 | v1.6.0 |')
+      expect(content).toContain('NODEJS_22_X')
+      expect(content).toContain('nodejs22.x')
+      expect(content).toContain(
+        'apt-get install -y --no-install-recommends openssl',
+      )
+      expect(content).toContain(
+        "import nodemailer, { SendMailOptions } from 'nodemailer'",
+      )
+      expect(content).toContain('| v1.6.0 | v1.6.0 | 10.x | 22.23.4+ |')
+      // CDK pipeline: pin CodeBuild to Node.js 22
+      expect(content).toContain("'runtime-versions': { nodejs: '22' }")
+      // Prisma engine is generated inside the image, not on the host
+      const v160 = content.slice(
+        content.indexOf('### v1.5.0 → v1.6.0'),
+        content.indexOf('## Version Compatibility Matrix'),
+      )
+      expect(v160).toContain('**inside the image**')
+      expect(v160).not.toMatch(/^\s*Run `npx prisma generate`/m)
+    })
+
+    it('should contain v1.7.0 migration guide (command admission)', () => {
+      expect(content).toContain('### v1.6.0 → v1.7.0')
+      expect(content).toContain('| v1.6.0 | v1.7.0 |')
+      expect(content).toContain('| v1.7.0 | v1.7.0 | 10.x | 22.23.4+ |')
+      const v170 = content.slice(
+        content.indexOf('### v1.6.0 → v1.7.0'),
+        content.indexOf('## Version Compatibility Matrix'),
+      )
+      expect(v170).toContain('getCommandAdmissionConditions')
+      expect(v170).toContain('putItemWithConditions')
+      expect(v170).toContain('dynamodb:ConditionCheckItem')
+      expect(v170).toContain('npm ls @mbc-cqrs-serverless/core   # 1.7.0')
+    })
+
+    it('should contain v1.8.0 migration guide (master system scope)', () => {
+      expect(content).toContain('### v1.7.0 → v1.8.0')
+      expect(content).toContain('| v1.7.0 | v1.8.0 | **Medium** |')
+      expect(content).toContain('| v1.8.0 | v1.8.0 | 10.x | 22.23.4+ |')
+      const v180 = content.slice(
+        content.indexOf('### v1.7.0 → v1.8.0'),
+        content.indexOf('## Version Compatibility Matrix'),
+      )
+      expect(v180).toContain('controllerAuth')
+      expect(v180).toContain('@MasterAccessResolver()')
+      expect(v180).toContain('systemId: getSystemId(cmd)')
+      expect(v180).toContain('invokeContext')
+      expect(v180).toContain('system_admin')
+      expect(v180).toContain('databaseProvider')
+      expect(v180).toContain("WHERE sk LIKE '%@%'")
+      expect(v180).toContain('npm ls @mbc-cqrs-serverless/master   # 1.8.0')
+    })
   })
 
   describe('mbc-debug skill', () => {
@@ -330,13 +399,51 @@ describe('Claude Code Skills', () => {
     })
 
     it('should contain local development debugging', () => {
-      expect(content).toContain('LocalStack')
+      expect(content).toContain('Floci')
       expect(content).toContain('Serverless Offline')
+    })
+
+    it('should start Floci from infra-local, where the compose file lives', () => {
+      expect(content).toContain(
+        'cd infra-local && docker compose --env-file ../.env up -d floci',
+      )
+      expect(content).not.toMatch(/^docker-compose up -d floci$/m)
     })
 
     it('should contain troubleshooting decision tree', () => {
       expect(content).toContain('Decision Tree')
       expect(content).toContain('Error Occurred')
+    })
+
+    it('should contain States.DataLimitExceeded troubleshooting (v1.3.3+)', () => {
+      expect(content).toContain('States.DataLimitExceeded')
+      expect(content).toContain('ATTRIBUTE_LIMIT_SIZE')
+    })
+  })
+
+  describe('npm package contents', () => {
+    it('should ship every skill in the published package', () => {
+      // README tells users to copy node_modules/@mbc-cqrs-serverless/mcp-server/skills/*,
+      // so the skills must survive `files` filtering. Ask npm itself rather than
+      // re-implementing its rules.
+      const packageDir = path.join(__dirname, '../..')
+      // execSync (shell) rather than execFileSync: npm is npm.cmd on Windows.
+      const output = execSync('npm pack --dry-run --json --ignore-scripts', {
+        cwd: packageDir,
+        encoding: 'utf-8',
+      })
+      const packed: string[] = JSON.parse(output)[0].files.map(
+        (file: { path: string }) => file.path,
+      )
+
+      for (const skill of [
+        'mbc-generate',
+        'mbc-review',
+        'mbc-migrate',
+        'mbc-debug',
+      ]) {
+        expect(packed).toContain(`skills/${skill}/SKILL.md`)
+      }
     })
   })
 
@@ -344,7 +451,7 @@ describe('Claude Code Skills', () => {
     it('should have consistent code block formatting', () => {
       const skills = ['mbc-generate', 'mbc-review', 'mbc-migrate', 'mbc-debug']
 
-      skills.forEach(skillName => {
+      skills.forEach((skillName) => {
         const skillPath = path.join(skillsDir, skillName, 'SKILL.md')
         const content = fs.readFileSync(skillPath, 'utf-8')
 
@@ -360,7 +467,7 @@ describe('Claude Code Skills', () => {
     it('should not contain placeholder text', () => {
       const skills = ['mbc-generate', 'mbc-review', 'mbc-migrate', 'mbc-debug']
 
-      skills.forEach(skillName => {
+      skills.forEach((skillName) => {
         const skillPath = path.join(skillsDir, skillName, 'SKILL.md')
         const content = fs.readFileSync(skillPath, 'utf-8')
 
@@ -374,7 +481,7 @@ describe('Claude Code Skills', () => {
     it('should have all skills with valid YAML frontmatter', () => {
       const skills = ['mbc-generate', 'mbc-review', 'mbc-migrate', 'mbc-debug']
 
-      skills.forEach(skillName => {
+      skills.forEach((skillName) => {
         const skillPath = path.join(skillsDir, skillName, 'SKILL.md')
         const content = fs.readFileSync(skillPath, 'utf-8')
 

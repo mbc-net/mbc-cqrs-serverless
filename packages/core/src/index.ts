@@ -1,4 +1,5 @@
 export * from './app.module'
+export * from './auth'
 export * from './bootstrap'
 export * from './command-events'
 export * from './commands'

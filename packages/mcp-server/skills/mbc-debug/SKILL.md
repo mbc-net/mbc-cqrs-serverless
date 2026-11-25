@@ -419,6 +419,23 @@ functions:
 
 ---
 
+### 11. States.DataLimitExceeded in Command State Machine (fixed in v1.3.3)
+
+**Symptom:** The command state machine execution fails with:
+```
+error: States.DataLimitExceeded
+cause: The state/task 'check_version' provided parameters with a size
+       exceeding the maximum number of bytes service limit.
+```
+
+**Cause:** `ATTRIBUTE_LIMIT_SIZE` was set too high. AWS Step Functions enforces a 256 KB payload limit per state, but the command state machine passes the DynamoDB stream event twice per state (`input.$` and `context.$`), so inline `attributes` above roughly 110 KB can exceed that limit even though DynamoDB itself allows items up to 400 KB. Prior to v1.3.3, the framework's default `ATTRIBUTE_LIMIT_SIZE` in generated CDK templates and env examples was `389120` (380 KB) — sized for DynamoDB's item limit rather than the Step Functions payload limit.
+
+**Fix:** As of v1.3.3, the default is lowered to `102400` (100 KB). If your `.env` or CDK stack (`infra/libs/infra-stack.ts`) still sets `ATTRIBUTE_LIMIT_SIZE=389120` (or another value above ~110 KB), lower it to `102400` or less. Attributes larger than this threshold are automatically offloaded to S3 by `DynamoDbService.objToDdbItem()`, so lowering the limit does not lose data — it just offloads to S3 earlier.
+
+**Related:** See migration guide v1.3.3.
+
+---
+
 ## CloudWatch Log Queries
 
 ### Find Errors by Request ID
@@ -456,23 +473,32 @@ fields @timestamp, @message
 
 ## Local Development Debugging
 
-### LocalStack Issues
+### Floci Issues
 
-**Start LocalStack:**
+**Start Floci** (the compose file lives in `infra-local/`; `.env` in the project root supplies `COMPOSE_PROJECT_NAME` and `LOCAL_S3_PORT`):
 ```bash
-docker-compose up -d localstack
+npm run offline:docker                                        # whole local stack, from the project root
+# or only Floci:
+cd infra-local && docker compose --env-file ../.env up -d floci
+```
+
+`--env-file ../.env` makes Compose read the project root's settings directly. Without it, Compose reads `infra-local/.env`, which `npm run offline:docker` links (copies on Windows) from the root `.env`; if that file does not exist yet, Compose falls back to the project name `infra-local` and port `4566`, i.e. a different container and data volume than `npm run offline:docker` uses.
+
+**Presigned URL returns 403 in the browser:** the bucket has no CORS rule (Floci does not allow any origin by default). From the project root, re-run `bash infra-local/scripts/resources.sh` (`npm run resources:win32` on Windows), or check the rule with:
+```bash
+set -a; . ./.env; set +a
+aws --endpoint-url="$S3_ENDPOINT" s3api get-bucket-cors --bucket "$S3_BUCKET_NAME"
 ```
 
 **Verify Services:**
 ```bash
-# Check DynamoDB
-aws --endpoint-url=http://localhost:4566 dynamodb list-tables
-
-# Check S3
+# Check S3 (Floci is S3-only on :4566)
 aws --endpoint-url=http://localhost:4566 s3 ls
+```
 
-# Check SQS
-aws --endpoint-url=http://localhost:4566 sqs list-queues
+DynamoDB Local runs separately on `:8000` (not Floci):
+```bash
+aws --endpoint-url=http://localhost:8000 dynamodb list-tables
 ```
 
 ### Serverless Offline Debug
@@ -593,6 +619,54 @@ Error Occurred
     └── Memory issues?
         └── Increase Lambda memory allocation
 ```
+
+---
+
+---
+
+## AppSync Events API Troubleshooting
+
+### Notifications not delivered via Events API
+
+**Symptom:** `appsync-event` transport is configured but clients receive no events.
+
+**Checklist:**
+
+1. **Verify `NOTIFICATION_TRANSPORTS` includes `appsync-event`**
+   ```bash
+   echo $NOTIFICATION_TRANSPORTS
+   # Expected: appsync-event  or  appsync-graphql,appsync-event
+   ```
+
+2. **Verify `APPSYNC_EVENTS_ENDPOINT` is set and correct**
+   ```bash
+   # Must end with /event, not /graphql
+   echo $APPSYNC_EVENTS_ENDPOINT
+   # Expected: https://xxxx.appsync-api.ap-northeast-1.amazonaws.com/event
+   ```
+
+3. **Check IAM permissions (most common cause)**
+   ```bash
+   # Lambda/ECS execution role must have appsync:EventPublish
+   aws iam simulate-principal-policy \
+     --policy-source-arn arn:aws:iam::ACCOUNT:role/YOUR_LAMBDA_ROLE \
+     --action-names appsync:EventPublish \
+     --resource-arns "arn:aws:appsync:REGION:ACCOUNT:apis/API_ID/channelNamespace/*"
+   ```
+   If using CDK, `appSyncEventsApi.grantPublish(lambdaRole)` handles this automatically.
+
+4. **Verify `APPSYNC_EVENTS_NAMESPACE` matches the ChannelNamespace in AppSync**
+   ```bash
+   echo $APPSYNC_EVENTS_NAMESPACE
+   # Expected: default (or whatever namespace was created by CDK)
+   ```
+   The value must match a pre-created `ChannelNamespace` in the AppSync Event API. Check the AWS Console → AppSync → your Event API → Channel Namespaces.
+
+5. **Check for 400 errors in CloudWatch**
+   A 400 response from AppSync means the channel path is invalid. Channel segments must be alphanumeric + dashes only, max 50 chars each. The framework sanitizes `tenantCode`, `action`, and `id` automatically.
+
+6. **Confirm dual-publish is intentional**
+   If `NOTIFICATION_TRANSPORTS=appsync-graphql,appsync-event`, the framework publishes to both transports. A failure in one transport causes the entire publish to fail — check CloudWatch for errors from either service.
 
 ---
 

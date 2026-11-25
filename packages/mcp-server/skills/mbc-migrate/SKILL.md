@@ -41,6 +41,15 @@ This skill helps migrate MBC CQRS Serverless projects between versions.
 | v1.2.x | v1.2.4 | Medium | TaskModule.register() must be in AppModule |
 | v1.2.4 | v1.2.5 | Low | ZIP import refactor (transparent); MCP AP016–AP020 added |
 | v1.2.5 | v1.2.6 | Low | Repository RYW improvements (transparent); `getVersion` API |
+| v1.2.7 | v1.3.0 | Low | AppSync Events API support (opt-in, no breaking changes) |
+| v1.3.0 | v1.3.1 | Low | Group-based roles (`@GroupRoleResolver`, `custom:groups`); `UserContext.tenantRoles`/`tenantGroupIds` added (opt-in, no breaking changes) |
+| v1.3.2 | v1.3.3 | Low | `ATTRIBUTE_LIMIT_SIZE` default lowered 389120 → 102400 for Step Functions payload limit (transparent unless overridden) |
+| v1.3.5 | v1.4.0 | Low | Configurable DynamoDB table names (opt-in) + `registerAsync` on domain modules; `prismaService` now always required; `MasterModule`+`SettingModule` shared-table alias warns |
+| v1.4.0 | v1.5.0 | Low | Local dev only: LocalStack → Floci as the local S3 emulator; bucket CORS must be applied locally for presigned URLs (no application code changes) |
+| v1.5.0 | v1.6.0 | **Medium** | **Node.js 22.23.4+ required** (Node2Shell, CVE-2026-111497): runtime, Lambda (`nodejs22.x`), Docker and CI; nodemailer 10 types (only if you import `nodemailer` directly) |
+| v1.6.0 | v1.7.0 | Low | Opt-in atomic command admission (`getCommandAdmissionConditions`, `CommandAdmissionRejectedException` / `CommandAdmissionContentionException`); unit-test mocks of `DynamoDbService` used with the real `CommandService` need `putItemWithConditions`; `dynamodb:ConditionCheckItem` only if you adopt the hook |
+| v1.7.0 | v1.8.0 | **Medium** | master only, behaviour changes for every app using master: setting/data codes and user/group ids reject `#` and `@` (400), rows stored with `@` in their key can no longer be updated, deleted or read by `getSetting`; master copy fixes; `POST /api/master-bulk` upserts settings before data; opt-in `controllerAuth`, `systemId` + `@MasterAccessResolver()` (RDS `system_id` column + handler change, `invokeContext` required), MySQL search (`databaseProvider`) |
+| v1.8.0 | v1.8.1 | **Medium** | **Security** (cli template): app client may write only `name` (users could rewrite `custom:roles`); ECS task role gets Cognito admin actions; existing projects must edit `infra-stack.ts` and audit `custom:roles` / `custom:tenant` / `custom:groups` |
 
 ## Migration Guides
 
@@ -549,10 +558,623 @@ export class OrderDataSyncRdsHandler implements IDataSyncHandler {}
 
 ---
 
+---
+
+### v1.2.7 → v1.3.0
+
+**Change:** AppSync Events API support added (opt-in, no breaking changes)
+
+No code changes are required. `AppSyncEventsService` is registered in `NotificationModule` automatically but does nothing unless `NOTIFICATION_TRANSPORTS` includes `appsync-event`.
+
+**To adopt the new Events API transport:**
+
+**Step 1 — Provision infrastructure (CDK)**
+
+Add `appsyncEvents` and `notificationTransports` to your `Config`:
+
+```typescript
+// infra/config/config.ts
+export const config: Config = {
+  appsyncEvents: {
+    enabled: true,
+    namespace: 'default',       // must match the ChannelNamespace created in AppSync
+    apiKeyExpireDays: 365,
+  },
+  notificationTransports: 'appsync-graphql,appsync-event', // dual-publish during migration
+}
+```
+
+Run `cdk deploy` to create the `EventApi` and `ChannelNamespace`. The stack outputs `AppSyncEventsHttpEndpoint` and `AppSyncEventsNamespace`.
+
+**Step 2 — Enable dual-publish (migration phase)**
+
+When `appsyncEvents.enabled: true`, the CDK stack automatically injects these env vars into Lambda/ECS:
+
+```bash
+NOTIFICATION_TRANSPORTS=appsync-graphql,appsync-event   # dual-publish
+APPSYNC_EVENTS_ENDPOINT=https://xxxx.appsync-api.ap-northeast-1.amazonaws.com/event
+APPSYNC_EVENTS_NAMESPACE=default
+APPSYNC_ENDPOINT=https://xxxx.appsync-api.ap-northeast-1.amazonaws.com/graphql  # keep existing
+```
+
+**Step 3 — Switch to Events API only**
+
+Once all clients have migrated to the Events API, update `notificationTransports` in CDK Config:
+
+```typescript
+notificationTransports: 'appsync-event',  // Events API only
+```
+
+Then redeploy. `APPSYNC_ENDPOINT` can be removed from the environment.
+
+**Channel subscription patterns (for client-side code):**
+
+```javascript
+// All events for a tenant
+appsyncClient.subscribe(`/${namespace}/${tenantCode}/*`)
+
+// Filtered by action
+appsyncClient.subscribe(`/${namespace}/${tenantCode}/${action}/*`)
+
+// Track one specific command result
+appsyncClient.subscribe(`/${namespace}/${tenantCode}/${action}/${sanitizedId}`)
+```
+
+Non-alphanumeric characters in `id` (e.g. `#`, `@` from DynamoDB pk/sk) are sanitized to `-` automatically on the server side. Client-side code using `EventsSubscriptionClientImpl` from the example app applies the same sanitization.
+
+**Migration Steps:**
+1. Add `appsyncEvents` and `notificationTransports` to CDK `Config` and deploy
+2. Verify events arrive via both transports (dual-publish phase)
+3. Migrate frontend clients to subscribe via AppSync Events API channels
+4. Once all clients migrated, set `notificationTransports: 'appsync-event'` and redeploy
+
+---
+
+### v1.3.0 → v1.3.1
+
+**Change:** Group-based roles added (opt-in, no breaking changes).
+
+`RolesGuard` now checks direct roles from `custom:roles` first, then roles derived from the user's groups in `custom:groups`. `UserContext` gains two fields — `tenantRoles` (direct roles array) and `tenantGroupIds` (group IDs for the active tenant) — while `tenantRole` (singular) is kept for backward compatibility. No code changes are required to upgrade; existing role checks keep working.
+
+**To adopt group-based roles:**
+
+**Step 1 — Add `custom:groups` to the JWT** (tenant-scoped; group → role mappings are NOT in the token):
+
+```json
+{
+  "custom:roles": "[{\"tenant\":\"tenant-a\",\"role\":\"admin\"}]",
+  "custom:groups": "[{\"tenant\":\"tenant-a\",\"groups\":[\"sales-team\"]}]"
+}
+```
+
+**Step 2 — Implement exactly one resolver** that maps group IDs to roles (loaded from DynamoDB/RDS/config):
+
+```typescript
+import {
+  GroupRoleResolver,
+  IGroupRoleResolver,
+} from '@mbc-cqrs-serverless/core';
+
+// Do NOT add @Injectable() — @GroupRoleResolver() already registers the provider
+// as a singleton. A second @Injectable() can override the scope and break bootstrap.
+@GroupRoleResolver()
+export class AppGroupRoleResolver implements IGroupRoleResolver {
+  async resolveRoles({ tenantCode, groupIds, claims }) {
+    // Map the user's group IDs to roles for this tenant
+    return ['viewer', 'reporter'];
+  }
+}
+```
+
+Register the class in your module `providers`. `AuthModule` is imported automatically via `AppModule.forRoot()`.
+
+**Notes / gotchas:**
+- The resolver must be a **singleton** — it is resolved once at bootstrap. Avoid `REQUEST`/`TRANSIENT` scope.
+- A resolver failure (e.g. DB outage) **propagates as a 5xx**, not a silent 403, so a backend outage is distinguishable from a genuine access denial. Make the resolver resilient (timeouts/retries) if its backing store can be unavailable.
+- Malformed `custom:groups` is tolerated (fail-closed → no group roles), so a bad token degrades to direct-role-only checks rather than crashing.
+- `getUserRole()` on `RolesGuard` is **deprecated** and no longer called by the default guard. For custom authorization, override `verifyRole`, `resolveGroupRoles`, or `canOverrideTenant` instead.
+- Role-name matching is case-sensitive; keep the casing in `custom:roles` consistent with your `@Roles(...)` values.
+
+**Migration Steps:**
+1. Upgrade to v1.3.1 — no code changes required; existing `@Roles()` checks keep working.
+2. (Optional) Populate `custom:groups` in the JWT and implement one `@GroupRoleResolver()`.
+3. Register the resolver in your NestJS module `providers`.
+
+---
+
+### v1.3.2 → v1.3.3 (no code changes required, unless you hardcoded the old default)
+
+**Change:** The framework's default `ATTRIBUTE_LIMIT_SIZE` in generated CDK templates (`infra/libs/infra-stack.ts`) and env examples (`.env.local`, `.env.example`) is lowered from `389120` (380 KB) to `102400` (100 KB).
+
+**Why:** The old default was sized for DynamoDB's 400 KB item limit, but AWS Step Functions enforces a 256 KB payload limit per state. The command state machine passes the DynamoDB stream event twice per state (`input.$` + `context.$`), so inline attributes above ~110 KB could trigger `States.DataLimitExceeded` in production. See [Debug Guide — States.DataLimitExceeded](../mbc-debug/SKILL.md) for the full symptom/cause/fix.
+
+**Action required:**
+- If you never customized `ATTRIBUTE_LIMIT_SIZE` and redeploy your CDK stack, the new lower default takes effect automatically — no code changes needed.
+- If you explicitly set `ATTRIBUTE_LIMIT_SIZE=389120` (or another value above ~110 KB) in your own `.env` or CDK stack, lower it to `102400` or less to avoid `States.DataLimitExceeded`. Attributes above the limit are automatically offloaded to S3, so lowering the value does not lose data.
+
+---
+
+### v1.3.5 → v1.4.0 (opt-in new features; no changes required if you keep defaults)
+
+v1.4.0 makes the DynamoDB table names of the domain modules (`master`, `directory`, `survey-template`, `ui-setting`) configurable and adds `registerAsync` support. **All new options default to the current names, so existing apps upgrade with no code changes.**
+
+**New capabilities (opt-in):**
+- `tableName?` on `MasterModule` / `DirectoryStorageModule` / `SurveyTemplateModule` / `SettingModule` (defaults: `master` / `directory` / `survey` / `master`).
+- `DirectoryStorageModule` also accepts `pkPrefix?` (default `DIRECTORY`) and `prismaModelName?` (default `directory`).
+- `registerAsync(...)` on all four modules.
+
+**Behavior changes to be aware of (not breaking for the common setup):**
+- `prismaService` is now **always required** when registering `MasterModule` / `DirectoryStorageModule` / `SurveyTemplateModule` (previously it was only validated when `enableController: true`). The domain services inject `PRISMA_SERVICE` unconditionally, so a missing `prismaService` now fails fast at startup with a clear message instead of a cryptic `UnknownDependenciesException`. **Action:** if you registered one of these modules with `enableController: false` and omitted `prismaService` (relying on a globally-provided token), pass `prismaService` explicitly.
+- If you use **`MasterModule` + `SettingModule` on the same (default `master`) table**, the framework now logs a **warning** at startup when both own the `master_CommandEventHandler` alias, and which module's data-sync handlers run is import-order dependent. Set `registerEventHandlerAlias: false` on `SettingModule` so `MasterModule` owns the alias (deterministic). This was a silent ambiguity before; nothing breaks, but the warning is new.
+
+#### How to change a table name
+
+Changing a table name is opt-in and backward compatible. Example: run the directory module as `document` (this is how the v1.3.x `directory` → `document` rename is now expressed — as configuration, not a forced default):
+
+```ts
+// Synchronous
+DirectoryStorageModule.register({
+  enableController: true,
+  prismaService: PrismaService,
+  tableName: 'document',        // physical tables: <env>-<app>-document-command/-data/-history
+  pkPrefix: 'DOCUMENT',         // partition key: DOCUMENT#<tenantCode>
+  prismaModelName: 'document',  // RDS reads via prismaService.document
+})
+
+// Async — the factory must resolve and return the PrismaService INSTANCE
+DirectoryStorageModule.registerAsync({
+  tableName: 'document',
+  pkPrefix: 'DOCUMENT',
+  prismaModelName: 'document',
+  imports: [PrismaModule],
+  inject: [PrismaService],
+  useFactory: (prisma) => ({ prismaService: prisma }),
+})
+```
+
+For `MasterModule` / `SurveyTemplateModule` / `SettingModule`, only `tableName` applies:
+
+```ts
+MasterModule.register({ enableController: true, prismaService: PrismaService, tableName: 'catalog' })
+```
+
+**Set all three (`tableName` + `pkPrefix` + `prismaModelName`) together for directory** — changing only `tableName` leaves the PK as `DIRECTORY#` and reads `prismaService.directory`, which is inconsistent.
+
+**Required provisioning and data migration (application responsibility):**
+1. **DynamoDB:** add the **raw base name** (e.g. `"document"`) — not the `-command`/`-data`/`-history` variants — to `prisma/dynamodbs/cqrs.json`, then run `npm run migrate:ddb` (`prisma/ddb.ts`). This creates `<name>-command/-data/-history`. Only `@mbc-cqrs-serverless/master`'s postinstall auto-adds its default `master`; every other module and every custom name must be added to `cqrs.json` by hand. Mirror the three physical tables in your IaC.
+2. **RDS:** add the corresponding Prisma model (e.g. `model Document { ... }` for `prismaModelName: 'document'`) to `schema.prisma`, then run `npm run migrate:rds` (`prisma migrate deploy`).
+3. **Data:** `migrate` only creates the (empty) tables. Copying existing rows from `directory-*` / `DIRECTORY#` / the `directory` model to the new `document-*` / `DOCUMENT#` / `document` targets is your responsibility (DynamoDB scan-and-rewrite + an RDS data migration). See [Data Migration Patterns](/docs/data-migration-patterns).
+
+> **Caveat — do NOT rename the `master` table.** The `master` table is a framework-wide central config store: `TtlService` (TTL config) and `@mbc-cqrs-serverless/sequence` (numbering formats) read a fixed `master-data` name. Overriding `MasterModule`'s `tableName` makes those readers miss their config (TTLs not applied, sequence formats fall back silently); `MasterModule.register`/`registerAsync` logs a warning in that case. Renaming `directory` / `survey-template` / `ui-setting` has no such caveat.
+
+**Action required:** none if you keep the defaults. To adopt a custom name, follow the steps above.
+
+---
+
+### v1.4.0 → v1.5.0 (local development stack only; no application code changes)
+
+v1.5.0 replaces LocalStack with [Floci](https://github.com/floci-io/floci) (`floci/floci:1.6.0`) as the local S3 emulator. LocalStack Community Edition reached end of life in March 2026 (it now requires an auth token and no longer receives security updates), and the template pinned no image version. Floci serves S3 on the same port (`4566`) with the same path-style addressing, so **application code and `.env` values (`S3_ENDPOINT`, `LOCAL_S3_PORT`, `S3_REGION`, `S3_BUCKET_NAME`) do not change**. Deployed environments are not affected.
+
+Newly scaffolded projects (`mbc new`) already use Floci. Existing projects keep working on LocalStack, but that image no longer receives security patches, so migrate when convenient.
+
+**Step 1 — Replace the compose service.** In `infra-local/docker-compose.yml`, replace the `localstack` service with:
+
+```yaml
+  floci:
+    image: floci/floci:1.6.0
+    ports:
+      - '${LOCAL_S3_PORT:-4566}:4566'
+    environment:
+      - FLOCI_DEFAULT_REGION=ap-northeast-1
+      - FLOCI_STORAGE_MODE=persistent
+    volumes:
+      - floci-data:/app/data
+```
+
+and declare the named volume at the top level of the same file:
+
+```yaml
+volumes:
+  floci-data:
+```
+
+`FLOCI_STORAGE_MODE=persistent` is required: the default is `memory`, which silently discards every bucket on `docker compose down`. The volume is project-scoped through `COMPOSE_PROJECT_NAME` in `.env`, so projects on the same machine do not share S3 data.
+
+**Step 2 — Remove the plugin.** Remove `serverless-localstack` from `package.json` (and any commented `localStackConfig` block in `infra-local/serverless.yml`), then run `npm install`.
+
+**Step 3 — Add the bucket CORS rule to your resource scripts (required for presigned URLs).** LocalStack allowed every origin through `EXTRA_CORS_ALLOWED_ORIGINS=*`. Floci 1.6.0 does not honor that variable (its own global switch is `FLOCI_SECURITY_EXTRA_CORS_ALLOWED_ORIGINS`), so without a CORS rule it answers the browser preflight with `403` and presigned upload/view URLs from `DirectoryFileService` fail in the browser. The template applies a bucket CORS rule instead, mirroring how production configures CORS on the bucket in the CDK stack. Copy the `configure S3 bucket CORS` block from the latest template's `infra-local/scripts/resources.sh` / `resources.ps1` into your own scripts, so the rule is re-applied every time the scripts run (`npm run offline:sls` runs them for you).
+
+On Windows, the template passes the JSON as `file://` and writes the file **without a BOM**: Windows PowerShell 5.1 adds one for `Set-Content -Encoding utf8`, and the AWS CLI rejects it with `Error parsing parameter '--cors-configuration'`. Keep the template's `[System.IO.File]::WriteAllText($path, $json, (New-Object System.Text.UTF8Encoding $false))` and `$LASTEXITCODE` check when you copy the block.
+
+**Step 4 — Start Floci and recreate the bucket.** Objects under `docker-data/localstack` are not migrated. `npm run offline:docker` runs `docker compose up` in the foreground and does not return, so use two terminals from the project root:
+
+```bash
+# Terminal 1 — keeps running
+npm run offline:docker
+```
+
+```bash
+# Terminal 2 — once Floci is up: creates the bucket and applies the CORS rule
+bash infra-local/scripts/resources.sh   # Windows: npm run resources:win32
+```
+
+`npm run offline:sls` also runs these scripts, but on macOS/Linux it starts them in the background alongside Serverless Offline (not before it, and without stopping on failure); only on Windows does it wait for them. Run `resources.sh` by hand once as above and confirm it succeeded before you test presigned URLs.
+
+If you did not update the scripts in Step 3, apply the rule once by hand **after** the bucket exists:
+
+```bash
+set -a; . ./.env; set +a   # load S3_ENDPOINT, S3_BUCKET_NAME and the local credentials
+aws --endpoint-url="$S3_ENDPOINT" s3api put-bucket-cors \
+  --bucket "$S3_BUCKET_NAME" \
+  --cors-configuration '{"CORSRules":[{"AllowedOrigins":["*"],"AllowedMethods":["GET","PUT","POST","DELETE","HEAD"],"AllowedHeaders":["*"],"ExposeHeaders":["ETag"]}]}'
+```
+
+**Verify** (from the project root, with `.env` loaded as above):
+
+```bash
+aws --endpoint-url="$S3_ENDPOINT" s3 ls
+aws --endpoint-url="$S3_ENDPOINT" s3api get-bucket-cors --bucket "$S3_BUCKET_NAME"
+```
+
+**Action required:** Steps 1–4 for existing projects that want to leave LocalStack. None for application code.
+
+---
+
+### v1.5.0 → v1.6.0 (Node.js 22 required)
+
+Every `@mbc-cqrs-serverless/*` package now declares `engines.node: ">=22"`. Node.js 18 and 20 are end of life and will not receive the fix for CVE-2026-111497 (Node2Shell), a remote code execution vulnerability in the Brotli decoder bundled with Node.js. The fix ships in **Node.js 22.23.4, 24.22.1 and 26.12.1**, so use one of those versions or later. On Node.js 18 or 20, `npm install` reports `EBADENGINE` (and fails when `engine-strict` is enabled). The public API of the framework (classes, method signatures, NestJS 10.x) does not change.
+
+Newly scaffolded projects (`mbc new`) already use Node.js 22. Existing projects are not changed automatically; update every place that pins a Node.js version:
+
+**Step 1 — Local and CI.** Install Node.js 22.23.4 or later (`node -v`), and update `.nvmrc` / `.node-version` / `engines` if your project has them, plus `node-version` in your CI workflows (for example `actions/setup-node`).
+
+**Step 2 — Lambda runtime (CDK).** In `infra/libs/infra-stack.ts`, change the Lambda function runtime and the layer's `compatibleRuntimes`:
+
+```typescript
+// Before
+runtime: cdk.aws_lambda.Runtime.NODEJS_20_X,
+compatibleRuntimes: [cdk.aws_lambda.Runtime.NODEJS_20_X],
+// After
+runtime: cdk.aws_lambda.Runtime.NODEJS_22_X,
+compatibleRuntimes: [cdk.aws_lambda.Runtime.NODEJS_22_X],
+```
+
+Rebuild the layer on Node.js 22 (the layer is built on the deploying host), then `cdk deploy`. The update is in place; deploy to a non-production stage first.
+
+If you deploy through the scaffolded CDK pipeline (`infra/libs/pipeline-stack.ts`), also pin the CodeBuild Node.js version, so that `npm ci`, the tests, the synth and the layer build run on Node.js 22 rather than the CodeBuild image's default (which can change):
+
+```typescript
+const pipeline = new CodePipeline(this, idName + 'PipelineV3', {
+  selfMutation: true,
+  codeBuildDefaults: {
+    partialBuildSpec: BuildSpec.fromObject({
+      phases: { install: { 'runtime-versions': { nodejs: '22' } } },
+    }),
+  },
+  // ...
+})
+```
+
+The pipeline updates itself (`selfMutation`) on the next run after you push this change.
+
+**Step 3 — Local Serverless config.** In `infra-local/serverless.yml`, set `provider.runtime: nodejs22.x`, and use `serverless-offline` `^13.9.0` or later (earlier 13.x releases do not know `nodejs22.x`).
+
+**Step 4 — Docker images.**
+- `Dockerfile` (ECS API image): `node:20-bullseye-slim` → `node:22-bookworm-slim` in both stages. **If you use Prisma, also install `openssl` in both stages** — bookworm-slim ships no libssl, and Prisma's query engine then fails to load with `libssl.so.1.1: cannot open shared object file`:
+
+  ```dockerfile
+  RUN apt-get update -y && apt-get install -y --no-install-recommends openssl && rm -rf /var/lib/apt/lists/*
+  ```
+
+  Then rebuild the image. The `prisma generate` that runs during `npm install` / `npm ci` **inside the image** (the template's `postinstall` script) detects OpenSSL 3 and generates the `debian-openssl-3.0.x` engine there. Running `npx prisma generate` on a macOS or Windows host does not produce that engine; if your Dockerfile copies a client generated on the host instead of installing inside the image, add `debian-openssl-3.0.x` (and `linux-arm64-openssl-3.0.x` for arm64) to `binaryTargets` in `prisma/schema.prisma`.
+- `infra-local/appsync-simulator/Dockerfile` and `infra-local/cognito-local/Dockerfile`: `node:18-alpine` → `node:22-alpine`, then rebuild with `docker compose build`.
+
+**Step 5 — nodemailer 10 types (only if your code imports `nodemailer` directly).** `@mbc-cqrs-serverless/core` now depends on nodemailer 10, which ships its own type definitions; its default export is no longer a namespace, so `nodemailer.SendMailOptions`, `nodemailer.Transporter` and `nodemailer.SentMessageInfo` no longer compile. Import the types by name and remove `@types/nodemailer`:
+
+```typescript
+// Before
+import nodemailer from 'nodemailer'
+const options: nodemailer.SendMailOptions = { /* ... */ }
+
+// After
+import nodemailer, { SendMailOptions } from 'nodemailer'
+const options: SendMailOptions = { /* ... */ }
+```
+
+```bash
+npm uninstall @types/nodemailer
+```
+
+Apps that only send mail through `EmailService` need no code changes.
+
+**Optional — dependency overrides.** v1.6.0 clears the high/critical production advisories in proxy-addr, body-parser and multer through the framework's and the template's `overrides`, and raises `qs` to the minimum that the patched body-parser and express 5 require. These overrides do not reach existing projects. To pick them up, add the same entries to your project's `package.json` and run `npm install`:
+
+```json
+"overrides": {
+  "multer": "^2.5.0",
+  "proxy-addr": "^2.0.8",
+  "body-parser@1": "^1.20.9",
+  "body-parser@2": "^2.4.0",
+  "qs": "^6.16.1"
+}
+```
+
+If your project lists any of these packages directly in `dependencies` (for example `multer`), override it as `"multer": "$multer"` and raise the direct dependency instead; otherwise npm aborts with `EOVERRIDE: Override for multer@^2.5.0 conflicts with direct dependency`. Then confirm with `npm audit --omit=dev --audit-level=high`.
+
+**Verify:**
+
+```bash
+node -v                                   # v22.23.4 or later
+npm ls @mbc-cqrs-serverless/core          # 1.6.0
+npx tsc --noEmit                          # no nodemailer type errors
+npm audit --omit=dev --audit-level=high   # no high/critical advisories
+```
+
+**Action required:** Steps 1–3 for every project (the CodeBuild pin in Step 2 only if you deploy through the scaffolded CDK pipeline). Step 4 for the Docker images you build (the `openssl` install only if the image runs Prisma). Step 5 only if you import `nodemailer` directly.
+
+---
+
+### v1.6.0 → v1.7.0 (opt-in atomic command admission; test mocks may need a new method)
+
+v1.7.0 adds atomic command admission: a protected `CommandService.getCommandAdmissionConditions(command, options)` hook that lets a server-owned `CommandService` subclass check DynamoDB conditions (for example a maintenance-window generation) atomically with the initial command write. The hook defaults to `[]`, and with no conditions the command is written with the same conditional `PutItem` as before, so **applications that do not override the hook need no code changes**. Two exceptions are added to `@mbc-cqrs-serverless/core`: `CommandAdmissionRejectedException` (409, a check failed) and `CommandAdmissionContentionException` (503, `TransactionConflict`). See `docs/development/command-admission.md` and `examples/command-admission/` in the framework repository.
+
+The one change that can affect existing projects is internal: `publishSync`, `publishAsync` and `duplicate` (and the partial update methods that delegate to them) now persist the initial command through `DynamoDbService.putItemWithConditions(tableName, item, condition, admissionConditions)` instead of `putItem`. With an empty `admissionConditions` it calls `this.putItem(tableName, item, condition)`.
+
+**Step 1 — Update packages.**
+
+```bash
+npm install @mbc-cqrs-serverless/core@^1.7.0 @mbc-cqrs-serverless/cli@^1.7.0
+# also update any other @mbc-cqrs-serverless/* packages you use to the same version
+```
+
+**Step 2 — Fix unit-test mocks of `DynamoDbService`.** Only tests that run the **real** `CommandService` against a mocked `DynamoDbService` are affected:
+
+| How the test provides `DynamoDbService` | Result after upgrading | Fix |
+|---|---|---|
+| Hand-written object with only `putItem` (`useValue: { putItem: jest.fn(), ... }`) | `TypeError: ...putItemWithConditions is not a function` | Add `putItemWithConditions` that forwards to `putItem` (below) |
+| Auto-mock (`createMock<DynamoDbService>()` from `@golevelup/ts-jest`) | No error, but `putItem` is no longer called, so `putItem` assertions fail | Assert on `putItemWithConditions`, or forward it to `putItem` as below |
+| Real `DynamoDbService` with `jest.spyOn(dynamoDbService, 'putItem')` | Works unchanged (empty conditions delegate to `putItem`) | None |
+
+```typescript
+const dynamoDbServiceMock = {
+  putItem: jest.fn(async (tableName: string, item: any) => item),
+  // v1.7.0: CommandService writes the initial command through this method
+  putItemWithConditions: jest.fn(function (
+    tableName: string,
+    item: any,
+    condition: string,
+  ) {
+    return this.putItem(tableName, item, condition)
+  }),
+  // ...the other methods your test already mocks
+}
+```
+
+Tests that mock `CommandService` itself (the usual pattern for testing your own services) are not affected.
+
+**Step 3 — IAM (only if you override `getCommandAdmissionConditions`).** A protected command is written with `TransactWriteItems`, which needs `dynamodb:ConditionCheckItem` on every witness table in addition to `dynamodb:PutItem` on the command table. Newly scaffolded projects grant it on tables whose names start with the stack prefix. In an existing project, add it to the Lambda role's DynamoDB statement in `infra/libs/infra-stack.ts`:
+
+```typescript
+actions: [
+  // ...existing DynamoDB actions
+  'dynamodb:ConditionCheckItem',
+],
+```
+
+Without it, a protected command fails with an access-denied error rather than `CommandAdmissionRejectedException`. Also note: every item in a transaction costs two underlying operations (also when the transaction is cancelled), and many concurrent commands checking the same witness item may be cancelled with `TransactionConflict` (503). That contention has not been measured on the DynamoDB service (DynamoDB Local does not reproduce it), so load test a hot witness before relying on it. Core does not retry; a new attempt must capture the witness again, reread and rebuild the update.
+
+**Verify:**
+
+```bash
+npm ls @mbc-cqrs-serverless/core   # 1.7.0
+npm test                           # no "putItemWithConditions is not a function" errors
+```
+
+**Action required:** Step 1 for every project. Step 2 only if your unit tests run the real `CommandService` with a mocked `DynamoDbService`. Step 3 only if you adopt the admission hook.
+
+---
+
+### v1.7.0 → v1.8.0 (master: per-system scope, stricter keys, MySQL search)
+
+v1.8.0 changes only `@mbc-cqrs-serverless/master` and `@mbc-cqrs-serverless/survey-template`. It adds opt-in access control for master data: a `controllerAuth` guard for the built-in routes, a `systemId` per master setting with an optional `@MasterAccessResolver()` that grants read and write per system and setting, `GET /api/master-access`, `assignSystem` and `includeCommon`. See `docs/development/master-access-and-sync.md` in the framework repository. **Some changes apply to every application that uses master**, with or without the new options: stricter key rules, the copy fixes, and the bulk ordering.
+
+**Step 1 — Update packages.**
+
+```bash
+npm install @mbc-cqrs-serverless/core@^1.8.0 @mbc-cqrs-serverless/master@^1.8.0 @mbc-cqrs-serverless/cli@^1.8.0
+# also update any other @mbc-cqrs-serverless/* packages you use (e.g. survey-template) to the same version
+```
+
+**Step 2 — Check the key rules (every application).** A key segment must be non-empty and contain neither `#` nor `@` (`@` is the sort-key version separator). Requests that break the rule now get a 400:
+
+| Value | Rejected when it is |
+|---|---|
+| Setting `code` | empty, `MASTER_SETTING`, or contains `#` or `@` (every setting create/upsert, bulk, and `GET /api/master-setting/:code`) |
+| Data `settingCode` | the same rule (data create/upsert, both bulk routes, `GET /api/master-data`) |
+| Data `code` | empty or contains `#` or `@` |
+| `userId` / `groupId` of user and group settings | empty or contains `#` or `@` |
+| `sk` on update/delete | contains `@`; `/api/master-data` also rejects `MASTER_SETTING#...` keys and `/api/master-setting` rejects data keys |
+
+Every bulk route checks the keys of all items before the first write. Fix integrations that send e-mail addresses or other values with `@` (or `#`) as a code, `userId` or `groupId`.
+
+**Stored rows can be affected.** In v1.7.0 the command service cut a sort key at its last `@`: a single `@` silently stored a different, shorter key (setting code `a@b` → `MASTER_SETTING#a`, data code `a@b` → `S1#a`, user `u@example.com` → `MASTER_SETTING#USER#u`), and two or more `@` stored a key that still holds `@` (setting code `X@Y@Z` → `MASTER_SETTING#X@Y`, data code `a@b@c` → `S1#a@b`). In v1.8.0 such a row is still listed and readable by its key, but `getSetting`, update and delete reject it with 400. Find them:
+
+```bash
+# DynamoDB master data table
+aws dynamodb scan --table-name <prefix>master-data \
+  --filter-expression "contains(sk, :at)" \
+  --expression-attribute-values '{":at":{"S":"@"}}' \
+  --projection-expression "pk, sk, code"
+```
+
+```sql
+-- RDS
+SELECT id, pk, sk, code FROM masters WHERE sk LIKE '%@%';
+```
+
+A key cut at a single `@` has no `@` left; look in your source systems for codes and user or group ids containing `@`. To make an affected row reachable through the API again, re-create it under a valid key and remove the old row from DynamoDB and RDS directly (the API can no longer change it).
+
+**Step 3 — RDS `system_id` column (only if you register a resolver).** `update-scheme.ts` does not change an existing schema or handler. In projects generated before v1.8.0, add the column to the Prisma `Master` model and write it in your own `src/master/handler/master-rds.handler.ts`:
+
+```prisma
+systemId String? @map("system_id")
+@@index([tenantCode, systemId])
+```
+
+```typescript
+import { getSystemId } from '@mbc-cqrs-serverless/master'
+
+// in both the update and create blocks of prismaService.master.upsert(...)
+systemId: getSystemId(cmd),
+```
+
+Order: add the column (migration), update the handler, deploy, then register the resolver. With a resolver registered and no `systemId` field on the Prisma `Master` model, the application refuses to start. Then tag existing data with `MasterSettingService.assignSystem` (untagged rows count as `shared`).
+
+**Step 4 — Protect the built-in routes with `controllerAuth` (recommended).** Without it the routes stay unguarded and `MasterModule` logs a startup warning. New projects get `controllerAuth: {}`, which means any logged-in user may read and only `system_admin` may write:
+
+```typescript
+MasterModule.register({
+  enableController: true,
+  controllerAuth: { read: [], write: ['master_editor'] },
+  prismaService: PrismaService,
+})
+```
+
+If you set `commonTenantCode` to a value other than `common`, also add it to the `COMMON_TENANT_CODES` environment variable: the guard first runs the core `RolesGuard` tenant check, which does not know `commonTenantCode`, so a caller without a `custom:tenant` claim who names the common tenant in `x-tenant-code` (and holds no cross-tenant role) otherwise gets 403.
+
+**Step 5 — Pass `invokeContext` from server-side code (only with a resolver).** With a resolver registered, master service methods, including reads, called without `invokeContext` are denied (403). Pass `{ invokeContext }`, or `{ skipAccessCheck: true }` for trusted internal work.
+
+**Step 6 — Master copy needs `system_admin`.** With `controllerAuth`, `POST /api/master-setting/copy` requires `system_admin` from the `custom:roles` claim (roles in `controllerAuth.write` and group-derived roles do not count). With a resolver, `MasterSettingService.copy` also needs a `'*'`/`'*'` write grant. Copy now reads data from the source setting's tenant (it used to read `meltec`) and now copies sequences (a target behind the source jumps forward).
+
+**Step 7 — MySQL (`databaseProvider`).** Name, code and keyword searches now work on MySQL. Remove any `patch-package` patch that stripped `mode: 'insensitive'` from the dist files. The provider is detected from the Prisma client; if a warning says it could not be detected, set it explicitly:
+
+```typescript
+MasterModule.register({ /* ... */ databaseProvider: 'mysql' })
+SurveyTemplateModule.register({ /* ... */ databaseProvider: 'mysql' })
+```
+
+**Step 8 — `registerAsync`: pass these options statically.** In `MasterModule.registerAsync`, the static `commonTenantCode`, `databaseProvider` and `controllerAuth` options override what `useFactory` returns, even when the static value is `undefined`. Move them out of the factory:
+
+```typescript
+MasterModule.registerAsync({
+  controllerAuth: {},
+  commonTenantCode: 'common',
+  databaseProvider: 'mysql',
+  prismaService: PrismaService,
+  useFactory: () => ({ /* other options */ }),
+})
+```
+
+**Other behaviour changes to be aware of:**
+- `POST /api/master-bulk` upserts settings first, then data. It is not a transaction: with a resolver, a data item that fails its access check (403) or has no setting (400) fails the request after the settings were written.
+- A setting update that omits `settingValue` no longer clears `attributes`; one that omits `name` keeps it; a data update that omits `seq` keeps it.
+- A client-sent `__systemId` in `attributes` is always removed; responses expose `systemId` at the top level.
+- `GET /api/tasks/sfn-task-parent` takes the tenant from the `custom:tenant` claim before `x-tenant-code`.
+- `includeCommon` lists are bounded: the data list needs `settingCode` (outside the common tenant), and a tenant with more than 10,000 matching rows gets a 400.
+
+**Verify:**
+
+```bash
+npm ls @mbc-cqrs-serverless/master   # 1.8.0
+npm ls @mbc-cqrs-serverless/core     # 1.8.0
+npm test                             # no 400s from codes or ids containing # or @
+```
+
+**Action required:** Steps 1 and 2 for every project that uses master. Step 3 and Step 5 only if you register a resolver. Step 4 recommended for every project with `enableController`. Step 6 if you use master copy. Step 7 on MySQL. Step 8 if you use `MasterModule.registerAsync`.
+
+---
+
+### v1.8.0 → v1.8.1 (cli: app client write attributes, security)
+
+**Why:** the Cognito app client that `mbc new` scaffolded (`apigw-client` in `infra/libs/infra-stack.ts`) set no write attributes. Cognito then lets every signed-in user call `UpdateUserAttributes` with their own access token on every writable attribute, including `custom:roles`, `custom:tenant` and `custom:groups`. Any user could set `custom:roles` to `[{"tenant":"...","role":"system_admin"}]`, add themselves to a privileged group through `custom:groups`, or switch `custom:tenant`, and `RolesGuard` trusts the claims from their next token. **Every project scaffolded before v1.8.1 is affected, in Lambda and ECS mode.** Upgrading packages does not fix it: the client lives in your own infra code.
+
+**Step 1 — Fix the stack (every project).** In `infra/libs/infra-stack.ts`, add `writeAttributes` to `apigw-client`:
+
+```ts
+const userPoolClient = new cdk.aws_cognito.UserPoolClient(this, 'apigw-client', {
+  userPool,
+  authFlows: { userPassword: true, userSrp: true },
+  // Users may change only their own name: custom:roles / custom:tenant
+  // drive authorization and are updated server-side via AdminUpdateUserAttributes.
+  writeAttributes: new cdk.aws_cognito.ClientAttributes().withStandardAttributes({
+    fullname: true,
+  }),
+})
+```
+
+In ECS mode (`config.ecs` set), also grant the task role the Cognito admin actions the Lambda already has, inside the `if (!!taskRole)` block — without them, server-side user management fails on ECS:
+
+```ts
+userPool.grant(
+  taskRole,
+  'cognito-idp:AdminGetUser',
+  'cognito-idp:AdminAddUserToGroup',
+  'cognito-idp:AdminCreateUser',
+  'cognito-idp:AdminDeleteUser',
+  'cognito-idp:AdminDisableUser',
+  'cognito-idp:AdminEnableUser',
+  'cognito-idp:AdminSetUserPassword',
+  'cognito-idp:AdminResetUserPassword',
+  'cognito-idp:AdminUpdateUserAttributes',
+)
+```
+
+Deploy. `cdk diff` should show only `WriteAttributes` added to the `AWS::Cognito::UserPoolClient` (plus the ECS role policy). The client is updated in place: same client ID, existing tokens stay valid. If you added other app clients yourself, give each one `writeAttributes` too.
+
+**Step 2 — Stopgap without a deploy (optional).** `update-user-pool-client` resets every setting you leave out to its default, so never run it with only `--write-attributes name`. Copy the current settings and change only `WriteAttributes`:
+
+```bash
+aws cognito-idp describe-user-pool-client --user-pool-id "$POOL_ID" --client-id "$CLIENT_ID" \
+  --query UserPoolClient > client.json
+jq '{UserPoolId, ClientId, ClientName, RefreshTokenValidity, AccessTokenValidity,
+     IdTokenValidity, TokenValidityUnits, ReadAttributes, ExplicitAuthFlows,
+     SupportedIdentityProviders, CallbackURLs, LogoutURLs, DefaultRedirectURI,
+     AllowedOAuthFlows, AllowedOAuthScopes, AllowedOAuthFlowsUserPoolClient,
+     AnalyticsConfiguration, PreventUserExistenceErrors, EnableTokenRevocation,
+     EnablePropagateAdditionalUserContextData, AuthSessionValidity, RefreshTokenRotation}
+    | with_entries(select(.value != null)) | .WriteAttributes = ["name"]' client.json > update.json
+aws cognito-idp update-user-pool-client --cli-input-json file://update.json
+```
+
+Check `describe-user-pool-client` afterwards. The next CDK deploy puts the old client settings back unless you also do Step 1.
+
+**Step 3 — Frontends.** A user's own `UpdateUserAttributes` call (Amplify `updateUserAttributes`) for any attribute other than `name` now fails with `NotAuthorizedException`. Move those edits to an API endpoint that checks the caller's permission and calls `AdminUpdateUserAttributes`. Reading attributes is unchanged.
+
+**Step 4 — Check whether the hole was used.** Compare the authorization attributes of **every** user — `custom:roles`, `custom:tenant`, `custom:groups` (group-based roles) and any other attribute your application authorizes on — with your application's source of truth. Calls older than your CloudTrail retention leave no event, and an attacker may have added a non-admin role in another tenant rather than an admin role, so sweep all users:
+
+```bash
+aws cognito-idp list-users --region "$REGION" --user-pool-id "$POOL_ID" --output json \
+  | jq -r '.Users[] | (.Attributes | from_entries) as $a
+      | [.Username, $a["custom:tenant"], $a["custom:roles"], $a["custom:groups"]] | @tsv'
+```
+
+To see who called the API recently, query CloudTrail **in the user pool's region** (Event history covers 90 days; use a trail or CloudTrail Lake for older events):
+
+```bash
+aws cloudtrail lookup-events --region "$REGION" \
+  --lookup-attributes AttributeKey=EventName,AttributeValue=UpdateUserAttributes \
+  --start-time "$START"   # ISO 8601, e.g. 2026-09-01T00:00:00Z
+```
+
+Cognito records the caller's `sub` (in `additionalEventData`), not the username, and may redact attribute values. Resolve each `sub` with `aws cognito-idp list-users --region "$REGION" --user-pool-id "$POOL_ID" --filter "sub = \"$SUB\""` and check that user's attributes. For every user whose attributes you correct, also run `aws cognito-idp admin-user-global-sign-out`: tokens they already hold keep the escalated claims until they expire.
+
+**Local development:** `infra-local/cognito-local/db/clients.json` now carries `"WriteAttributes": ["name"]` to mirror AWS, but cognito-local (3.23.x) does not enforce it. Local dev will not catch a frontend that still updates custom attributes itself — test that against a deployed pool.
+
+**Action required:** Steps 1, 3 and 4 for every project. Step 2 only if you cannot deploy right away.
+
+---
+
 ## Version Compatibility Matrix
 
 | Core Version | CLI Version | NestJS | Node.js | TypeScript |
 |--------------|-------------|--------|---------|------------|
+| v1.8.1 | v1.8.1 | 10.x | 22.23.4+ | 5.x |
+| v1.8.0 | v1.8.0 | 10.x | 22.23.4+ | 5.x |
+| v1.7.0 | v1.7.0 | 10.x | 22.23.4+ | 5.x |
+| v1.6.0 | v1.6.0 | 10.x | 22.23.4+ | 5.x |
+| v1.5.0 | v1.5.0 | 10.x | 18+ | 5.x |
+| v1.4.0 | v1.4.0 | 10.x | 18+ | 5.x |
+| v1.3.0 | v1.3.0 | 10.x | 18+ | 5.x |
 | v1.0.23 | v1.0.23 | 10.x | 18+ | 5.x |
 | v1.0.22 | v1.0.22 | 10.x | 18+ | 5.x |
 | v1.0.21 | v1.0.21 | 10.x | 18+ | 5.x |

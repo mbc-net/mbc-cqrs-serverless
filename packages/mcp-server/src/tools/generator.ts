@@ -158,12 +158,12 @@ To create a new project:
         timeout: 5000,
       })
       return true
-    } catch (error) {
+    } catch {
       // Check if globally installed
       try {
         execSync('mbc --version', { stdio: 'pipe', timeout: 5000 })
         return true
-      } catch (innerError) {
+      } catch {
         return false
       }
     }

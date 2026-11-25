@@ -53,6 +53,10 @@ describe('DataSyncNewCommandEventHandler', () => {
   const sfnMock = mockClient(SFNClient)
 
   beforeEach(async () => {
+    // Default to a production-like environment (not running under
+    // serverless-offline) so the StateMachineDoesNotExist swallow is NOT
+    // applied unless a test explicitly opts into local by setting IS_OFFLINE.
+    delete process.env.IS_OFFLINE
     const moduleRef = await Test.createTestingModule({
       providers: [
         DataSyncNewCommandEventHandler,
@@ -83,6 +87,7 @@ describe('DataSyncNewCommandEventHandler', () => {
   })
 
   afterEach(() => {
+    delete process.env.IS_OFFLINE
     jest.clearAllMocks()
     sfnMock.reset()
   })
@@ -107,5 +112,51 @@ describe('DataSyncNewCommandEventHandler', () => {
       ),
       input: JSON.stringify(dynamoInsertEvent),
     })
+  })
+
+  it('should warn and return undefined when state machine does not exist in local environment', async () => {
+    // Arrange
+    process.env.IS_OFFLINE = 'true'
+    const error = new Error('State Machine Does Not Exist')
+    error.name = 'StateMachineDoesNotExist'
+    sfnMock.on(StartExecutionCommand).rejects(error)
+
+    const warnSpy = jest.spyOn(handler['logger'], 'warn')
+
+    // Action
+    const result = await handler.execute(dynamoInsertEvent)
+
+    // Assert
+    expect(result).toBeUndefined()
+    expect(warnSpy).toHaveBeenCalledWith(
+      expect.stringContaining('State machine not found'),
+    )
+  })
+
+  it('should rethrow StateMachineDoesNotExist in a non-local environment (no silent skip in production)', async () => {
+    // Arrange: not running under serverless-offline => production
+    delete process.env.IS_OFFLINE
+    const error = new Error('State Machine Does Not Exist')
+    error.name = 'StateMachineDoesNotExist'
+    sfnMock.on(StartExecutionCommand).rejects(error)
+
+    // Action & Assert: outside local dev a missing state machine is a real
+    // misconfiguration and must surface (Lambda error / stream retry / alarm),
+    // not be swallowed into a silent data-sync skip.
+    await expect(handler.execute(dynamoInsertEvent)).rejects.toThrow(
+      'State Machine Does Not Exist',
+    )
+  })
+
+  it('should rethrow other errors', async () => {
+    // Arrange
+    const error = new Error('Some other error')
+    error.name = 'InternalError'
+    sfnMock.on(StartExecutionCommand).rejects(error)
+
+    // Action & Assert
+    await expect(handler.execute(dynamoInsertEvent)).rejects.toThrow(
+      'Some other error',
+    )
   })
 })

@@ -9,7 +9,7 @@ async function bootstrap() {
 
   program
     .version(
-      // eslint-disable-next-line @typescript-eslint/no-var-requires
+      // eslint-disable-next-line @typescript-eslint/no-var-requires, @typescript-eslint/no-require-imports
       require('../package.json').version,
       '-v, --version',
       'Output the current version.',

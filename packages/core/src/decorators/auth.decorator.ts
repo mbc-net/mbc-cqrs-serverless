@@ -32,7 +32,7 @@ export function AuthGuard({
   guard = RolesGuard,
   roles,
 }: {
-  // eslint-disable-next-line @typescript-eslint/ban-types
+  // eslint-disable-next-line @typescript-eslint/no-unsafe-function-type
   guard?: CanActivate | Function
   roles: string[]
 }) {

@@ -20,7 +20,18 @@ module.exports = {
     node: true,
     jest: true,
   },
-  ignorePatterns: ['.eslintrc.js', 'prisma', '**/*.spec.ts', '**/*.test.ts'],
+  ignorePatterns: [
+    '.eslintrc.js',
+    'prisma',
+    '**/*.spec.ts',
+    '**/*.e2e-spec.ts',
+    'packages/core/test/scripts/**',
+    '**/*.test.ts',
+    'examples/**',
+    // Scaffolding templates are excluded from tsconfig and reference
+    // generated-app paths, so they cannot be type-aware linted.
+    '**/src/templates/**',
+  ],
   rules: {
     '@typescript-eslint/interface-name-prefix': 'off',
     '@typescript-eslint/explicit-function-return-type': 'off',

@@ -314,6 +314,42 @@ await dataSettingService.create(tenantCode, {
 
 Full documentation available at [https://mbc-cqrs-serverless.mbc-net.com/](https://mbc-cqrs-serverless.mbc-net.com/)
 
+## Configurable table name
+
+`SettingModule` stores its data on the `master` DynamoDB table by default
+(shared with `MasterModule`). Pass `tableName` to override it (backward
+compatible). Both `register` and `registerAsync` accept it:
+
+```ts
+SettingModule.register({
+  enableSettingController: true,
+  tableName: 'master', // default: 'master'
+})
+
+SettingModule.registerAsync({ tableName: 'master', inject: [] })
+
+// When combined with MasterModule on the same table, let MasterModule own the
+// data-sync pipeline and defer the alias:
+SettingModule.register({
+  enableSettingController: true,
+  registerEventHandlerAlias: false,
+})
+```
+
+> **Shared table:** `SettingModule` and `MasterModule` share the same physical
+> table. When you use both:
+> 1. Register them with the **same** `tableName`, otherwise their data is split
+>    across two tables.
+> 2. Set `registerEventHandlerAlias: false` on `SettingModule` so `MasterModule`
+>    owns the `<tableName>_CommandEventHandler` alias. If both modules own the
+>    alias, the app still boots but logs a **warning** — which module's data-sync
+>    handlers run is then import-order dependent, so setting the flag is required
+>    for deterministic behavior.
+>
+> **Provisioning:** A custom `tableName` must exist as physical tables
+> (`-command` / `-data` / `-history`). Add the raw base name to
+> `prisma/dynamodbs/cqrs.json` and define the tables in your IaC.
+
 ## License
 
 Copyright © 2024-2025, Murakami Business Consulting, Inc. [https://www.mbc-net.com/](https://www.mbc-net.com/)

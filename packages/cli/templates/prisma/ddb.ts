@@ -10,10 +10,13 @@ import {
   UpdateTimeToLiveCommand,
 } from '@aws-sdk/client-dynamodb'
 import dotenv from 'dotenv'
+import { expand } from 'dotenv-expand'
 import { appendFileSync, readFileSync, readdirSync, writeFileSync } from 'fs'
 import path from 'path'
 
-dotenv.config()
+// .env.local writes endpoints as http://localhost:${LOCAL_X_PORT:-NNNN};
+// plain dotenv would leave that literal, so expand it like Serverless does.
+expand(dotenv.config())
 
 const envFilePath = './.env'
 const tableDir = path.join(__dirname, 'dynamodbs')

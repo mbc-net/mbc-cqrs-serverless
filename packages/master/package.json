@@ -47,5 +47,8 @@
     "@mbc-cqrs-serverless/sequence": "^0.1.74-beta.0",
     "@mbc-cqrs-serverless/task": "^0.1.74-beta.0",
     "ulid": "^2.3.0"
+  },
+  "engines": {
+    "node": ">=22"
   }
 }

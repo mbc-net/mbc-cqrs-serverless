@@ -25,6 +25,7 @@ describe('EnvironmentVariables', () => {
       SFN_COMMAND_ARN:
         'arn:aws:states:us-east-1:123456789012:stateMachine:test',
       SES_FROM_EMAIL: 'test@example.com',
+      APPSYNC_ENDPOINT: 'http://localhost:20002/graphql',
       ...overrides,
     }
   }
@@ -219,18 +220,18 @@ describe('EnvironmentVariables', () => {
       expect(() => validate(config)).not.toThrow()
     })
 
-    it('should validate without optional APPSYNC_ENDPOINT', () => {
+    it('should throw when default transport is enabled but APPSYNC_ENDPOINT is missing', () => {
       const config = createValidEnv()
-      // APPSYNC_ENDPOINT is optional
+      delete config.APPSYNC_ENDPOINT
 
       const validate = getValidateConfig()
 
-      expect(() => validate(config)).not.toThrow()
+      expect(() => validate(config)).toThrow(/APPSYNC_ENDPOINT/)
     })
 
     it('should validate with APPSYNC_ENDPOINT set', () => {
       const config = createValidEnv({
-        APPSYNC_ENDPOINT: 'http://localhost:20002',
+        APPSYNC_ENDPOINT: 'http://localhost:20002/graphql',
       })
 
       const validate = getValidateConfig()
@@ -274,6 +275,50 @@ describe('EnvironmentVariables', () => {
       const validate = getValidateConfig()
 
       expect(() => validate(config)).not.toThrow()
+    })
+  })
+
+  describe('Notification transport env (phase 1)', () => {
+    it('should throw when appsync-event is enabled without APPSYNC_EVENTS_ENDPOINT', () => {
+      const config = createValidEnv({
+        NOTIFICATION_TRANSPORTS: 'appsync-event',
+      })
+
+      const validate = getValidateConfig()
+
+      expect(() => validate(config)).toThrow(/APPSYNC_EVENTS_ENDPOINT/)
+    })
+
+    it('should pass when both built-in transports have endpoints', () => {
+      const config = createValidEnv({
+        NOTIFICATION_TRANSPORTS: 'appsync-graphql,appsync-event',
+        APPSYNC_EVENTS_ENDPOINT: 'https://example.appsync-api.com/event',
+      })
+
+      const validate = getValidateConfig()
+
+      expect(() => validate(config)).not.toThrow()
+    })
+
+    it('should pass for custom transport without AppSync endpoints', () => {
+      const config = createValidEnv({
+        NOTIFICATION_TRANSPORTS: 'pusher',
+        APPSYNC_ENDPOINT: undefined,
+      })
+      delete config.APPSYNC_ENDPOINT
+
+      const validate = getValidateConfig()
+
+      expect(() => validate(config)).not.toThrow()
+    })
+
+    it('should throw in local NODE_ENV when built-in endpoint is missing', () => {
+      const config = createValidEnv({ NODE_ENV: 'local' })
+      delete config.APPSYNC_ENDPOINT
+
+      const validate = getValidateConfig()
+
+      expect(() => validate(config)).toThrow(/APPSYNC_ENDPOINT/)
     })
   })
 
@@ -437,6 +482,7 @@ describe('EnvironmentVariables', () => {
         SFN_COMMAND_ARN:
           'arn:aws:states:ap-northeast-1:123456789012:stateMachine:prod-machine',
         SES_FROM_EMAIL: 'noreply@example.com',
+        APPSYNC_ENDPOINT: 'https://example.appsync-api.com/graphql',
       }
 
       const validate = getValidateConfig()
@@ -460,6 +506,7 @@ describe('EnvironmentVariables', () => {
         SNS_REGION: 'ap-northeast-1',
         SES_REGION: 'ap-northeast-1',
         SES_FROM_EMAIL: 'noreply@example.com',
+        APPSYNC_ENDPOINT: 'https://example.appsync-api.com/graphql',
       }
 
       const validate = getValidateConfig()
@@ -505,6 +552,59 @@ describe('EnvironmentVariables', () => {
       expect(Environment.Development).toBe('dev')
       expect(Environment.Staging).toBe('stg')
       expect(Environment.Production).toBe('prod')
+    })
+  })
+
+  describe('Deprecated Environment Variable Migration', () => {
+    it('should migrate COGNITO_USER_POLL_CLIENT_ID to COGNITO_USER_POOL_CLIENT_ID', () => {
+      const config = createValidEnv({
+        COGNITO_USER_POLL_CLIENT_ID: 'test-client-id',
+      })
+
+      const validate = getValidateConfig()
+      const result = validate(config)
+
+      expect(
+        (result as unknown as Record<string, unknown>)[
+          'COGNITO_USER_POOL_CLIENT_ID'
+        ],
+      ).toBe('test-client-id')
+    })
+
+    it('should not overwrite COGNITO_USER_POOL_CLIENT_ID if already set', () => {
+      const config = createValidEnv({
+        COGNITO_USER_POLL_CLIENT_ID: 'old-value',
+        COGNITO_USER_POOL_CLIENT_ID: 'new-value',
+      })
+
+      const validate = getValidateConfig()
+      const result = validate(config)
+
+      expect(
+        (result as unknown as Record<string, unknown>)[
+          'COGNITO_USER_POOL_CLIENT_ID'
+        ],
+      ).toBe('new-value')
+    })
+
+    it('should log a deprecation warning when migrating old variable name', () => {
+      const config = createValidEnv({
+        COGNITO_USER_POLL_CLIENT_ID: 'test-client-id',
+      })
+
+      const warnSpy = jest.spyOn(
+        jest.requireActual('@nestjs/common').Logger.prototype,
+        'warn',
+      )
+
+      const validate = getValidateConfig()
+      validate(config)
+
+      expect(warnSpy).toHaveBeenCalledWith(
+        expect.stringContaining('COGNITO_USER_POLL_CLIENT_ID'),
+      )
+
+      warnSpy.mockRestore()
     })
   })
 

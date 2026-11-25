@@ -11,11 +11,17 @@ import {
   VERSION_FIRST,
 } from '@mbc-cqrs-serverless/core'
 import {
+  containsInsensitive,
+  DatabaseProvider,
+  resolveDatabaseProvider,
+} from '@mbc-cqrs-serverless/master'
+import {
   BadRequestException,
   Inject,
   Injectable,
   Logger,
   NotFoundException,
+  Optional,
 } from '@nestjs/common'
 import { basename } from 'path'
 import { ulid } from 'ulid'
@@ -26,12 +32,29 @@ import { SurveyTemplateUpdateDto } from './dto/survey-template-update.dto'
 import { SurveyTemplateDataEntity } from './entity/survey-template-data.entity'
 import { SurveyTemplateDataListEntity } from './entity/survey-template-data-list.entity'
 import { SURVEY_TEMPLATE_SK_PREFIX } from './keys'
-import { PRISMA_SERVICE } from './survey-template.module-definition'
+import {
+  MODULE_OPTIONS_TOKEN,
+  PRISMA_SERVICE,
+  SurveyTemplateModuleOptions,
+} from './survey-template.module-definition'
 import { getOrderBys, parsePk } from './utils'
 
 @Injectable()
 export class SurveyTemplateService {
   private readonly logger = new Logger(SurveyTemplateService.name)
+
+  @Optional()
+  @Inject(MODULE_OPTIONS_TOKEN)
+  private readonly moduleOptions?: SurveyTemplateModuleOptions
+
+  private resolvedProvider?: DatabaseProvider
+
+  private get databaseProvider(): DatabaseProvider {
+    return (this.resolvedProvider ??= resolveDatabaseProvider(
+      this.prismaService,
+      this.moduleOptions?.databaseProvider,
+    ))
+  }
 
   constructor(
     @Inject(PRISMA_SERVICE)
@@ -49,14 +72,11 @@ export class SurveyTemplateService {
       tenantCode,
     }
     if (searchDto.keyword?.trim()) {
+      const keyword = searchDto.keyword.trim()
+      const provider = this.databaseProvider
       where.OR = [
-        { name: { contains: searchDto.keyword.trim(), mode: 'insensitive' } },
-        {
-          description: {
-            contains: searchDto.keyword.trim(),
-            mode: 'insensitive',
-          },
-        },
+        { name: containsInsensitive(keyword, provider) },
+        { description: containsInsensitive(keyword, provider) },
       ]
     }
     if (searchDto.id) {

@@ -5,15 +5,42 @@ if [ -f .env ]; then
   export $(echo $(cat .env | sed 's/#.*//g' | xargs) | envsubst)
 fi
 
+# Get S3 port from environment variable with default
+S3_PORT="${LOCAL_S3_PORT:-4566}"
+S3_ENDPOINT_URL="http://localhost:${S3_PORT}"
+
 echo "======= check if S3 bucket exists ======="
-bucket_exists=$(aws --endpoint-url=http://localhost:4566 s3 ls | grep "$S3_BUCKET_NAME" | wc -l)
+bucket_exists=$(aws --endpoint-url=${S3_ENDPOINT_URL} s3 ls | grep "$S3_BUCKET_NAME" | wc -l)
 
 if [ "$bucket_exists" -eq 0 ]; then
   echo "Bucket $S3_BUCKET_NAME does not exist. Creating it..."
-  aws --endpoint-url=http://localhost:4566 s3 mb s3://$S3_BUCKET_NAME
+  aws --endpoint-url=${S3_ENDPOINT_URL} s3 mb s3://$S3_BUCKET_NAME
 else
   echo "Bucket $S3_BUCKET_NAME already exists."
 fi
 
+# Presigned upload/view URLs (see DirectoryFileService) are fetched by the
+# browser, so the bucket needs a CORS rule or the preflight fails with 403 and
+# the real request is never sent. The previous LocalStack service granted this
+# implicitly through EXTRA_CORS_ALLOWED_ORIGINS=*, which Floci 1.6.0 does not
+# honor (its global switch is FLOCI_SECURITY_EXTRA_CORS_ALLOWED_ORIGINS); a bucket
+# rule is used instead so local matches production.
+# Production configures CORS in the CDK stack — this is the local equivalent.
+# Applied unconditionally so buckets created before this script gained the rule
+# are brought up to date too.
+echo "======= configure S3 bucket CORS ======="
+aws --endpoint-url=${S3_ENDPOINT_URL} s3api put-bucket-cors \
+  --bucket $S3_BUCKET_NAME \
+  --cors-configuration '{
+    "CORSRules": [
+      {
+        "AllowedOrigins": ["*"],
+        "AllowedMethods": ["GET", "PUT", "POST", "DELETE", "HEAD"],
+        "AllowedHeaders": ["*"],
+        "ExposeHeaders": ["ETag"]
+      }
+    ]
+  }'
+
 echo "======= list S3 buckets ======="
-aws --endpoint-url=http://localhost:4566 s3 ls
+aws --endpoint-url=${S3_ENDPOINT_URL} s3 ls

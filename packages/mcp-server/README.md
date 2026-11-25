@@ -35,13 +35,13 @@ Generate code and analyze projects:
 | `mbc_validate_cqrs` | Validate CQRS pattern implementation |
 | `mbc_analyze_project` | Analyze project structure and detect framework usage |
 | `mbc_lookup_error` | Look up error solutions from the error catalog |
-| `mbc_check_anti_patterns` | Detect anti-patterns (AP001–AP020) in project source files |
+| `mbc_check_anti_patterns` | Detect anti-patterns (AP001–AP027) in project source files |
 | `mbc_health_check` | Health check for dependencies, structure, and configuration |
 | `mbc_explain_code` | Explain a file or code section in the MBC CQRS context |
 
 #### Anti-Pattern Detection (`mbc_check_anti_patterns`)
 
-Detects 20 anti-patterns including v1.1.x and v1.2.x breaking changes:
+Detects 27 anti-patterns including v1.1.x, v1.2.x, and v1.3.x breaking changes and security issues:
 
 | Code | Name | Severity |
 |------|------|----------|
@@ -65,6 +65,13 @@ Detects 20 anti-patterns including v1.1.x and v1.2.x breaking changes:
 | AP018 | Missing Swagger Documentation | Low |
 | AP019 | Missing Pagination in List Queries | High |
 | AP020 | Missing getCommandSource for Tracing | Low |
+| AP021 | Event Emit Directly After publishAsync in CommandService | High |
+| AP022 | Use of eval() or Function() Constructor | Critical |
+| AP023 | Shell Command Built from String Concatenation | Critical |
+| AP024 | HTTP Request Without Timeout | Medium |
+| AP025 | Logging process.env or full request object | High |
+| AP026 | Notification service class using @Injectable instead of @NotificationTransport | High |
+| AP027 | GroupRoleResolver class also annotated with @Injectable (v1.3.1+) | High |
 
 ### Prompts
 
@@ -74,7 +81,7 @@ Get guided assistance:
 |--------|-------------|
 | `cqrs_implementation_guide` | Step-by-step CQRS implementation (module, entity, command, query, event) |
 | `debug_command_error` | Debug command-related errors |
-| `migration_guide` | Version migration guidance including v1.1.x and v1.2.x breaking changes |
+| `migration_guide` | Version migration guidance through v1.8.1, including security remediation for existing Cognito app clients |
 
 #### `migration_guide` coverage
 
@@ -86,8 +93,13 @@ Get guided assistance:
 | v1.2.0 | `publishSync`/`publishPartialUpdateSync` return `null` on no-op; `genNewSequence()` removed; RYW `Repository` added |
 | v1.2.2 | `CsvBatchProcessor` Smart Retry (Poison Pill fix); `ImportQueueEventHandler` payload fix |
 | v1.2.4 | `TaskModule.register()` is now global — must be called once in host `AppModule` |
+| v1.8.1 | Restrict the Cognito app client to writing only `name`; grant ECS task-role Cognito admin actions; audit authorization attributes in existing deployments |
+
+**v1.8.1 security upgrade:** Updating packages alone does not fix deployed app clients. The `migration_guide` prompt and [`mbc-migrate` skill](skills/mbc-migrate/SKILL.md#v180--v181-cli-app-client-write-attributes-security) explain the required infrastructure edit, frontend changes, and audit of `custom:roles`, `custom:tenant`, and `custom:groups`.
 
 ## Installation
+
+Requires Node.js 22.23.4 or later (`engines.node: ">=22"` since v1.6.0). Make sure the Node.js that your MCP client uses to launch the server (for example through `npx`) meets this requirement.
 
 ```bash
 npm install @mbc-cqrs-serverless/mcp-server

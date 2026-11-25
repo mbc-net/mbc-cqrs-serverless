@@ -42,5 +42,8 @@
   },
   "dependencies": {
     "@mbc-cqrs-serverless/core": "^0.1.74-beta.0"
+  },
+  "engines": {
+    "node": ">=22"
   }
 }

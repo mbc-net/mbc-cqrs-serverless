@@ -29,13 +29,14 @@ import { McpServer } from './server.js'
  * }
  */
 
-// Global error handlers
+// Global error handlers — process-level handlers must use console as no logger is available
+/* eslint-disable no-console */
 process.on('uncaughtException', (error) => {
   console.error('[Uncaught Exception]', error)
   process.exit(1)
 })
 
-process.on('unhandledRejection', (reason, promise) => {
+process.on('unhandledRejection', (reason) => {
   console.error('[Unhandled Rejection]', reason)
 })
 
@@ -48,5 +49,6 @@ async function main() {
     process.exit(1)
   }
 }
+/* eslint-enable no-console */
 
 main()

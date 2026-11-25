@@ -1,6 +1,7 @@
 export * from './command.event.handler'
 export * from './command.module'
 export * from './command.service'
+export * from './command-module.helper'
 export * from './data.service'
 export * from './enums'
 export * from './handlers'

@@ -461,7 +461,7 @@ interface AntiPatternMatch {
 /**
  * Anti-patterns to check for.
  *
- * Codes are sequential from AP001 to AP025 in detector-implementation order.
+ * Codes are sequential from AP001 to AP028 in detector-implementation order.
  *
  * IMPORTANT: These detector codes are a SEPARATE numbering system from the AP codes
  * used in `skills/mbc-review/SKILL.md`. Only AP016, AP017, AP018, AP019, and AP021
@@ -471,6 +471,10 @@ interface AntiPatternMatch {
  *
  * When adding a new detector, append at the end (do not renumber) and update the
  * cross-reference table in `skills/mbc-review/SKILL.md`.
+ *
+ * AP028 is a cross-file check implemented separately in
+ * checkDuplicateDataSyncHandlerRegistrations() and merged into the results
+ * inside checkAntiPatterns().
  */
 const ANTI_PATTERNS = [
   {
@@ -710,6 +714,56 @@ const ANTI_PATTERNS = [
     recommendation:
       'Logging process.env (without picking specific keys), the full headers object, or fields like authorization/cookie leaks credentials, JWT tokens, and API keys into log aggregation systems where they may be retained or replicated to less-trusted observers (CWE-312, CWE-532). Log only the specific non-secret fields you actually need (e.g. process.env.NODE_ENV, request id, user id from JWT claims).',
   },
+  {
+    code: 'AP026',
+    name: 'Notification service class using @Injectable instead of @NotificationTransport',
+    severity: 'high' as const,
+    // Detect classes that implement INotificationTransport but use @Injectable() instead of @NotificationTransport()
+    pattern: /@Injectable\(\)[\s\S]{0,200}implements\s+INotificationTransport/,
+    recommendation:
+      "Classes that implement INotificationTransport must use @NotificationTransport('transport-name') instead of @Injectable(). The decorator registers the transport name as metadata so NotificationEventHandler can discover and activate it via NOTIFICATION_TRANSPORTS env var. With @Injectable() alone, the transport will never be invoked.",
+  },
+  {
+    code: 'AP027',
+    name: 'GroupRoleResolver class also annotated with @Injectable (v1.3.1+)',
+    severity: 'high' as const,
+    // Detect classes decorated with @GroupRoleResolver() that ALSO carry @Injectable().
+    // @GroupRoleResolver() already applies @Injectable() with the default (singleton)
+    // scope; a second @Injectable() overrides that scope and breaks bootstrap, which
+    // resolves a single instance once at startup. The two decorators must be ADJACENT
+    // (only whitespace or other decorators between them) so we don't match
+    // @GroupRoleResolver on one class and @Injectable on a different class below it.
+    // Decorator arguments are allowed. Matches either order.
+    pattern:
+      /@GroupRoleResolver\([^)]*\)(?:\s|@[A-Za-z]+\([^)]*\))*@Injectable\(|@Injectable\([^)]*\)(?:\s|@[A-Za-z]+\([^)]*\))*@GroupRoleResolver\(/,
+    recommendation:
+      'Do not annotate a @GroupRoleResolver() class with @Injectable(). @GroupRoleResolver() already registers the class as a singleton provider; adding @Injectable() (particularly with REQUEST/TRANSIENT scope) overrides the scope and breaks bootstrap, which resolves the resolver exactly once at application startup. Remove the extra @Injectable().',
+  },
+  {
+    code: 'AP029',
+    name: 'Reserved DataSyncHandler Type',
+    severity: 'high' as const,
+    // Detect a @DataSyncHandler-decorated class that sets readonly type = 'dynamodb'.
+    // 'dynamodb' is reserved for the internal DataSyncDdsHandler. Any user-defined
+    // handler with this type is silently excluded from publishSync's handler pipeline
+    // (which filters out type === 'dynamodb'), causing data loss with no error or warning.
+    pattern:
+      /@DataSyncHandler[\s\S]{0,500}readonly\s+type\s*=\s*['"`]dynamodb['"`]/,
+    recommendation:
+      "Remove or rename the 'dynamodb' type value. This string is reserved for the internal DataSyncDdsHandler. Setting readonly type = 'dynamodb' on a custom handler causes publishSync to silently exclude it from the synchronous pipeline (CommandService filters handler.type !== 'dynamodb'), resulting in data loss with no error or warning. Use any other string (e.g. 'rds', 'opensearch') or omit the type property entirely.",
+  },
+  {
+    code: 'AP030',
+    name: 'Fully-Qualified Table Name in @DataSyncHandler',
+    severity: 'high' as const,
+    // Detect @DataSyncHandler called with a table name ending in '-command'.
+    // The decorator expects the RAW table name as passed to CommandModule.register({ tableName }).
+    // Passing the DynamoDB-level name (e.g. 'dev-my-table-command') causes silent handler
+    // discovery failure: ExplorerService matches by this metadata key and finds nothing.
+    pattern: /@DataSyncHandler\s*\(\s*['"`][^'"`]+-command['"`]/,
+    recommendation:
+      "Pass the raw table name to @DataSyncHandler(), not the fully-qualified DynamoDB table name. Example: if CommandModule.register({ tableName: 'my-table' }), then use @DataSyncHandler('my-table'). Passing 'dev-my-table-command' (with environment prefix and -command suffix) causes the ExplorerService to find no matching metadata, so the handler is silently never called — no error is raised. Remove the environment prefix and the '-command' suffix.",
+  },
 ]
 
 /**
@@ -734,6 +788,94 @@ const DETECTOR_TO_SKILL_AP: Record<string, string> = {
   AP019: 'AP019', // Missing Pagination in List Queries ✅
   AP020: 'AP011', // Missing getCommandSource for Tracing → Missing getCommandSource for Tracing
   AP021: 'AP021', // Event Emit After publishAsync ✅
+  // AP026: detector-only (no skill-doc AP counterpart)
+  AP027: 'AP022', // GroupRoleResolver + @Injectable → Incorrect Group-Based Role Resolver Implementation
+  AP028: 'AP023', // Duplicate DataSyncHandler Registration → Duplicate DataSyncHandler Registration Across Modules
+  AP029: 'AP024', // Reserved DataSyncHandler Type → Reserved DataSyncHandler Type
+  AP030: 'AP025', // Fully-Qualified Table Name in @DataSyncHandler → Fully-Qualified Table Name
+}
+
+/**
+ * AP028: Detect @DataSyncHandler classes registered as providers in more than one module.
+ *
+ * ExplorerService.flatMap() collects providers from every NestJS module without
+ * class-level deduplication. If the same @DataSyncHandler class appears in the
+ * providers array (or dataSyncHandlers option) of N modules, handler.up()/down()
+ * is called N times per command event — causing duplicate DB writes and P2002 errors.
+ */
+async function checkDuplicateDataSyncHandlerRegistrations(
+  targetPath: string,
+  projectPath: string,
+): Promise<AntiPatternMatch[]> {
+  const allTsFiles = await findFiles(targetPath, '.ts')
+  const nonTestFiles = allTsFiles.filter(
+    (f) =>
+      !f.includes('.spec.') && !f.includes('.test.') && !f.endsWith('.d.ts'),
+  )
+
+  // Phase 1: find all @DataSyncHandler-decorated class names and their source files.
+  const handlerSourceFile = new Map<string, string>() // className → relative path
+  const handlerClassPattern =
+    /@DataSyncHandler\([^)]*\)[\s\S]{0,100}class\s+(\w+)/g
+
+  for (const file of nonTestFiles) {
+    const content = readFileSafe(file)
+    for (const m of content.matchAll(handlerClassPattern)) {
+      handlerSourceFile.set(m[1], path.relative(projectPath, file))
+    }
+  }
+
+  if (handlerSourceFile.size === 0) return []
+
+  // Phase 2: for each module file, check which handler classes are registered.
+  // A class is considered "registered" if it appears in a providers: [...] block
+  // or inside a dataSyncHandlers: [...] option of CommandModule.register().
+  const moduleFiles = nonTestFiles.filter((f) => f.endsWith('.module.ts'))
+  const registeredInModules = new Map<string, string[]>()
+
+  for (const modFile of moduleFiles) {
+    const content = readFileSafe(modFile)
+    if (!content.includes('@Module(')) continue
+
+    for (const className of handlerSourceFile.keys()) {
+      const inProviders = new RegExp(
+        `\\bproviders\\s*:\\s*\\[[^\\]]{0,2000}\\b${className}\\b`,
+      ).test(content)
+      const inDataSyncHandlersOption = new RegExp(
+        `\\bdataSyncHandlers\\s*:\\s*\\[[^\\]]{0,500}\\b${className}\\b`,
+      ).test(content)
+
+      if (inProviders || inDataSyncHandlersOption) {
+        if (!registeredInModules.has(className)) {
+          registeredInModules.set(className, [])
+        }
+        registeredInModules
+          .get(className)!
+          .push(path.relative(projectPath, modFile))
+      }
+    }
+  }
+
+  // Phase 3: report classes registered in more than one module.
+  const results: AntiPatternMatch[] = []
+  for (const [className, modules] of registeredInModules) {
+    if (modules.length <= 1) continue
+    results.push({
+      code: 'AP028',
+      name: 'Duplicate DataSyncHandler Registration',
+      severity: 'high' as const,
+      file: handlerSourceFile.get(className)!,
+      line: 1,
+      snippet: `class ${className}`,
+      recommendation:
+        `${className} is registered in ${modules.length} module(s): ${modules.join(', ')}. ` +
+        `ExplorerService scans all modules without class-level deduplication, so ` +
+        `handler.up()/down() is called ${modules.length} times per command event — ` +
+        `causing duplicate DB writes and potential P2002 unique-constraint errors. ` +
+        `Register the handler as a provider in exactly one module (the module that owns this concern).`,
+    })
+  }
+  return results
 }
 
 /**
@@ -790,6 +932,11 @@ async function checkAntiPatterns(
       }
     }
   }
+
+  // Cross-file check: AP028 Duplicate DataSyncHandler Registration
+  const duplicateHandlerMatches =
+    await checkDuplicateDataSyncHandlerRegistrations(targetPath, projectPath)
+  matches.push(...duplicateHandlerMatches)
 
   if (matches.length === 0) {
     let text =
@@ -875,7 +1022,7 @@ async function healthCheck(
     }
     try {
       pkg = JSON.parse(readFileSafe(packageJsonPath))
-    } catch (err) {
+    } catch {
       result.checks.push({
         name: 'package.json',
         status: 'fail',
@@ -1164,7 +1311,7 @@ async function explainCode(
   }
   if (content.includes('getUserContext(')) {
     explanations.push(
-      'Extracts user context (tenantCode, userId, role) from the invocation context.',
+      'Extracts user context (userId, tenantCode, tenantRole, tenantRoles, tenantGroupIds) from the invocation context. Since v1.3.1, tenantRoles is the array of direct roles from custom:roles and tenantGroupIds holds the group IDs from custom:groups; tenantRole (singular) is kept for backward compatibility. A malformed custom:groups claim is tolerated (fail-closed to no group roles), but a malformed custom:roles claim still throws — guard accordingly when the claim source is untrusted.',
     )
   }
 

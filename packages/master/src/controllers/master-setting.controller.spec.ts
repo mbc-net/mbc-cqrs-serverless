@@ -2,6 +2,7 @@ import { Test, TestingModule } from '@nestjs/testing'
 import { BadRequestException } from '@nestjs/common'
 import { DetailDto, IInvoke } from '@mbc-cqrs-serverless/core'
 
+import { MASTER_ROUTE_METADATA } from '../guards/master-route.decorator'
 import { MasterSettingController } from './master-setting.controller'
 import { MasterSettingService } from '../services/master-setting.service'
 
@@ -43,6 +44,9 @@ describe('MasterSettingController', () => {
       upsertBulk: jest.fn(),
       updateSetting: jest.fn(),
       deleteSetting: jest.fn(),
+      list: jest.fn(),
+      getDetail: jest.fn(),
+      checkExistCode: jest.fn(),
     }
 
     const module: TestingModule = await Test.createTestingModule({
@@ -261,5 +265,40 @@ describe('MasterSettingController', () => {
         controller.deleteTenant(key, mockInvokeContext),
       ).rejects.toThrow('Deletion failed')
     })
+  })
+
+  describe('read access arguments', () => {
+    it('passes the invoke context to list', async () => {
+      await controller.list({} as any, mockInvokeContext)
+      expect(service.list).toHaveBeenCalledWith({}, mockInvokeContext, {
+        invokeContext: mockInvokeContext,
+      })
+    })
+
+    it('passes the invoke context to getDetailById', async () => {
+      const key: DetailDto = { pk: 'MASTER#test-tenant', sk: 'test-sk' }
+      await controller.getDetailById(key, mockInvokeContext)
+      expect(service.getDetail).toHaveBeenCalledWith(key, {
+        invokeContext: mockInvokeContext,
+      })
+    })
+
+    it('passes the invoke context to checkExistCode', async () => {
+      await controller.checkExistCode('S1', mockInvokeContext)
+      expect(service.checkExistCode).toHaveBeenCalledWith(
+        'S1',
+        mockInvokeContext,
+        { invokeContext: mockInvokeContext },
+      )
+    })
+  })
+
+  it('marks copyMaster as systemAdminOnly', () => {
+    expect(
+      Reflect.getMetadata(
+        MASTER_ROUTE_METADATA,
+        MasterSettingController.prototype.copyMaster,
+      ),
+    ).toEqual({ systemAdminOnly: true })
   })
 })

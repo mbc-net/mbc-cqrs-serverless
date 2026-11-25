@@ -327,6 +327,28 @@ Same as "version not match" error above - refresh and retry.
 
 ---
 
+### CommandAdmissionRejectedException
+
+**Location**: `packages/core/src/data-store/dynamodb.service.ts`
+
+**Cause**: An application-supplied admission check failed, for example because a maintenance gate closed or its generation changed. Returns HTTP 409. Only occurs when a `CommandService` subclass overrides `getCommandAdmissionConditions`.
+
+**Solution**:
+Do not retry the same payload. Capture the witness again, reread the current state, and rebuild the update. See [Atomic command admission](./development/command-admission.md#rejections-and-http-responses).
+
+---
+
+### CommandAdmissionContentionException
+
+**Location**: `packages/core/src/data-store/dynamodb.service.ts`
+
+**Cause**: The command transaction was cancelled by `TransactionConflict`, for example because many concurrent commands checked the same witness. Returns HTTP 503. Only occurs when a `CommandService` subclass overrides `getCommandAdmissionConditions`.
+
+**Solution**:
+Retry later, capturing the witness again and rebuilding the update. If conflicts are frequent, narrow the scope of the witness. See [Capacity and contention](./development/command-admission.md#capacity-and-contention).
+
+---
+
 ## Import Module Errors
 
 ### Step Functions Timeout (Import Job)

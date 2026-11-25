@@ -8,7 +8,11 @@
  * that are then sent via AWS SES as raw email.
  */
 
-import nodemailer from 'nodemailer'
+import nodemailer, {
+  SendMailOptions,
+  SentMessageInfo,
+  Transporter,
+} from 'nodemailer'
 
 describe('nodemailer Behavioral Tests', () => {
   describe('Module exports', () => {
@@ -41,21 +45,19 @@ describe('nodemailer Behavioral Tests', () => {
         buffer: true,
       })
 
-      const mailOptions: nodemailer.SendMailOptions = {
+      const mailOptions: SendMailOptions = {
         from: 'sender@example.com',
         to: 'recipient@example.com',
         subject: 'Test Email',
         html: '<p>This is a test email</p>',
       }
 
-      const info = await new Promise<nodemailer.SentMessageInfo>(
-        (resolve, reject) => {
-          transporter.sendMail(mailOptions, (err, info) => {
-            if (err) return reject(err)
-            resolve(info)
-          })
-        },
-      )
+      const info = await new Promise<SentMessageInfo>((resolve, reject) => {
+        transporter.sendMail(mailOptions, (err, info) => {
+          if (err) return reject(err)
+          resolve(info)
+        })
+      })
 
       // With buffer: true, message should be a Buffer
       expect(info.message).toBeInstanceOf(Buffer)
@@ -71,7 +73,7 @@ describe('nodemailer Behavioral Tests', () => {
         buffer: true,
       })
 
-      const mailOptions: nodemailer.SendMailOptions = {
+      const mailOptions: SendMailOptions = {
         from: 'sender@example.com',
         to: 'recipient@example.com',
         subject: 'Test Email',
@@ -86,7 +88,7 @@ describe('nodemailer Behavioral Tests', () => {
   })
 
   describe('MIME message structure', () => {
-    let transporter: nodemailer.Transporter
+    let transporter: Transporter
 
     beforeAll(() => {
       transporter = nodemailer.createTransport({
@@ -218,7 +220,7 @@ describe('nodemailer Behavioral Tests', () => {
   })
 
   describe('Attachment handling', () => {
-    let transporter: nodemailer.Transporter
+    let transporter: Transporter
 
     beforeAll(() => {
       transporter = nodemailer.createTransport({
@@ -341,7 +343,7 @@ describe('nodemailer Behavioral Tests', () => {
   })
 
   describe('Unicode and encoding support', () => {
-    let transporter: nodemailer.Transporter
+    let transporter: Transporter
 
     beforeAll(() => {
       transporter = nodemailer.createTransport({
@@ -440,7 +442,7 @@ describe('nodemailer Behavioral Tests', () => {
   })
 
   describe('Callback vs Promise API consistency', () => {
-    let transporter: nodemailer.Transporter
+    let transporter: Transporter
 
     beforeAll(() => {
       transporter = nodemailer.createTransport({
@@ -451,7 +453,7 @@ describe('nodemailer Behavioral Tests', () => {
     })
 
     it('should produce same result with callback and promise', async () => {
-      const mailOptions: nodemailer.SendMailOptions = {
+      const mailOptions: SendMailOptions = {
         from: 'sender@example.com',
         to: 'recipient@example.com',
         subject: 'Consistency Test',
@@ -459,7 +461,7 @@ describe('nodemailer Behavioral Tests', () => {
       }
 
       // Callback style
-      const callbackResult = await new Promise<nodemailer.SentMessageInfo>(
+      const callbackResult = await new Promise<SentMessageInfo>(
         (resolve, reject) => {
           transporter.sendMail(mailOptions, (err, info) => {
             if (err) return reject(err)
@@ -530,7 +532,7 @@ describe('nodemailer Behavioral Tests', () => {
         buffer: true,
       })
 
-      const mailOptions: nodemailer.SendMailOptions = {
+      const mailOptions: SendMailOptions = {
         from: 'noreply@example.com',
         to: ['user1@example.com', 'user2@example.com'],
         cc: ['cc@example.com'],

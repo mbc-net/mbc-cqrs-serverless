@@ -47,5 +47,8 @@
   },
   "devDependencies": {
     "@types/jsonstream": "^0.8.33"
+  },
+  "engines": {
+    "node": ">=22"
   }
 }
