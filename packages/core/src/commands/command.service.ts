@@ -1,10 +1,14 @@
-import { ConditionCheck } from '@aws-sdk/client-dynamodb'
+import {
+  ConditionalCheckFailedException,
+  ConditionCheck,
+} from '@aws-sdk/client-dynamodb'
 import {
   BadRequestException,
   Inject,
   Injectable,
   Logger,
   OnModuleInit,
+  ServiceUnavailableException,
   Type,
 } from '@nestjs/common'
 import { ModuleRef } from '@nestjs/core'
@@ -14,7 +18,12 @@ import { VER_SEPARATOR, VERSION_FIRST, VERSION_LATEST } from '../constants'
 import { getUserContext } from '../context/user'
 import { DynamoDbService } from '../data-store/dynamodb.service'
 import { SessionService } from '../data-store/session.service'
+import { validateStrictInlineOptions } from '../data-store/strict-inline-options'
 import { DATA_SYNC_HANDLER_METADATA } from '../decorators'
+import {
+  CommandAdmissionContentionException,
+  CommandAdmissionRejectedException,
+} from '../exceptions'
 import { mergeDeep, pickKeys } from '../helpers'
 import {
   addSortKeyVersion,
@@ -44,6 +53,12 @@ import { DataSyncDdsHandler } from './handlers/data-sync-dds.handler'
 import { HistoryService } from './history.service'
 import { TtlService } from './ttl.service'
 
+class StrictInlineCommandRejected extends BadRequestException {
+  constructor() {
+    super('Invalid strict inline command request')
+  }
+}
+
 const TABLE_NAME = Symbol('command')
 const DATA_SYNC_HANDLER = Symbol(DATA_SYNC_HANDLER_METADATA)
 
@@ -51,6 +66,7 @@ export type DataSyncHandlerType = Type<IDataSyncHandler>
 
 @Injectable()
 export class CommandService implements OnModuleInit, ICommandService {
+  private readonly strictInline: boolean
   private logger: Logger
   private [TABLE_NAME]: string
   private [DATA_SYNC_HANDLER]: IDataSyncHandler[] = []
@@ -68,18 +84,36 @@ export class CommandService implements OnModuleInit, ICommandService {
     private readonly historyService: HistoryService,
     private readonly sessionService: SessionService,
   ) {
+    validateStrictInlineOptions(this.options.safety)
+    this.strictInline = this.options.safety !== undefined
+    if (this.strictInline && this.dynamoDbService.isStrictInline !== true) {
+      throw new Error('Strict inline transport is required')
+    }
     this.tableName = this.dynamoDbService.getTableName(
       this.options.tableName,
       TableType.COMMAND,
     )
-    this.logger = new Logger(`${CommandService.name}:${this.tableName}`)
+    this.logger = new Logger(
+      this.strictInline
+        ? 'CommandService:strict-inline'
+        : `${CommandService.name}:${this.tableName}`,
+    )
   }
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   publishItem(key: DetailKey): Promise<any | null> {
     throw new Error('Method not implemented.')
   }
 
+  private requireLegacyMethod(): void {
+    if (this.strictInline)
+      throw new BadRequestException(
+        'Method is not supported by strict inline profile',
+      )
+  }
+
   onModuleInit() {
+    if (this.strictInline) return
+
     // Detect how many CommandModule instances own this table's
     // `<tableName>_CommandEventHandler` alias. The Step Functions data-sync
     // pipeline resolves the alias non-strictly, so a duplicate can shadow one
@@ -188,6 +222,7 @@ export class CommandService implements OnModuleInit, ICommandService {
     input: CommandPartialInputModel,
     options: ICommandOptions,
   ): Promise<CommandModel | null> {
+    this.requireLegacyMethod()
     const item: CommandModel = await this.dataService.getItem({
       pk: input.pk,
       sk: input.sk,
@@ -211,6 +246,7 @@ export class CommandService implements OnModuleInit, ICommandService {
     input: CommandPartialInputModel,
     options: ICommandOptions,
   ): Promise<CommandModel | null> {
+    this.requireLegacyMethod()
     let item: CommandModel
     if (input.version > VERSION_FIRST) {
       item = await this.getItem({
@@ -267,6 +303,7 @@ export class CommandService implements OnModuleInit, ICommandService {
     input: CommandInputModel,
     options: ICommandOptions,
   ): Promise<CommandModel | null> {
+    this.requireLegacyMethod()
     const item = await this.dataService.getItem({ pk: input.pk, sk: input.sk })
 
     let inputVersion = input.version ?? VERSION_FIRST
@@ -374,6 +411,57 @@ export class CommandService implements OnModuleInit, ICommandService {
     input: CommandInputModel,
     options: ICommandOptions,
   ): Promise<CommandModel | null> {
+    try {
+      if (this.strictInline) {
+        const version = Object.getOwnPropertyDescriptor(input, 'version')?.value
+        const sk = Object.getOwnPropertyDescriptor(input, 'sk')?.value
+        if (
+          !Number.isSafeInteger(version) ||
+          version < 0 ||
+          version >= Number.MAX_SAFE_INTEGER ||
+          typeof sk !== 'string' ||
+          sk.includes(VER_SEPARATOR)
+        ) {
+          throw new StrictInlineCommandRejected()
+        }
+      }
+      return await this.publishAsyncInternal(input, options)
+    } catch (error) {
+      if (this.strictInline && error instanceof StrictInlineCommandRejected)
+        throw new StrictInlineCommandRejected()
+      if (
+        this.strictInline &&
+        error instanceof ConditionalCheckFailedException
+      ) {
+        throw new ConditionalCheckFailedException({
+          message: 'The conditional request failed',
+          $metadata: {},
+        })
+      }
+      if (
+        this.strictInline &&
+        error instanceof CommandAdmissionRejectedException
+      ) {
+        throw new CommandAdmissionRejectedException()
+      }
+      if (
+        this.strictInline &&
+        error instanceof CommandAdmissionContentionException
+      ) {
+        throw new CommandAdmissionContentionException()
+      }
+      if (this.strictInline)
+        throw new ServiceUnavailableException(
+          'Strict inline publication is unavailable',
+        )
+      throw error
+    }
+  }
+
+  private async publishAsyncInternal(
+    input: CommandInputModel,
+    options: ICommandOptions,
+  ): Promise<CommandModel | null> {
     let inputVersion = input.version || VERSION_FIRST
     let item: CommandModel
     if (inputVersion === VERSION_LATEST) {
@@ -423,7 +511,8 @@ export class CommandService implements OnModuleInit, ICommandService {
       createdIp: sourceIp,
       updatedIp: sourceIp,
     }
-    this.logger.debug('publish::', command)
+    if (this.strictInline) this.logger.debug('strict_inline_command_publish')
+    else this.logger.debug('publish::', command)
     await this.persistInitialCommand(command, options)
     await this.writeRywSessionIfApplicable(command, options)
     return command
@@ -462,11 +551,14 @@ export class CommandService implements OnModuleInit, ICommandService {
         command.version,
       )
     } catch (err) {
-      this.logger.warn('RYW session write failed (non-fatal)', err)
+      if (this.strictInline)
+        this.logger.warn('strict_inline_session_unconfirmed')
+      else this.logger.warn('RYW session write failed (non-fatal)', err)
     }
   }
 
   async duplicate(key: DetailKey, options: ICommandOptions) {
+    this.requireLegacyMethod()
     const item = await this.getItem(key)
     if (!item) {
       throw new BadRequestException('Invalid input key: item not found')
@@ -490,6 +582,7 @@ export class CommandService implements OnModuleInit, ICommandService {
   }
 
   async reSyncData() {
+    this.requireLegacyMethod()
     const targetSyncHandlers = this.dataSyncHandlers?.filter(
       (handler) => handler.type !== 'dynamodb',
     )
@@ -524,6 +617,7 @@ export class CommandService implements OnModuleInit, ICommandService {
   }
 
   async updateStatus(key: DetailKey, status: string, notifyId?: string) {
+    this.requireLegacyMethod()
     const item = await this.dynamoDbService.updateItem(this.tableName, key, {
       set: { status },
     })
@@ -543,6 +637,32 @@ export class CommandService implements OnModuleInit, ICommandService {
     key: DetailKey,
     options?: { consistentRead?: boolean },
   ): Promise<CommandModel> {
+    if (this.strictInline) {
+      let observed: DetailKey
+      try {
+        const pk = Object.getOwnPropertyDescriptor(key, 'pk')?.value
+        const sk = Object.getOwnPropertyDescriptor(key, 'sk')?.value
+        const match = typeof sk === 'string' ? /@([1-9][0-9]*)$/.exec(sk) : null
+        if (
+          typeof pk !== 'string' ||
+          !match ||
+          !Number.isSafeInteger(Number(match[1]))
+        )
+          throw new StrictInlineCommandRejected()
+        observed = { pk, sk }
+      } catch {
+        throw new StrictInlineCommandRejected()
+      }
+      try {
+        return await this.dynamoDbService.getItem(this.tableName, observed, {
+          consistentRead: true,
+        })
+      } catch {
+        throw new ServiceUnavailableException(
+          'Strict inline command read is unavailable',
+        )
+      }
+    }
     if (!key.sk.includes(VER_SEPARATOR)) {
       return this.getLatestItem(key)
     }
@@ -550,6 +670,7 @@ export class CommandService implements OnModuleInit, ICommandService {
   }
 
   async getLatestItem(key: DetailKey): Promise<CommandModel> {
+    this.requireLegacyMethod()
     const lookUpStep = 5
     const dataItem = await this.dataService.getItem(key)
     let ver = (dataItem?.version || 0) + lookUpStep
@@ -603,6 +724,7 @@ export class CommandService implements OnModuleInit, ICommandService {
   }
 
   async updateTtl(key: DetailKey) {
+    this.requireLegacyMethod()
     const version = getSortKeyVersion(key.sk)
     const sk = removeSortKeyVersion(key.sk)
     if (version <= VERSION_FIRST + 1) {
@@ -631,6 +753,7 @@ export class CommandService implements OnModuleInit, ICommandService {
   }
 
   async updateTaskToken(key: DetailKey, token: string) {
+    this.requireLegacyMethod()
     this.logger.debug(`Saving taskToken for ${key.pk}#${key.sk}`)
 
     return await this.dynamoDbService.updateItem(this.tableName, key, {
@@ -639,6 +762,7 @@ export class CommandService implements OnModuleInit, ICommandService {
   }
 
   async getNextCommand(currentKey: DetailKey): Promise<CommandModel> {
+    this.requireLegacyMethod()
     this.logger.debug(
       `Getting next command for ${currentKey.pk}#${currentKey.sk}`,
     )

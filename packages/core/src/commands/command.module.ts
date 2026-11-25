@@ -1,5 +1,10 @@
 import { DynamicModule, Module } from '@nestjs/common'
+import { ConfigService } from '@nestjs/config'
 
+import { DynamoDbService } from '../data-store/dynamodb.service'
+import { S3Service } from '../data-store/s3.service'
+import { SessionService } from '../data-store/session.service'
+import { validateStrictInlineOptions } from '../data-store/strict-inline-options'
 import { ExplorerService } from '../services'
 import { CommandEventHandler } from './command.event.handler'
 import {
@@ -12,6 +17,10 @@ import { DataSyncDdsHandler } from './handlers/data-sync-dds.handler'
 import { HistoryService } from './history.service'
 import { Repository } from './repository'
 import { TtlService } from './ttl.service'
+
+/** Publication-only boundary; no projection/event-handler exports. */
+@Module({})
+class StrictInlineCommandModule {}
 
 @Module({
   imports: [],
@@ -36,7 +45,61 @@ import { TtlService } from './ttl.service'
 })
 export class CommandModule extends ConfigurableModuleClass {
   static register(options: typeof OPTIONS_TYPE): DynamicModule {
+    validateStrictInlineOptions(options.safety)
+    if (
+      (options.safety !== undefined) !==
+      (typeof options.strictDataStoreToken === 'symbol')
+    ) {
+      throw new Error('Strict inline profile requires a domain transport token')
+    }
+    if (!options.safety && options.strictDataStoreToken !== undefined) {
+      throw new Error('Strict inline transport requires a profile')
+    }
+    if (options.safety) {
+      options = Object.freeze({
+        ...options,
+        safety: Object.freeze({ profile: 'strict-inline-v1' as const }),
+      })
+    }
     const module = super.register(options)
+    if (options.safety) {
+      if (
+        options.dataSyncHandlers?.length ||
+        options.skipError ||
+        options.registerEventHandlerAlias === true ||
+        options.disableDefaultHandler === false
+      ) {
+        throw new Error(
+          'Strict inline profile does not support data sync handlers',
+        )
+      }
+      module.providers.push(
+        ExplorerService,
+        CommandService,
+        DataService,
+        TtlService,
+        HistoryService,
+        DataSyncDdsHandler,
+        {
+          provide: DynamoDbService,
+          inject: [ConfigService, S3Service],
+          useFactory: (config: ConfigService, s3: S3Service) =>
+            new DynamoDbService(config, s3, options.safety),
+        },
+        {
+          provide: SessionService,
+          inject: [DynamoDbService, ConfigService],
+          useFactory: (dynamo: DynamoDbService, config: ConfigService) =>
+            new SessionService(dynamo, config),
+        },
+        { provide: options.strictDataStoreToken, useExisting: DynamoDbService },
+      )
+      return {
+        ...module,
+        module: StrictInlineCommandModule,
+        exports: [CommandService, options.strictDataStoreToken],
+      }
+    }
 
     const {
       tableName,

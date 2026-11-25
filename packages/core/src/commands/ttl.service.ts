@@ -1,4 +1,9 @@
-import { Inject, Injectable, Logger } from '@nestjs/common'
+import {
+  Inject,
+  Injectable,
+  Logger,
+  ServiceUnavailableException,
+} from '@nestjs/common'
 
 import { DynamoDbService } from '../data-store/dynamodb.service'
 import { masterPk, ttlSk } from '../helpers'
@@ -15,7 +20,11 @@ export class TtlService implements ITtlService {
     private readonly options: CommandModuleOptions,
     private readonly dynamoDbService: DynamoDbService,
   ) {
-    this.logger = new Logger(`${TtlService.name}:${this.options.tableName}`)
+    this.logger = new Logger(
+      this.dynamoDbService.isStrictInline
+        ? 'TtlService:strict-inline'
+        : `${TtlService.name}:${this.options.tableName}`,
+    )
   }
 
   async calculateTtl(
@@ -24,7 +33,11 @@ export class TtlService implements ITtlService {
     startDate?: Date,
   ): Promise<number | null> {
     const numberOfDay = await this.getTtlConfiguration(type, tenantCode)
-    this.logger.debug('numberOfDay', numberOfDay)
+    if (this.dynamoDbService.isStrictInline) {
+      this.logger.debug('ttl.configuration.calculated')
+    } else {
+      this.logger.debug('numberOfDay', numberOfDay)
+    }
     return numberOfDay ? this.calculateUnixTime(numberOfDay, startDate) : null
   }
 
@@ -50,14 +63,40 @@ export class TtlService implements ITtlService {
 
       const numberOfDay = ttlData?.attributes?.days // pk | sk | attributes {days: 90}
 
+      if (this.dynamoDbService.isStrictInline) {
+        if (ttlData == null) return null
+        if (
+          typeof numberOfDay !== 'number' ||
+          !Number.isSafeInteger(numberOfDay) ||
+          numberOfDay <= 0
+        ) {
+          throw new ServiceUnavailableException(
+            'TTL configuration is unavailable',
+          )
+        }
+        return numberOfDay
+      }
+
       return numberOfDay ? +numberOfDay : null
     } catch (error) {
+      if (this.dynamoDbService.isStrictInline) {
+        this.logger.error('ttl.configuration.unavailable')
+        throw new ServiceUnavailableException(
+          'TTL configuration is unavailable',
+        )
+      }
       this.logger.error('error', error)
       return null
     }
   }
 
   calculateUnixTime(days: number, startDate?: Date): number {
+    if (
+      this.dynamoDbService.isStrictInline &&
+      (!Number.isSafeInteger(days) || days <= 0)
+    ) {
+      throw new ServiceUnavailableException('TTL configuration is unavailable')
+    }
     if (days <= 0) {
       throw new Error('Number of days must be greater than 0.')
     }
@@ -69,6 +108,10 @@ export class TtlService implements ITtlService {
 
     // Convert days to seconds and add to the base time
     const result = baseTimeInSeconds + days * 24 * 60 * 60
+
+    if (this.dynamoDbService.isStrictInline && !Number.isSafeInteger(result)) {
+      throw new ServiceUnavailableException('TTL configuration is unavailable')
+    }
 
     return result
   }

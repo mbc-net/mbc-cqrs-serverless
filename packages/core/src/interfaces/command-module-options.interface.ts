@@ -1,5 +1,6 @@
 import { Type } from '@nestjs/common'
 
+import { StrictInlineOptions } from '../data-store/strict-inline-options'
 import { IDataSyncHandler } from './data-sync-handler.interface'
 
 /**
@@ -13,6 +14,10 @@ import { IDataSyncHandler } from './data-sync-handler.interface'
  * })
  */
 export interface CommandModuleOptions {
+  /** Opt-in strict transport for explicit-version publishAsync/getItem only. */
+  safety?: StrictInlineOptions
+  /** Domain-owned export; never export the bare DynamoDbService token. */
+  strictDataStoreToken?: symbol
   /** DynamoDB table name for command storage */
   tableName: string
   /** If true, skips errors from previous command versions */

@@ -36,7 +36,11 @@ export class SessionService {
     this.sessionWritesEnabled = !Number.isNaN(ttlMinutes) && ttlMinutes > 0
     this.ttlSeconds = this.sessionWritesEnabled ? ttlMinutes * 60 : 0
 
-    if (this.sessionWritesEnabled) {
+    if (this.dynamoDbService.isStrictInline) {
+      this.logger.log(
+        this.sessionWritesEnabled ? 'session.enabled' : 'session.disabled',
+      )
+    } else if (this.sessionWritesEnabled) {
       this.logger.log(
         `Session table: ${this.sessionTableName}, RYW TTL: ${ttlMinutes}m`,
       )
@@ -79,7 +83,9 @@ export class SessionService {
   ): Promise<void> {
     if (!this.sessionWritesEnabled) {
       this.logger.debug(
-        'session put skipped: RYW_SESSION_TTL_MINUTES not enabled',
+        this.dynamoDbService.isStrictInline
+          ? 'session.put.skipped'
+          : 'session put skipped: RYW_SESSION_TTL_MINUTES not enabled',
       )
       return
     }
@@ -89,7 +95,11 @@ export class SessionService {
       version,
       ttl: this.calculateTtl(),
     }
-    this.logger.debug('session put::', item)
+    if (this.dynamoDbService.isStrictInline) {
+      this.logger.debug('session.put')
+    } else {
+      this.logger.debug('session put::', item)
+    }
     await this.dynamoDbService.putItem(this.sessionTableName, item)
   }
 
@@ -135,7 +145,9 @@ export class SessionService {
       await this.dynamoDbService.deleteItem(this.sessionTableName, key)
     } catch (error) {
       this.logger.warn(
-        `Failed to delete RYW session (non-fatal): ${error instanceof Error ? error.message : 'Unknown error'}`,
+        this.dynamoDbService.isStrictInline
+          ? 'session.delete.failed'
+          : `Failed to delete RYW session (non-fatal): ${error instanceof Error ? error.message : 'Unknown error'}`,
       )
     }
   }
