@@ -222,6 +222,8 @@ Visit our [documentation site](https://mbc-cqrs-serverless.mbc-net.com/) for:
 
 **Requirements:** Node.js 22.23.4 or later (all packages declare `engines.node: ">=22"` since v1.6.0; older Node.js lines do not receive the fix for CVE-2026-111497). See the [v1.6.0 migration guide](https://mbc-cqrs-serverless.mbc-net.com/docs/migration/v1.6.0) for the upgrade steps.
 
+**v1.8.1 security upgrade (2026-11-25):** Existing scaffolded projects must restrict their deployed Cognito app client to writing only `name`; upgrading npm packages alone does not fix the client. ECS deployments also need the task-role Cognito admin permissions. Review frontend attribute updates and audit user authorization attributes. See the [migration guide](packages/mcp-server/skills/mbc-migrate/SKILL.md#v180--v181-cli-app-client-write-attributes-security) for the required steps.
+
 ### Latest Stable Release
 ```bash
 npm install -g @mbc-cqrs-serverless/cli

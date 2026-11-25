@@ -1168,6 +1168,7 @@ Cognito records the caller's `sub` (in `additionalEventData`), not the username,
 
 | Core Version | CLI Version | NestJS | Node.js | TypeScript |
 |--------------|-------------|--------|---------|------------|
+| v1.8.1 | v1.8.1 | 10.x | 22.23.4+ | 5.x |
 | v1.8.0 | v1.8.0 | 10.x | 22.23.4+ | 5.x |
 | v1.7.0 | v1.7.0 | 10.x | 22.23.4+ | 5.x |
 | v1.6.0 | v1.6.0 | 10.x | 22.23.4+ | 5.x |
