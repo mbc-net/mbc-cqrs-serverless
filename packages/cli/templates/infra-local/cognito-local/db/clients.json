@@ -11,7 +11,8 @@
         "IdToken": "minutes",
         "RefreshToken": "days"
       },
-      "UserPoolId": "local_2G7noHgW"
+      "UserPoolId": "local_2G7noHgW",
+      "WriteAttributes": ["name"]
     }
   }
 }

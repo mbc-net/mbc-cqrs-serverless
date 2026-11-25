@@ -22,6 +22,20 @@ import { Config } from '../config/type'
 import { buildApp } from './build-app'
 import { DistributedMap } from './distributed-map'
 
+// User management runs server-side with these admin actions, whichever compute
+// (Lambda or ECS) serves the API.
+const COGNITO_ADMIN_ACTIONS = [
+  'cognito-idp:AdminGetUser',
+  'cognito-idp:AdminAddUserToGroup',
+  'cognito-idp:AdminCreateUser',
+  'cognito-idp:AdminDeleteUser',
+  'cognito-idp:AdminDisableUser',
+  'cognito-idp:AdminEnableUser',
+  'cognito-idp:AdminSetUserPassword',
+  'cognito-idp:AdminResetUserPassword',
+  'cognito-idp:AdminUpdateUserAttributes',
+]
+
 export interface InfraStackProps extends cdk.StackProps {
   config: Config
 }
@@ -543,6 +557,13 @@ export class InfraStack extends cdk.Stack {
           userPassword: true,
           userSrp: true,
         },
+        // Users may change only their own name: custom:roles / custom:tenant
+        // drive authorization and are updated server-side via
+        // AdminUpdateUserAttributes.
+        writeAttributes:
+          new cdk.aws_cognito.ClientAttributes().withStandardAttributes({
+            fullname: true,
+          }),
       },
     )
 
@@ -1222,18 +1243,7 @@ export class InfraStack extends cdk.Stack {
     }
 
     // add lambda role
-    userPool.grant(
-      lambdaApi,
-      'cognito-idp:AdminGetUser',
-      'cognito-idp:AdminAddUserToGroup',
-      'cognito-idp:AdminCreateUser',
-      'cognito-idp:AdminDeleteUser',
-      'cognito-idp:AdminDisableUser',
-      'cognito-idp:AdminEnableUser',
-      'cognito-idp:AdminSetUserPassword',
-      'cognito-idp:AdminResetUserPassword',
-      'cognito-idp:AdminUpdateUserAttributes',
-    )
+    userPool.grant(lambdaApi, ...COGNITO_ADMIN_ACTIONS)
     ddbBucket.grantReadWrite(lambdaApi)
     ddbBucket.grantRead(importCsvStateMachine)
     importCsvStateMachine.role?.attachInlinePolicy(
@@ -1358,6 +1368,7 @@ export class InfraStack extends cdk.Stack {
     )
 
     if (!!taskRole) {
+      userPool.grant(taskRole, ...COGNITO_ADMIN_ACTIONS)
       ddbBucket.grantReadWrite(taskRole)
       publicBucket.grantReadWrite(taskRole)
       mainSns.grantPublish(taskRole)
