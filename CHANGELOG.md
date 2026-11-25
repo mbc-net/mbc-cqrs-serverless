@@ -9,8 +9,9 @@ See [Conventional Commits](https://conventionalcommits.org) for commit guideline
 
 - **cli:** The scaffolded Cognito app client (`apigw-client` in `infra/libs/infra-stack.ts`) set
   no write attributes, so Cognito let every signed-in user call `UpdateUserAttributes` with their
-  own access token on every writable attribute, including `custom:roles` and `custom:tenant`. Any
-  user could grant themselves `system_admin` or move to another tenant. New projects now allow
+  own access token on every writable attribute, including `custom:roles`, `custom:tenant` and
+  `custom:groups`. Any user could grant themselves `system_admin`, join a privileged group or move
+  to another tenant. New projects now allow
   users to write only `name`; other attributes are updated server-side through
   `AdminUpdateUserAttributes`. The ECS task role now gets the same Cognito admin actions as the
   Lambda, so that path works in ECS mode too. **Every project scaffolded before this release is

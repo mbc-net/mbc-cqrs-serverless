@@ -49,7 +49,7 @@ This skill helps migrate MBC CQRS Serverless projects between versions.
 | v1.5.0 | v1.6.0 | **Medium** | **Node.js 22.23.4+ required** (Node2Shell, CVE-2026-111497): runtime, Lambda (`nodejs22.x`), Docker and CI; nodemailer 10 types (only if you import `nodemailer` directly) |
 | v1.6.0 | v1.7.0 | Low | Opt-in atomic command admission (`getCommandAdmissionConditions`, `CommandAdmissionRejectedException` / `CommandAdmissionContentionException`); unit-test mocks of `DynamoDbService` used with the real `CommandService` need `putItemWithConditions`; `dynamodb:ConditionCheckItem` only if you adopt the hook |
 | v1.7.0 | v1.8.0 | **Medium** | master only, behaviour changes for every app using master: setting/data codes and user/group ids reject `#` and `@` (400), rows stored with `@` in their key can no longer be updated, deleted or read by `getSetting`; master copy fixes; `POST /api/master-bulk` upserts settings before data; opt-in `controllerAuth`, `systemId` + `@MasterAccessResolver()` (RDS `system_id` column + handler change, `invokeContext` required), MySQL search (`databaseProvider`) |
-| v1.8.0 | v1.8.1 | **Medium** | **Security** (cli template): app client may write only `name` (users could rewrite `custom:roles`); ECS task role gets Cognito admin actions; existing projects must edit `infra-stack.ts` and audit `custom:roles` |
+| v1.8.0 | v1.8.1 | **Medium** | **Security** (cli template): app client may write only `name` (users could rewrite `custom:roles`); ECS task role gets Cognito admin actions; existing projects must edit `infra-stack.ts` and audit `custom:roles` / `custom:tenant` / `custom:groups` |
 
 ## Migration Guides
 
@@ -1086,7 +1086,7 @@ npm test                             # no 400s from codes or ids containing # or
 
 ### v1.8.0 → v1.8.1 (cli: app client write attributes, security)
 
-**Why:** the Cognito app client that `mbc new` scaffolded (`apigw-client` in `infra/libs/infra-stack.ts`) set no write attributes. Cognito then lets every signed-in user call `UpdateUserAttributes` with their own access token on every writable attribute, including `custom:roles` and `custom:tenant`. Any user could set `custom:roles` to `[{"tenant":"...","role":"system_admin"}]` or switch `custom:tenant`, and `RolesGuard` trusts the claim from their next token. **Every project scaffolded before v1.8.1 is affected, in Lambda and ECS mode.** Upgrading packages does not fix it: the client lives in your own infra code.
+**Why:** the Cognito app client that `mbc new` scaffolded (`apigw-client` in `infra/libs/infra-stack.ts`) set no write attributes. Cognito then lets every signed-in user call `UpdateUserAttributes` with their own access token on every writable attribute, including `custom:roles`, `custom:tenant` and `custom:groups`. Any user could set `custom:roles` to `[{"tenant":"...","role":"system_admin"}]`, add themselves to a privileged group through `custom:groups`, or switch `custom:tenant`, and `RolesGuard` trusts the claims from their next token. **Every project scaffolded before v1.8.1 is affected, in Lambda and ECS mode.** Upgrading packages does not fix it: the client lives in your own infra code.
 
 **Step 1 — Fix the stack (every project).** In `infra/libs/infra-stack.ts`, add `writeAttributes` to `apigw-client`:
 
@@ -1140,15 +1140,23 @@ Check `describe-user-pool-client` afterwards. The next CDK deploy puts the old c
 
 **Step 3 — Frontends.** A user's own `UpdateUserAttributes` call (Amplify `updateUserAttributes`) for any attribute other than `name` now fails with `NotAuthorizedException`. Move those edits to an API endpoint that checks the caller's permission and calls `AdminUpdateUserAttributes`. Reading attributes is unchanged.
 
-**Step 4 — Check whether the hole was used.** List who called it:
+**Step 4 — Check whether the hole was used.** Compare the authorization attributes of **every** user — `custom:roles`, `custom:tenant`, `custom:groups` (group-based roles) and any other attribute your application authorizes on — with your application's source of truth. Calls older than your CloudTrail retention leave no event, and an attacker may have added a non-admin role in another tenant rather than an admin role, so sweep all users:
 
 ```bash
-aws cloudtrail lookup-events \
-  --lookup-attributes AttributeKey=EventName,AttributeValue=UpdateUserAttributes \
-  --start-time "$(date -u -d '90 days ago' +%Y-%m-%dT%H:%M:%SZ)"
+aws cognito-idp list-users --region "$REGION" --user-pool-id "$POOL_ID" --output json \
+  | jq -r '.Users[] | (.Attributes | from_entries) as $a
+      | [.Username, $a["custom:tenant"], $a["custom:roles"], $a["custom:groups"]] | @tsv'
 ```
 
-CloudTrail Event history covers 90 days; use a trail or CloudTrail Lake for older events. Attribute values may be redacted in the event, so for each user found, run `aws cognito-idp admin-get-user` and compare `custom:roles` and `custom:tenant` with your application's source of truth. Also compare every user that holds an admin role (`aws cognito-idp list-users`), since calls older than your CloudTrail retention leave no event.
+To see who called the API recently, query CloudTrail **in the user pool's region** (Event history covers 90 days; use a trail or CloudTrail Lake for older events):
+
+```bash
+aws cloudtrail lookup-events --region "$REGION" \
+  --lookup-attributes AttributeKey=EventName,AttributeValue=UpdateUserAttributes \
+  --start-time "$START"   # ISO 8601, e.g. 2026-09-01T00:00:00Z
+```
+
+Cognito records the caller's `sub` (in `additionalEventData`), not the username, and may redact attribute values. Resolve each `sub` with `aws cognito-idp list-users --region "$REGION" --user-pool-id "$POOL_ID" --filter "sub = \"$SUB\""` and check that user's attributes. For every user whose attributes you correct, also run `aws cognito-idp admin-user-global-sign-out`: tokens they already hold keep the escalated claims until they expire.
 
 **Local development:** `infra-local/cognito-local/db/clients.json` now carries `"WriteAttributes": ["name"]` to mirror AWS, but cognito-local (3.23.x) does not enforce it. Local dev will not catch a frontend that still updates custom attributes itself — test that against a deployed pool.
 
