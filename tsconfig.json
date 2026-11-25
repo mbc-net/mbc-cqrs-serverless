@@ -22,6 +22,7 @@
     "noLib": false,
     "noUnusedLocals": false,
     "paths": {
+      "JSONStream": ["./node_modules/@types/jsonstream"],
       "@mbc-cqrs-serverless/*": ["./packages/*/"]
     }
   },

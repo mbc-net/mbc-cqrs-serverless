@@ -224,6 +224,8 @@ Visit our [documentation site](https://mbc-cqrs-serverless.mbc-net.com/) for:
 
 **v1.8.1 security upgrade (2026-11-25):** Existing scaffolded projects must restrict their deployed Cognito app client to writing only `name`; upgrading npm packages alone does not fix the client. ECS deployments also need the task-role Cognito admin permissions. Review frontend attribute updates and audit user authorization attributes. See the [migration guide](packages/mcp-server/skills/mbc-migrate/SKILL.md#v180--v181-cli-app-client-write-attributes-security) for the required steps.
 
+**v1.8.2 explicit tenant selection (opt-in):** Set `EXPLICIT_TENANT_SELECTION_CODES=common,*` to prioritize an authorized selected tenant over the JWT home tenant. Clients must omit `x-tenant-code` when no tenant is selected before the server enables this option. Applications without the option retain existing selection behavior. See the [configuration and authorization rules](packages/core/README.md#explicit-tenant-selection-opt-in).
+
 ### Latest Stable Release
 ```bash
 npm install -g @mbc-cqrs-serverless/cli

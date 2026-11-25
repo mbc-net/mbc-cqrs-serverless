@@ -3,6 +3,40 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.8.2](https://github.com/mbc-net/mbc-cqrs-serverless/releases/tag/v1.8.2) (2026-11-25)
+
+### Upgrade Notes
+
+- **core (opt-in):** `EXPLICIT_TENANT_SELECTION_CODES` defaults to empty, so applications
+  that do not enable it retain the existing JWT home-tenant selection. Before enabling it,
+  clients must omit `x-tenant-code` when no tenant is selected. Use `common` for a named
+  selection or `common,*` to allow authorized selection of other tenants as well.
+- A selected tenant requires direct membership or `system_admin` authority. Only the selected
+  tenant's direct roles and groups are used; `system_admin` authority is retained across scopes.
+  Named codes take precedence over `*`: an unauthorized named selection retains the legacy
+  home fallback, while an unauthorized wildcard selection resolves no tenant and is denied.
+  Missing or empty headers retain home selection, and a literal `*` header is rejected while
+  the opt-in is enabled. See [Explicit tenant selection](packages/core/README.md#explicit-tenant-selection-opt-in)
+  for the configuration and authorization rules.
+
+### Features
+
+- **core:** support explicit tenant selection consistently in `getUserContext()` and
+  `RolesGuard`, including direct membership, scoped/global `system_admin`, selected-tenant
+  role and group isolation, and normalized opt-in headers. Applications may now select an
+  authorized ordinary tenant even when the JWT home tenant differs.
+  ([#522](https://github.com/mbc-net/mbc-cqrs-serverless/pull/522))
+
+### Bug Fixes
+
+- **core:** reject unauthorized wildcard selections and no-home whitespace headers instead
+  of authorizing an unintended tenant. The opt-in does not change the defaults of
+  `COMMON_TENANT_CODES` or `CROSS_TENANT_ROLES`.
+- **cli/build:** await the generation runner, isolate its child-process tests, correct the
+  JSONStream type alias and picomatch lock entry, and exclude raw EJS assets from coverage
+  while retaining schematic implementation coverage.
+  ([#522](https://github.com/mbc-net/mbc-cqrs-serverless/pull/522))
+
 ## [1.8.1](https://github.com/mbc-net/mbc-cqrs-serverless/releases/tag/v1.8.1) (2026-11-25)
 
 ### Upgrade Notes

@@ -114,6 +114,8 @@
       "**/*.(t|j)s",
       "!**/dist/**",
       "!**/node_modules/**",
+      "!cli/schematics/lib/*/files/**",
+      "!cli/schematics/lib/*/units/**",
       "!**/*.d.ts"
     ],
     "coverageDirectory": "../coverage",
