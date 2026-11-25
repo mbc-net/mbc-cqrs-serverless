@@ -244,4 +244,142 @@ describe('explicit tenant selection opt-in', () => {
     expect(getUserContext(f.invoke).tenantCode).toBe('common')
     expect(await f.guard.canActivate(f.context)).toBe(true)
   })
+
+  describe('wildcard selection', () => {
+    beforeEach(() => {
+      process.env.EXPLICIT_TENANT_SELECTION_CODES = 'common,*'
+    })
+
+    it.each(['home', 'common', ''])(
+      'selects a directly joined ordinary tenant from home %j',
+      async (home) => {
+        const f = fixture(
+          [
+            { tenant: 'home', role: 'admin' },
+            { tenant: 'other', role: 'admin' },
+          ],
+          home,
+          ' OTHER ',
+        )
+        expect(getUserContext(f.invoke)).toMatchObject({
+          tenantCode: 'other',
+          tenantRole: 'admin',
+          tenantRoles: ['admin'],
+          tenantGroupIds: [],
+        })
+        expect(getUserContext(f.context)).toEqual(getUserContext(f.invoke))
+        expect(await f.guard.canActivate(f.context)).toBe(true)
+      },
+    )
+
+    it.each(['', 'home', 'common'])(
+      'rejects unauthorized ordinary selection without falling back to %j',
+      async (home) => {
+        const f = fixture([{ tenant: '', role: 'admin' }], home, 'other')
+        f.reflector.getAllAndOverride = jest.fn().mockReturnValue(undefined)
+        expect(getUserContext(f.invoke)).toMatchObject({
+          tenantCode: undefined,
+          tenantRole: '',
+          tenantRoles: [],
+          tenantGroupIds: [],
+        })
+        expect(await f.guard.canActivate(f.context)).toBe(false)
+        expect(f.resolveRoles).not.toHaveBeenCalled()
+      },
+    )
+
+    it('keeps named common fallback ahead of the wildcard', async () => {
+      const f = fixture([{ tenant: 'home', role: 'admin' }])
+      expect(getUserContext(f.invoke).tenantCode).toBe('home')
+      expect(await f.guard.canActivate(f.context)).toBe(true)
+    })
+
+    it.each(['', 'other'])(
+      'permits %j-scoped system_admin to select an ordinary tenant',
+      async (scope) => {
+        const f = fixture(
+          [{ tenant: scope, role: 'system_admin' }],
+          'home',
+          'target',
+        )
+        expect(getUserContext(f.invoke)).toMatchObject({
+          tenantCode: 'target',
+          tenantRole: 'system_admin',
+          tenantRoles: ['system_admin'],
+        })
+        expect(await f.guard.canActivate(f.context)).toBe(true)
+      },
+    )
+
+    it('uses only selected tenant roles and groups', async () => {
+      const f = fixture(
+        [
+          { tenant: '', role: 'admin' },
+          { tenant: 'common', role: 'admin' },
+          { tenant: 'home', role: 'user' },
+        ],
+        'common',
+        'home',
+      )
+      expect(getUserContext(f.invoke)).toMatchObject({
+        tenantCode: 'home',
+        tenantRole: 'user',
+        tenantRoles: ['user'],
+        tenantGroupIds: ['home-group'],
+      })
+      expect(await f.guard.canActivate(f.context)).toBe(false)
+      expect(f.resolveRoles).toHaveBeenCalledWith(
+        expect.objectContaining({
+          tenantCode: 'home',
+          groupIds: ['home-group'],
+        }),
+      )
+    })
+
+    it.each(['', '   ', undefined])(
+      'keeps home for absent or empty header %j',
+      (header) => {
+        const f = fixture([{ tenant: 'home', role: 'admin' }])
+        if (header === undefined) delete f.invoke.event.headers['x-tenant-code']
+        else f.invoke.event.headers['x-tenant-code'] = header
+        expect(getUserContext(f.invoke).tenantCode).toBe('home')
+      },
+    )
+
+    it.each(['', '   ', undefined])(
+      'rejects absent or empty header %j without a home even with global admin',
+      async (header) => {
+        const f = fixture([{ tenant: '', role: 'admin' }], '')
+        if (header === undefined) {
+          delete f.invoke.event.headers['x-tenant-code']
+        } else {
+          f.invoke.event.headers['x-tenant-code'] = header
+        }
+        // The HTTP and invoke paths share the same headers object.
+        f.reflector.getAllAndOverride = jest.fn().mockReturnValue(undefined)
+        expect(getUserContext(f.invoke).tenantCode).toBeUndefined()
+        expect(await f.guard.canActivate(f.context)).toBe(false)
+      },
+    )
+
+    it.each(['*', ' * '])(
+      'rejects literal wildcard header %j even for system_admin',
+      async (header) => {
+        const f = fixture(
+          [{ tenant: '', role: 'system_admin' }],
+          'home',
+          header,
+        )
+        expect(getUserContext(f.invoke).tenantCode).toBeUndefined()
+        expect(await f.guard.canActivate(f.context)).toBe(false)
+      },
+    )
+
+    it('requires membership when wildcard is configured without named common', async () => {
+      process.env.EXPLICIT_TENANT_SELECTION_CODES = '*'
+      const f = fixture([{ tenant: 'home', role: 'admin' }])
+      expect(getUserContext(f.invoke).tenantCode).toBeUndefined()
+      expect(await f.guard.canActivate(f.context)).toBe(false)
+    })
+  })
 })

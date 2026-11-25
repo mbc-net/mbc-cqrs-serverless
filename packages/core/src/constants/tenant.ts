@@ -39,6 +39,9 @@ export const DEFAULT_CROSS_TENANT_ROLES = (
 
 /**
  * Tenant codes that support authorized explicit header selection before JWT home.
+ * '*' opts in all other nonempty tenant codes, rejecting unauthorized selection.
+ * Named codes take precedence and retain the legacy unauthorized home fallback.
+ * The literal '*' header is never a tenant selection while this opt-in is enabled.
  * Read at request time so application bootstrap can configure the opt-in safely.
  */
 export function getExplicitTenantSelectionCodes(): string[] {

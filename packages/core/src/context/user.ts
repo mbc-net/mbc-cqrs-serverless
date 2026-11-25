@@ -94,8 +94,9 @@ function collectTenantRoles(
  *
  * Tenant code determination:
  * 1. An opted-in header with direct membership or system_admin selects that tenant.
- * 2. Otherwise use the JWT home tenant, falling back to legacy header selection.
- * An unauthorized opted-in header without a home tenant resolves no tenant.
+ * 2. Unauthorized named selections retain the JWT home fallback for old clients.
+ * 3. Unauthorized wildcard selections and literal '*' resolve no tenant.
+ * 4. Without an opted-in header, retain the legacy JWT home/header precedence.
  *
  * Explicit selection eligibility is validated here so guards and services agree.
  * RolesGuard validates legacy header access and route permissions.
@@ -116,8 +117,17 @@ export function getUserContext(ctx: IInvoke | ExecutionContext): UserContext {
   const rawHeader = (ctx?.event?.headers || {})[HEADER_TENANT_CODE]
   const headerTenantCode =
     typeof rawHeader === 'string' ? rawHeader.trim().toLowerCase() : undefined
-  const optedHeader =
-    getExplicitTenantSelectionCodes().includes(headerTenantCode)
+  const explicitCodes = getExplicitTenantSelectionCodes()
+  const invalidSelection = explicitCodes.length > 0 && headerTenantCode === '*'
+  // Named codes retain their compatibility fallback even alongside '*'.
+  const namedSelection =
+    !invalidSelection && explicitCodes.includes(headerTenantCode)
+  const wildcardSelection =
+    !invalidSelection &&
+    !namedSelection &&
+    !!headerTenantCode &&
+    explicitCodes.includes('*')
+  const optedHeader = namedSelection || wildcardSelection
   const isSystemAdmin = roles.some(({ role }) => role === ROLE_SYSTEM_ADMIN)
   const explicitSelection =
     optedHeader &&
@@ -128,24 +138,30 @@ export function getUserContext(ctx: IInvoke | ExecutionContext): UserContext {
           typeof role === 'string' &&
           role.length > 0,
       ))
-  // Preserve legacy precedence outside opted-in headers. Unauthorized selection
-  // falls back to home, never to public header access when there is no home.
-  const tenantCode = explicitSelection
-    ? headerTenantCode
-    : optedHeader
-      ? claims['custom:tenant']?.toLowerCase() || undefined
-      : (claims['custom:tenant'] || rawHeader)?.toLowerCase()
+  // Wildcard selection fails closed; a different home tenant must never become
+  // the silent target of an explicitly requested ordinary tenant operation.
+  const rejectedSelection =
+    invalidSelection || (wildcardSelection && !explicitSelection)
+  const tenantCode = rejectedSelection
+    ? undefined
+    : explicitSelection
+      ? headerTenantCode
+      : namedSelection || (explicitCodes.length > 0 && !headerTenantCode)
+        ? claims['custom:tenant']?.toLowerCase() || undefined
+        : (claims['custom:tenant'] || rawHeader)?.toLowerCase()
 
   const tenantGroupIds = parseTenantGroups(
     claims['custom:groups'],
     tenantCode,
     explicitSelection,
   )
-  const selectedRoles = explicitSelection
-    ? roles
-        .filter(({ tenant }) => tenant.trim() === tenantCode)
-        .map((role) => ({ ...role, tenant: role.tenant.trim() }))
-    : roles
+  const selectedRoles = rejectedSelection
+    ? []
+    : explicitSelection
+      ? roles
+          .filter(({ tenant }) => tenant.trim() === tenantCode)
+          .map((role) => ({ ...role, tenant: role.tenant.trim() }))
+      : roles
   const tenantRoles = collectTenantRoles(selectedRoles, tenantCode)
   if (
     explicitSelection &&

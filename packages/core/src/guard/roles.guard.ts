@@ -93,7 +93,12 @@ export class RolesGuard implements CanActivate {
   ): boolean {
     // getUserContext only resolves an opted-in header without a matching home
     // after validating direct membership or system_admin authority.
-    if (getExplicitTenantSelectionCodes().includes(userContext.tenantCode)) {
+    const explicitCodes = getExplicitTenantSelectionCodes()
+    if (
+      userContext.tenantCode !== '*' &&
+      (explicitCodes.includes(userContext.tenantCode) ||
+        explicitCodes.includes('*'))
+    ) {
       return true
     }
 

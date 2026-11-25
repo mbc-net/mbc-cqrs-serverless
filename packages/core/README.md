@@ -266,6 +266,11 @@ ignores empty entries, and matches tenant codes case-insensitively. The default
 is empty, so existing applications keep their tenant resolution behavior.
 For opted-in selection, header values and matching role/group tenant codes are
 also trimmed. Values outside the opt-in list retain legacy normalization.
+Add `*` to enable selection of all other nonempty tenant codes:
+
+```bash
+EXPLICIT_TENANT_SELECTION_CODES=common,*
+```
 
 For an opted-in header value, a nonempty direct `custom:roles` entry for that
 tenant, or `system_admin` in any tenant/global entry, selects the header tenant
@@ -280,10 +285,15 @@ For example, a home `admin` who is a `common` `user` remains a user when selecti
 `common`; a home `user` who is a `common` `admin` receives the common admin role.
 `RolesGuard` and services calling `getUserContext()` use the same selection.
 
-A caller without a qualifying membership keeps their home tenant, supporting
-older clients that always sent a default `common` header. Without a home tenant,
-an unauthorized opted-in header produces no resolved tenant and `RolesGuard`
-denies access, including routes without role metadata. Header values outside the
+A caller without a qualifying membership for a **named code** keeps their home
+tenant, supporting older clients that always sent a default `common` header.
+Named codes take precedence over `*`, regardless of configuration order.
+Without a home tenant, an unauthorized named header produces no resolved tenant.
+For a **wildcard-selected code**, an unauthorized request always produces no
+resolved tenant; it never silently falls back to the home tenant. `RolesGuard`
+denies unresolved access, including routes without role metadata. A literal `*`
+header is rejected while the opt-in is enabled, even for a system administrator.
+Missing or empty headers retain home selection. Header values outside the
 opt-in list keep the existing behavior. This setting is independent of
 `COMMON_TENANT_CODES` (legacy public header access) and `CROSS_TENANT_ROLES`;
 application-specific guards and package-specific policies still apply. In
@@ -298,7 +308,7 @@ an explicit choice, including when their home tenant differs.
 
 | Variable | Description | Default |
 |----------|-------------|---------|
-| `EXPLICIT_TENANT_SELECTION_CODES` | Tenant codes allowing authorized header selection before JWT home tenant | Empty (disabled) |
+| `EXPLICIT_TENANT_SELECTION_CODES` | Named tenant codes and optional `*` allowing authorized header selection before JWT home tenant | Empty (disabled) |
 | `DYNAMODB_ENDPOINT` | DynamoDB endpoint URL | AWS default |
 | `DYNAMODB_REGION` | DynamoDB region | AWS default |
 | `SFN_ENDPOINT` | Step Functions endpoint | AWS default |
