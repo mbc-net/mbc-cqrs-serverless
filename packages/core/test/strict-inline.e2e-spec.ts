@@ -86,6 +86,24 @@ describe('strict inline publication on real DynamoDB', () => {
       attributes,
     }
   }
+  function hookedAttributes(
+    kind: 'prototype' | 'nonenumerable',
+    value: string,
+    projection: { value: string },
+  ) {
+    if (kind === 'prototype') {
+      return new (class {
+        value = value
+        toJSON() {
+          return projection
+        }
+      })()
+    }
+    return Object.defineProperty({ value }, 'toJSON', {
+      enumerable: false,
+      value: () => projection,
+    })
+  }
   function commandPuts(): number {
     return requests.filter(
       ({ operation, input: request }) =>
@@ -99,7 +117,7 @@ describe('strict inline publication on real DynamoDB', () => {
   function transportFault() {
     return Object.assign(new Error(marker), { code: 'ECONNRESET' })
   }
-  async function readCommand(code: string, version = 1) {
+  async function readNativeCommand(code: string, version = 1) {
     const result = await native.send(
       new GetItemCommand({
         TableName: commandTable,
@@ -107,7 +125,11 @@ describe('strict inline publication on real DynamoDB', () => {
         ConsistentRead: true,
       }),
     )
-    return result.Item ? unmarshall(result.Item) : undefined
+    return result.Item
+  }
+  async function readCommand(code: string, version = 1) {
+    const item = await readNativeCommand(code, version)
+    return item ? unmarshall(item) : undefined
   }
   beforeAll(async () => {
     const home = process.env.STRICT_INLINE_DYNAMODB_HOME
@@ -425,4 +447,316 @@ describe('strict inline publication on real DynamoDB', () => {
       value: marker,
     })
   })
+  it.each(['prototype', 'nonenumerable'] as const)(
+    'rejects native oversized attributes despite a small %s toJSON projection',
+    async (kind) => {
+      const code = `oversized-hook-${kind}`
+      const attributes = hookedAttributes(kind, 'x'.repeat(150 * 1024), {
+        value: 'small-json-projection',
+      })
+      let writeRejected = false
+      try {
+        await commands.publishAsync(input(code, attributes), {
+          invokeContext: invoke,
+        })
+      } catch {
+        writeRejected = true
+      }
+      const saved = await readCommand(code)
+      let readRejected = false
+      if (saved) {
+        try {
+          await commands.getItem({ pk: `ASSET#${tenant}`, sk: `${code}@1` })
+        } catch {
+          readRejected = true
+        }
+      }
+      // Keep RED diagnostics numeric; do not dump the oversized payload.
+      expect({
+        writeRejected,
+        commandPuts: commandPuts(),
+        persistedAttributeBytes: saved
+          ? Buffer.byteLength(JSON.stringify(saved.attributes))
+          : 0,
+        readRejected,
+      }).toEqual({
+        writeRejected: true,
+        commandPuts: 0,
+        persistedAttributeBytes: 0,
+        readRejected: false,
+      })
+    },
+  )
+  it.each(['prototype', 'nonenumerable'] as const)(
+    'round-trips lawful native attributes despite a large %s toJSON projection',
+    async (kind) => {
+      const code = `small-hook-${kind}`
+      const attributes = hookedAttributes(kind, marker, {
+        value: 'x'.repeat(150 * 1024),
+      })
+      let writeSucceeded = false
+      try {
+        await commands.publishAsync(input(code, attributes), {
+          invokeContext: invoke,
+        })
+        writeSucceeded = true
+      } catch {
+        // The compact assertion below records failure without dumping data.
+      }
+      const saved = await readCommand(code)
+      const observed = saved
+        ? await commands.getItem({ pk: `ASSET#${tenant}`, sk: `${code}@1` })
+        : undefined
+      expect({
+        writeSucceeded,
+        commandPuts: commandPuts(),
+        nativeMatches: saved?.attributes?.value === marker,
+        readMatches: observed?.attributes?.value === marker,
+      }).toEqual({
+        writeSucceeded: true,
+        commandPuts: 1,
+        nativeMatches: true,
+        readMatches: true,
+      })
+    },
+  )
+  it('rejects oversized own __proto__ attributes from lawful JSON before command Put', async () => {
+    const code = 'oversized-proto-json'
+    const attributes = JSON.parse(
+      '{"__proto__":' + JSON.stringify({ value: 'x'.repeat(150 * 1024) }) + '}',
+    )
+    let writeRejected = false
+    try {
+      await commands.publishAsync(input(code, attributes), {
+        invokeContext: invoke,
+      })
+    } catch {
+      writeRejected = true
+    }
+    expect({
+      writeRejected,
+      commandPuts: commandPuts(),
+      commandExists: !!(await readNativeCommand(code)),
+    }).toEqual({
+      writeRejected: true,
+      commandPuts: 0,
+      commandExists: false,
+    })
+  })
+  it.each([
+    ['root', '{"__proto__":{"value":"small"}}'],
+    ['nested', '{"nested":{"__proto__":{"value":"small"}}}'],
+    ['list', '{"list":[{"__proto__":{"value":"small"}}]}'],
+  ])(
+    'rejects even small own __proto__ names in a %s before command Put',
+    async (kind, json) => {
+      const code = `small-proto-${kind}`
+      let writeRejected = false
+      try {
+        await commands.publishAsync(input(code, JSON.parse(json)), {
+          invokeContext: invoke,
+        })
+      } catch {
+        writeRejected = true
+      }
+      expect({
+        writeRejected,
+        commandPuts: commandPuts(),
+        commandExists: !!(await readNativeCommand(code)),
+      }).toEqual({
+        writeRejected: true,
+        commandPuts: 0,
+        commandExists: false,
+      })
+    },
+  )
+  it('round-trips ordinary toJSON, constructor and prototype map names', async () => {
+    const code = 'ordinary-special-names'
+    const attributes = JSON.parse(
+      '{"toJSON":{"value":"ordinary"},"constructor":{"value":"ordinary"},"prototype":[{"value":"ordinary"}]}',
+    )
+    await commands.publishAsync(input(code, attributes), {
+      invokeContext: invoke,
+    })
+    const saved = await readCommand(code)
+    const observed = await commands.getItem({
+      pk: `ASSET#${tenant}`,
+      sk: `${code}@1`,
+    })
+    expect(commandPuts()).toBe(1)
+    expect(saved?.attributes).toEqual(attributes)
+    expect(observed?.attributes).toEqual(attributes)
+  })
+  it('rejects excessive nested native string-set payload before command Put', async () => {
+    const code = 'oversized-nested-string-set'
+    let writeRejected = false
+    try {
+      await commands.publishAsync(
+        input(code, { nested: { items: new Set(['x'.repeat(150 * 1024)]) } }),
+        { invokeContext: invoke },
+      )
+    } catch {
+      writeRejected = true
+    }
+    const saved = await readCommand(code)
+    expect({
+      writeRejected,
+      commandPuts: commandPuts(),
+      persistedSetValueBytes: saved
+        ? [...saved.attributes.nested.items].reduce(
+            (bytes: number, value: string) => bytes + Buffer.byteLength(value),
+            0,
+          )
+        : 0,
+    }).toEqual({
+      writeRejected: true,
+      commandPuts: 0,
+      persistedSetValueBytes: 0,
+    })
+  })
+  it('round-trips lawful native string, number and binary sets with their types', async () => {
+    const code = 'lawful-native-sets'
+    const attributes = {
+      nested: {
+        strings: new Set(['alpha', 'beta']),
+        numbers: new Set([1, 2]),
+        binaries: new Set([Buffer.from('alpha'), Buffer.from('beta')]),
+      },
+    }
+    await commands.publishAsync(input(code, attributes), {
+      invokeContext: invoke,
+    })
+    const saved = await readCommand(code)
+    const observed = await commands.getItem({
+      pk: `ASSET#${tenant}`,
+      sk: `${code}@1`,
+    })
+    const setSnapshot = (value: any) => {
+      const { strings, numbers, binaries } = value.nested
+      return {
+        stringSet: strings instanceof Set,
+        numberSet: numbers instanceof Set,
+        binarySet: binaries instanceof Set,
+        binaryValues: [...binaries].every(
+          (entry) => entry instanceof Uint8Array,
+        ),
+        strings: [...strings].sort(),
+        numbers: [...numbers].sort((left, right) => left - right),
+        binaries: [...binaries]
+          .map((entry: Uint8Array) => Buffer.from(entry).toString('hex'))
+          .sort(),
+      }
+    }
+    const expected = {
+      stringSet: true,
+      numberSet: true,
+      binarySet: true,
+      binaryValues: true,
+      strings: ['alpha', 'beta'],
+      numbers: [1, 2],
+      binaries: ['616c706861', '62657461'],
+    }
+    expect(commandPuts()).toBe(1)
+    expect(setSnapshot(saved.attributes)).toEqual(expected)
+    expect(setSnapshot(observed.attributes)).toEqual(expected)
+  })
+  it.each([
+    ['BS', 20000],
+    ['B', 30000],
+    ['BS', 30000],
+  ] as const)(
+    'round-trips a %s payload of %i bytes using the same native binary budget',
+    async (kind, size) => {
+      const code = `binary-budget-${kind}-${size}`
+      const binary = Buffer.alloc(size, 120)
+      const payload = kind === 'BS' ? new Set([binary]) : binary
+      let writeSucceeded = false
+      let readSucceeded = false
+      let observed: any
+      try {
+        await commands.publishAsync(input(code, { nested: { payload } }), {
+          invokeContext: invoke,
+        })
+        writeSucceeded = true
+      } catch {
+        // Assert only counts and byte lengths below, never binary payloads.
+      }
+      const saved = await readCommand(code)
+      try {
+        observed = await commands.getItem({
+          pk: `ASSET#${tenant}`,
+          sk: `${code}@1`,
+        })
+        readSucceeded = !!observed
+      } catch {
+        // A write/read size mismatch must produce a compact failing assertion.
+      }
+      const binarySnapshot = (attributes: any) => {
+        const value = attributes?.nested?.payload
+        const entries =
+          kind === 'BS'
+            ? value instanceof Set
+              ? [...value]
+              : []
+            : value instanceof Uint8Array
+              ? [value]
+              : []
+        return {
+          correctType:
+            entries.length === 1 &&
+            entries.every((entry) => entry instanceof Uint8Array) &&
+            (kind !== 'BS' || value instanceof Set),
+          bytes: entries.reduce(
+            (total, entry: Uint8Array) => total + entry.byteLength,
+            0,
+          ),
+          contentMatches:
+            entries.length === 1 &&
+            entries.every((entry: Uint8Array) =>
+              entry.every((byte) => byte === 120),
+            ),
+        }
+      }
+      expect({
+        writeSucceeded,
+        readSucceeded,
+        commandPuts: commandPuts(),
+        native: binarySnapshot(saved?.attributes),
+        strictRead: binarySnapshot(observed?.attributes),
+      }).toEqual({
+        writeSucceeded: true,
+        readSucceeded: true,
+        commandPuts: 1,
+        native: { correctType: true, bytes: size, contentMatches: true },
+        strictRead: { correctType: true, bytes: size, contentMatches: true },
+      })
+    },
+  )
+  it.each(['B', 'BS'] as const)(
+    'rejects a %s payload above the base64 attribute budget before command Put',
+    async (kind) => {
+      const code = `oversized-base64-${kind}`
+      const binary = Buffer.alloc(100000, 120)
+      let writeRejected = false
+      try {
+        await commands.publishAsync(
+          input(code, {
+            nested: { payload: kind === 'BS' ? new Set([binary]) : binary },
+          }),
+          { invokeContext: invoke },
+        )
+      } catch {
+        writeRejected = true
+      }
+      expect({
+        writeRejected,
+        commandPuts: commandPuts(),
+        commandExists: !!(await readNativeCommand(code)),
+      }).toEqual({
+        writeRejected: true,
+        commandPuts: 0,
+        commandExists: false,
+      })
+    },
+  )
 })

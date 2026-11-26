@@ -56,6 +56,16 @@ Attributes must remain inline: at most 128 KiB of UTF-8 JSON, and at most
 300 KiB for a marshalled Put or observed item. The strict limits are independent of the legacy
 `ATTRIBUTE_LIMIT_SIZE` setting. Oversized writes and S3 attribute references
 are rejected before calling S3; there is no alternate storage path.
+Attribute JSON size is measured from the unmarshalled native representation on
+both writes and reads. A caller's `toJSON` projection does not determine the
+budget; the content that is actually persisted does.
+Set members are measured as JSON arrays so their contents also consume the budget.
+Binary values and binary-set members are measured as base64 strings, including
+the native-item budget. Buffer and Uint8Array responses therefore use identical
+budgets without changing the stored or returned binary types.
+The map key `__proto__` is unsupported at every depth in the strict profile:
+the SDK does not preserve it reliably. Writes and native reads reject it before
+I/O or decoding instead of silently dropping its value. Legacy behavior is unchanged.
 Datastore query/update expression payloads have request budgets; a partial
 update does not atomically prove a size limit for the complete resulting item.
 The supported command operations use complete Put/read payloads, not partial

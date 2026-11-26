@@ -92,6 +92,81 @@ describe('strict inline DynamoDB boundary', () => {
     }
   })
 
+  it.each(['small', 'x'.repeat(150 * 1024)])(
+    'rejects an unsupported prototype map key before writing',
+    async (value) => {
+      const service = create()
+      const send = jest
+        .spyOn(service.client, 'send')
+        .mockResolvedValue({} as never)
+      const attributes = JSON.parse(
+        JSON.stringify({ value }).replace('"value"', '"__proto__"'),
+      )
+      let rejected = false
+      try {
+        await service.putItem('table', { pk: 'p', sk: 's', attributes })
+      } catch (error) {
+        rejected =
+          error instanceof Error &&
+          error.message === 'Strict inline data operation rejected'
+      }
+      expect(rejected).toBe(true)
+      expect(send).not.toHaveBeenCalled()
+    },
+  )
+
+  it('rejects a native prototype map before unmarshalling it', async () => {
+    const service = create()
+    const attributes = JSON.parse('{"__proto__":{"M":{"value":{"S":"small"}}}}')
+    jest.spyOn(service.client, 'send').mockResolvedValue({
+      Item: { pk: { S: 'p' }, sk: { S: 's' }, attributes: { M: attributes } },
+    } as never)
+    await expect(
+      service.getItem('table', { pk: 'p', sk: 's' }),
+    ).rejects.toThrow('Strict inline data operation rejected')
+  })
+
+  it('counts every string set member against the attribute budget', async () => {
+    const service = create()
+    const send = jest
+      .spyOn(service.client, 'send')
+      .mockResolvedValue({} as never)
+    let rejected = false
+    try {
+      await service.putItem('table', {
+        pk: 'p',
+        sk: 's',
+        attributes: { values: new Set(['x'.repeat(150 * 1024)]) },
+      })
+    } catch (error) {
+      rejected =
+        error instanceof Error &&
+        error.message === 'Strict inline data operation rejected'
+    }
+    expect(rejected).toBe(true)
+    expect(send).not.toHaveBeenCalled()
+  })
+
+  it('rejects oversized native string sets on reads', async () => {
+    const service = create()
+    jest.spyOn(service.client, 'send').mockResolvedValue({
+      Item: {
+        pk: { S: 'p' },
+        sk: { S: 's' },
+        attributes: { M: { values: { SS: ['x'.repeat(150 * 1024)] } } },
+      },
+    } as never)
+    let rejected = false
+    try {
+      await service.getItem('table', { pk: 'p', sk: 's' })
+    } catch (error) {
+      rejected =
+        error instanceof Error &&
+        error.message === 'Strict inline data operation rejected'
+    }
+    expect(rejected).toBe(true)
+  })
+
   it.each([
     ['put', (d: DynamoDbService) => d.putItem('table', { pk: 'p', sk: 's' })],
     [

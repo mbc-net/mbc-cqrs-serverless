@@ -472,9 +472,9 @@ export class DynamoDbService {
     if (!item) {
       return item
     }
-    const obj = unmarshall(item)
+    if (this.strictInline) this.assertStrictInlineObject(item)
 
-    if (this.strictInline) this.assertStrictInlineObject(obj, item)
+    const obj = unmarshall(item)
 
     if (isS3AttributeKey(obj.attributes)) {
       const { key } = parseS3AttributeKey(obj.attributes)
@@ -509,7 +509,7 @@ export class DynamoDbService {
         convertClassInstanceToMap: true,
         removeUndefinedValues: true,
       })
-      this.assertStrictInlineObject(data, native)
+      this.assertStrictInlineObject(native)
       return native
     }
 
@@ -535,9 +535,16 @@ export class DynamoDbService {
   }
 
   private assertStrictInlineObject(
-    data: Record<string, any>,
     native: Record<string, AttributeValue>,
   ): void {
+    this.assertStrictInlineMapKeys(native)
+    // Check the persisted representation, never a caller's JSON projection.
+    const data = Object.fromEntries(
+      Object.entries(native).map(([key, value]) => [
+        key,
+        this.strictInlineBudgetValue(value, false),
+      ]),
+    )
     for (const key of ['attributes', ':attributes']) {
       const attributes = data[key]
       if (attributes === undefined) continue
@@ -550,10 +557,100 @@ export class DynamoDbService {
       }
     }
     if (
-      Buffer.byteLength(JSON.stringify(native), 'utf8') >
-      STRICT_INLINE_ITEM_BYTES
+      Buffer.byteLength(
+        JSON.stringify(
+          Object.fromEntries(
+            Object.entries(native).map(([key, value]) => [
+              key,
+              this.strictInlineBudgetValue(value, true),
+            ]),
+          ),
+        ),
+        'utf8',
+      ) > STRICT_INLINE_ITEM_BYTES
     ) {
       throw new StrictInlineDataRejected()
+    }
+  }
+
+  /** Stable JSON budgets independent of SDK Buffer/Uint8Array and Set shapes. */
+  private strictInlineBudgetValue(
+    value: AttributeValue,
+    wire: boolean,
+  ): unknown {
+    if (value.M) {
+      const map = Object.fromEntries(
+        Object.entries(value.M).map(([key, entry]) => [
+          key,
+          this.strictInlineBudgetValue(entry, wire),
+        ]),
+      )
+      return wire ? { M: map } : map
+    }
+    if (value.L) {
+      const list = Array.from(value.L, (entry) =>
+        this.strictInlineBudgetValue(entry, wire),
+      )
+      return wire ? { L: list } : list
+    }
+    if (value.B !== undefined) {
+      const binary = this.strictInlineBinaryBudget(value.B)
+      return wire ? { B: binary } : binary
+    }
+    if (value.BS) {
+      const binaries = Array.from(value.BS, (entry) =>
+        this.strictInlineBinaryBudget(entry),
+      )
+      return wire ? { BS: binaries } : binaries
+    }
+    if (value.SS) {
+      const strings = Array.from(value.SS)
+      return wire ? { SS: strings } : strings
+    }
+    if (value.NS) {
+      return wire
+        ? { NS: Array.from(value.NS) }
+        : Array.from(unmarshall({ value }).value as Set<unknown>)
+    }
+    return wire ? { ...value } : unmarshall({ value }).value
+  }
+
+  private strictInlineBinaryBudget(value: Uint8Array): string {
+    // Use intrinsic accessors so a caller serializer cannot change byte counts.
+    const prototype =
+      value instanceof DataView
+        ? DataView.prototype
+        : Object.getPrototypeOf(Uint8Array.prototype)
+    const buffer = Object.getOwnPropertyDescriptor(
+      prototype,
+      'buffer',
+    ).get.call(value)
+    const offset = Object.getOwnPropertyDescriptor(
+      prototype,
+      'byteOffset',
+    ).get.call(value)
+    const length = Object.getOwnPropertyDescriptor(
+      prototype,
+      'byteLength',
+    ).get.call(value)
+    return Buffer.from(buffer, offset, length).toString('base64')
+  }
+
+  private assertStrictInlineMapKeys(map: Record<string, AttributeValue>): void {
+    const prototype = Object.getPrototypeOf(map)
+    // The SDK map converters cannot preserve this key. Reject before I/O or
+    // decoding rather than silently losing it or omitting it from the budget.
+    if (
+      Object.prototype.hasOwnProperty.call(map, '__proto__') ||
+      (prototype !== Object.prototype && prototype !== null)
+    ) {
+      throw new StrictInlineDataRejected()
+    }
+    for (const value of Object.values(map)) {
+      if (value.M) this.assertStrictInlineMapKeys(value.M)
+      if (value.L) {
+        for (const entry of value.L) this.assertStrictInlineMapKeys({ entry })
+      }
     }
   }
 
