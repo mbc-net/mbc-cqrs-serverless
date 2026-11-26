@@ -13,7 +13,14 @@ import {
   UpdateItemCommand,
 } from '@aws-sdk/client-dynamodb'
 import { marshall, unmarshall } from '@aws-sdk/util-dynamodb'
-import { Injectable, Logger } from '@nestjs/common'
+import {
+  BadRequestException,
+  Inject,
+  Injectable,
+  Logger,
+  Optional,
+  ServiceUnavailableException,
+} from '@nestjs/common'
 import { ConfigService } from '@nestjs/config'
 import { ulid } from 'ulid'
 
@@ -38,22 +45,78 @@ import {
   DetailKey,
 } from '../interfaces'
 import { S3Service } from './s3.service'
+import {
+  DYNAMODB_SAFETY_OPTIONS,
+  STRICT_INLINE_ATTRIBUTE_BYTES,
+  STRICT_INLINE_ITEM_BYTES,
+  StrictInlineOptions,
+  validateStrictInlineOptions,
+} from './strict-inline-options'
 
 const CLIENT_INSTANCE = Symbol()
+
+class StrictInlineDataRejected extends BadRequestException {
+  constructor() {
+    super('Strict inline data operation rejected')
+  }
+}
+
+/** Keep native payloads and error causes inside the opted-in datastore. */
+function StrictInlineBoundary(): MethodDecorator {
+  return (_target, _property, descriptor: PropertyDescriptor) => {
+    const original = descriptor.value
+    descriptor.value = async function (
+      this: DynamoDbService,
+      ...args: unknown[]
+    ) {
+      try {
+        return await original.apply(this, args)
+      } catch (error) {
+        if (!this.isStrictInline) throw error
+        if (error instanceof StrictInlineDataRejected) {
+          throw new StrictInlineDataRejected()
+        }
+        if (error instanceof ConditionalCheckFailedException) {
+          throw new ConditionalCheckFailedException({
+            message: 'The conditional request failed',
+            $metadata: {},
+          })
+        }
+        if (error instanceof CommandAdmissionRejectedException) {
+          throw new CommandAdmissionRejectedException()
+        }
+        if (error instanceof CommandAdmissionContentionException) {
+          throw new CommandAdmissionContentionException()
+        }
+        throw new ServiceUnavailableException(
+          'Strict inline data operation unavailable',
+        )
+      }
+    }
+  }
+}
 
 @Injectable()
 export class DynamoDbService {
   private readonly logger = new Logger(DynamoDbService.name)
   private readonly [CLIENT_INSTANCE]: DynamoDBClient
   private readonly tablePrefix: string
+  private readonly strictInline: boolean
+  private destroyed = false
 
   constructor(
     private readonly config: ConfigService,
     private readonly s3Service: S3Service,
+    @Optional()
+    @Inject(DYNAMODB_SAFETY_OPTIONS)
+    safety?: StrictInlineOptions,
   ) {
+    validateStrictInlineOptions(safety)
+    this.strictInline = safety !== undefined
     this[CLIENT_INSTANCE] = new DynamoDBClient({
       endpoint: config.get<string>('DYNAMODB_ENDPOINT'),
       region: config.get<string>('DYNAMODB_REGION'),
+      ...(this.strictInline ? { maxAttempts: 1 } : {}),
     })
     this.tablePrefix = `${config.get<string>('NODE_ENV')}-${config.get<string>(
       'APP_NAME',
@@ -64,6 +127,18 @@ export class DynamoDbService {
     return this[CLIENT_INSTANCE]
   }
 
+  get isStrictInline(): boolean {
+    return this.strictInline
+  }
+
+  onModuleDestroy(): void {
+    if (this.strictInline && !this.destroyed) {
+      this.destroyed = true
+      this[CLIENT_INSTANCE].destroy()
+    }
+  }
+
+  @StrictInlineBoundary()
   async putItem(
     tableName: string,
     item: Record<string, any>,
@@ -84,6 +159,7 @@ export class DynamoDbService {
   }
 
   /** Persist an item atomically with server-owned, read-only admission checks. */
+  @StrictInlineBoundary()
   async putItemWithConditions(
     tableName: string,
     item: Record<string, any>,
@@ -131,6 +207,23 @@ export class DynamoDbService {
       return error
     }
     const codes = (error.CancellationReasons ?? []).map(({ Code }) => Code)
+    if (this.strictInline) {
+      if (codes.slice(1).includes('ConditionalCheckFailed')) {
+        return new CommandAdmissionRejectedException()
+      }
+      if (codes[0] === 'ConditionalCheckFailed') {
+        return new ConditionalCheckFailedException({
+          message: 'The conditional request failed',
+          $metadata: {},
+        })
+      }
+      if (codes.includes('TransactionConflict')) {
+        return new CommandAdmissionContentionException()
+      }
+      return new ServiceUnavailableException(
+        'Strict inline data operation unavailable',
+      )
+    }
     const context = `pk=${item.pk} sk=${item.sk} reasons=${codes.join(',')}`
     if (codes.slice(1).includes('ConditionalCheckFailed')) {
       this.logger.warn(`Command admission rejected: ${context}`)
@@ -233,6 +326,7 @@ export class DynamoDbService {
     }
   }
 
+  @StrictInlineBoundary()
   async updateItem(
     tableName: string,
     key: DetailKey,
@@ -253,9 +347,11 @@ export class DynamoDbService {
       expressionAttributeNames,
       expressionAttributeValues,
     } = this.buildUpdateExpression(item)
-    this.logger.debug(updateExpression)
-    this.logger.debug(expressionAttributeNames)
-    this.logger.debug(expressionAttributeValues)
+    if (!this.strictInline) {
+      this.logger.debug(updateExpression)
+      this.logger.debug(expressionAttributeNames)
+      this.logger.debug(expressionAttributeValues)
+    }
     const res = await this.client.send(
       new UpdateItemCommand({
         TableName: tableName,
@@ -274,6 +370,7 @@ export class DynamoDbService {
     return this.ddbItemToObj(res.Attributes)
   }
 
+  @StrictInlineBoundary()
   async getItem(
     tableName: string,
     key: DetailKey,
@@ -290,6 +387,7 @@ export class DynamoDbService {
     return await this.ddbItemToObj(Item)
   }
 
+  @StrictInlineBoundary()
   async deleteItem(tableName: string, key: DetailKey, conditions?: string) {
     const res = await this.client.send(
       new DeleteItemCommand({
@@ -301,6 +399,7 @@ export class DynamoDbService {
     return res
   }
 
+  @StrictInlineBoundary()
   async listItemsByPk(
     tableName: string,
     pk: string,
@@ -344,6 +443,7 @@ export class DynamoDbService {
     }
   }
 
+  @StrictInlineBoundary()
   async listAllItems(tableName: string, startKey?: DetailKey, limit = 10) {
     const res = await this.client.send(
       new ScanCommand({
@@ -372,6 +472,8 @@ export class DynamoDbService {
     if (!item) {
       return item
     }
+    if (this.strictInline) this.assertStrictInlineObject(item)
+
     const obj = unmarshall(item)
 
     if (isS3AttributeKey(obj.attributes)) {
@@ -402,6 +504,15 @@ export class DynamoDbService {
       }
     }
 
+    if (this.strictInline) {
+      const native = marshall(data, {
+        convertClassInstanceToMap: true,
+        removeUndefinedValues: true,
+      })
+      this.assertStrictInlineObject(native)
+      return native
+    }
+
     if (data.attributes || data[':attributes']) {
       const attributes = data.attributes || data[':attributes']
       // check size of attributes
@@ -421,6 +532,126 @@ export class DynamoDbService {
       convertClassInstanceToMap: true,
       removeUndefinedValues: true,
     })
+  }
+
+  private assertStrictInlineObject(
+    native: Record<string, AttributeValue>,
+  ): void {
+    this.assertStrictInlineMapKeys(native)
+    // Check the persisted representation, never a caller's JSON projection.
+    const data = Object.fromEntries(
+      Object.entries(native).map(([key, value]) => [
+        key,
+        this.strictInlineBudgetValue(value, false),
+      ]),
+    )
+    for (const key of ['attributes', ':attributes']) {
+      const attributes = data[key]
+      if (attributes === undefined) continue
+      if (
+        isS3AttributeKey(attributes) ||
+        Buffer.byteLength(JSON.stringify(attributes), 'utf8') >
+          STRICT_INLINE_ATTRIBUTE_BYTES
+      ) {
+        throw new StrictInlineDataRejected()
+      }
+    }
+    if (
+      Buffer.byteLength(
+        JSON.stringify(
+          Object.fromEntries(
+            Object.entries(native).map(([key, value]) => [
+              key,
+              this.strictInlineBudgetValue(value, true),
+            ]),
+          ),
+        ),
+        'utf8',
+      ) > STRICT_INLINE_ITEM_BYTES
+    ) {
+      throw new StrictInlineDataRejected()
+    }
+  }
+
+  /** Stable JSON budgets independent of SDK Buffer/Uint8Array and Set shapes. */
+  private strictInlineBudgetValue(
+    value: AttributeValue,
+    wire: boolean,
+  ): unknown {
+    if (value.M) {
+      const map = Object.fromEntries(
+        Object.entries(value.M).map(([key, entry]) => [
+          key,
+          this.strictInlineBudgetValue(entry, wire),
+        ]),
+      )
+      return wire ? { M: map } : map
+    }
+    if (value.L) {
+      const list = Array.from(value.L, (entry) =>
+        this.strictInlineBudgetValue(entry, wire),
+      )
+      return wire ? { L: list } : list
+    }
+    if (value.B !== undefined) {
+      const binary = this.strictInlineBinaryBudget(value.B)
+      return wire ? { B: binary } : binary
+    }
+    if (value.BS) {
+      const binaries = Array.from(value.BS, (entry) =>
+        this.strictInlineBinaryBudget(entry),
+      )
+      return wire ? { BS: binaries } : binaries
+    }
+    if (value.SS) {
+      const strings = Array.from(value.SS)
+      return wire ? { SS: strings } : strings
+    }
+    if (value.NS) {
+      return wire
+        ? { NS: Array.from(value.NS) }
+        : Array.from(unmarshall({ value }).value as Set<unknown>)
+    }
+    return wire ? { ...value } : unmarshall({ value }).value
+  }
+
+  private strictInlineBinaryBudget(value: Uint8Array): string {
+    // Use intrinsic accessors so a caller serializer cannot change byte counts.
+    const prototype =
+      value instanceof DataView
+        ? DataView.prototype
+        : Object.getPrototypeOf(Uint8Array.prototype)
+    const buffer = Object.getOwnPropertyDescriptor(
+      prototype,
+      'buffer',
+    ).get.call(value)
+    const offset = Object.getOwnPropertyDescriptor(
+      prototype,
+      'byteOffset',
+    ).get.call(value)
+    const length = Object.getOwnPropertyDescriptor(
+      prototype,
+      'byteLength',
+    ).get.call(value)
+    return Buffer.from(buffer, offset, length).toString('base64')
+  }
+
+  private assertStrictInlineMapKeys(map: Record<string, AttributeValue>): void {
+    const prototype = Object.getPrototypeOf(map)
+    // The SDK map converters cannot preserve this key. Reject before I/O or
+    // decoding rather than silently losing it or omitting it from the budget.
+    if (
+      Object.prototype.hasOwnProperty.call(map, '__proto__') ||
+      (prototype !== Object.prototype && prototype !== null)
+    ) {
+      throw new StrictInlineDataRejected()
+    }
+    for (const value of Object.values(map)) {
+      if (value.M) this.assertStrictInlineMapKeys(value.M)
+      if (value.L) {
+        for (const entry of value.L) this.assertStrictInlineMapKeys({ entry })
+      }
+    }
   }
 
   private toDdbKey(key: DetailKey) {
